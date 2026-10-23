@@ -154,12 +154,12 @@ test("chữ viết hoa bằng CSS toàn app: chỉ còn chỗ nhận diện cố
   expect(CLEANED.filter((f) => /tracking-wider|tracking-widest/.test(read(`components/${f}.tsx`)))).toEqual([]);
 });
 
-test("Dashboard: mốc \"Số đủ tới\" nói MỘT chỗ (bỏ viên ở đầu trang lặp đúng dải/dòng ngay dưới)", () => {
-  // Agency (22/10): dòng trạng thái dưới thanh chọn kỳ — hai tab không lặp lại.
-  expect(read("components/AgencyDashboard.tsx").match(/Số đủ tới/g)).toHaveLength(1);
-  for (const f of ["PlatformTab", "BrandTab", "brandBelow", "opsBlocks"]) expect(read(`components/dashboard/period/${f}.tsx`), f).not.toMatch(/Số đủ tới/);
+test("Dashboard: mốc \"Dữ liệu đầy đủ đến\" nói MỘT chỗ (bỏ viên ở đầu trang lặp đúng dải/dòng ngay dưới)", () => {
+  // Agency (22/10): dòng trạng thái dưới thanh chọn kỳ — các tab không lặp lại. 24/10: tab Tổng quan account có dòng riêng (mọi sàn).
+  expect(read("components/AgencyDashboard.tsx").match(/Dữ liệu đầy đủ đến/g)).toHaveLength(2);
+  for (const f of ["PlatformTab", "BrandTab", "brandBelow", "opsBlocks", "OverviewTab"]) expect(read(`components/dashboard/period/${f}.tsx`), f).not.toMatch(/Dữ liệu đầy đủ đến|Số đủ tới/);
   // Workspace brand (ops) = chính tab Brand (23/10) — không có dòng riêng.
-  expect(read("components/brand-workspace/BrandDashboard.tsx")).not.toMatch(/Số đủ tới/);
+  expect(read("components/brand-workspace/BrandDashboard.tsx")).not.toMatch(/Dữ liệu đầy đủ đến|Số đủ tới/);
 });
 
 test("Report Tháng: khung ngoài không viền, ô số trong Panel không khung, khối gập không bọc hộp", () => {

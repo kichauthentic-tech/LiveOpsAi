@@ -2127,8 +2127,10 @@ export default function App() {
 
                 {activeTab === "agency_overview" && (
                   <AgencyDashboard
-                    key={agencyPlatformState}
                     platform={agencyPlatformState}
+                    platforms={agencyPlatforms}
+                    allBrands={brands.filter((b) => agencyPlatforms.some((p) => brandsOn(p).includes(b)))}
+                    onPickPlatform={pickAgencyScope}
                     today={todayVn()}
                     brands={agencyBrands}
                     brandChannels={channels}

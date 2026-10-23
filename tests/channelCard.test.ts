@@ -143,7 +143,7 @@ describe("agencyTodos — chỉ việc từ dự báo (23/10)", () => {
       base({ key: "b", name: "VERA", landing: { key: "safe", pHit: 0.9 } }),
       base({ key: "c", name: "JOCKEY Shopee", state: "off", landing: null, forecast: null, target: null })
     ];
-    expect(agencyTodos(cards)).toEqual([{ tone: "bad", text: "Báo sớm brand: 1 kênh dự kiến hụt target" }]);
+    expect(agencyTodos(cards)).toEqual([{ tone: "bad", text: "Báo sớm brand: 1 kênh dự báo hụt target" }]);
     expect(agencyTodos([cards[1]])).toEqual([]);
   });
 });

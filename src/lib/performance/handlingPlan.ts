@@ -114,7 +114,7 @@ export function handlingPlan(x: PlanInput): HandlingPlan {
   const el = dayElasticity(x.sessions, o.through, x.camp);
   const marginalDaily = o.rates ? o.rates.daily * el.value : null;
   const marginalCamp = o.rates ? o.rates.camp * el.value : null;
-  const elNote = el.reliable ? `co giãn ${el.value.toLocaleString("vi-VN", { maximumFractionDigits: 2 })} từ ${el.days} ngày thường` : "chưa đủ ngày thường để đo co giãn nên tính tối thiểu";
+  const elNote = el.reliable ? `hệ số co giãn ${el.value.toLocaleString("vi-VN", { maximumFractionDigits: 2 })} từ ${el.days} ngày Daily` : "chưa đủ ngày Daily để đo hệ số co giãn nên tính mức tối thiểu";
   const gap = o.target && o.projectionMethod !== "none" ? o.target.total - o.projected : null;
   const mode: PlanMode = landing.key === "no_target" ? "no_target" : landing.key === "no_forecast" ? "no_forecast" : landing.key;
   const levers: Lever[] = [];
@@ -133,11 +133,11 @@ export function handlingPlan(x: PlanInput): HandlingPlan {
     levers.push({
       id: "data_missing",
       tone: "fix",
-      title: `Cập nhật số của ${missingPast.length} ca đã chạy`,
-      detail: `Đang tạm tính ${g > 0 ? `khoảng ${fmtVndShort(g)} ` : ""}theo dự báo từng ca. Up file giao ca / đối soát để thay bằng số thật — dự phóng và run-rate sẽ chính xác hơn.`,
+      title: `Cập nhật số liệu ${missingPast.length} ca đã live`,
+      detail: `Đang tạm tính ${g > 0 ? `khoảng ${fmtVndShort(g)} ` : ""}theo dự báo từng ca. Cập nhật file giao ca / đối soát để thay bằng số thật — dự báo và Run-rate sẽ chính xác hơn.`,
       gmv: g > 0 ? g : null,
       hours: round1(missingPast.reduce((a, p) => a + p.hours, 0)),
-      basis: "Ca đã quá ngày mà chưa có số (monthOutlook.pending, loại ca)."
+      basis: "Ca đã qua ngày live mà chưa có số liệu."
     });
   }
 
@@ -149,7 +149,7 @@ export function handlingPlan(x: PlanInput): HandlingPlan {
       id: "open_slots",
       tone: "fix",
       title: `Lấp ${open.length} ca còn mở chưa có người`,
-      detail: `${h1(open.reduce((a, p) => a + p.hours, 0))} giờ đang nằm trong dự phóng. Không ai nhận thì dự phóng mất khoảng ${fmtVndShort(g)} GMV.`,
+      detail: `${h1(open.reduce((a, p) => a + p.hours, 0))} giờ đang nằm trong dự báo. Không ai nhận thì dự báo mất khoảng ${fmtVndShort(g)} GMV.`,
       gmv: g,
       hours: round1(open.reduce((a, p) => a + p.hours, 0)),
       basis: "Ca mở trong lịch × dự báo từng ca (engine target v3: hình dạng tháng × mức đã cập nhật bằng số trong tháng; kênh chưa đủ lịch sử: GMV/giờ 28 ngày)."
@@ -207,10 +207,10 @@ export function handlingPlan(x: PlanInput): HandlingPlan {
       id: "add_hours",
       tone: "grow",
       title: `Mốc ${cpLabel}: thêm khoảng ${Math.ceil(hrs)} giờ live (+${Math.round(checkpoint.pct * 100)}% giờ còn lại, ≈ ${Math.ceil(hrs / slotHours)} ca ${slotHours}h)`,
-      detail: `${checkpoint.capped ? `Để chạm target cần +${Math.round(checkpoint.needPct * 100)}% giờ — vượt trần +${Math.round((x.checkpointCap ?? 0.3) * 100)}%, nên thêm tới trần VÀ báo brand sớm khả năng hụt (làm đủ trần thì dự phóng ≈ ${fmtVndShort(checkpoint.projectedAfter)}). ` : `Làm đủ thì dự phóng ≈ ${fmtVndShort(checkpoint.projectedAfter)} (chạm target). `}${bestBlock ? `Ưu tiên khung ${SLOT_BLOCK_LABEL[bestBlock.block].toLowerCase()} — chỉ số ${bestBlock.idx.toLocaleString("vi-VN", { maximumFractionDigits: 2 })} so với ngày thường (qua backtest).` : "Chưa đủ dữ liệu để chỉ khung giờ nào tốt hơn."}`,
+      detail: `${checkpoint.capped ? `Để đạt target cần thêm +${Math.round(checkpoint.needPct * 100)}% giờ — vượt giới hạn +${Math.round((x.checkpointCap ?? 0.3) * 100)}%, nên thêm tối đa +${Math.round((x.checkpointCap ?? 0.3) * 100)}% và báo brand sớm khả năng hụt (thêm đủ thì dự báo ≈ ${fmtVndShort(checkpoint.projectedAfter)}). ` : `Thêm đủ thì dự báo ≈ ${fmtVndShort(checkpoint.projectedAfter)} (đạt target). `}${bestBlock ? `Ưu tiên khung ${SLOT_BLOCK_LABEL[bestBlock.block].toLowerCase()} — chỉ số ${bestBlock.idx.toLocaleString("vi-VN", { maximumFractionDigits: 2 })} so với ngày Daily (đã kiểm chứng trên các tháng trước).` : "Chưa đủ dữ liệu để chỉ ra khung giờ tốt hơn."}`,
       gmv: checkpoint.projectedAfter - o.projected,
       hours: Math.ceil(hrs),
-      basis: `Thiếu ${fmtVndShort(gap)} trên dự phóng ${fmtVndShort(futureForecast)} của ${h1(remainingHours)}h còn lại; giờ cần = ((còn lại + thiếu) ÷ còn lại)^(1 ÷ co giãn) − 1; ${elNote}. Ba mốc điều chỉnh mỗi tháng: sau đợt D-Day, sau Mid-Month, ngày 20.`
+      basis: `Thiếu ${fmtVndShort(gap)} trên dự báo ${fmtVndShort(futureForecast)} của ${h1(remainingHours)}h còn lại; giờ cần = ((còn lại + thiếu) ÷ còn lại)^(1 ÷ hệ số co giãn) − 1; ${elNote}. Ba mốc điều chỉnh mỗi tháng: sau đợt D-Day, sau Mid-Month, ngày 20.`
     });
   }
   // 6. GMV/giờ cần trên giờ còn lại.
@@ -222,10 +222,10 @@ export function handlingPlan(x: PlanInput): HandlingPlan {
       id: "rate_needed",
       tone: "info",
       title: `Nếu giữ nguyên lịch: cần GMV/giờ cao hơn ${Math.round(up * 100)}%`,
-      detail: up > 0.25 ? "Tăng cỡ này bằng kịch bản/ưu đãi khó đạt một mình — nên kèm thêm giờ hoặc báo brand sớm về khả năng hụt." : "Tăng trong tầm với bằng ưu đãi và kịch bản chốt ở các ca còn lại.",
+      detail: up > 0.25 ? "Mức tăng này khó đạt chỉ bằng kịch bản/ưu đãi — nên kèm thêm giờ hoặc báo brand sớm khả năng hụt." : "Tăng trong tầm với bằng ưu đãi và kịch bản chốt ở các ca còn lại.",
       gmv: null,
       hours: null,
-      basis: `Cần ${fmtVndShort(needRate)}/giờ trên ${h1(remainingHours)}h còn lại, đang chiếu ${fmtVndShort(blendedRate)}/giờ.`
+      basis: `Cần ${fmtVndShort(needRate)}/giờ trên ${h1(remainingHours)}h còn lại, dự báo ${fmtVndShort(blendedRate)}/giờ.`
     });
   }
 
@@ -240,28 +240,28 @@ export function handlingPlan(x: PlanInput): HandlingPlan {
         detail: `${bestBlock ? `Khung ${SLOT_BLOCK_LABEL[bestBlock.block].toLowerCase()} đang tốt nhất (chỉ số ${bestBlock.idx.toLocaleString("vi-VN", { maximumFractionDigits: 2 })}). ` : ""}Chi phí và lãi của giờ thêm sẽ tính được khi đã nhập commission và rate.`,
         gmv: per,
         hours: slotHours,
-        basis: `GMV/giờ ngày thường 28 ngày × co giãn; ${elNote}.`
+        basis: `GMV/giờ ngày Daily 28 ngày × hệ số co giãn; ${elNote}.`
       });
       if (landing.ratio != null && landing.ratio >= 1.15) {
         levers.push({
           id: "raise_target",
           tone: "info",
-          title: `Dự phóng vượt target ${Math.round((landing.ratio - 1) * 100)}% — cân nhắc đề xuất brand nâng target`,
+          title: `Dự báo vượt target ${Math.round((landing.ratio - 1) * 100)}% — cân nhắc đề xuất brand nâng target`,
           detail: "Nâng target giữa tháng giúp run-rate phản ánh đúng mục tiêu và mở cửa thêm ngân sách giờ live.",
           gmv: null,
           hours: null,
-          basis: "Dự phóng ÷ target; dải tin cậy nằm trên target."
+          basis: "Dự báo ÷ target; vùng tin cậy nằm trên target."
         });
       }
     } else {
       levers.push({
         id: "keep_pace",
         tone: "info",
-        title: "Giữ nhịp, chưa cần thêm giờ — nhưng chưa chắc",
-        detail: "Dự phóng chạm target nhưng dải tin cậy vẫn chạm dưới target. Lấp hết ca mở và cập nhật số ca đã chạy trước khi nghĩ tới mở rộng.",
+        title: "Giữ tiến độ hiện tại, chưa cần thêm giờ — nhưng chưa chắc chắn",
+        detail: "Dự báo đạt target nhưng vùng tin cậy vẫn xuống dưới target. Lấp hết ca mở và cập nhật số liệu ca đã live trước khi cân nhắc mở rộng.",
         gmv: null,
         hours: null,
-        basis: "Khả năng đạt target dưới 80%."
+        basis: "Xác suất đạt target dưới 80%."
       });
     }
   }

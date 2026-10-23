@@ -11,8 +11,19 @@
 
 ---
 
-## 1. Giai đoạn hiện tại (cập nhật 2026-10-23)
+## 1. Giai đoạn hiện tại (cập nhật 2026-10-24)
 
+- **24/10: DASHBOARD "TỔNG QUAN ACCOUNT" + CHUẨN HOÁ TỪ NGỮ (đã commit, chưa push, không migration)** — user duyệt demo
+  https://claude.ai/artifact/AQtXSSHpTxFgbNC8tYTFCH ("áp dụng vào code app cùng lúc build"). Tab đầu mới **Tổng quan account** (`period/OverviewTab.tsx`,
+  logic `lib/performance/accountOverview.ts`: `accountRow`/`sortAccounts`/`platformPace`/`accountActions`/`landingText`, test `tests/accountOverview.test.ts`):
+  mọi kênh brand × sàn của MỌI sàn, một dòng, xếp theo rủi ro; tổng riêng từng sàn; không theo thanh Sàn/bộ chọn kỳ. Không công thức mới — đọc thẻ kênh
+  (`useChannelCards` nạp MỘT lần cho mọi sàn, tab theo sàn lọc lại; `AgencyDashboard` nhận `platforms`/`allBrands`/`onPickPlatform`, bỏ `key` theo sàn).
+  Toàn sàn: bỏ hàng ô vận hành (một dòng), bỏ thẻ run-rate từng brand (gỡ `runrate/AccountCard`, `PctBar`, `runRateVerdict`), một số "ca chưa có số liệu",
+  cột "T10 dự báo"; Host/Cặp/Khung giờ/Độ dài ca chuyển sang cuối **Hiệu Suất Host** (`period/TeamBlocks.tsx`, mờ chỉ số host < 8 ca, cặp < 4 ca).
+  Bộ từ ngữ (§5.5): `LANDING_LABEL` = Đạt target / Sát target / Rủi ro / Hụt target, "xác suất đạt", "dự báo" (bỏ dự phóng/dự kiến), Target luỹ kế,
+  "Dữ liệu đầy đủ đến", "ca chưa có số liệu", Phân rã GMV/giờ · ngày Daily (`WAVE_NAME.daily` = "Daily"), Đầu mối xử lý (`LEVER_OWNER`), Lên live trễ,
+  Nhân sự live; bỏ chữ kỹ thuật lộ ra (Engine, monthOutlook.pending, Sa bàn, trần). Chưa đổi: Report Tháng (phiên song song đang sửa), cổng brand/bản tin,
+  các màn khác ngoài Dashboard + Hiệu Suất Host. Verify + số đo: lịch sử `## Dashboard Tổng quan account (2026-10-24)`.
 - **24/10: REPORT THÁNG GỬI BRAND 10 TRANG (BUILT, đã commit, chưa push, không migration)** — user duyệt demo CROCS T9 rồi "triển khai đi". `MonthlyReportTabs`
   (TikTok) 7 phần → 10 trang (§4 mục 4); trang mới: bảng điểm, bảng nhiệt loại ngày × yếu tố, Quảng cáo riêng, Hủy/hoàn & NMV, Affiliate, lịch creator tháng
   sau, Key Metrics 5 tab × 3 tháng. Logic `lib/report/brandReport.ts` (test `tests/brandReport.test.ts`), UI `report/BrandPages.tsx`. Sửa lỗi nhóm đối chứng
@@ -30,27 +41,8 @@
   — xấp xỉ (user chấp nhận), chỉ sàn có `shop_analytics` trong `profileOf().dataRawTypes` (Shopee luôn ước tính). Kế hoạch + câu chốt: `docs/ACCOUNTING_MODULE_PLAN.md`.
   Đo app thật T10: 0/237 ca đủ dữ liệu (rate host/trợ chưa nhập, % commission chưa đặt, % hoàn dự kiến 0, không brand nào có hợp đồng "hiệu lực") — tab nói đúng vậy, số
   chỉ hiện khi nhập xong. **Còn mở:** K2 (bản chụp "Chốt tháng": báo lệch hay khoá — chờ user), role kế toán riêng, kiểm cột Hoàn tiền tính theo ngày đặt hay ngày hoàn.
-- **23/10: DASHBOARD LÀM LẠI THEO DEMO "SO CÙNG KỲ" (BUILT, chưa commit, không migration)** — user duyệt demo 22/10 rồi "bắt đầu build vào app".
-  Dashboard agency = `AgencyDashboard.tsx`: MỘT sàn (thanh Sàn, `TAB_CHANNEL_SCOPE.agency_overview = "one"`), thanh trên = 2 tab **Toàn sàn | Brand** +
-  kỳ (Tháng này · 7 ngày; 23/10 tối bỏ Tháng trước · Tự chọn) + "So với" + Tải Excel + dòng "Đang xem … · Số đủ tới · N ca chờ số". Số so kỳ: `lib/performance/periodCompare.ts`
-  (`resolvePeriod`, `aggregate`, `indexBy`/`channelGph`, `hostRows`/`coRows`); 4 nút của tab Brand: `lib/performance/brandLens.ts` (`weekRows`/`waveRows` +
-  dòng "Cả tháng tới nay", `lensScope`). UI ở `components/dashboard/period/` (`PlatformTab`, `BrandTab`, `brandBelow`, `opsBlocks`, `useBrandFiles`, `ui`).
-  Toàn sàn: 2 hàng ô (vận hành, rồi GMV · run-rate theo kế hoạch · dự kiến cuối tháng · GMV/giờ · Orders·CVR · AOV), thẻ run-rate từng brand + dòng so cùng
-  kỳ (kỳ khác: thẻ so cùng kỳ), GMV luỹ kế, việc cần làm, so theo loại ngày, Vận hành (trễ, độ dài ca, lãi gộp/giờ CEO-admin, lưới khung giờ, host), GMV và
-  GMV/giờ theo tháng. Brand: đồng hồ RUN-RATE + 2 ô (% Target tháng, Dự kiến cuối tháng) + 4 ô; 4 nút; Key Metrics theo nút; Shop/SKU/Ads/Khuyến mãi (file
-  theo tháng) chỉ ở nút Tháng; Đội live (Host GMV | Trợ live giờ) + Khung giờ ở nút Tháng và Đợt (lọc ca của đợt); Ngày/Ca thu một dòng. Viên nhãn nói rõ
-  ("Khó đạt · khả năng chạm target 29%", "Sẽ hụt · dự kiến thiếu ~34% target"). Gỡ: tab Theo kỳ/Sức khoẻ (`CeoBrief.tsx`, `dashboard/Health`,
-  `AgencyHealth`, `FinanceSection`, `model`), `AgencyRunRate.tsx`, component `AccountDetail` (giữ `RunRateLenses` cho Chi tiết kênh), `periodFor`,
-  `combineOutlooks`, `likeForLikeMany`, `dataDiscipline`. Verify: tsc 0, vitest 973/973 (cả CI env), audit:dead sạch, build OK, lint chỉ còn 1 lỗi
-  `Date.now` ở `SessionWindow.tsx` của phiên song song "Layout cải thiện giao diện" (sửa 00:35–00:37 23/10, không đụng file Dashboard). App thật: số đo +
-  cách kiểm ở lịch sử `## Dashboard so cùng kỳ (2026-10-23)`. **Gộp Chi tiết kênh (user "gộp hẳn", 23/10):** Dashboard trong workspace brand
-  (ops) = `BrandDashboard.tsx` → `AgencyDashboard lockBrandId` (chỉ tab Brand, không hàng chọn brand); role brand vẫn `BrandPortal`. Chuyển vào tab Brand (nút
-  Tháng, tháng đang chạy): giờ cam kết (dòng ở đầu), bản tin (`BulletinComposer` một hàng), "Dự báo cuối tháng qua từng ngày" (sổ 0163, `ledger` từ
-  `useChannelCards`), "Vì sao và nên làm gì" (`period/brandExtras.tsx`: cây GMV/giờ + nhóm đối chứng shop, Phương án `ChannelPlan`, Đề xuất tối ưu). Bỏ (trùng
-  màn khác): thẻ kênh cỡ lớn `ChannelCardView` (giữ `CardPill`), GMV/giờ theo tuần (`weeklySeries`), Soát kế hoạch tháng sau (`planCheck` — Kế Hoạch Tháng
-  đã có dự báo engine v3 so target), Host so mặt bằng (thay bằng bảng Host chỉ số kênh), dòng % live trong Total GMV (ô % LIVE GMV ở Shop). Thêm theo
-  demo: "Cặp host + trợ live" (`pairRows`, Toàn sàn), bảng Affiliate (`fetchAffiliateActuals`, mục Quảng cáo). Commit + push 23/10 (trừ 6 file giao ca
-  của phiên song song + `.claude/launch.json`).
+- **23/10: Dashboard "so cùng kỳ"** (2 tab + chọn kỳ + so cùng kỳ, gộp Chi tiết kênh vào tab Brand, `lib/performance/periodCompare.ts`/`brandLens.ts`,
+  UI `components/dashboard/period/`) — đã push b7d8315; 24/10 thêm tab Tổng quan account (mục trên). Nguyên văn: lịch sử `## §1 mục 23/10 Dashboard so cùng kỳ (chuyển khỏi WORKSPACE 24/10)`.
 - **21–22/10 (thay bởi mục trên):** "một thẻ kênh" (`buildChannelCard` + `useChannelCards`, `0179` ĐÃ CHẠY, cổng brand `BrandPortal` + bản tin) và module
   Run-rate gộp vào Dashboard — nguyên văn: lịch sử `## §1 mục 21–22/10 Dashboard (chuyển khỏi WORKSPACE 23/10)`.
 
@@ -348,7 +340,11 @@
 **Thẻ kênh (21/10):** kết quả tháng của một kênh (tới nay, dự báo cuối tháng, nhãn, nguyên nhân, GMV/giờ cần, xu hướng 5 tháng, dự báo đứng yên
 từ ngày nào) CHỈ dựng ở `buildChannelCard` (lib/performance/channelCard.ts), nạp qua `useChannelCards`; Chi tiết kênh vẽ bằng `ChannelCardView`, Dashboard (tab Toàn sàn) vẽ thẻ run-rate (`runrate/AccountCard` với `vm.card`). Component
 không tự gọi `landingOf`/`monthOutlook`/`buildChannelRoom`/`pHitOf` ngoài danh sách trong `tests/channelCard.test.ts`. Thang nhãn duy nhất =
-`LANDING_LABEL` (Chắc đạt / Có thể đạt / Khó đạt / Sẽ hụt), luôn kèm % và nói % gì (23/10: "khả năng chạm target X%", "Sẽ hụt · dự kiến thiếu ~X% target").
+`LANDING_LABEL` (24/10: Đạt target / Sát target / Rủi ro / Hụt target), luôn kèm % và nói % gì — một câu duy nhất `accountOverview.landingText`
+("Rủi ro · xác suất đạt 23%", "Hụt target · dự báo thiếu ~34%"). **Từ ngữ Dashboard (user duyệt 24/10):** dự báo (không dự phóng/dự kiến), xác suất đạt
+(không khả năng chạm), Target luỹ kế, Dữ liệu đầy đủ đến / dữ liệu đến, ca chưa có số liệu, ca đã live, Phân rã GMV/giờ · ngày Daily, Yếu tố giảm mạnh
+nhất / Đầu mối xử lý, vượt giới hạn +30%, hiển thị mờ, Nhân sự live, Lên live trễ; không để tên biến/module nội bộ lọt ra chữ hiển thị.
+**Tổng quan account (24/10):** dòng = `accountRow(thẻ kênh)`; không tự tính dự báo/giờ bù — "Bù được" = `plan.checkpoint` chưa kẹp, "Không bù kịp" = kẹp +30%.
 **So cùng kỳ (23/10):** kỳ + kỳ so sánh chỉ qua `resolvePeriod`; cộng số một khoảng qua `aggregate` (assertOnePlatform); chỉ số so với chính kênh qua
 `indexBy`/`channelGph` (KHÔNG chia trung bình sàn); host = `hostRows` (chỉ ca làm host, chia phần khi đổi host), trợ live = `coRows` (chỉ ca + giờ, giờ
 đổi để xám); dưới `WEAK_SESSIONS` (5) ca một bên ⇒ mũi tên xám; lệch giờ lên sóng > `LATE_MAX_MIN` (180) không vào % trễ. Bảng tuần/đợt của tab Brand
@@ -463,6 +459,8 @@ target khung camp ở Nhập Ads bỏ 06/10 — tháng không có kế hoạch c
 
 | Mục trong file lịch sử | Tóm tắt |
 |---|---|
+| `## Dashboard Tổng quan account (2026-10-24)` | tab mới mọi account, nguồn số từ thẻ kênh, bộ từ ngữ cũ → mới, chuyển 4 khối sang Hiệu Suất Host, số đo app thật, cách verify |
+| `## §1 mục 23/10 Dashboard so cùng kỳ (chuyển khỏi WORKSPACE 24/10)` | nguyên văn §1: Dashboard 2 tab so cùng kỳ, gộp Chi tiết kênh, bỏ/thêm khối theo demo |
 | `## Report Tháng 10 trang (2026-10-24)` | cấu trúc 10 trang, lỗi đối chứng (−38%/−51% → −15%/−36%), ngưỡng dao động, bộ từ brand, cách verify, việc còn mở |
 | `## §1 mục 17–19/10 (chuyển khỏi WORKSPACE 24/10)` | nguyên văn §1: bố cục 18–19/10 (3 đợt, số trước/sau) + audit toàn app 17/10 (0178, cách verify) |
 | `## Audit trùng màn (2026-10-23)` | đếm cửa trùng (chốt người 6, mở ca 5, tải người 4, host 6, việc cần làm 5, cam kết 4), quyết định user, 3 sửa đợt 3 + cách verify, việc còn mở |

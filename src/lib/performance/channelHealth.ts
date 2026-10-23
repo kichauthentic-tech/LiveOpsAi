@@ -215,13 +215,13 @@ export function gmvTree(metrics: PlatformMetricSet, l: LikeForLike): GmvTree | n
 
 /** Người giữ đòn bẩy của từng nhánh — để dòng nguyên nhân nói "ai làm gì", không chỉ "số nào giảm". */
 export const LEVER_OWNER: Record<string, string> = {
-  [METRIC.viewsPerHour]: "lưu lượng: Ads (LIVE GMV Max), video kéo vào live, giờ phát",
-  [METRIC.viewersPerHour]: "lưu lượng: Ads, video kéo vào live, giờ phát",
-  [METRIC.liveCtr]: "host: thứ tự ghim, kịch bản mở đầu",
-  [METRIC.ctor]: "host + brand: giá, voucher, tồn kho SKU ghim",
-  [METRIC.aov]: "brand: combo, quà tặng",
-  [METRIC.atcRate]: "host + brand: xu/voucher live, deal giờ vàng",
-  [METRIC.gmvPerAtc]: "brand: combo, giá trị giỏ"
+  [METRIC.viewsPerHour]: "traffic — Ads (LIVE GMV Max), video dẫn traffic vào live, khung giờ live",
+  [METRIC.viewersPerHour]: "traffic — Ads, video dẫn traffic vào live, khung giờ live",
+  [METRIC.liveCtr]: "host — thứ tự ghim sản phẩm, kịch bản mở đầu",
+  [METRIC.ctor]: "host và brand — giá, voucher, tồn kho SKU ghim",
+  [METRIC.aov]: "brand — combo, quà tặng kèm",
+  [METRIC.atcRate]: "host và brand — xu/voucher live, deal giờ vàng",
+  [METRIC.gmvPerAtc]: "brand — combo, giá trị giỏ hàng"
 };
 
 // ---------------------------------------------------------------------------
@@ -338,7 +338,7 @@ export interface ChannelVerdict {
   runRate: number | null;
 }
 
-export const WAVE_NAME: Record<CampDayBucket, string> = { dday: "D-Day", midmonth: "Mid-Month", payday: "Pay Day", daily: "Ngày thường" };
+export const WAVE_NAME: Record<CampDayBucket, string> = { dday: "D-Day", midmonth: "Mid-Month", payday: "Pay Day", daily: "Daily" };
 
 export function channelVerdict(x: {
   outlook: MonthOutlook;
@@ -357,7 +357,7 @@ export function channelVerdict(x: {
   // 10/10 cả 4 kênh TikTok đều có 1–4 ca chờ số (1–4% dự phóng), để lên đầu là che mất VERA −47% GMV/giờ.
   const missingForecast = o.pending.filter((p) => p.kind === "session" && p.date < x.today).reduce((a, p) => a + p.forecast, 0);
   const dataCause: Cause | null =
-    c.missingSessions > 0 ? { key: "data", tone: "warn", text: `${c.missingSessions} ca đã chạy chưa có số${c.oldestMissing ? ` (từ ${dm(c.oldestMissing)})` : ""} — dự phóng đang tạm tính${missingForecast > 0 ? ` ~${fmtVndShort(missingForecast)}` : ""} cho phần này` } : null;
+    c.missingSessions > 0 ? { key: "data", tone: "warn", text: `${c.missingSessions} ca đã live chưa có số liệu${c.oldestMissing ? ` (từ ${dm(c.oldestMissing)})` : ""} — dự báo đang tạm tính${missingForecast > 0 ? ` ~${fmtVndShort(missingForecast)}` : ""} cho phần này` } : null;
   const dataMaterial = !!dataCause && o.projected > 0 && missingForecast >= MATERIAL_PENDING_SHARE * o.projected;
   if (dataCause && dataMaterial) causes.push(dataCause);
   if (f && f.ratio != null && f.ratio > TARGET_HIGH_RATIO)
@@ -365,13 +365,13 @@ export function channelVerdict(x: {
   if (f && f.trailing == null && o.target)
     causes.push({ key: "new_channel", tone: "info", text: "Kênh mới, chưa đủ 28 ngày lịch sử để kiểm target" });
   if (t && t.gmvPerHour.change != null && t.gmvPerHour.change <= -PRODUCTIVITY_SHIFT)
-    causes.push({ key: "productivity_down", tone: hurting ? "bad" : "warn", text: `GMV/giờ ngày thường ${signedPct(t.gmvPerHour.change)} so cùng loại ngày tháng trước${t.worst ? `; giảm nhiều nhất ${t.worst.label} ${signedPct(t.worst.change)} (${LEVER_OWNER[t.worst.label] ?? "xem cây GMV"})` : ""}` });
+    causes.push({ key: "productivity_down", tone: hurting ? "bad" : "warn", text: `GMV/giờ ngày Daily ${signedPct(t.gmvPerHour.change)} so cùng loại ngày tháng trước${t.worst ? `; giảm mạnh nhất ${t.worst.label} ${signedPct(t.worst.change)} (${LEVER_OWNER[t.worst.label] ?? "xem cây GMV"})` : ""}` });
   if (w && w.ratio != null && w.ratio < THIN_WAVE_RATIO)
     causes.push({ key: "thin_wave", tone: "warn", text: `${WAVE_NAME[w.bucket]} ${dm(w.days[0])}–${dm(w.days[w.days.length - 1])} mới xếp ${Math.round(w.scheduledHours)} giờ, mọi khi ~${Math.round(w.usualHours!)} giờ` });
   if (o.remainingDays > 0 && o.actual > 0 && !o.pending.some((p) => p.date >= x.today))
     causes.push({ key: "no_schedule", tone: "bad", text: `Chưa có ca nào trong lịch cho ${o.remainingDays} ngày còn lại` });
   if (t && t.gmvPerHour.change != null && t.gmvPerHour.change >= PRODUCTIVITY_SHIFT)
-    causes.push({ key: "productivity_up", tone: "good", text: `GMV/giờ ngày thường ${signedPct(t.gmvPerHour.change)} so cùng loại ngày tháng trước` });
+    causes.push({ key: "productivity_up", tone: "good", text: `GMV/giờ ngày Daily ${signedPct(t.gmvPerHour.change)} so cùng loại ngày tháng trước` });
   if (f && f.ratio != null && f.ratio < TARGET_EASY_RATIO)
     causes.push({ key: "target_easy", tone: "good", text: `Target vừa sức: cần ${times(f.ratio)} GMV/giờ lịch sử` });
 

@@ -1,8 +1,8 @@
 import type { LiveSession } from "../../types";
 import { eachDay, isoWeekStart } from "../dateUtils";
 import type { CampDayBucket } from "../campaignDays";
-import { monthEndOf, RUN_RATE_BAD, RUN_RATE_WARN } from "./ceoBrief";
-import { runRateTone, WAVE_NAME, type RunRateTone } from "./channelHealth";
+import { monthEndOf } from "./ceoBrief";
+import { WAVE_NAME } from "./channelHealth";
 import { noDataSplit, runRateLive, type PlanRunRate, type PlanSlotState } from "./planRunRate";
 import { dataSourceTier } from "../dataSource";
 
@@ -317,24 +317,6 @@ function tailOf(rr: PlanRunRate, asOf: string | null, completeThrough: string | 
 }
 
 // ---------------------------------------------------------------------------
-// Nhãn kết luận — cùng ngưỡng 85% / 95% với mọi màn (RUN_RATE_BAD / RUN_RATE_WARN)
-// ---------------------------------------------------------------------------
-
-export interface RunRateVerdict {
-  tone: RunRateTone;
-  label: string;
-}
-
-export function runRateVerdict(v: number | null): RunRateVerdict {
-  const tone = runRateTone(v);
-  if (v == null) return { tone, label: "Chưa có số" };
-  if (v >= 1.05) return { tone, label: "Vượt tiến độ" };
-  if (v >= RUN_RATE_WARN) return { tone, label: "Đúng tiến độ" };
-  if (v >= RUN_RATE_BAD) return { tone, label: "Hơi chậm" };
-  return { tone, label: "Chậm tiến độ" };
-}
-
-// ---------------------------------------------------------------------------
 // Tài khoản đưa vào file Excel
 // ---------------------------------------------------------------------------
 
@@ -375,13 +357,13 @@ export function runRateExportSheets(accounts: ExportAccount[]): { name: string; 
     return {
       "Tài khoản": a.name,
       "Sàn": a.platform,
-      "Số tới ngày": r?.asOf ?? "",
+      "Dữ liệu đến ngày": r?.asOf ?? "",
       "Target tháng": round(r?.total.target ?? null),
       "Kỳ vọng tới ngày": round(r?.total.targetToDate ?? null),
       "Thực đạt": round(r?.total.actual ?? a.actualOnly ?? null),
       "Run-rate (%)": pctNum(r?.total.runRate ?? null),
       "% target tháng": pctNum(r?.total.pctTarget ?? null),
-      "Dự kiến cuối tháng": round(a.forecast ?? null),
+      "Dự báo cuối tháng": round(a.forecast ?? null),
       "Cần mỗi ngày còn lại": round(r?.total.needPerRemainingDay ?? null),
       "Ghi chú": r ? a.landing ?? "" : a.missing === "no_plan" ? "Chưa chốt Kế Hoạch Tháng" : "Tháng này chưa có số"
     };

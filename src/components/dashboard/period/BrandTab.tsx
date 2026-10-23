@@ -12,6 +12,7 @@ import type { ReportPlatform } from "../../../lib/reportPlatform";
 import { BrandLogo } from "../../ui/BrandLogo";
 import { PlatformChip } from "../../common/PlatformChip";
 import { CardPill, TONE_FILL } from "../ChannelCardView";
+import { LANDING_LABEL } from "../../../lib/performance/forecastCone";
 import { Card, chartColor, ddmm, money, pct, WEEKDAY, weekdayIdx } from "../shared";
 import { CumulativeChart, CumulativeLegend, DayBars, DayBarsLegend, RunRateGauge, TONE_VAR, toneOfPct } from "../../runrate/parts";
 import { SHIFT_STATE_LABEL } from "../../../lib/performance/runRateUpdate";
@@ -108,7 +109,7 @@ export const BrandTab: React.FC<{
           </div>
           {lens === "month" && (
             <Card>
-              <BlockHead title="Đã đạt so với target, cộng dồn theo ngày" sub={`Nét liền dừng ở ngày số tới (${ddmm(r.asOf!)})`} />
+              <BlockHead title="Đã đạt so với target, cộng dồn theo ngày" sub={`Nét liền dừng ở ngày có dữ liệu cuối (${ddmm(r.asOf!)})`} />
               <CumulativeChart r={r} color={chartColor(brand.name)} showPace={false} />
               <CumulativeLegend color={chartColor(brand.name)} showPace={false} />
               <RowsTable kind="Tuần" rows={weeks.rows} total={weeks.total} selected={pick.week ?? ""} onPick={(id) => set({ week: id && id !== pick.week ? id : null })} card={card} lastHead="Target cả kỳ"
@@ -117,7 +118,7 @@ export const BrandTab: React.FC<{
           )}
           {lens === "wave" && (
             <Card>
-              <BlockHead title="Theo loại ngày camp" sub={`Tính tới ngày số tới (${ddmm(r.asOf!)}) · bấm một dòng: Key Metrics và đội live bên dưới đổi theo loại ngày đó`} />
+              <BlockHead title="Theo loại ngày camp" sub={`Tính đến ngày có dữ liệu cuối (${ddmm(r.asOf!)}) · bấm một dòng: Key Metrics và nhân sự live bên dưới đổi theo loại ngày đó`} />
               <RowsTable kind="Loại ngày" rows={waves.rows} total={waves.total} selected={scope.wave ?? ""} onPick={(id) => id && set({ wave: id as CampDayBucket })} card={card} lastHead="Target còn lại" remaining totalClickable={false} />
             </Card>
           )}
@@ -145,7 +146,7 @@ export const BrandTab: React.FC<{
           <TeamSection s={teamScope} brands={brands} />
         </>
       )}
-      {lens === "wave" && <TeamSection s={teamScope} brands={brands} wave={scope.wave ? (scope.wave === "daily" ? "ngày thường" : WAVE_NAME[scope.wave]) : undefined} />}
+      {lens === "wave" && <TeamSection s={teamScope} brands={brands} wave={scope.wave ? (scope.wave === "daily" ? "ngày Daily" : WAVE_NAME[scope.wave]) : undefined} />}
       {lens !== "month" && (
         <BelowNote lens={lens} wave={scope.wave} day={pick.day ?? r?.asOf ?? null} onGo={(l) => set({ lens: l })} />
       )}
@@ -164,7 +165,7 @@ const RunRateHead: React.FC<{ vm: AccountVM; onNavigate: (tab: string) => void }
   const rrColor = TONE_VAR[toneOfPct(t.runRate)];
   const fc = card?.forecast ?? null;
   const pM = t.target ? t.actual / t.target : null, pPlan = t.target ? t.targetToDate / t.target : null, pF = fc && t.target ? fc.p50 / t.target : null;
-  const lead = fc && (t.runRate ?? 0) >= 0.95 && card?.landing && (card.landing.key === "unlikely" || card.landing.key === "short") ? `Run-rate ${pct(t.runRate)} nhưng vẫn "${card.landing.key === "short" ? "Sẽ hụt" : "Khó đạt"}": dự kiến` : "Dự kiến";
+  const lead = fc && (t.runRate ?? 0) >= 0.95 && card?.landing && (card.landing.key === "unlikely" || card.landing.key === "short") ? `Run-rate ${pct(t.runRate)} nhưng vẫn "${LANDING_LABEL[card.landing.key]}": dự báo` : "Dự báo";
   const tentative = r.tail.shifts > 0;
   const small = "rounded-xl border border-[var(--border)] bg-[var(--surface-base)] px-3 py-2 grid grid-rows-[auto_auto_auto_auto] text-left min-w-0";
   return (
@@ -179,13 +180,13 @@ const RunRateHead: React.FC<{ vm: AccountVM; onNavigate: (tab: string) => void }
               <span className="text-[11px] text-[var(--text-faint)] truncate">% Target tháng</span>
               <b className="text-lg font-black text-[var(--text)] tabular-nums leading-tight">{pct(pM)}</b>
               <span className="text-[11px] text-[var(--text-faint)] truncate tabular-nums">{money(t.actual)} / {money(t.target)}</span>
-              <span className="text-[11px] text-[var(--text-faint)] truncate">kế hoạch tới nay {pct(pPlan)}</span>
+              <span className="text-[11px] text-[var(--text-faint)] truncate">target luỹ kế {pct(pPlan)}</span>
             </div>
             <div className={small}>
-              <span className="text-[11px] text-[var(--text-faint)] truncate">Dự kiến cuối tháng</span>
+              <span className="text-[11px] text-[var(--text-faint)] truncate">Dự báo cuối tháng</span>
               <b className="text-lg font-black tabular-nums leading-tight" style={{ color: fc ? fill : "var(--text-faint)" }}>{fc ? pct(pF) : "—"}</b>
               <span className="text-[11px] text-[var(--text-faint)] truncate tabular-nums">{fc ? `~${money(fc.p50)}` : "kênh mới"}</span>
-              <span className="text-[11px] text-[var(--text-faint)] truncate">{fc && card?.landing ? `khả năng chạm ${card.landing.pHit < 0.01 ? "gần 0" : pct(card.landing.pHit)}` : "chưa dự báo"}</span>
+              <span className="text-[11px] text-[var(--text-faint)] truncate">{fc && card?.landing ? `xác suất đạt ${card.landing.pHit < 0.01 ? "≈ 0%" : pct(card.landing.pHit)}` : "chưa có dự báo"}</span>
             </div>
           </div>
         </div>
@@ -194,17 +195,17 @@ const RunRateHead: React.FC<{ vm: AccountVM; onNavigate: (tab: string) => void }
             <BrandLogo brand={vm.brand} size="md" />
             <h3 className="text-xl font-black text-[var(--text)]">{vm.brand.name}</h3>
             <PlatformChip platform={vm.platform} />
-            <span className="text-xs text-[var(--text-faint)]">Tháng {Number(r.month.slice(5))}/{r.month.slice(0, 4)}{r.asOf ? ` · số tới hết ${ddmm(r.asOf)}` : ""}</span>
+            <span className="text-xs text-[var(--text-faint)]">Tháng {Number(r.month.slice(5))}/{r.month.slice(0, 4)}{r.asOf ? ` · dữ liệu đến ${ddmm(r.asOf)}` : ""}</span>
           </div>
           {t.runRate == null ? (
-            <p className="text-sm text-[var(--text-muted)]">Chưa có ca nào đã chạy và có số trong tháng, nên chưa tính được run-rate.</p>
+            <p className="text-sm text-[var(--text-muted)]">Chưa có ca nào đã live và có số liệu trong tháng, nên chưa tính được Run-rate.</p>
           ) : (
             <div className="text-sm sm:text-[15px] leading-relaxed text-[var(--text-muted)] space-y-1">
-              <p>Run-rate theo kế hoạch: các ca đã chạy đạt <b className="text-[var(--text)]">{money(t.actual)}</b> trên target của chính các ca đó <b className="text-[var(--text)]">{money(t.targetToDate)}</b>, {ahead ? "vượt" : "thiếu"} <b style={{ color: ahead ? "var(--success)" : rrColor }}>{money(gap)}</b> so với tiến độ.</p>
+              <p>Run-rate theo kế hoạch: các ca đã live đạt <b className="text-[var(--text)]">{money(t.actual)}</b> trên target của chính các ca đó <b className="text-[var(--text)]">{money(t.targetToDate)}</b>, {ahead ? "vượt" : "thiếu"} <b style={{ color: ahead ? "var(--success)" : rrColor }}>{money(gap)}</b> so với tiến độ.</p>
               {card && (
                 <p>
                   {fc ? <>{lead} cuối tháng <b className="text-[var(--text)]">~{money(fc.p50)}</b> (khoảng {money(Math.max(0, fc.lo))}–{money(fc.hi)}){pF != null && <>, <b className="text-[var(--text)]">{pct(pF)}</b> target</>}.</> : card.newChannel ? "Kênh mới (dưới 15 ca lịch sử): chưa dự báo cuối tháng." : "Chưa đủ số + lịch để dự báo cuối tháng."}
-                  {card.need && <> Muốn chạm target cần <b className="text-[var(--text)]">{money(card.need.perHour)}/giờ</b> cho {Math.round(card.need.hours)} giờ ca còn trong lịch{card.need.blended != null && <> (đang chạy {money(card.need.blended)}/giờ)</>}.</>}
+                  {card.need && <> Để đạt target cần <b className="text-[var(--text)]">{money(card.need.perHour)}/giờ</b> cho {Math.round(card.need.hours)} giờ live còn trong lịch{card.need.blended != null && <> (hiện đạt {money(card.need.blended)}/giờ)</>}.</>}
                 </p>
               )}
             </div>
@@ -213,8 +214,8 @@ const RunRateHead: React.FC<{ vm: AccountVM; onNavigate: (tab: string) => void }
             {[
               ["Target tháng", money(t.target), `% Target ${pct(pM)}`],
               ["Đã đạt", money(t.actual), `${t.elapsedDays} ngày đã tính`],
-              ["Kỳ vọng tới nay", money(t.targetToDate), "target các ca tới ngày số tới"],
-              [ahead ? "Vượt tiến độ" : "Thiếu so tiến độ", <span key="g" style={{ color: ahead ? "var(--success)" : rrColor }}>{`${ahead ? "+" : "−"}${money(gap)}`}</span>, r.offPlan.length > 0 ? `${r.offPlan.length} ca ngoài kế hoạch: ${money(r.offPlanActual)}` : ""]
+              ["Target luỹ kế", money(t.targetToDate), "target các ca đến ngày có dữ liệu"],
+              [ahead ? "Vượt target luỹ kế" : "Chênh so target luỹ kế", <span key="g" style={{ color: ahead ? "var(--success)" : rrColor }}>{`${ahead ? "+" : "−"}${money(gap)}`}</span>, r.offPlan.length > 0 ? `${r.offPlan.length} ca ngoài kế hoạch: ${money(r.offPlanActual)}` : ""]
             ].map(([l, v, h], i) => (
               <div key={i} className="rounded-xl border border-[var(--border)] bg-[var(--surface-base)] p-3 min-w-0">
                 <p className="text-xs text-[var(--text-muted)]">{l}</p>
@@ -223,13 +224,13 @@ const RunRateHead: React.FC<{ vm: AccountVM; onNavigate: (tab: string) => void }
               </div>
             ))}
           </div>
-          {card?.commitment && <p className="text-xs text-[var(--text-muted)]">Giờ cam kết: đã chạy <b className="text-[var(--text)]">{Math.round(card.commitment.deliveredHours)}/{Math.round(card.commitment.committedHours)} giờ</b> · còn {Math.round(card.commitment.scheduledHours)} giờ trong lịch{card.commitment.gapHours > 0.5 ? <b className="text-amber-300"> · thiếu {Math.round(card.commitment.gapHours)} giờ chưa xếp</b> : ""}</p>}
+          {card?.commitment && <p className="text-xs text-[var(--text-muted)]">Giờ cam kết: đã live <b className="text-[var(--text)]">{Math.round(card.commitment.deliveredHours)}/{Math.round(card.commitment.committedHours)} giờ</b> · còn {Math.round(card.commitment.scheduledHours)} giờ trong lịch{card.commitment.gapHours > 0.5 ? <b className="text-amber-300"> · thiếu {Math.round(card.commitment.gapHours)} giờ chưa xếp</b> : ""}</p>}
           {(tentative || vm.missingSessions > 0) && (
             <div className="flex flex-wrap items-start gap-x-3 gap-y-1 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200 leading-snug">
               <AlertTriangle className="w-4 h-4 shrink-0 mt-px text-amber-300" />
               <div className="flex-1 min-w-0 space-y-0.5">
                 {tentative && <p>Run-rate gồm {r.tail.shifts} ca sau ngày đủ số{vm.completeThrough ? ` (${ddmm(vm.completeThrough)})` : ""}{r.tail.lastShift ? `, tới ca ${r.tail.lastShift.startTime}–${r.tail.lastShift.endTime} ${ddmm(r.tail.lastShift.date)}` : ""}, mỗi ca so với target đúng ca đó{r.tail.unreconciled > 0 ? `; ${r.tail.unreconciled} ca chưa đối soát nên còn đổi` : ""}.</p>}
-                {vm.missingSessions > 0 && <p>{vm.missingSessions} ca đã chạy chưa có số{vm.oldestMissing ? `, cũ nhất ${ddmm(vm.oldestMissing)}` : ""}{r.noDataCount - r.noDataWaiting > 0 ? ": run-rate có thể thấp hơn thực tế." : ": chưa vào run-rate, có số là tự cập nhật."}</p>}
+                {vm.missingSessions > 0 && <p>{vm.missingSessions} ca đã live chưa có số liệu{vm.oldestMissing ? `, cũ nhất ${ddmm(vm.oldestMissing)}` : ""}{r.noDataCount - r.noDataWaiting > 0 ? ": run-rate có thể thấp hơn thực tế." : ": chưa vào run-rate, có số là tự cập nhật."}</p>}
               </div>
               {vm.missingSessions > 0 && <button type="button" onClick={() => onNavigate("sessions")} className="font-bold underline underline-offset-2 hover:text-amber-100 min-h-[24px]">Mở Sổ Ca</button>}
             </div>
@@ -256,7 +257,7 @@ const NoPlan: React.FC<{ vm: AccountVM | null; brand: Brand; platform: ReportPla
 // ---------------------------------------------------------------------------
 
 const RowsTable: React.FC<{ kind: string; rows: LensRow[]; total: LensRow; selected: string; onPick: (id: string) => void; card: AccountVM["card"] | null; lastHead: string; remaining?: boolean; totalClickable?: boolean; foot?: string }> = ({ kind, rows, total, selected, onPick, card, lastHead, remaining, totalClickable = true, foot }) => {
-  const fcLine = card?.forecast && card.target ? `dự kiến ~${money(card.forecast.p50)} · ${pct(card.forecast.p50 / card.target)}` : "";
+  const fcLine = card?.forecast && card.target ? `dự báo ~${money(card.forecast.p50)} · ${pct(card.forecast.p50 / card.target)}` : "";
   return (
     <div className="mt-3">
       <Table head={[kind, "Đã đạt", "Target tới nay", "Run-rate", lastHead]}>
@@ -329,7 +330,7 @@ const ShiftPicker: React.FC<{ r: NonNullable<AccountVM["report"]>; day: string; 
                   <span className="tabular-nums font-bold text-[var(--text)]">{on ? "▸ " : ""}{s.startTime}–{s.endTime}</span>
                   <span className="truncate text-[var(--text-muted)]">{[s.hostName, s.assistantName].filter(Boolean).join(" + ") || "Chưa có người"}</span>
                   <span className="text-[11px] text-[var(--text-faint)] hidden sm:block">{SHIFT_STATE_LABEL[s.state]}</span>
-                  <span className="tabular-nums text-[var(--text)] col-span-2 sm:col-span-1">{s.state === "done" ? money(s.actual) : s.state === "no_data" ? "Ca đã chạy, chưa có số" : "Chưa tới giờ"}<span className="text-[var(--text-faint)]"> / target {money(s.target)}</span></span>
+                  <span className="tabular-nums text-[var(--text)] col-span-2 sm:col-span-1">{s.state === "done" ? money(s.actual) : s.state === "no_data" ? "Ca đã live, chưa có số liệu" : "Chưa tới giờ"}<span className="text-[var(--text-faint)]"> / target {money(s.target)}</span></span>
                   <b className="tabular-nums text-right" style={{ color: TONE_VAR[tone] }}>{s.pctTarget == null ? "" : pct(s.pctTarget)}</b>
                 </button>
               );
@@ -371,7 +372,7 @@ const KeyMetrics: React.FC<{ platform: ReportPlatform; scope: LensScope }> = ({ 
   };
   return (
     <Card>
-      <BlockHead title={`Key Metrics · ${scope.label}`} sub={<><span className="inline-block px-2 py-0.5 rounded-full bg-[var(--surface-base)] text-[var(--text-muted)] mr-1.5">theo: {scope.by}</span>% đổi so với {scope.baseLabel}, số trong ngoặc là vế so sánh{norm ? ` (chỉ số cộng dồn quy về mỗi ${scope.unit})` : ""} · {curGot.length} ca có số</>} />
+      <BlockHead title={`Key Metrics · ${scope.label}`} sub={<><span className="inline-block px-2 py-0.5 rounded-full bg-[var(--surface-base)] text-[var(--text-muted)] mr-1.5">theo: {scope.by}</span>% thay đổi so với {scope.baseLabel}, số trong ngoặc là giá trị kỳ so sánh{norm ? ` (chỉ số tổng quy về bình quân mỗi ${scope.unit})` : ""} · {curGot.length} ca có số liệu</>} />
       {curGot.length === 0 ? (
         <p className="text-sm text-[var(--text-muted)]">Không có ca có số trong {scope.label}. Chọn ngày, đợt hoặc ca khác.</p>
       ) : (
@@ -383,7 +384,7 @@ const KeyMetrics: React.FC<{ platform: ReportPlatform; scope: LensScope }> = ({ 
               <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-x-4">{prof.metrics.defs.filter((d) => d.group === g.group).map((d) => cell(d, false))}</div>
             </div>
           ))}
-          {weak && baseGot.length > 0 && <p className="text-xs text-[var(--text-faint)]">Dưới 5 ca ở một bên: % đổi để xám, chưa kết luận.</p>}
+          {weak && baseGot.length > 0 && <p className="text-xs text-[var(--text-faint)]">Dưới 5 ca ở một bên: % thay đổi hiển thị mờ, chưa kết luận.</p>}
           {prof.metrics.coverageNotes(c).map((n) => <p key={n.text} className={`text-xs ${n.tone === "warn" ? "text-amber-300" : "text-[var(--text-faint)]"}`}>{n.text}</p>)}
         </div>
       )}
@@ -403,7 +404,7 @@ const BelowNote: React.FC<{ lens: Lens; wave?: CampDayBucket; day: string | null
       ? ["Shop, SKU, quảng cáo và khuyến mãi không tách được theo đợt", `File brand gửi chỉ có số cả tháng. Muốn xem theo đợt cần brand xuất thêm file SKU riêng cho ${w}.`, back]
       : lens === "day"
         ? [`Ngày ${day ? ddmm(day) : ""}: chỉ xem số của ngày ở trên và Key Metrics`, "Một ngày chỉ 2–3 ca, quá ít để xếp hạng host hay so khung giờ. Host và trợ live từng ca ở nút Ca; shop, SKU, quảng cáo ở nút Tháng.", <><button type="button" onClick={() => onGo("shift")} className="text-xs font-bold px-3 py-1.5 rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] min-h-[30px]">Xem các ca ngày này</button>{back}</>]
-        : ["Ca đang chọn: host, trợ live và số của ca ở bảng trên", "Đội live, khung giờ, shop và quảng cáo cần nhiều ca hoặc chỉ có số cả tháng: xem ở nút Tháng hoặc Đợt campaign.", back];
+        : ["Ca đang chọn: host, trợ live và số của ca ở bảng trên", "Nhân sự live, khung giờ, shop và quảng cáo cần nhiều ca hoặc chỉ có số cả tháng: xem ở nút Tháng hoặc Đợt campaign.", back];
   return (
     <Card className="!py-3">
       <div className="flex flex-wrap items-center gap-3">

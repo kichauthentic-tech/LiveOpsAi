@@ -42,9 +42,9 @@ export const WhySection: React.FC<{ card: ChannelCard; sessions: LiveSession[]; 
   }, [prof, shopCur, shopPrev, sessions, win, bucketOf]);
   return (
     <>
-      <Sect title="Vì sao và nên làm gì" sub="tháng đang chạy · cùng số với thẻ kênh" />
+      <Sect title="Nguyên nhân và hành động đề xuất" sub="tháng đang chạy · cùng số với thẻ kênh" />
       <Card>
-        <BlockHead title="Vì sao: cây GMV/giờ ngày thường" />
+        <BlockHead title="Phân rã GMV/giờ · ngày Daily" />
         <TreeCard tree={card.tree} platform={platform} />
         {!prof.hasShopAnalytics ? null : control.length > 0 ? (
           <ul className="text-xs text-[var(--text-muted)] space-y-1 mt-3">
@@ -68,7 +68,7 @@ export const WhySection: React.FC<{ card: ChannelCard; sessions: LiveSession[]; 
           o={card.outlook}
           p={card.plan}
           today={today}
-          extra={<button type="button" onClick={() => onNavigate("control_room")} className="min-h-[28px] px-2.5 rounded-lg border border-[var(--border)] text-xs font-bold text-[var(--text)] hover:border-[var(--accent)]">Thử thêm ca ở Sa bàn</button>}
+          extra={<button type="button" onClick={() => onNavigate("control_room")} className="min-h-[28px] px-2.5 rounded-lg border border-[var(--border)] text-xs font-bold text-[var(--text)] hover:border-[var(--accent)]">Mô phỏng thêm ca</button>}
         />
       )}
       <Suggestions sessions={sessions} bucketOf={bucketOf} through={through} win={win} />
@@ -118,15 +118,15 @@ const Suggestions: React.FC<{ sessions: LiveSession[]; bucketOf: (d: string) => 
       <BlockHead title="Đề xuất tối ưu" sub="Chỉ giữ quy tắc đã được thử lại: lấy các tháng trước để đoán tháng sau, quy tắc nào đoán đúng hơn mới được đưa ra. Mức tăng là mức tối đa — giả định giờ dời sang khung khác vẫn bán tốt như trung bình khung đó." />
       <div className="space-y-4 text-xs">
         <div className={`border-l-2 pl-3 space-y-1.5 ${slotOk ? "border-emerald-500" : "border-[var(--border)] opacity-80"}`}>
-          <p className="font-bold text-[var(--text)] flex items-center gap-2">{pill(slotOk)}Khung giờ ngày thường</p>
+          <p className="font-bold text-[var(--text)] flex items-center gap-2">{pill(slotOk)}Khung giờ ngày Daily</p>
           {SLOT_BLOCKS.some((k) => sIdx[k]) && (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[480px]">
                 <thead>
                   <tr className="text-[var(--text-faint)] text-left">
                     <th className="pb-1 pr-3 font-semibold">Khung</th>
-                    <th className="pb-1 pr-3 text-right font-semibold">Chỉ số (1,00 = mặt bằng tháng)</th>
-                    <th className="pb-1 pr-3 text-right font-semibold" title="90% khả năng chỉ số thật nằm trong khoảng này">Dao động có thể</th>
+                    <th className="pb-1 pr-3 text-right font-semibold">Chỉ số (1,00 = trung bình tháng)</th>
+                    <th className="pb-1 pr-3 text-right font-semibold" title="Vùng tin cậy 90% của chỉ số">Vùng tin cậy 90%</th>
                     <th className="pb-1 text-right font-semibold">Giờ lịch sử</th>
                   </tr>
                 </thead>
@@ -148,11 +148,11 @@ const Suggestions: React.FC<{ sessions: LiveSession[]; bucketOf: (d: string) => 
           )}
           {slotOk && slotMove && recent28?.daily != null && (
             <p className="text-[var(--text-muted)]">
-              Dời 1 giờ ngày thường từ khung {lbl(slotMove.from)} sang {lbl(slotMove.to)} ≈ <b className="text-[var(--text)]">+{fmtVndShort(slotMove.lo * recent28.daily)} – {fmtVndShort(slotMove.hi * recent28.daily)}</b> theo {METRIC.gmvPerHour} ngày thường 28 ngày gần nhất.
+              Dời 1 giờ ngày Daily từ khung {lbl(slotMove.from)} sang {lbl(slotMove.to)} ≈ <b className="text-[var(--text)]">+{fmtVndShort(slotMove.lo * recent28.daily)} – {fmtVndShort(slotMove.hi * recent28.daily)}</b> theo {METRIC.gmvPerHour} ngày thường 28 ngày gần nhất.
               {(() => {
                 const hF = hoursPerDailyDay(curRange, slotMove.from), hT = hoursPerDailyDay(curRange, slotMove.to), hTp = hoursPerDailyDay(prevRange, slotMove.to);
                 if (hT == null) return null;
-                return <> Kỳ này mỗi ngày thường chạy {num(hT, 1)}h ở khung {lbl(slotMove.to)} (cùng kỳ tháng trước {num(hTp, 1)}h) và {num(hF, 1)}h ở khung {lbl(slotMove.from)}.{hTp != null && hT < hTp * 0.85 && <b className="text-rose-300"> Giờ ở khung mạnh nhất đang bị cắt bớt.</b>}</>;
+                return <> Kỳ này mỗi ngày Daily live {num(hT, 1)}h ở khung {lbl(slotMove.to)} (cùng kỳ tháng trước {num(hTp, 1)}h) và {num(hF, 1)}h ở khung {lbl(slotMove.from)}.{hTp != null && hT < hTp * 0.85 && <b className="text-rose-300"> Giờ ở khung mạnh nhất đang bị cắt bớt.</b>}</>;
               })()}
             </p>
           )}
@@ -203,7 +203,7 @@ export const ForecastHistory: React.FC<{ card: ChannelCard; rows: ForecastSnapsh
   const ch = last.p50 / first.p50 - 1;
   return (
     <Card>
-      <BlockHead title="Dự báo cuối tháng qua từng ngày" sub={`Engine chụp mỗi ngày · dải = khoảng ~80% · từ ${ddmm(first.asOf)} tới ${ddmm(last.asOf)} dự báo ${ch >= 0 ? "lên" : "xuống"} ${pct(Math.abs(ch), 1)} (${money(first.p50)} → ${money(last.p50)})`} />
+      <BlockHead title="Dự báo cuối tháng qua từng ngày" sub={`Dự báo ghi lại mỗi ngày · vùng tin cậy 80% · từ ${ddmm(first.asOf)} tới ${ddmm(last.asOf)} dự báo ${ch >= 0 ? "lên" : "xuống"} ${pct(Math.abs(ch), 1)} (${money(first.p50)} → ${money(last.p50)})`} />
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label="Dự báo cuối tháng qua từng ngày">
         {[0, 1, 2, 3, 4].map((j) => { const v = ymin + step * j; return <g key={j}><line x1={L} x2={L + iw} y1={Y(v)} y2={Y(v)} stroke="var(--border)" strokeDasharray={j ? "2 4" : undefined} /><text x={L - 6} y={Y(v) + 3.5} textAnchor="end" fontSize="10" fill="var(--text-faint)">{money(v)}</text></g>; })}
         {days.map((d, i) => (i % 5 === 0 ? <text key={d} x={X(d)} y={H - 6} textAnchor="middle" fontSize="10" fill="var(--text-faint)">{ddmm(d)}</text> : null))}

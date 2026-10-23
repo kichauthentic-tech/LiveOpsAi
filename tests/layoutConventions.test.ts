@@ -150,7 +150,7 @@ test("Dashboard agency: khối không tính được thì không chiếm chỗ n
   // Viên nhãn (21/10): chưa chốt kế hoạch / kênh mới thì viên nói rõ, không vẽ dự báo rỗng.
   const card = readFileSync(join(SRC, "components/dashboard/ChannelCardView.tsx"), "utf8");
   expect(card).toMatch(/Chưa có target/);
-  expect(card).toMatch(/c\.newChannel \? "Chưa dự báo"/);
+  expect(card).toMatch(/c\.newChannel \? "Chưa có dự báo"/);
   // Lãi gộp mỗi giờ (22/10): chưa tính được tiền ca nào thì không dựng khối (không ô "Chưa tính được" chiếm chỗ).
   const ops = readFileSync(join(SRC, "components/dashboard/period/opsBlocks.tsx"), "utf8");
   expect(ops).toMatch(/if \(!c \|\| c\.priced === 0\) return null;/);
@@ -158,8 +158,10 @@ test("Dashboard agency: khối không tính được thì không chiếm chỗ n
 
 test("Dashboard agency: mỗi kênh MỘT kết luận (một thang nhãn kèm %), không còn hàng Hôm qua/Hôm nay và bảng xếp host thô qua brand", () => {
   const card = readFileSync(join(SRC, "components/dashboard/ChannelCardView.tsx"), "utf8");
-  // 22/10: viên nói rõ con số là gì ("99% run-rate mà Khó đạt" đọc không hiểu) — vẫn MỘT thang nhãn kèm %.
-  expect(card).toMatch(/\$\{LANDING_LABEL\[c\.landing\.key\]\} · khả năng chạm target \$\{pct\(c\.landing\.pHit\)\}/);
+  // 22/10: viên nói rõ con số là gì ("99% run-rate mà Rủi ro" đọc không hiểu) — vẫn MỘT thang nhãn kèm %, một câu chung (24/10).
+  expect(card).toMatch(/\{landingText\(c\)\}/);
+  const ov = readFileSync(join(SRC, "lib/performance/accountOverview.ts"), "utf8");
+  expect(ov).toMatch(/\$\{LANDING_LABEL\[l\.key\]\} · xác suất đạt/);
   expect(card).not.toMatch(/Dự phóng ÷ target|tiến độ/);
   // Đội live tách vai (22/10): host xếp bằng chỉ số so với CHÍNH kênh (GMV/giờ kênh), trợ live chỉ ca + giờ — không xếp GMV/giờ thô qua brand.
   const pc = readFileSync(join(SRC, "lib/performance/periodCompare.ts"), "utf8");

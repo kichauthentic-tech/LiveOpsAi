@@ -7,6 +7,7 @@ import { downloadSheetsAsXlsx } from "../lib/exportXlsx";
 import { useToast } from "../hooks/useToast";
 import { errorMessage } from "../lib/errorMessage";
 import { PageHeader } from "./common/PageHeader";
+import { TeamBlocks } from "./dashboard/period/TeamBlocks";
 
 import { fmtDateVn, fmtFixed, fmtVndShort } from "../lib/format";
 import { METRIC, metricHint } from "../lib/metricGlossary";
@@ -215,7 +216,7 @@ export function HostPerformance({ platform, sessions, brands }: HostPerformanceP
       >
         {quality.total === 0 ? (
           <p className="text-xs text-[var(--text-faint)]">
-            Chưa có ca nào có số liệu trong khoảng này. Số liệu sinh ra khi trợ live up file vào ca (mở ca ở Bảng Vận Hành).
+            Chưa có ca nào có số liệu trong khoảng này. Số liệu có khi trợ live cập nhật file vào ca (mở ca ở Bảng Vận Hành).
           </p>
         ) : (
           <p className="text-[11px] text-[var(--text-muted)] flex items-start gap-1.5">
@@ -356,6 +357,8 @@ export function HostPerformance({ platform, sessions, brands }: HostPerformanceP
           </div>
         </>
       )}
+      {/* 24/10: bốn khối cả sàn chuyển từ Dashboard (tab Toàn sàn) sang đây. */}
+      <TeamBlocks platform={platform} sessions={sessions} brands={brands} from={from} to={to} byMonth={mode === "month"} today={today} />
     </div>
   );
 }

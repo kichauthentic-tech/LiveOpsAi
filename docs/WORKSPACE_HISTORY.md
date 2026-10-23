@@ -6134,3 +6134,53 @@ Dữ Liệu Gốc; TikTok API "Chưa dùng" vẫn ở menu; trainer xem cả Fin
   file Excel tải thật, tháng có Kế Hoạch Tháng chốt + lịch affiliate tháng sau thật (CROCS T10 chưa dán kế hoạch Affiliate). Còn mở (chờ user chốt): brand
   nào là whole shop (bảng điểm theo dịch vụ), xuất deck/PDF, song ngữ, loại file Order cho tỷ lệ hủy, bảng "việc tháng trước → kết quả". Phiên Dashboard
   song song (App.tsx, AgencyDashboard, accountOverview) đang sửa cùng lúc — không đụng file của nhau.
+
+## Dashboard Tổng quan account (2026-10-24)
+
+Bối cảnh: 23/10 user hỏi Dashboard hiện tại ổn/không ổn gì cho cấp quản lý → đánh giá 8 điểm (không thấy mọi account một màn; câu trả lời chính dưới màn
+đầu; báo "sẽ hụt" không nói còn cứu được không; GMV/giờ giảm không nói vì sao; nửa dưới là chi tiết trainer; số lệch nhau trên một màn; JOCKEY Shopee
+không ca vẫn ghi "Chưa lập Kế Hoạch Tháng"; chưa có lãi/lỗ vì 0/237 ca đủ rate). Demo https://claude.ai/artifact/AQtXSSHpTxFgbNC8tYTFCH (bản 1 tự vẽ;
+bản 3 "làm 1 bảng full" = phần giữ nguyên là bản chụp thật của app trong shadow DOM; bản 4 chuẩn hoá từ ngữ) → user duyệt, "áp dụng vào code app".
+- **Phát hiện khi làm demo:** tab Brand đã có sẵn "Muốn chạm target cần X/giờ cho Y giờ", mục Phương án (giới hạn +30%, kiểm chứng T7–T9: 9/9 kênh-tháng
+  CROCS+VERA ≥ 95% target khi làm đủ 3 mốc) và cây GMV/giờ ngày thường — bảng mới chỉ đưa các số đó lên một chỗ, không có phép tính mới.
+- **Số app thật 24/10 (dữ liệu đầy đủ đến 20/10):** 8 account; 4 rủi ro cao, 1 rủi ro, 3 chưa đủ dữ liệu/tạm dừng; bù được bằng giờ: JOCKEY TikTok
+  (+6 giờ), CROCS (+12 giờ); không bù kịp: VERA TikTok (tối đa ~59% target), Franklin TikTok (~72%), VERA Shopee (~85%); Franklin Shopee kênh mới chưa
+  dự báo (cần ~7,3M/giờ, đang ~1,1M/giờ). FUJIWA = "Chưa chạy tháng 10" (hợp đồng dời sang bắt đầu 01/11 — 23/10 12:02), JOCKEY Shopee "Tạm dừng"
+  (ca live cuối 26/09). Ca chưa có số liệu TikTok 17 · Shopee 13.
+- **Từ ngữ cũ → mới (user duyệt):** chạm target → đạt target; khả năng → xác suất đạt; dự phóng/dự kiến → dự báo; Chắc đạt/Có thể đạt/Khó đạt/Sẽ hụt →
+  Đạt target/Sát target/Rủi ro/Hụt target; Kỳ vọng tới nay/kế hoạch tới nay → Target luỹ kế; Thiếu so tiến độ → Chênh so target luỹ kế; số tới/Số đủ
+  tới → dữ liệu đến/Dữ liệu đầy đủ đến; ca chờ số → ca chưa có số liệu; ca đã chạy → ca đã live; Up số/Up file → Cập nhật số liệu/file; cây GMV/giờ ngày
+  thường → Phân rã GMV/giờ · ngày Daily; Nhánh kéo xuống → Yếu tố giảm mạnh nhất; Người giữ đòn bẩy → Đầu mối xử lý; Engine chụp mỗi ngày · dải ~80% →
+  Dự báo ghi lại mỗi ngày · vùng tin cậy 80%; "(monthOutlook.pending, loại ca)" → bỏ; Thử thêm ca ở Sa bàn → Mô phỏng thêm ca; Căn cứ → Cơ sở tính;
+  co giãn → hệ số co giãn; vượt trần → vượt giới hạn; giữ nhịp → giữ tiến độ hiện tại; Lên sóng trễ → Lên live trễ; để xám → hiển thị mờ; Đội live →
+  Nhân sự live; mặt bằng tháng → trung bình tháng. Giữ: tên chỉ số metricGlossary, "Run-rate".
+- **Verify:** tsc 0; vitest 1003/1003 (cả CI env); eslint 0 lỗi ở file đợt này (lỗi `Date.now` ở `SessionWindow.tsx` là của phiên khác, có từ trước);
+  audit:dead sạch; vite build OK. App thật (dev 3101, DB thật, admin): tab Tổng quan 1440 + 375 không tràn; "Xem chi tiết brand" ở dòng VERA Shopee tự
+  chuyển sàn sang Shopee + mở tab Brand đúng brand; quét chữ hiển thị 5 brand TikTok × 4 nút + 3 brand Shopee × 4 nút + Toàn sàn hai sàn + Tổng quan:
+  0 chữ cũ, 0 NaN/undefined; Hiệu Suất Host có phần "Toàn sàn TikTok · mọi brand" (số khớp bảng Host cũ của Dashboard). Sửa kèm: thẻ trong lưới 2 cột
+  (GMV theo tháng, Host/Trợ live của tab Brand) tràn ngang ở 375px vì thiếu `min-w-0` — có từ trước. Hai lỗi 400 `live_sessions_secure` trong log là
+  `0178` chưa chạy (đã biết).
+
+## §1 mục 23/10 Dashboard so cùng kỳ (chuyển khỏi WORKSPACE 24/10)
+
+- **23/10: DASHBOARD LÀM LẠI THEO DEMO "SO CÙNG KỲ" (BUILT, chưa commit, không migration)** — user duyệt demo 22/10 rồi "bắt đầu build vào app".
+  Dashboard agency = `AgencyDashboard.tsx`: MỘT sàn (thanh Sàn, `TAB_CHANNEL_SCOPE.agency_overview = "one"`), thanh trên = 2 tab **Toàn sàn | Brand** +
+  kỳ (Tháng này · 7 ngày; 23/10 tối bỏ Tháng trước · Tự chọn) + "So với" + Tải Excel + dòng "Đang xem … · Số đủ tới · N ca chờ số". Số so kỳ: `lib/performance/periodCompare.ts`
+  (`resolvePeriod`, `aggregate`, `indexBy`/`channelGph`, `hostRows`/`coRows`); 4 nút của tab Brand: `lib/performance/brandLens.ts` (`weekRows`/`waveRows` +
+  dòng "Cả tháng tới nay", `lensScope`). UI ở `components/dashboard/period/` (`PlatformTab`, `BrandTab`, `brandBelow`, `opsBlocks`, `useBrandFiles`, `ui`).
+  Toàn sàn: 2 hàng ô (vận hành, rồi GMV · run-rate theo kế hoạch · dự kiến cuối tháng · GMV/giờ · Orders·CVR · AOV), thẻ run-rate từng brand + dòng so cùng
+  kỳ (kỳ khác: thẻ so cùng kỳ), GMV luỹ kế, việc cần làm, so theo loại ngày, Vận hành (trễ, độ dài ca, lãi gộp/giờ CEO-admin, lưới khung giờ, host), GMV và
+  GMV/giờ theo tháng. Brand: đồng hồ RUN-RATE + 2 ô (% Target tháng, Dự kiến cuối tháng) + 4 ô; 4 nút; Key Metrics theo nút; Shop/SKU/Ads/Khuyến mãi (file
+  theo tháng) chỉ ở nút Tháng; Đội live (Host GMV | Trợ live giờ) + Khung giờ ở nút Tháng và Đợt (lọc ca của đợt); Ngày/Ca thu một dòng. Viên nhãn nói rõ
+  ("Khó đạt · khả năng chạm target 29%", "Sẽ hụt · dự kiến thiếu ~34% target"). Gỡ: tab Theo kỳ/Sức khoẻ (`CeoBrief.tsx`, `dashboard/Health`,
+  `AgencyHealth`, `FinanceSection`, `model`), `AgencyRunRate.tsx`, component `AccountDetail` (giữ `RunRateLenses` cho Chi tiết kênh), `periodFor`,
+  `combineOutlooks`, `likeForLikeMany`, `dataDiscipline`. Verify: tsc 0, vitest 973/973 (cả CI env), audit:dead sạch, build OK, lint chỉ còn 1 lỗi
+  `Date.now` ở `SessionWindow.tsx` của phiên song song "Layout cải thiện giao diện" (sửa 00:35–00:37 23/10, không đụng file Dashboard). App thật: số đo +
+  cách kiểm ở lịch sử `## Dashboard so cùng kỳ (2026-10-23)`. **Gộp Chi tiết kênh (user "gộp hẳn", 23/10):** Dashboard trong workspace brand
+  (ops) = `BrandDashboard.tsx` → `AgencyDashboard lockBrandId` (chỉ tab Brand, không hàng chọn brand); role brand vẫn `BrandPortal`. Chuyển vào tab Brand (nút
+  Tháng, tháng đang chạy): giờ cam kết (dòng ở đầu), bản tin (`BulletinComposer` một hàng), "Dự báo cuối tháng qua từng ngày" (sổ 0163, `ledger` từ
+  `useChannelCards`), "Vì sao và nên làm gì" (`period/brandExtras.tsx`: cây GMV/giờ + nhóm đối chứng shop, Phương án `ChannelPlan`, Đề xuất tối ưu). Bỏ (trùng
+  màn khác): thẻ kênh cỡ lớn `ChannelCardView` (giữ `CardPill`), GMV/giờ theo tuần (`weeklySeries`), Soát kế hoạch tháng sau (`planCheck` — Kế Hoạch Tháng
+  đã có dự báo engine v3 so target), Host so mặt bằng (thay bằng bảng Host chỉ số kênh), dòng % live trong Total GMV (ô % LIVE GMV ở Shop). Thêm theo
+  demo: "Cặp host + trợ live" (`pairRows`, Toàn sàn), bảng Affiliate (`fetchAffiliateActuals`, mục Quảng cáo). Commit + push 23/10 (trừ 6 file giao ca
+  của phiên song song + `.claude/launch.json`).

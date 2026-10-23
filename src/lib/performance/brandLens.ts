@@ -157,14 +157,14 @@ export function lensScope(x: { sessions: LiveSession[]; month: string; asOf: str
     return { by: "Tháng", label: rangeLbl(m1, asOf), baseLabel: `cùng ngày tháng trước ${rangeLbl(pa, shiftMonth(asOf, -1))}`, cur: inR(m1, asOf), base: inR(pa, shiftMonth(asOf, -1)), unit: null };
   }
   if (pick.lens === "wave") {
-    const w = pick.wave, name = w === "daily" ? "ngày thường" : WAVE_NAME[w];
+    const w = pick.wave, name = w === "daily" ? "ngày Daily" : WAVE_NAME[w];
     const cur = inR(m1, asOf).filter((s) => bucketOf(s.date) === w), base = inR(pa, pb).filter((s) => resolveCampBucketType(s.date) === w);
     const nd = (xs: LiveSession[]) => new Set(xs.map((s) => s.date)).size;
     const list = (xs: LiveSession[]) => span([...new Set(xs.map((s) => s.date))]);
     return {
       by: `Đợt campaign · ${w === "daily" ? "Daily" : WAVE_NAME[w]}`,
-      label: cur.length ? (w === "daily" ? `${nd(cur)} ngày thường tới ${dm(asOf)}` : `${WAVE_NAME[w]} ${list(cur)}`) : `${w === "daily" ? "Ngày thường" : WAVE_NAME[w]} tháng này chưa tới`,
-      baseLabel: base.length ? (w === "daily" ? `${nd(base)} ngày thường ${pmon}` : `${WAVE_NAME[w]} ${list(base)}`) : `${pmon} không có ${name}`,
+      label: cur.length ? (w === "daily" ? `${nd(cur)} ngày Daily đến ${dm(asOf)}` : `${WAVE_NAME[w]} ${list(cur)}`) : `${w === "daily" ? "Ngày Daily" : WAVE_NAME[w]} tháng này chưa tới`,
+      baseLabel: base.length ? (w === "daily" ? `${nd(base)} ngày Daily ${pmon}` : `${WAVE_NAME[w]} ${list(base)}`) : `${pmon} không có ${name}`,
       cur, base, unit: "ngày", wave: w
     };
   }

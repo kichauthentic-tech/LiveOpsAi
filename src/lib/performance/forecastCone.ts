@@ -41,13 +41,14 @@ export interface Landing {
   hi: number;
 }
 
+// Tên nhãn chuẩn hoá 24/10 (user duyệt bộ từ ngữ): Chắc đạt / Có thể đạt / Khó đạt / Sẽ hụt → Đạt target / Sát target / Rủi ro / Hụt target.
 export const LANDING_LABEL: Record<LandingKey, string> = {
   no_target: "Chưa có target",
-  no_forecast: "Chưa chiếu được",
-  safe: "Chắc đạt",
-  likely: "Có thể đạt",
-  unlikely: "Khó đạt",
-  short: "Sẽ hụt"
+  no_forecast: "Chưa có dự báo",
+  safe: "Đạt target",
+  likely: "Sát target",
+  unlikely: "Rủi ro",
+  short: "Hụt target"
 };
 
 /**

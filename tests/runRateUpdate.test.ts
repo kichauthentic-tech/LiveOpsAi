@@ -2,7 +2,7 @@
 // Chạy: npx vitest run tests/runRateUpdate.test.ts
 import { describe, expect, test } from "vitest";
 import { planRunRate } from "../src/lib/performance/planRunRate";
-import { buildAccountRunRate, resolveAsOf, runRateExportSheets, runRateVerdict } from "../src/lib/performance/runRateUpdate";
+import { buildAccountRunRate, resolveAsOf, runRateExportSheets } from "../src/lib/performance/runRateUpdate";
 import type { BrandMonthPlanSlot, LiveSession, ShiftSlot } from "../src/types";
 
 let seq = 0;
@@ -137,16 +137,6 @@ describe("resolveAsOf", () => {
   });
 });
 
-describe("runRateVerdict — ngưỡng 85% / 95% dùng chung", () => {
-  test("nhãn theo ngưỡng", () => {
-    expect(runRateVerdict(null).label).toBe("Chưa có số");
-    expect(runRateVerdict(1.2)).toEqual({ tone: "good", label: "Vượt tiến độ" });
-    expect(runRateVerdict(0.95)).toEqual({ tone: "good", label: "Đúng tiến độ" });
-    expect(runRateVerdict(0.9)).toEqual({ tone: "warn", label: "Hơi chậm" });
-    expect(runRateVerdict(0.7)).toEqual({ tone: "bad", label: "Chậm tiến độ" });
-  });
-});
-
 describe("runRateExportSheets", () => {
   const report = buildAccountRunRate(rrOf(), "2026-10-06");
 
@@ -158,7 +148,7 @@ describe("runRateExportSheets", () => {
     expect(sheets.map((s) => s.name)).toEqual(["Tổng quan", "Theo đợt", "Theo ngày", "Theo ca"]);
     const [overview, , , shifts] = sheets;
     expect(overview.rows).toHaveLength(2);
-    expect(overview.rows[0]).toMatchObject({ "Tài khoản": "CROCS", "Số tới ngày": "2026-10-06", "Target tháng": 500e6, "Thực đạt": 350e6, "Run-rate (%)": 87.5, "Dự kiến cuối tháng": 480e6, "Ghi chú": "Có thể đạt · 62%" });
+    expect(overview.rows[0]).toMatchObject({ "Tài khoản": "CROCS", "Dữ liệu đến ngày": "2026-10-06", "Target tháng": 500e6, "Thực đạt": 350e6, "Run-rate (%)": 87.5, "Dự báo cuối tháng": 480e6, "Ghi chú": "Có thể đạt · 62%" });
     // Cuối tháng một số (dự báo thẻ kênh) — không còn cột "giữ nhịp" ra số thứ hai.
     expect(Object.keys(overview.rows[0]).some((k) => /Giữ nhịp/.test(k))).toBe(false);
     expect(overview.rows[1]).toMatchObject({ "Tài khoản": "JOCKEY · Shopee", "Thực đạt": 120e6, "Run-rate (%)": "", "Ghi chú": "Chưa chốt Kế Hoạch Tháng" });

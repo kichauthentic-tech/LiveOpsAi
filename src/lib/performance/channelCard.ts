@@ -243,7 +243,7 @@ export function buildChannelCard(x: ChannelCardInput): ChannelCard {
     state === "off" || state === "no_plan"
       ? { kind: "month_plan", label: state === "off" ? "Mở Kế Hoạch Tháng" : x.plan ? "Chốt Kế Hoạch Tháng" : "Lập Kế Hoạch Tháng" }
       : coverage.missingSessions > 0
-        ? { kind: "reconcile", label: `Up số ${coverage.missingSessions} ca` }
+        ? { kind: "reconcile", label: `Cập nhật số liệu ${coverage.missingSessions} ca` }
         : { kind: "detail", label: "Xem chi tiết" };
 
   return {
@@ -296,5 +296,5 @@ export interface AgencyTodo {
 export function agencyTodos(cards: ChannelCard[]): AgencyTodo[] {
   const short = cards.filter((c) => c.landing && (c.landing.key === "short" || c.landing.key === "unlikely") && c.forecast && c.target);
   // Tên kênh đã nằm ngay trên ở thẻ run-rate (dòng đỏ/vàng) — không liệt kê lại (22/10).
-  return short.length > 0 ? [{ tone: "bad", text: `Báo sớm brand: ${short.length} kênh dự kiến hụt target` }] : [];
+  return short.length > 0 ? [{ tone: "bad", text: `Báo sớm brand: ${short.length} kênh dự báo hụt target` }] : [];
 }

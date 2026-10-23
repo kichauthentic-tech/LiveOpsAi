@@ -9,8 +9,9 @@ import { buildChannelCard } from "../src/lib/performance/channelCard";
 import { bulletinFromCard, bulletinText } from "../src/lib/brand/bulletin";
 import { CardPill } from "../src/components/dashboard/ChannelCardView";
 import { BrandPortal } from "../src/components/brand-workspace/BrandPortal";
-import { AccountCard } from "../src/components/runrate/AccountCard";
-import type { AccountVM } from "../src/components/runrate/types";
+import { OverviewTab } from "../src/components/dashboard/period/OverviewTab";
+import { accountRow, platformPace } from "../src/lib/performance/accountOverview";
+import type { Brand } from "../src/types";
 import { todayVn } from "../src/lib/performance/brandCommitment";
 import { DEFAULT_ENGINE_PARAMS } from "../src/lib/scheduling/engineParams";
 import type { BrandMonthPlan, BrandMonthPlanSlot, LiveSession, ShiftSlot } from "../src/types";
@@ -42,26 +43,22 @@ function world() {
 describe("CardPill", () => {
   test("viên nhãn: một thang kèm % và nói rõ % gì; không NaN/undefined", () => {
     const html = renderToStaticMarkup(React.createElement(CardPill, { card: world() }));
-    expect(html).toMatch(/(Chắc đạt|Có thể đạt|Khó đạt|Sẽ hụt) · (khả năng chạm target |dự kiến thiếu ~)\d+%/);
+    expect(html).toMatch(/(Đạt target|Sát target|Rủi ro|Hụt target) · (xác suất đạt |dự báo thiếu ~)(\d+|≈ 0)%/);
     expect(html).not.toMatch(/NaN|undefined|Infinity|\[object|tiến độ|ngã ngũ|giằng co/);
   });
 });
 
-describe("Dashboard agency = thẻ run-rate (22/10)", () => {
-  const vmOf = (withCard: boolean): AccountVM => {
+describe("Dashboard agency = Tổng quan account (24/10)", () => {
+  test("một dòng mỗi kênh: nhãn + %, dự báo, khả năng bù, phân rã; không chữ cũ", () => {
     const c = world();
-    return {
-      key: c.key, brand: { id: "fr", name: "Franklin", logo: "" } as AccountVM["brand"], platform: c.platform, name: c.name, planStatus: c.planStatus,
-      report: c.report, actualOnly: c.monthActual, completeThrough: c.coverage.completeThrough, missingSessions: c.coverage.missingSessions,
-      oldestMissing: c.coverage.oldestMissing, loading: false, card: withCard ? c : undefined
-    };
-  };
-  test("thẻ có thẻ kênh: run-rate % + nhãn khả năng đạt + dự báo cuối tháng; không 'Giữ nhịp'/'tiến độ'", () => {
-    const vm = vmOf(true);
-    const html = renderToStaticMarkup(React.createElement(AccountCard, { vm, selected: false, onSelect: () => {}, onOpenMonthPlan: () => {} }));
-    expect(html).toMatch(/(Chắc đạt|Có thể đạt|Khó đạt|Sẽ hụt) · (khả năng chạm target |dự kiến thiếu ~)\d+%/);
-    expect(html).toMatch(/Dự kiến cuối tháng/);
-    expect(html).not.toMatch(/Giữ nhịp|tiến độ|NaN|undefined|Infinity/);
+    const html = renderToStaticMarkup(React.createElement(OverviewTab, {
+      rows: [accountRow(c)], summaries: [{ platform: "TikTok", pace: platformPace([c]), waiting: c.coverage.missingSessions }],
+      brands: [{ id: "fr", name: "Franklin", logo: "" } as Brand], loading: false, today: "2026-10-21", onOpenBrand: () => {}, onOpenMonthPlan: () => {}
+    }));
+    expect(html).toMatch(/(Đạt target|Sát target|Rủi ro|Hụt target) · (xác suất đạt |dự báo thiếu ~)(\d+|≈ 0)%/);
+    expect(html).toMatch(/Dự báo cuối tháng/);
+    expect(html).toMatch(/Bù được|Không bù kịp|Đúng tiến độ/);
+    expect(html).not.toMatch(/Giữ nhịp|chạm target|dự kiến|Sẽ hụt|Khó đạt|NaN|undefined|Infinity/);
   });
 });
 

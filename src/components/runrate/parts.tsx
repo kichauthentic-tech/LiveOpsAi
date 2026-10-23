@@ -1,6 +1,6 @@
 import React from "react";
 import { RUN_RATE_BAD, RUN_RATE_WARN } from "../../lib/performance/ceoBrief";
-import type { RunRateTone } from "../../lib/performance/channelHealth";
+import { runRateTone, type RunRateTone } from "../../lib/performance/channelHealth";
 import type { AccountRunRate, RRDay } from "../../lib/performance/runRateUpdate";
 import { BUCKET_COLOR, WEEKDAY, ddmm, money, niceMax, pct, weekdayIdx } from "../dashboard/shared";
 import type { CampDayBucket } from "../../lib/campaignDays";
@@ -8,19 +8,8 @@ import type { CampDayBucket } from "../../lib/campaignDays";
 // Phần trình bày của module Run-rate: không có luật số (xem lib/performance/runRateUpdate.ts).
 
 export const TONE_VAR: Record<RunRateTone, string> = { good: "var(--success)", warn: "var(--warning)", bad: "var(--danger)", none: "var(--text-faint)" };
-export const toneOfPct = (v: number | null): RunRateTone => (v == null ? "none" : v >= RUN_RATE_WARN ? "good" : v >= RUN_RATE_BAD ? "warn" : "bad");
-
-/** Thanh tiến độ gọn: nền ba vùng đỏ/vàng/xanh nhạt, vạch 100%. Cùng thang với RunRateBar của Dashboard.
- *  `mark`: đặt vạch ở mốc khác 100% (vd mức kỳ vọng tới nay khi thanh là % target cả đợt). */
-export const PctBar: React.FC<{ value: number | null; tone: RunRateTone; max?: number; height?: number; label?: string; mark?: number; color?: string }> = ({ value, tone, max = 1.4, height = 8, label, mark = 1, color }) => {
-  const w = (v: number) => `${(Math.min(v, max) / max) * 100}%`;
-  return (
-    <div className="relative rounded-full overflow-hidden bg-[var(--surface-base)] w-full" style={{ height }} role="img" aria-label={label ?? (value == null ? "chưa có số" : `${Math.round(value * 100)}%`)}>
-      {value != null && <div className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-500" style={{ width: w(value), background: color ?? TONE_VAR[tone] }} />}
-      <div className="absolute inset-y-0 w-px bg-[var(--text)] opacity-60" style={{ left: w(mark) }} />
-    </div>
-  );
-};
+/** Màu theo ngưỡng run-rate 85% / 95% — đúng một hàm (channelHealth.runRateTone). */
+export const toneOfPct = runRateTone;
 
 // ---------------------------------------------------------------------------
 // Đồng hồ run-rate (cung 270°, thang 0–120%)
@@ -95,7 +84,7 @@ const dayTip = (d: RRDay) =>
   `${ddmm(d.date)} (${WEEKDAY[weekdayIdx(d.date)]})\nTarget: ${money(d.target)}\n` +
   (d.state === "future" || d.state === "empty"
     ? d.shifts > 0 ? `${d.shifts} ca chưa tới` : "Không có ca"
-    : `Đạt: ${money(d.actual)}${d.pctTarget != null ? ` (${pct(d.pctTarget)} target)` : ""}\n${d.withData}/${d.shifts} ca có số${d.state === "partial" ? (d.counted ? "\nTạm tính — ca đã có số đã vào run-rate theo target đúng ca, ca chờ số thì chưa" : "\nTạm tính — chưa vào run-rate") : d.state === "missing" ? "\nCòn ca chưa có số" : ""}`);
+    : `Đạt: ${money(d.actual)}${d.pctTarget != null ? ` (${pct(d.pctTarget)} target)` : ""}\n${d.withData}/${d.shifts} ca có số liệu${d.state === "partial" ? (d.counted ? "\nTạm tính — ca đã có số liệu đã vào Run-rate theo target đúng ca, ca chưa có số liệu thì chưa" : "\nTạm tính — chưa vào Run-rate") : d.state === "missing" ? "\nCòn ca chưa có số liệu" : ""}`);
 
 /** `showPace` = vẽ đường "giữ nhịp" (module Run-rate). Chi tiết kênh tắt nó — dự báo cuối tháng ở đó là của thẻ kênh (engine), một số duy nhất. */
 export const CumulativeChart: React.FC<{ r: AccountRunRate; color: string; showPace?: boolean }> = ({ r, color, showPace = true }) => {
@@ -155,7 +144,7 @@ export const CumulativeChart: React.FC<{ r: AccountRunRate; color: string; showP
       {endLabels.map((l) => <text key={l.text} x={W - R + 8} y={l.y} dominantBaseline="middle" style={{ fill: l.fill, fontSize: 11, fontWeight: 800 }}>{l.text}</text>)}
       {r.days.map((d, i) => (
         <rect key={d.date} x={x(i) - colW / 2} y={T} width={colW} height={H - T - B} fill="transparent"
-          data-tip={`${dayTip(d)}\n\nCộng dồn target: ${money(pts[i].target)}${pts[i].actual != null ? `\nCộng dồn đạt: ${money(pts[i].actual)}` : showPace && pts[i].projected != null ? `\nDự phóng giữ nhịp: ${money(pts[i].projected)}` : ""}`} />
+          data-tip={`${dayTip(d)}\n\nCộng dồn target: ${money(pts[i].target)}${pts[i].actual != null ? `\nCộng dồn đạt: ${money(pts[i].actual)}` : showPace && pts[i].projected != null ? `\nDự báo nếu giữ tiến độ: ${money(pts[i].projected)}` : ""}`} />
       ))}
     </svg>
   );
@@ -164,7 +153,7 @@ export const CumulativeChart: React.FC<{ r: AccountRunRate; color: string; showP
 export const CumulativeLegend: React.FC<{ color: string; showPace?: boolean }> = ({ color, showPace = true }) => (
   <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-[var(--text-muted)]">
     <span className="inline-flex items-center gap-1.5"><i className="w-4 h-[3px] rounded inline-block" style={{ background: color }} />Đã đạt (cộng dồn)</span>
-    {showPace && <span className="inline-flex items-center gap-1.5"><i className="w-4 h-[3px] rounded inline-block" style={{ background: `repeating-linear-gradient(90deg,${color} 0 5px,transparent 5px 8px)` }} />Nếu giữ nhịp hiện tại</span>}
+    {showPace && <span className="inline-flex items-center gap-1.5"><i className="w-4 h-[3px] rounded inline-block" style={{ background: `repeating-linear-gradient(90deg,${color} 0 5px,transparent 5px 8px)` }} />Nếu giữ tiến độ hiện tại</span>}
     <span className="inline-flex items-center gap-1.5"><i className="w-4 h-[3px] rounded inline-block" style={{ background: "repeating-linear-gradient(90deg,var(--text-faint) 0 3px,transparent 3px 6px)" }} />Target cộng dồn</span>
     <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: "var(--accent)", opacity: 0.35 }} />Ngày camp</span>
   </div>

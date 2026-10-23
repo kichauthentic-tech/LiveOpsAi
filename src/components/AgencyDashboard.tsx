@@ -20,16 +20,19 @@ import { PageHeader } from "./common/PageHeader";
 import { channelRefs, useChannelCards } from "./dashboard/useChannelCards";
 import { ddmm, useTooltip } from "./dashboard/shared";
 import { PlatformTab } from "./dashboard/period/PlatformTab";
+import { OverviewTab, type PlatformSummary } from "./dashboard/period/OverviewTab";
+import { accountRow, platformPace, sortAccounts } from "../lib/performance/accountOverview";
 import { BrandTab } from "./dashboard/period/BrandTab";
 import { rangeLabel } from "./dashboard/period/ui";
 import type { AccountVM } from "./runrate/types";
 
 // Dashboard agency (demo duyệt 22/10/2026 — thay 3 tab Tháng này / Theo kỳ / Sức khoẻ): MỘT sàn (thanh "Sàn"), kỳ chọn ở thanh trên
-// (Tháng này · 7 ngày + "So với"; 23/10 bỏ "Tháng trước"/"Tự chọn" — Dashboard chỉ xem trong tháng, tháng đã hết xem ở Report Tháng), mọi con số tự so kỳ so sánh (lib/performance/periodCompare.ts). Hai tab:
+// (Tháng này · 7 ngày + "So với"; 23/10 bỏ "Tháng trước"/"Tự chọn" — Dashboard chỉ xem trong tháng, tháng đã hết xem ở Report Tháng), mọi con số tự so kỳ so sánh (lib/performance/periodCompare.ts). 24/10 thêm tab đầu "Tổng quan account" (mọi sàn, một dòng mỗi kênh, xếp theo rủi ro —
+// lib/performance/accountOverview.ts; không theo thanh "Sàn" và bộ chọn kỳ). Hai tab theo sàn:
 // "Toàn sàn" (mọi brand của sàn) và "Brand" (một brand: run-rate + 4 nút xem + Key Metrics + shop/ads/đội live đi theo nút).
 // Run-rate, dự báo, 4 nút xem chỉ có ở "Tháng này" — số đi qua MỘT lần tính (useChannelCards → buildChannelCard).
 
-type View = "platform" | "brand";
+type View = "overview" | "platform" | "brand";
 const PERIODS: { id: PeriodKey; label: string }[] = [
   { id: "month", label: "Tháng này" },
   { id: "7d", label: "7 ngày" }
@@ -53,6 +56,11 @@ export interface AgencyDashboardProps {
   currentRole: UserRole;
   onOpenMonthPlan: (brandId: string, platform: ReportPlatform) => void;
   onNavigate: (tab: string) => void;
+  /** Mọi sàn agency đang chạy + mọi brand — cho tab Tổng quan account (24/10). Thiếu = chỉ sàn đang chọn. */
+  platforms?: ReportPlatform[];
+  allBrands?: Brand[];
+  /** Đổi sàn của thanh "Sàn" (App) — khi mở một account của sàn khác từ Tổng quan account. */
+  onPickPlatform?: (p: ReportPlatform) => void;
   /** Workspace brand (ops): khoá vào một brand — chỉ tab Brand, không có hàng chọn brand. */
   lockBrandId?: string;
   /** Tính tiền từng ca (khối "Lãi gộp mỗi giờ", chỉ CEO/admin) — cùng hàm Finance & P&L. */
@@ -85,7 +93,7 @@ export const AgencyDashboard: React.FC<AgencyDashboardProps> = (props) => {
   const { platform, today, brands, brandChannels, sessions, shiftSlots, engineParams, currentRole, onOpenMonthPlan, onNavigate, lockBrandId } = props;
   const { showToast } = useToast();
   const tooltip = useTooltip();
-  const [viewPick, setView] = useState<View>("platform");
+  const [viewPick, setView] = useState<View>("overview");
   const [brandPick, setBrandId] = useState<string | null>(null);
   const view: View = lockBrandId ? "brand" : viewPick;
   const brandId = lockBrandId ?? brandPick;
@@ -101,12 +109,32 @@ export const AgencyDashboard: React.FC<AgencyDashboardProps> = (props) => {
 
   // Thẻ kênh tháng đang chạy — MỘT lần tính cho cả hai tab.
   const month = today.slice(0, 7);
-  const refs = useMemo(() => channelRefs(brands, brandChannels, [platform]), [brands, brandChannels, platform]);
-  const { cards, loading, ledger } = useChannelCards({ month, today, refs, brandChannels, sessions, shiftSlots, engineParams, role: currentRole });
+  // Tổng quan account cần thẻ của MỌI sàn ⇒ một lần nạp cho mọi kênh, các tab theo sàn lọc lại (không nạp hai lần).
+  const allPlatforms = useMemo(() => (lockBrandId || !props.platforms?.length ? [platform] : props.platforms), [lockBrandId, props.platforms, platform]);
+  const allBrands = lockBrandId ? brands : props.allBrands ?? brands;
+  const refs = useMemo(() => channelRefs(allBrands, brandChannels, allPlatforms), [allBrands, brandChannels, allPlatforms]);
+  const { cards: allCards, loading, ledger } = useChannelCards({ month, today, refs, brandChannels, sessions, shiftSlots, engineParams, role: currentRole });
+  const cards = useMemo(() => allCards.filter((c) => c.platform === platform), [allCards, platform]);
+  const platRefs = useMemo(() => refs.filter((r) => r.platform === platform && brands.some((b) => b.id === r.brand.id)), [refs, platform, brands]);
+  const overviewRows = useMemo(
+    () => sortAccounts(allCards.map((c) => accountRow(c, c.state === "off" ? sessions.filter((s) => s.brandId === c.brandId && platformOf(s) === c.platform) : []))),
+    [allCards, sessions]
+  );
+  const summaries: PlatformSummary[] = useMemo(
+    () => allPlatforms.map((p) => {
+      const cs = allCards.filter((c) => c.platform === p);
+      return { platform: p, pace: platformPace(cs), waiting: cs.filter((c) => c.state !== "off").reduce((a, c) => a + c.coverage.missingSessions, 0) };
+    }),
+    [allPlatforms, allCards]
+  );
+  const coverageOf = useMemo(
+    () => new Map(allPlatforms.map((p) => [p, dataCoverage(sessions.filter((s) => platformOf(s) === p), today).completeThrough])),
+    [allPlatforms, sessions, today]
+  );
   const brandOf = useMemo(() => new Map(brands.map((b) => [b.id, b])), [brands]);
   const vms: AccountVM[] = useMemo(() => {
     if (loading || cards.length === 0)
-      return refs.map((r) => ({
+      return platRefs.map((r) => ({
         key: brandPlatformKey(r.brand.id, r.platform), brand: brandOf.get(r.brand.id)!, platform: r.platform, name: r.brand.name,
         planStatus: "none", report: null, actualOnly: 0, completeThrough: null, missingSessions: 0, oldestMissing: null, loading: true
       }));
@@ -115,7 +143,7 @@ export const AgencyDashboard: React.FC<AgencyDashboardProps> = (props) => {
       actualOnly: c.monthActual, completeThrough: c.coverage.completeThrough, missingSessions: c.coverage.missingSessions,
       oldestMissing: c.coverage.oldestMissing, loading: false, card: c
     }));
-  }, [loading, cards, refs, brandOf]);
+  }, [loading, cards, platRefs, brandOf]);
 
   const { talents, financeRecords, brandPlatformRates, brandPlatformRateHistory, talentRateHistory } = props;
   const canSeeMoney = currentRole === "ceo" || currentRole === "admin";
@@ -132,6 +160,7 @@ export const AgencyDashboard: React.FC<AgencyDashboardProps> = (props) => {
 
   const pickedBrand = brands.find((b) => b.id === brandId) ?? brands[0] ?? null;
   const openBrand = (id: string) => { setBrandId(id); setView("brand"); window.scrollTo({ top: 0, behavior: "smooth" }); };
+  const openAccount = (id: string, p: ReportPlatform) => { if (p !== platform) props.onPickPlatform?.(p); openBrand(id); };
   const waiting = cards.filter((c) => c.state !== "off").reduce((a, c) => a + c.coverage.missingSessions, 0);
   const label = rangeLabel(period.start, period.end), prevLabel = period.noBase ? "—" : rangeLabel(period.prevStart, period.prevEnd);
 
@@ -157,11 +186,11 @@ export const AgencyDashboard: React.FC<AgencyDashboardProps> = (props) => {
       <PageHeader icon={LayoutDashboard} title={lockBrandId && pickedBrand ? `Dashboard · ${pickedBrand.name}` : "Dashboard"}>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           {!lockBrandId && <div className="flex gap-1 rounded-xl border border-[var(--border)] p-1" role="tablist" aria-label="Phần của Dashboard">
-            {([["platform", "Toàn sàn"], ["brand", "Brand"]] as const).map(([v, l]) => (
+            {([["overview", "Tổng quan account"], ["platform", "Toàn sàn"], ["brand", "Brand"]] as const).map(([v, l]) => (
               <button key={v} type="button" role="tab" aria-selected={view === v} onClick={() => setView(v)} className={`${seg(view === v)} !text-sm px-3.5 min-h-[32px]`}>{l}</button>
             ))}
           </div>}
-          <div className="flex gap-1 rounded-xl border border-[var(--border)] p-1 overflow-x-auto" role="group" aria-label="Kỳ xem">
+          {view !== "overview" && <><div className="flex gap-1 rounded-xl border border-[var(--border)] p-1 overflow-x-auto" role="group" aria-label="Kỳ xem">
             {PERIODS.map((x) => <button key={x.id} type="button" aria-pressed={periodKey === x.id} onClick={() => setPeriodKey(x.id)} className={seg(periodKey === x.id)}>{x.label}</button>)}
           </div>
           <label className="inline-flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
@@ -169,20 +198,30 @@ export const AgencyDashboard: React.FC<AgencyDashboardProps> = (props) => {
             <select value={mode} onChange={(e) => setMode(e.target.value as CompareMode)} className="bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1 min-h-[30px] text-[var(--text)] text-xs font-bold">
               {MODES.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
             </select>
-          </label>
-          <button type="button" onClick={exportXlsx} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] hover:border-[var(--accent)] min-h-[32px]">
+          </label></>}
+          {view !== "overview" && <button type="button" onClick={exportXlsx} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] hover:border-[var(--accent)] min-h-[32px]">
             <Download className="w-3.5 h-3.5" />Tải Excel
-          </button>
+          </button>}
         </div>
+        {view === "overview" ? (
+          <p role="status" className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[var(--text-faint)] mt-2">
+            <span>Tháng <b className="text-[var(--text-muted)]">{Number(month.slice(5))}/{month.slice(0, 4)}</b> · mọi sàn, mỗi sàn tính riêng (không cộng chéo)</span>
+            <span>· Dữ liệu đầy đủ đến {allPlatforms.map((p) => `${p} ${coverageOf.get(p) ? ddmm(coverageOf.get(p)!) : "—"}`).join(" · ")}</span>
+            {summaries.some((x) => x.waiting > 0) && <button type="button" onClick={() => onNavigate("sessions")} className="min-h-[24px] font-bold text-amber-300 hover:underline">· ca chưa có số liệu: {summaries.map((x) => `${x.platform} ${x.waiting}`).join(" · ")} →</button>}
+          </p>
+        ) : (
         <p role="status" className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[var(--text-faint)] mt-2">
           <span>Đang xem <b className="text-[var(--text-muted)]">{label}</b> · {spanDays(period.start, period.end)} ngày · so với <b className="text-[var(--text-muted)]">{prevLabel}</b>{period.mode === "mom" ? " cùng ngày tháng trước" : " ngay trước, cùng độ dài"}</span>
-          <span>· Số đủ tới {coverage.completeThrough ? ddmm(coverage.completeThrough) : "—"}</span>
-          {waiting > 0 && <button type="button" onClick={() => onNavigate("sessions")} className="min-h-[24px] font-bold text-amber-300 hover:underline">· {waiting} ca chờ số →</button>}
-          <span className="sm:ml-auto">Chỉ số trong {platform} · dưới 5 ca thì không tô màu</span>
+          <span>· Dữ liệu đầy đủ đến {coverage.completeThrough ? ddmm(coverage.completeThrough) : "—"}</span>
+          {waiting > 0 && <button type="button" onClick={() => onNavigate("sessions")} className="min-h-[24px] font-bold text-amber-300 hover:underline">· {waiting} ca chưa có số liệu →</button>}
+          <span className="sm:ml-auto">Chỉ số trong {platform} · dưới 5 ca không đánh giá tăng/giảm</span>
         </p>
+        )}
       </PageHeader>
 
-      {brands.length === 0 ? (
+      {view === "overview" ? (
+        <OverviewTab rows={overviewRows} summaries={summaries} brands={allBrands} loading={loading} today={today} onOpenBrand={openAccount} onOpenMonthPlan={onOpenMonthPlan} />
+      ) : brands.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[var(--border)] p-8 text-center text-sm text-[var(--text-muted)]">Chưa có brand nào chạy {platform}. Thêm kênh cho brand ở CRM.</div>
       ) : view === "platform" ? (
         <PlatformTab
@@ -191,11 +230,10 @@ export const AgencyDashboard: React.FC<AgencyDashboardProps> = (props) => {
           brands={brands}
           sessions={platSessions}
           cards={cards}
-          vms={vms}
           cardsLoading={loading}
+          waiting={waiting}
           today={today}
           onOpenBrand={openBrand}
-          onOpenMonthPlan={onOpenMonthPlan}
           onNavigate={onNavigate}
           pnl={pnl}
         />

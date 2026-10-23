@@ -12,16 +12,16 @@ import { profileOf } from "../../../lib/platforms/profiles";
 import { fmtMonth } from "../../../lib/format";
 import { StatTile } from "../../common/StatTile";
 import { BrandLogo } from "../../ui/BrandLogo";
-import { AccountCard } from "../../runrate/AccountCard";
-import type { AccountVM } from "../../runrate/types";
 import { Card, chartColor, ddmm, money, niceMax, pct } from "../shared";
-import { HeatCard, HostTable, LateCard, PairTable, ProfitCard, ShiftLenCard, type Scope } from "./opsBlocks";
+import { LateCard, ProfitCard, type Scope } from "./opsBlocks";
+import { platformPace } from "../../../lib/performance/accountOverview";
 import type { PnlFn } from "../../../lib/performance/ceoBrief";
 import { BlockHead, Chg, Sect, TD, Table, rangeLabel } from "./ui";
 
-// Tab "Toàn sàn" của Dashboard (demo duyệt 22/10/2026): MỘT sàn, kỳ chọn ở thanh trên, mọi số so kỳ so sánh. Tháng đang chạy thì
-// có thẻ run-rate từng brand (thẻ kênh — một lần tính ở useChannelCards) + dự kiến cuối tháng; kỳ khác thì thẻ so cùng kỳ.
-// Không cộng gì giữa TikTok và Shopee (kể cả giờ, người).
+// Tab "Toàn sàn" của Dashboard (demo duyệt 22/10/2026): MỘT sàn, kỳ chọn ở thanh trên, mọi số so kỳ so sánh. Không cộng gì giữa
+// TikTok và Shopee (kể cả giờ, người). 24/10 (demo Tổng quan account): thẻ run-rate từng brand chuyển thành bảng ở tab Tổng quan
+// account; hàng ô vận hành gộp thành một dòng; Host, Cặp host + trợ, Khung giờ, Độ dài ca chuyển sang màn Hiệu Suất Host; bảng
+// GMV theo tháng có cột "dự báo" của tháng đang chạy.
 
 export interface PlatformTabProps {
   platform: ReportPlatform;
@@ -30,18 +30,18 @@ export interface PlatformTabProps {
   /** Ca của sàn này (mọi brand chạy sàn). */
   sessions: LiveSession[];
   cards: ChannelCard[];
-  vms: AccountVM[];
   cardsLoading: boolean;
+  /** Ca đã live chưa có số liệu (Σ thẻ kênh của sàn) — một con số cho cả màn. */
+  waiting: number;
   today: string;
   onOpenBrand: (brandId: string) => void;
-  onOpenMonthPlan: (brandId: string, platform: ReportPlatform) => void;
   onNavigate: (tab: string) => void;
   /** Chỉ CEO/admin: tính tiền từng ca (null = không thấy tiền). */
   pnl: PnlFn | null;
 }
 
 export const PlatformTab: React.FC<PlatformTabProps> = (p) => {
-  const { platform, period: P, brands, sessions, cards, vms, cardsLoading, today, onOpenBrand, onOpenMonthPlan, onNavigate } = p;
+  const { platform, period: P, brands, sessions, cards, cardsLoading, waiting, today, onOpenBrand, onNavigate } = p;
   const label = rangeLabel(P.start, P.end), prevLabel = P.noBase ? "—" : rangeLabel(P.prevStart, P.prevEnd);
   const cur = useMemo(() => ranIn(sessions, P.start, P.end), [sessions, P.start, P.end]);
   const prev = useMemo(() => (P.noBase ? null : ranIn(sessions, P.prevStart, P.prevEnd)), [sessions, P.noBase, P.prevStart, P.prevEnd]);
@@ -50,18 +50,16 @@ export const PlatformTab: React.FC<PlatformTabProps> = (p) => {
   const live = cards.filter((x) => x.state !== "off");
   const todos = useMemo(() => agencyTodos(cards), [cards]);
 
-  // Run-rate theo kế hoạch của cả sàn = Σ đã đạt ÷ Σ kế hoạch tới nay của các thẻ (mỗi thẻ tới ca mới nhất có số của nó).
-  const rrAct = live.reduce((a, x) => a + (x.pace?.actual ?? 0), 0), rrExp = live.reduce((a, x) => a + (x.pace?.targetToDate ?? 0), 0);
-  const tgt = live.reduce((a, x) => a + (x.target ?? 0), 0);
-  const withFc = live.filter((x) => x.target);
-  const fc = withFc.reduce((a, x) => a + (x.forecast?.p50 ?? x.pace?.actual ?? x.monthActual), 0);
+  // Run-rate theo kế hoạch của cả sàn = Σ thực đạt ÷ Σ target luỹ kế của các thẻ (mỗi thẻ tới ca gần nhất có số liệu của nó).
+  const sp = platformPace(cards);
+  const rrAct = sp.actual, rrExp = sp.targetToDate, tgt = sp.target, fc = sp.forecast;
   const scheduledLeft = useMemo(() => {
     if (!P.isCurrentMonth) return null;
     const from = addDays(today, 0), to = monthEndOf(`${today.slice(0, 7)}-01`);
     return sessions.filter((s) => s.status !== "Cancelled" && s.status !== "Completed" && s.date >= from && s.date <= to).reduce((a, s) => a + sessionHours(s), 0);
   }, [P.isCurrentMonth, sessions, today]);
 
-  // Hai hàng KPI cùng một khung cột (6 khi tháng này, 4 khi kỳ khác) để ô thẳng hàng; ô cao bằng nhau (h-full).
+  // Hàng KPI kết quả (6 ô khi tháng này, 4 khi kỳ khác); ô cao bằng nhau (h-full). Số vận hành là một dòng ngay dưới.
   const kpiGrid = `grid grid-cols-2 gap-2.5 ${P.isCurrentMonth ? "md:grid-cols-3 xl:grid-cols-6" : "xl:grid-cols-4"}`;
   const tile = (labelText: string, value: string, hint: React.ReactNode) => <StatTile frame="card" size="lg" label={labelText} value={value} hint={hint} className="h-full" />;
   const vs = (x: number | null | undefined, f: (v: number) => string) => (x == null ? null : <span className="text-[var(--text-faint)]"> vs {f(x)}</span>);
@@ -69,36 +67,26 @@ export const PlatformTab: React.FC<PlatformTabProps> = (p) => {
 
   return (
     <div className="space-y-5">
-      {/* Vận hành trước (giờ, ca, người) — số hiệu suất sau. */}
-      <div className={kpiGrid}>
-        {tile(`Giờ live · ${profileOf(platform).label}`, `${nf(c.hours)} giờ`, <><Chg cur={c.hours} prev={b?.hours} weak />{vs(b?.hours, (v) => `${nf(v)} giờ`)}</>)}
-        {tile("Sessions", nf(c.n), <><Chg cur={c.n} prev={b?.n} weak />{vs(b?.n, (v) => nf(v))}</>)}
-        {tile("Người có ca (host + trợ)", nf(c.people), <><Chg cur={c.people} prev={b?.people} weak />{vs(b?.people, (v) => nf(v))}</>)}
-        {tile("Giờ live/ca", c.hoursPerShift == null ? "—" : `${nf(c.hoursPerShift, 1)} giờ`, <><Chg cur={c.hoursPerShift} prev={b?.hoursPerShift} weak />{vs(b?.hoursPerShift, (v) => `${nf(v, 1)} giờ`)}</>)}
-        {P.isCurrentMonth && tile(`Giờ đã xếp ${rangeLabel(today, monthEndOf(`${today.slice(0, 7)}-01`))}`, `${nf(scheduledLeft ?? 0)} giờ`, `${live.length}/${cards.length} kênh đang chạy`)}
-        {P.isCurrentMonth && tile("Ca chưa có số", nf(c.noData), c.noData > 0 ? <button type="button" onClick={() => onNavigate("sessions")} className="font-bold text-amber-300 hover:underline min-h-[24px]">Mở Sổ Ca →</button> : "đủ số")}
-      </div>
       <div className={kpiGrid}>
         {tile(`GMV ${label}`, money(c.gmv), <><Chg cur={c.gmv} prev={b?.gmv} weak={weak} />{vs(b?.gmv, money)}</>)}
-        {P.isCurrentMonth && tile(`Run-rate theo kế hoạch · ${profileOf(platform).label}`, rrExp > 0 ? pct(rrAct / rrExp) : "—", rrExp > 0 ? `${money(rrAct)} / ${money(rrExp)} kế hoạch tới nay${tgt ? ` · đã đạt ${pct(rrAct / tgt)} target tháng` : ""}` : "chưa có kế hoạch chốt")}
-        {P.isCurrentMonth && tile("Dự kiến cuối tháng", tgt ? `~${money(fc)}` : "—", tgt ? `${pct(fc / tgt)} của target ${money(tgt)}` : "chưa có target")}
+        {P.isCurrentMonth && tile(`Run-rate theo kế hoạch · ${profileOf(platform).label}`, rrExp > 0 ? pct(rrAct / rrExp) : "—", rrExp > 0 ? <>{money(rrAct)} / {money(rrExp)} target luỹ kế · <b className="text-amber-300">tính đến ca gần nhất có số liệu</b>{tgt ? ` · đã đạt ${pct(rrAct / tgt)} target tháng` : ""}</> : "chưa có kế hoạch chốt")}
+        {P.isCurrentMonth && tile("Dự báo cuối tháng", tgt ? `~${money(fc)}` : "—", tgt ? `${pct(fc / tgt)} của target ${money(tgt)}` : "chưa có target")}
         {tile("GMV/giờ", money(c.gph), <><Chg cur={c.gph} prev={b?.gph} weak={weak} />{vs(b?.gph, money)}</>)}
         {tile("Orders · CVR", nf(c.orders), <><Chg cur={c.orders} prev={b?.orders} weak={weak} /> · CVR <b className="text-[var(--text-muted)]">{c.cvr == null ? "—" : `${nf(c.cvr * 100, 2)}%`}</b> <Chg cur={c.cvr} prev={b?.cvr} points digits={2} weak={weak} /></>)}
         {tile("AOV", money(c.aov), <><Chg cur={c.aov} prev={b?.aov} weak={weak} />{vs(b?.aov, money)}</>)}
       </div>
+      <p role="status" className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-xs text-[var(--text-muted)]">
+        <span>Giờ live <b className="text-[var(--text)]">{nf(c.hours)} giờ</b> <Chg cur={c.hours} prev={b?.hours} weak /></span>
+        <span><b className="text-[var(--text)]">{nf(c.n)}</b> Sessions <Chg cur={c.n} prev={b?.n} weak /></span>
+        <span><b className="text-[var(--text)]">{nf(c.people)}</b> nhân sự live</span>
+        <span><b className="text-[var(--text)]">{c.hoursPerShift == null ? "—" : nf(c.hoursPerShift, 1)}</b> giờ/ca</span>
+        {P.isCurrentMonth && <span>đã xếp lịch <b className="text-[var(--text)]">{nf(scheduledLeft ?? 0)} giờ</b> {rangeLabel(today, monthEndOf(`${today.slice(0, 7)}-01`))} · {live.length}/{cards.length} kênh đang chạy</span>}
+        {P.isCurrentMonth && (waiting > 0
+          ? <button type="button" onClick={() => onNavigate("sessions")} className="font-bold text-amber-300 hover:underline min-h-[24px]">{waiting} ca chưa có số liệu · Mở Sổ Ca →</button>
+          : <span>đủ số liệu</span>)}
+      </p>
 
-      {P.isCurrentMonth ? (
-        <section className="space-y-2.5" aria-label="Run-rate từng brand">
-          <Sect title="Run-rate từng brand" sub={`${live.length} brand trên ${profileOf(platform).label} · run-rate theo kế hoạch = đã đạt ÷ target của các ca đã chạy (tới ca mới nhất có số), khác với % target tháng · dòng cuối mỗi thẻ: so cùng kỳ · bấm thẻ để mở brand`} />
-          <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-2 -mx-3 px-3 sm:mx-0 sm:px-0 sm:pb-0 sm:overflow-visible sm:grid sm:grid-cols-2 xl:grid-cols-4">
-            {vms.map((vm) => (
-              <div key={vm.key} className="snap-start shrink-0 w-[82%] sm:w-auto min-w-0 flex flex-col [&>*]:flex-1">
-                <AccountCard vm={vm} selected={false} onSelect={() => onOpenBrand(vm.brand.id)} onOpenMonthPlan={onOpenMonthPlan} compare={cardsLoading ? null : <CmpLine sessions={sessions.filter((s) => s.brandId === vm.brand.id)} P={P} />} />
-              </div>
-            ))}
-          </div>
-        </section>
-      ) : (
+      {!P.isCurrentMonth && (
         <section className="space-y-2.5" aria-label="Từng brand so cùng kỳ">
           <Sect title="Từng brand" sub={`${label} so với ${prevLabel} · bấm thẻ để mở brand`} />
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -113,32 +101,20 @@ export const PlatformTab: React.FC<PlatformTabProps> = (p) => {
 
       <CampTable sessions={sessions} P={P} />
 
-      <Sect title="Vận hành" sub="con người, giờ giấc, cách xếp ca" />
-      <div className="grid gap-4 xl:grid-cols-2 items-start">
-        <LateCard s={scope} />
-        <ShiftLenCard s={scope} />
-      </div>
+      <Sect title="Vận hành" sub="giờ giấc, chi phí" />
+      <LateCard s={scope} />
       {p.pnl && <ProfitCard s={scope} pnl={p.pnl} />}
-      <HeatCard s={scope} />
-      <HostTable s={scope} brands={brands} showBrand title="Host" />
-      <PairTable s={scope} brands={brands} />
 
-      <MonthlyTables brands={brands} sessions={sessions} through={P.isCurrentMonth ? P.end : P.end} />
+      <MonthlyTables brands={brands} sessions={sessions} through={P.end} forecastOf={P.isCurrentMonth && !cardsLoading ? (id) => cards.find((x) => x.brandId === id) ?? null : null} />
+      <p className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-dashed border-[var(--border)] px-4 py-2.5 text-xs text-[var(--text-muted)]">
+        <span>Host · Cặp host + trợ live · Khung giờ · Độ dài ca: xem ở màn <b className="text-[var(--text)]">Hiệu Suất Host</b>.</span>
+        <button type="button" onClick={() => onNavigate("host_performance")} className="font-bold text-[var(--accent-text)] hover:underline min-h-[24px]">Mở Hiệu Suất Host →</button>
+      </p>
     </div>
   );
 };
 
 // ---------------------------------------------------------------------------
-
-/** Dòng so cùng kỳ ở chân thẻ run-rate. */
-const CmpLine: React.FC<{ sessions: LiveSession[]; P: ResolvedPeriod }> = ({ sessions, P }) => {
-  const label = rangeLabel(P.start, P.end), prevLabel = rangeLabel(P.prevStart, P.prevEnd);
-  const c = aggregate(ranIn(sessions, P.start, P.end)), b = P.noBase ? null : aggregate(ranIn(sessions, P.prevStart, P.prevEnd));
-  if (!b || !b.n) return <>{label} so với {prevLabel}: kỳ trước kênh chưa chạy</>;
-  if (!c.n) return <>{label}: không có ca · kỳ so sánh {prevLabel} có {b.n} ca, {money(b.gmv)}</>;
-  const w = isWeak(c, b);
-  return <>{label} so với {prevLabel}: GMV <Chg cur={c.gmv} prev={b.gmv} weak={w} /> · GMV/giờ <Chg cur={c.gph} prev={b.gph} weak={w} /> · giờ <Chg cur={c.hours} prev={b.hours} weak /></>;
-};
 
 const PeriodCard: React.FC<{ brand: Brand; sessions: LiveSession[]; P: ResolvedPeriod; onOpen: () => void }> = ({ brand, sessions, P, onOpen }) => {
   const c = aggregate(ranIn(sessions, P.start, P.end)), b = P.noBase ? null : aggregate(ranIn(sessions, P.prevStart, P.prevEnd));
@@ -221,7 +197,7 @@ export const CumChart: React.FC<{ sessions: LiveSession[]; P: ResolvedPeriod; ca
             {ca.length > 0 && <text x={X(last) - 6} y={Y(ca[last]) - 9} textAnchor="end" fontSize="11" fontWeight="600" fill="var(--text)">{money(ca[last])}</text>}
             {showTgt && <path d={`M${X(last)} ${Y(ca[last] ?? 0)}L${X(axis.length - 1)} ${Y(fcTotal)}`} fill="none" stroke="var(--text-muted)" strokeWidth="1.8" strokeDasharray="2 3" />}
             {showTgt && <text x={L + iw + 6} y={Y(tgtTotal) + 3.5} fontSize="10.5" fontWeight="600" fill="var(--warning)">Target {money(tgtTotal)}</text>}
-            {showTgt && <text x={L + iw + 6} y={Y(fcTotal) + (Math.abs(Y(fcTotal) - Y(tgtTotal)) < 14 ? 17 : 3.5)} fontSize="10.5" fontWeight="600" fill="var(--text-muted)">~{money(fcTotal)} dự kiến</text>}
+            {showTgt && <text x={L + iw + 6} y={Y(fcTotal) + (Math.abs(Y(fcTotal) - Y(tgtTotal)) < 14 ? 17 : 3.5)} fontSize="10.5" fontWeight="600" fill="var(--text-muted)">~{money(fcTotal)} dự báo</text>}
           </>
         )}
       </svg>
@@ -229,7 +205,7 @@ export const CumChart: React.FC<{ sessions: LiveSession[]; P: ResolvedPeriod; ca
         <span className="inline-flex items-center gap-1.5"><i className="w-4 border-t-2 border-[var(--accent)]" />{rangeLabel(P.start, P.end)}</span>
         {!P.noBase && <span className="inline-flex items-center gap-1.5"><i className="w-4 border-t-2 border-dashed border-[var(--text-faint)]" />{P.isCurrentMonth ? fmtMonth(P.prevStart.slice(0, 7)) : rangeLabel(P.prevStart, P.prevEnd)}</span>}
         {showTgt && <span className="inline-flex items-center gap-1.5"><i className="w-4 border-t-2 border-dashed border-[var(--warning)]" />Target cộng dồn</span>}
-        {showTgt && <span className="inline-flex items-center gap-1.5"><i className="w-4 border-t-2 border-dotted border-[var(--text-muted)]" />Tới dự kiến cuối tháng (thẻ kênh)</span>}
+        {showTgt && <span className="inline-flex items-center gap-1.5"><i className="w-4 border-t-2 border-dotted border-[var(--text-muted)]" />Tới dự báo cuối tháng (thẻ kênh)</span>}
       </div>
     </Card>
   );
@@ -251,7 +227,7 @@ const Todos: React.FC<{ todos: AgencyTodo[]; onNavigate: (tab: string) => void }
       <li className="flex gap-2.5 text-sm">
         <i className="mt-1.5 w-2 h-2 rounded-full shrink-0 bg-[var(--text-faint)]" aria-hidden="true" />
         <span className="min-w-0 text-[var(--text-muted)] leading-snug">
-          Up số ca, chốt kế hoạch tháng sau, giờ cam kết còn thiếu: ở Bảng Vận Hành
+          Cập nhật số liệu ca, chốt kế hoạch tháng sau, giờ cam kết còn thiếu: ở Bảng Vận Hành
           <button type="button" onClick={() => onNavigate("calendar")} className="ml-1.5 min-h-[24px] text-xs font-bold text-[var(--accent-text)] hover:underline">Mở →</button>
         </span>
       </li>
@@ -308,23 +284,29 @@ export const CampTable: React.FC<{ sessions: LiveSession[]; P: ResolvedPeriod }>
 // GMV và GMV/giờ theo tháng (5 tháng), tháng đang chạy cắt ở ngày đủ số.
 // ---------------------------------------------------------------------------
 
-const MonthlyTables: React.FC<{ brands: Brand[]; sessions: LiveSession[]; through: string }> = ({ brands, sessions, through }) => {
+const MonthlyTables: React.FC<{ brands: Brand[]; sessions: LiveSession[]; through: string; forecastOf: ((brandId: string) => ChannelCard | null) | null }> = ({ brands, sessions, through, forecastOf }) => {
   const month = through.slice(0, 7);
   const rows = brands.map((b) => ({ b, t: monthlyTrend(sessions.filter((s) => s.brandId === b.id), month, through) })).filter((r) => r.t.some((x) => x.gmv > 0));
   const months = rows[0]?.t.map((x) => x.month) ?? [month, prevMonthOf(month)];
   const partial = through < monthEndOf(`${month}-01`);
   const head = ["Brand", ...months.map((m) => `T${Number(m.slice(5))}${m === month && partial ? "*" : ""}`)];
+  // Tháng đang chạy: cột dự báo cuối tháng (thẻ kênh) cạnh số luỹ kế — để T10 dở dang không trông như tụt so với tháng đủ.
+  const fcHead = forecastOf ? [...head, `T${Number(month.slice(5))} dự báo`] : head;
+  const fcCell = (id: string) => {
+    const cd = forecastOf?.(id);
+    return <td className={`${TD} font-bold text-[var(--text)]`}>{cd?.forecast ? `~${money(cd.forecast.p50)}` : cd?.state === "off" ? "tạm dừng" : "—"}</td>;
+  };
   return (
-    <div className="grid gap-4 xl:grid-cols-2 items-start">
+    <div className="grid gap-4 xl:grid-cols-2 items-start [&>*]:min-w-0">
       <Card>
-        <BlockHead title="GMV theo tháng" sub={partial ? `* T${Number(month.slice(5))} tính tới ${ddmm(through)}` : undefined} />
-        <Table head={head} empty={rows.length ? undefined : "Chưa có ca có số."}>
-          {rows.map(({ b, t }) => <tr key={b.id}><td className={`${TD} font-semibold text-[var(--text)]`}>{b.name}</td>{t.map((x) => <td key={x.month} className={TD}>{x.gmv ? money(x.gmv) : "—"}</td>)}</tr>)}
+        <BlockHead title="GMV theo tháng" sub={partial ? `* T${Number(month.slice(5))} luỹ kế đến ${ddmm(through)}${forecastOf ? " · cột cuối: dự báo cuối tháng" : ""}` : undefined} />
+        <Table head={fcHead} empty={rows.length ? undefined : "Chưa có ca có số liệu."}>
+          {rows.map(({ b, t }) => <tr key={b.id}><td className={`${TD} font-semibold text-[var(--text)]`}>{b.name}</td>{t.map((x) => <td key={x.month} className={`${TD}${x.month === month && forecastOf ? " text-[var(--text-faint)]" : ""}`}>{x.gmv ? money(x.gmv) : "—"}</td>)}{forecastOf && fcCell(b.id)}</tr>)}
         </Table>
       </Card>
       <Card>
-        <BlockHead title="GMV/giờ theo tháng" sub="GMV ÷ giờ live của ca có số" />
-        <Table head={head} empty={rows.length ? undefined : "Chưa có ca có số."}>
+        <BlockHead title="GMV/giờ theo tháng" sub="GMV ÷ Giờ live của các ca có số liệu" />
+        <Table head={head} empty={rows.length ? undefined : "Chưa có ca có số liệu."}>
           {rows.map(({ b, t }) => <tr key={b.id}><td className={`${TD} font-semibold text-[var(--text)]`}>{b.name}</td>{t.map((x) => <td key={x.month} className={TD}>{money(x.gmvPerHour)}</td>)}</tr>)}
         </Table>
       </Card>

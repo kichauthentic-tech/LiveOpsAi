@@ -65,11 +65,11 @@ export const LateCard: React.FC<{ s: Scope }> = ({ s }) => {
   const worst = [...mc].filter(([, p]) => p.late > 0).sort((x, y) => y[1].late - x[1].late || y[1].sum - x[1].sum).slice(0, 6);
   return (
     <Card>
-      <BlockHead title="Lên sóng trễ" sub={`% ca lên sóng trễ quá ${LATE_MIN} phút so với giờ xếp`} />
+      <BlockHead title="Lên live trễ" sub={`% ca lên live trễ hơn ${LATE_MIN} phút so với lịch`} />
       <div className="space-y-2">
         {rows.map(([lab, a]) => (
           <div key={lab} className="grid grid-cols-[minmax(0,1fr)_minmax(60px,140px)_48px] items-center gap-3 text-xs">
-            <span className="text-[var(--text-muted)] truncate">{lab}{a && <span className="text-[var(--text-faint)]"> · {a.lateMeasured} ca có giờ lên sóng</span>}</span>
+            <span className="text-[var(--text-muted)] truncate">{lab}{a && <span className="text-[var(--text-faint)]"> · {a.lateMeasured} ca có giờ lên live</span>}</span>
             <span className="h-2 rounded-full bg-[var(--surface-base)] overflow-hidden"><i className="block h-full rounded-full" style={{ width: `${a?.lateRate == null ? 0 : (a.lateRate / max) * 100}%`, background: col(a?.lateRate ?? null) }} /></span>
             <b className="text-right tabular-nums" style={{ color: col(a?.lateRate ?? null) }}>{a ? pct(a.lateRate, 1) : "—"}</b>
           </div>
@@ -112,7 +112,7 @@ export const ShiftLenCard: React.FC<{ s: Scope }> = ({ s }) => {
   const max = Math.max(130, ...[...ic.values()].map((x) => x.index));
   return (
     <Card>
-      <BlockHead title="GMV/giờ theo độ dài ca" sub={`${s.label} · mỗi ca so với GMV/giờ trung bình của chính kênh đó (100 = bằng kênh), nên brand bán to không kéo lệch`} />
+      <BlockHead title="GMV/giờ theo độ dài ca" sub={`${s.label} · mỗi ca so với GMV/giờ trung bình của chính kênh đó (100 = bằng kênh), nên quy mô brand không làm lệch so sánh`} />
       <div className="space-y-2">
         {SHIFT_LEN_LABELS.map((lab, i) => {
           const x = ic.get(i);
@@ -175,12 +175,13 @@ export const HeatCard: React.FC<{ s: Scope }> = ({ s }) => {
 // Đội live: host (GMV) | trợ live (giờ)
 // ---------------------------------------------------------------------------
 
-export const HostTable: React.FC<{ s: Scope; brands: Brand[]; showBrand: boolean; minSessions?: number; title?: string }> = ({ s, brands, showBrand, minSessions = 3, title = "Host" }) => {
+/** `weakBelow`: dưới bấy nhiêu ca thì chỉ số hiển thị mờ (Hiệu Suất Host dùng 8 — xếp hạng host ít ca gần như không lặp lại tháng sau). */
+export const HostTable: React.FC<{ s: Scope; brands: Brand[]; showBrand: boolean; minSessions?: number; title?: string; weakBelow?: number }> = ({ s, brands, showBrand, minSessions = 3, title = "Host", weakBelow = 3 }) => {
   const rows = hostRows(s.cur).filter((r) => r.n >= minSessions);
   const prev = new Map((s.prev ? hostRows(s.prev) : []).map((r): [string, HostRow] => [r.id, r]));
   return (
     <Card>
-      <BlockHead title={title} sub={`${s.label} · ${minSessions > 1 ? `host từ ${minSessions} ca` : "mọi host có ca, dưới 3 ca để xám"} · GMV = các ca người đó làm host · chỉ số 100 = GMV/giờ trung bình của chính kênh đó · so với ${s.prevLabel}`} />
+      <BlockHead title={title} sub={`${s.label} · ${minSessions > 1 ? `host từ ${minSessions} ca` : "mọi host có ca"}${weakBelow > minSessions ? `, dưới ${weakBelow} ca hiển thị mờ` : ""} · GMV = các ca người đó làm host · chỉ số 100 = GMV/giờ trung bình của chính kênh đó · so với ${s.prevLabel}`} />
       <Table head={["Host", "Sessions", "Giờ live", "GMV", "Chỉ số", "vs kỳ trước"]} empty={rows.length ? undefined : minSessions > 1 ? `Chưa host nào có từ ${minSessions} ca trong kỳ này.` : `Chưa có ca có số trong ${s.label}.`}>
         {rows.map((r) => (
           <tr key={r.id}>
@@ -188,8 +189,8 @@ export const HostTable: React.FC<{ s: Scope; brands: Brand[]; showBrand: boolean
             <td className={TD}>{r.n}</td>
             <td className={TD}>{hrs(r.hours)}</td>
             <td className={TD}>{money(r.gmv)}</td>
-            <td className={TD}><IdxCell index={r.index} weak={r.n < 3} /></td>
-            <td className={TD}><IdxDelta cur={r} prev={prev.get(r.id)} /></td>
+            <td className={TD}><IdxCell index={r.index} weak={r.n < weakBelow} /></td>
+            <td className={TD}><IdxDelta cur={r} prev={prev.get(r.id)} weakAt={Math.max(5, weakBelow)} /></td>
           </tr>
         ))}
       </Table>
@@ -222,12 +223,12 @@ export const CoTable: React.FC<{ s: Scope; brands: Brand[]; showBrand: boolean }
 };
 
 /** Cặp host + trợ live từ 2 ca chạy chung — tham khảo cách ghép người; chỉ số theo ca của cặp, không chấm riêng trợ live. */
-export const PairTable: React.FC<{ s: Scope; brands: Brand[] }> = ({ s, brands }) => {
+export const PairTable: React.FC<{ s: Scope; brands: Brand[]; weakBelow?: number }> = ({ s, brands, weakBelow = 3 }) => {
   const rows = pairRows(s.cur).filter((r) => r.n >= 2).slice(0, 15);
   const prev = new Map((s.prev ? pairRows(s.prev) : []).map((r) => [r.id, r]));
   return (
     <Card>
-      <BlockHead title="Cặp host + trợ live" sub={`${s.label} · cặp chạy chung từ 2 ca · chỉ số 100 = GMV/giờ trung bình của kênh · so với ${s.prevLabel} · chỉ để xem cách ghép, trợ live không chịu trách nhiệm GMV`} />
+      <BlockHead title="Cặp host + trợ live" sub={`${s.label} · cặp chạy chung từ 2 ca, dưới ${weakBelow} ca hiển thị mờ · chỉ số 100 = GMV/giờ trung bình của kênh · so với ${s.prevLabel} · chỉ để xem cách ghép, trợ live không chịu trách nhiệm GMV`} />
       <Table head={["Cặp", "Brand", "Sessions", "Giờ live", "GMV", "Chỉ số", "vs kỳ trước"]} empty={rows.length ? undefined : "Chưa cặp nào có từ 2 ca chạy chung trong kỳ này."}>
         {rows.map((r) => (
           <tr key={r.id}>
@@ -236,8 +237,8 @@ export const PairTable: React.FC<{ s: Scope; brands: Brand[] }> = ({ s, brands }
             <td className={TD}>{r.n}</td>
             <td className={TD}>{hrs(r.hours)}</td>
             <td className={TD}>{money(r.gmv)}</td>
-            <td className={TD}><IdxCell index={r.index} weak={r.n < 3} /></td>
-            <td className={TD}><IdxDelta cur={r} prev={prev.get(r.id)} /></td>
+            <td className={TD}><IdxCell index={r.index} weak={r.n < weakBelow} /></td>
+            <td className={TD}><IdxDelta cur={r} prev={prev.get(r.id)} weakAt={Math.max(5, weakBelow)} /></td>
           </tr>
         ))}
       </Table>
@@ -258,7 +259,7 @@ export const SlotTable: React.FC<{ s: Scope; within?: string }> = ({ s, within =
   const best = [...ok].sort((p, q) => q.x!.index - p.x!.index)[0], worst = [...ok].sort((p, q) => p.x!.index - q.x!.index)[0];
   return (
     <Card>
-      <BlockHead title="Khung giờ của kênh" sub={`${s.label} so với ${s.prevLabel} · theo giờ bắt đầu ca · chỉ số 100 = GMV/giờ trung bình của kênh trong ${within} · dưới 5 ca để xám`} />
+      <BlockHead title="Khung giờ của kênh" sub={`${s.label} so với ${s.prevLabel} · theo giờ bắt đầu ca · chỉ số 100 = GMV/giờ trung bình của kênh trong ${within} · dưới 5 ca hiển thị mờ`} />
       <Table head={["Khung giờ", "Sessions", "Giờ live", "GMV/giờ", "Chỉ số", "vs kỳ trước"]} empty={rows.length ? undefined : `Không có ca có số trong ${s.label}.`}>
         {rows.map((r) => {
           const weak = r.x!.n < WEAK_SESSIONS || !r.y || r.y.n < WEAK_SESSIONS;

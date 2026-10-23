@@ -16,8 +16,8 @@ export const TreeCard: React.FC<{ tree: GmvTree | null; platform: ReportPlatform
   const mx = t ? Math.max(0.05, ...t.parts.map((p) => Math.abs(p.change))) : 1;
   return (
     <div className="space-y-3">
-      <p className="text-xs text-[var(--text-faint)] leading-snug">{prof.metrics.driverFormula.replace(/^GMV = [^×]+× /, "GMV/giờ = ")} · ngày thường tháng này so ngày thường cùng thứ tự tháng trước</p>
-      {!t ? <p className="text-sm text-[var(--text-faint)]">Chưa đủ ca ngày thường có số ở cả hai tháng (cần từ 3 ca mỗi bên) để so.</p> : (
+      <p className="text-xs text-[var(--text-faint)] leading-snug">{prof.metrics.driverFormula.replace(/^GMV = [^×]+× /, "GMV/giờ = ")} · ngày Daily tháng này so ngày Daily cùng thứ tự tháng trước</p>
+      {!t ? <p className="text-sm text-[var(--text-faint)]">Chưa đủ ca Daily có số liệu ở cả hai tháng (cần từ 3 ca mỗi bên) để phân rã.</p> : (
         <>
           <div className="flex flex-wrap items-baseline gap-x-3">
             <span className="text-2xl font-black text-[var(--text)]">{money(t.gmvPerHour.cur)}/giờ</span>
@@ -41,7 +41,7 @@ export const TreeCard: React.FC<{ tree: GmvTree | null; platform: ReportPlatform
             })}
           </div>
           <p className="text-xs text-[var(--text-muted)] leading-snug">
-            {t.worst && t.worst.change < -0.03 ? <>Nhánh kéo xuống nhiều nhất: <b className="text-[var(--text)]">{t.worst.label} {sign(t.worst.change)}</b>. Người giữ đòn bẩy — {LEVER_OWNER[t.worst.label] ?? "xem chi tiết từng ca"}.</> : "Không nhánh nào giảm quá 3%."}
+            {t.worst && t.worst.change < -0.03 ? <>Yếu tố giảm mạnh nhất: <b className="text-[var(--text)]">{t.worst.label} {sign(t.worst.change)}</b>. Đầu mối xử lý: {LEVER_OWNER[t.worst.label] ?? "xem chi tiết từng ca"}.</> : "Không yếu tố nào giảm quá 3%."}
           </p>
         </>
       )}
