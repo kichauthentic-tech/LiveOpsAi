@@ -93,8 +93,8 @@ export function giftLine(prev: GiftStats | null, cur: GiftStats | null, prevLabe
   const down = cur.giftPerOrder < prev.giftPerOrder;
   const dir = down ? "giảm" : "tăng";
   return (
-    `Quà tặng (hàng dưới ${fmtVndShort(GIFT_MAX_PRICE)}/món) ${dir} từ ${dec2(prev.giftPerOrder)} ${down ? "xuống" : "lên"} ${dec2(cur.giftPerOrder)} món mỗi đơn cả shop (${prevLabel} → nay)` +
-    ` — UPT ${dir} chủ yếu vì vậy; tính trên hàng bán thật, UPT cả shop ${dec2(prev.uptExGift)} → ${dec2(cur.uptExGift)}.`
+    `Quà tặng kèm (sản phẩm giá dưới ${fmtVndShort(GIFT_MAX_PRICE)}) ${dir} từ ${dec2(prev.giftPerOrder)} ${down ? "xuống" : "lên"} ${dec2(cur.giftPerOrder)} món mỗi đơn toàn shop (${prevLabel} → nay)` +
+    ` — đây là lý do chính UPT ${dir}; không tính quà tặng, UPT toàn shop ${dec2(prev.uptExGift)} → ${dec2(cur.uptExGift)}.`
   );
 }
 
@@ -273,16 +273,16 @@ export function controlVerdict(r: ControlRow | undefined): ControlVerdict | null
   return gap <= -CONTROL_GAP ? "ops" : gap >= CONTROL_GAP ? "agency_better" : "market";
 }
 
-const GROUP_LABEL: Record<ControlRow["key"], string> = { daily: "Ngày thường", camp: "Ngày camp", all: "Cả kỳ" };
+const GROUP_LABEL: Record<ControlRow["key"], string> = { daily: "Daily", camp: "Campaign", all: "Cả kỳ" };
 
 export function controlLabel(key: ControlRow["key"]): string {
   return GROUP_LABEL[key];
 }
 
 export const VERDICT_TEXT: Record<ControlVerdict, string> = {
-  ops: "khoảng hụt nằm ở vận hành live",
-  agency_better: "thị trường giảm mạnh hơn, agency giữ tốt hơn",
-  market: "live đi cùng thị trường"
+  ops: "phần giảm nằm ở vận hành livestream",
+  agency_better: "thị trường giảm mạnh hơn, livestream YFB giữ tốt hơn",
+  market: "livestream đi cùng thị trường"
 };
 
 /** Một câu cho phần Kết luận: ưu tiên nhóm ngày có kết luận "vận hành" (việc agency tự sửa được), rồi tới cả kỳ. */
@@ -292,7 +292,7 @@ export function controlLine(rows: ControlRow[]): string | null {
   const v = controlVerdict(r);
   if (!r || !v) return null;
   const vis = r.visitorsChg != null ? `, lượt vào shop ${signed(r.visitorsChg, 0)}` : "";
-  return `So với phần còn lại của shop (${GROUP_LABEL[r.key].toLowerCase()}): live agency ${signed(r.liveChg!, 0)}, phần còn lại ${signed(r.restChg!, 0)}${vis} ⇒ ${VERDICT_TEXT[v]}.`;
+  return `So với các kênh còn lại của shop (${GROUP_LABEL[r.key]}): livestream YFB ${signed(r.liveChg!, 0)}, các kênh còn lại ${signed(r.restChg!, 0)}${vis} ⇒ ${VERDICT_TEXT[v]}.`;
 }
 
 // ---------- 4. Độ tin cậy so sánh host ----------
@@ -400,5 +400,5 @@ export function dailyGap(g: DayGroupStats | undefined): number | null {
 export function dailyGapLine(g: DayGroupStats | undefined): string | null {
   const gap = dailyGap(g);
   if (gap == null || !g) return null;
-  return `Nếu ngày thường giữ GMV/giờ kỳ trước (${money(g.prev.gmvPerHour!)}/giờ, nay ${money(g.cur.gmvPerHour!)}/giờ) với ${g.cur.hours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })} giờ live đã chạy, LIVE GMV có thêm ~${money(gap)}.`;
+  return `Nếu Daily giữ GMV/giờ kỳ trước (${money(g.prev.gmvPerHour!)}/giờ, nay ${money(g.cur.gmvPerHour!)}/giờ) với ${g.cur.hours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })} giờ live đã chạy, LIVE GMV có thêm ~${money(gap)}.`;
 }

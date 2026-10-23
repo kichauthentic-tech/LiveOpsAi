@@ -15,20 +15,6 @@ import { STAT_LABEL_SHAPE } from "../../common/StatTile";
 // ô sửa nhận xét. Tách khỏi MonthlyReportTabs.tsx 2026-10-01: toàn bộ chỗ này đã tự chứa sẵn (không
 // đọc state nào của màn), nằm chung chỉ khiến phần TÍNH SỐ của report bị đẩy xuống quá tầm đọc.
 
-export const ProgressBar: React.FC<{ pct: number | null; label?: string }> = ({ pct, label = "target Lịch Vận Hành" }) => {
-  const clamped = pct == null ? 0 : Math.max(0, Math.min(100, pct));
-  return (
-    <div className="mt-2">
-      <div className="h-1.5 rounded-full overflow-hidden" style={{ background: PAL.line }}>
-        <div className="h-full rounded-full" style={{ width: `${clamped}%`, background: PAL.gold }} />
-      </div>
-      <div className="text-[11px] mt-1 font-mono" style={{ color: PAL.muted }}>
-        {pct == null ? "chưa có target (Lịch Vận Hành)" : `${fmtFixed(pct, 1)}% ${label}`}
-      </div>
-    </div>
-  );
-};
-
 export const Panel: React.FC<{ title: string; icon: React.ReactNode; sub?: string; children: React.ReactNode }> = ({ title, icon, sub, children }) => (
   <div className="rounded-2xl overflow-hidden" style={{ background: PAL.panel, border: `1px solid ${PAL.line}` }}>
     <div

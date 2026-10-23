@@ -58,6 +58,13 @@ export function compareWindow(month: string, through: string | null): CompareWin
   };
 }
 
+/** Cửa sổ của mọi phép so có dùng file shop (tỷ trọng live/shop, nhóm đối chứng): file Shop Analytics về chậm hơn số ca
+ *  (CROCS T9: shop tới 22/09, ca tới 30/09) ⇒ cắt cả hai tháng tới ngày cuối của file shop. Tháng report đã hết thì `win`
+ *  là trọn tháng — trước 24/10 nhóm đối chứng cộng 1–22/09 rồi đem so với CẢ tháng 8 (live −38% thay vì −15%). */
+export function shopCompareWindow(month: string, win: CompareWindow, shopThrough: string | null | undefined): CompareWindow {
+  return shopThrough && shopThrough < win.curEnd ? compareWindow(month, shopThrough) : win;
+}
+
 // ---------- chỉ số live theo cửa sổ ----------
 
 /** Bộ Key Metrics (lib/report/keyMetrics.ts) + 2 số riêng của Report Tháng. Tỷ lệ là giá trị %. */
@@ -362,36 +369,6 @@ export function shopKpiProgress(
   return { target, actual: cur.gmv, pct: (cur.gmv / target) * 100, projected, projectedPct: (projected / target) * 100, partial, method };
 }
 
-// ---------- dấu hiệu xu hướng ----------
-
-export interface TrendSignal {
-  label: string;
-  values: number[];
-  direction: "up" | "down";
-  /** Số tháng liên tiếp cùng chiều tính tới tháng report (≥ 3 mới báo). */
-  streak: number;
-  totalChange: number;
-}
-
-/** Dãy cũ → mới. Báo khi ≥ 3 tháng liên tiếp cùng chiều (tính cả tháng report) và tổng biến động ≥ 10%. */
-export function trendSignal(label: string, values: (number | null)[]): TrendSignal | null {
-  const v = values.filter((x): x is number => x != null && Number.isFinite(x));
-  if (v.length < 3 || v.length !== values.length) return null;
-  const last = v.length - 1;
-  const dir = v[last] < v[last - 1] ? "down" : v[last] > v[last - 1] ? "up" : null;
-  if (!dir) return null;
-  let streak = 1;
-  for (let i = last - 1; i > 0; i--) {
-    if ((dir === "down" && v[i] < v[i - 1]) || (dir === "up" && v[i] > v[i - 1])) streak++;
-    else break;
-  }
-  const first = v[last - streak];
-  const totalChange = first !== 0 ? ((v[last] - first) / Math.abs(first)) * 100 : 0;
-  if (streak < 2 || Math.abs(totalChange) < 10) return null;
-  // streak đếm số BƯỚC đổi; số tháng liên tiếp = bước + 1.
-  return { label, values: v.slice(last - streak), direction: dir, streak: streak + 1, totalChange };
-}
-
 // ---------- bản nháp văn xuôi ----------
 
 // Kết luận trước (Pyramid Principle, user chọn 2026-09-26): 3–5 câu — kết quả, nguyên nhân, thị trường hay vận
@@ -445,8 +422,8 @@ export function factorValueText(key: RateFactor, s: LiveStats): string {
 }
 
 export const FACTOR_ACTION: Record<RateFactor, string> = {
-  viewsPerHour: "Điểm nghẽn ở traffic — rà khung giờ live, ảnh bìa/tiêu đề phiên và ngân sách đẩy live.",
-  liveCtr: "Điểm nghẽn ở bước bấm sản phẩm — ghim sản phẩm và nhắc bấm giỏ thường xuyên hơn trong live.",
+  viewsPerHour: "Điểm nghẽn ở traffic vào phòng — rà soát khung giờ, thumbnail, tiêu đề phiên và ngân sách Ads cho live.",
+  liveCtr: "Điểm nghẽn ở tỷ lệ click sản phẩm — ghim sản phẩm và nhắc mở giỏ hàng thường xuyên hơn trong live.",
   ctor: "Điểm nghẽn ở bước chốt đơn — rà giá, voucher và cách chốt của nhóm SKU chủ lực.",
   aov: "Giá trị mỗi đơn giảm — thử combo hoặc ưu đãi theo ngưỡng AOV."
 };
@@ -460,15 +437,15 @@ export function autoSummary(i: NarrativeInput): string[] {
 
   const head = i.shopCur
     ? shopShort
-      ? `Tới ${dayMonth(through)}, live do agency vận hành mang về ${money(i.liveCur.gmv)}. File shop mới tới ${dayMonth(shopThrough!)}: shop đạt ${money(i.shopCur.gmv)} GMV${liveShare != null ? `, live agency chiếm ${pctTxt(liveShare)} cùng kỳ` : ""}.`
-      : `Tới ${dayMonth(through)}, shop đạt ${money(i.shopCur.gmv)} GMV; live do agency vận hành mang về ${money(i.liveCur.gmv)}${liveShare != null ? ` (${pctTxt(liveShare)} tổng shop)` : ""}.`
-    : `Tới ${dayMonth(through)}, live do agency vận hành đạt ${money(i.liveCur.gmv)} GMV qua ${i.liveCur.sessions} ca.`;
+      ? `Tới ${dayMonth(through)}, livestream YFB vận hành mang về ${money(i.liveCur.gmv)}. File shop mới tới ${dayMonth(shopThrough!)}: shop đạt ${money(i.shopCur.gmv)} GMV${liveShare != null ? `, livestream YFB chiếm ${pctTxt(liveShare)} cùng kỳ` : ""}.`
+      : `Tới ${dayMonth(through)}, shop đạt ${money(i.shopCur.gmv)} GMV; livestream YFB vận hành mang về ${money(i.liveCur.gmv)}${liveShare != null ? ` (${pctTxt(liveShare)} tổng shop)` : ""}.`
+    : `Tới ${dayMonth(through)}, livestream YFB vận hành đạt ${money(i.liveCur.gmv)} GMV qua ${i.liveCur.sessions} phiên.`;
   const target = i.targetGmv && i.targetGmv > 0 ? ` Đạt ${pctTxt((i.liveCur.gmv / i.targetGmv) * 100, 0)} target tháng (${money(i.targetGmv)}).` : "";
   const k = i.shopKpi;
   const kpi = k
     ? k.partial
-      ? ` Cả shop đạt ${pctTxt(k.pct, 0)} KPI ${money(k.target)}; ${k.method === "prev" ? "theo nhịp cùng kỳ tháng trước" : "chia đều theo ngày"}, dự kiến cuối tháng ~${money(k.projected)} (${pctTxt(k.projectedPct, 0)} KPI).`
-      : ` Cả shop đạt ${pctTxt(k.pct, 0)} KPI ${money(k.target)}${k.pct >= 100 ? ` (vượt ${money(k.actual - k.target)})` : ` (thiếu ${money(k.target - k.actual)})`}.`
+      ? ` Total GMV đạt ${pctTxt(k.pct, 0)} KPI ${money(k.target)}; ${k.method === "prev" ? "theo nhịp cùng kỳ tháng trước" : "chia đều theo ngày"}, dự kiến cuối tháng ~${money(k.projected)} (${pctTxt(k.projectedPct, 0)} KPI).`
+      : ` Total GMV đạt ${pctTxt(k.pct, 0)} KPI ${money(k.target)}${k.pct >= 100 ? ` (vượt ${money(k.actual - k.target)})` : ` (thiếu ${money(k.target - k.actual)})`}.`
     : "";
   out.push(head + target + kpi);
 
@@ -514,15 +491,15 @@ export function autoNextSteps(i: NarrativeInput): string[] {
   if (worst) out.push(`${DRIVER_LABEL[worst.k]} ${signed(worst.c, 0)} so với cùng kỳ. ${FACTOR_ACTION[worst.k]}`);
   if (i.controlOpsGroup) {
     out.push(
-      `${i.controlOpsGroup === "daily" ? "Ngày thường" : "Ngày camp"} là chỗ hụt của riêng live (giảm mạnh hơn phần còn lại của shop) — rà khung giờ, host và kịch bản của các ca ${i.controlOpsGroup === "daily" ? "ngày thường" : "ngày camp"} trước khi chốt lịch tháng ${i.nextMonth.slice(5)}.`
+      `${i.controlOpsGroup === "daily" ? "Daily" : "Campaign"} là chỗ giảm của riêng livestream (giảm mạnh hơn các kênh còn lại của shop) — rà soát khung giờ, host và kịch bản các phiên ${i.controlOpsGroup === "daily" ? "Daily" : "campaign"} trước khi chốt lịch tháng ${i.nextMonth.slice(5)}.`
     );
   }
   if (i.giftLine && /giảm từ/.test(i.giftLine)) {
-    out.push("Hỏi brand về chương trình quà tặng kèm đã giảm — nếu quà từng kéo tỷ lệ chốt đơn, đề xuất chạy lại cho ngày camp.");
+    out.push("Hỏi brand về chương trình quà tặng kèm đã giảm — nếu quà từng kéo tỷ lệ chốt đơn, đề xuất chạy lại cho các ngày campaign.");
   }
   const hChg = pctChange(i.livePrev.hours, i.liveCur.hours);
   const ghChg = pctChange(i.livePrev.gmvPerHour, i.liveCur.gmvPerHour);
-  if (hChg != null && ghChg != null && hChg > 5 && ghChg <= -10) out.push(`Tăng giờ live nhưng GMV/giờ giảm — ưu tiên dồn giờ vào khung giờ và ngày Campaign có GMV/giờ cao nhất thay vì kéo dài ca.`);
+  if (hChg != null && ghChg != null && hChg > 5 && ghChg <= -10) out.push(`Tăng giờ live nhưng GMV/giờ giảm — ưu tiên dồn giờ vào khung giờ và ngày Campaign có GMV/giờ cao nhất thay vì kéo dài phiên.`);
   for (const t of i.sectionSteps ?? []) if (!out.includes(t)) out.push(t);
   // Có kế hoạch thì target + số ca đã ở 2 ô ngay dưới danh sách — không viết lại thành 1 việc.
   if (!i.nextPlan) out.push(`Chốt target và lịch live tháng ${i.nextMonth.slice(5)}.`);

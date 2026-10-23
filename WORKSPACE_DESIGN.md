@@ -13,6 +13,11 @@
 
 ## 1. Giai đoạn hiện tại (cập nhật 2026-10-23)
 
+- **24/10: REPORT THÁNG GỬI BRAND 10 TRANG (BUILT, đã commit, chưa push, không migration)** — user duyệt demo CROCS T9 rồi "triển khai đi". `MonthlyReportTabs`
+  (TikTok) 7 phần → 10 trang (§4 mục 4); trang mới: bảng điểm, bảng nhiệt loại ngày × yếu tố, Quảng cáo riêng, Hủy/hoàn & NMV, Affiliate, lịch creator tháng
+  sau, Key Metrics 5 tab × 3 tháng. Logic `lib/report/brandReport.ts` (test `tests/brandReport.test.ts`), UI `report/BrandPages.tsx`. Sửa lỗi nhóm đối chứng
+  khi file shop ngắn hơn tháng (`shopCompareWindow`). Đổi từ ngữ theo bộ từ brand (§5.2). Verify + việc còn mở + quyết định chờ user: lịch sử
+  `## Report Tháng 10 trang (2026-10-24)`. Phiên Dashboard song song (App.tsx, AgencyDashboard, accountOverview) đang sửa cùng lúc — không đụng file của nhau.
 - **23/10 tối: AUDIT TRÙNG MÀN + "mỗi loại số một màn" (đã commit + push 23/10, không migration)** — User chốt: OP VẪN chốt người + mở/huỷ/dời ca
   như trainer (không gom về Bàn Trainer, giữ Phòng Điều Hành). Đã làm: Dashboard chỉ xem trong tháng (kỳ `"month" | "7d"`); Điều Phối Phát Hành gộp
   vào Toàn Cảnh Brand (`hooks/useReportPublish.ts`, id/link cũ → `brands_overview`); "Việc cần làm" Dashboard chỉ còn "Báo sớm brand" + dẫn sang Bảng
@@ -49,20 +54,8 @@
 - **21–22/10 (thay bởi mục trên):** "một thẻ kênh" (`buildChannelCard` + `useChannelCards`, `0179` ĐÃ CHẠY, cổng brand `BrandPortal` + bản tin) và module
   Run-rate gộp vào Dashboard — nguyên văn: lịch sử `## §1 mục 21–22/10 Dashboard (chuyển khỏi WORKSPACE 23/10)`.
 
-- **18–19/10: SẮP LẠI BỐ CỤC CHO BỚT RỐI (đã commit + push `9426932` 19/10, không migration)** — user: "quá rối mắt, không đẹp"; số đo + cách đo: 3 mục bố cục 18–19/10 ở §8.
-  Đợt 1 (18/10): đầu trang hết là thẻ hộp; "Sàn" lên thanh trên cùng; "Tất cả kênh" một tiêu đề; tab đang chọn hết vàng đặc; sidebar 9 → 6 nhóm
-  (brand 1 → 3); Bảng Vận Hành thẳng cột; Sổ Ca mở vào hôm nay; Finance bỏ 215 nhãn đỏ lặp; tuần bắt đầu Thứ 2. Đợt 2 (19/10): ô KPI = `StatTile`
-  nhãn chữ thường; "Số đủ tới" một chỗ; Report Tháng 137 → 0 chữ viết hoa, hộp lồng 44 → 1; AI Training 159 → 70 dòng giải thích. Đợt 2b (19/10):
-  `uppercase` toàn app 61 → 14 (giữ cố ý: logo, avatar, mã role, dải camp). Đợt 3 (19/10): xem màn talent + brand bằng giả lập vai (ổn, 0 tràn);
-  Lịch brand 9.546 → 3.363px (bỏ danh sách ca lặp dưới lưới, ô ngày không viền); Bàn Trainer hộp lồng 92 → 1; Cửa sổ ca 27 hộp chỉ số → 1 khung;
-  cửa sổ chốt người lấy ngày giờ làm tiêu đề. Verify: tsc/eslint 0 lỗi, vitest 966/966 (cả CI), audit:dead, build OK; app thật 1440 + 375 (0 tràn).
-
-- **17/10: AUDIT TOÀN APP THEO SIDEBAR + SỬA (đã commit + push `9426932` 19/10; migration `0178` CHƯA CHẠY).** ~25 lỗi phi logic/gãy vận hành đã sửa — nguyên
-  văn: lịch sử `## §1 mục 17/10 (chuyển khỏi WORKSPACE 19/10)`, chi tiết từng module: `## Audit toàn app theo sidebar (2026-10-17)`. Chính:
-  sửa ca ghi theo TRƯỜNG đã đổi (`update_session_fields` 0178 + `updateSession(next, base)`); đóng ca quá giờ không vấp cặp trùng người cũ;
-  người đứng ca theo đoạn được up file/báo bận; app tự nạp lại danh sách ca (≥ 2 phút / 5 phút); brand không đếm ca chờ xác nhận thành giờ
-  đã giao (cờ `live_evidence` 0178); Finance chỉ cộng ca đủ dữ liệu; Report Tháng/Tuần so cùng độ dài kỳ; Hiệu Suất Host xếp trong MỘT brand.
-  Verify: vitest 947/947, replay 0001→0178 sạch, `supabase/tests/0178_ops_flow_integrity.sql` 10/10.
+- **17–19/10** (đã commit + push `9426932`): sắp lại bố cục cho bớt rối 3 đợt + audit toàn app theo sidebar (~25 lỗi, `0178` CHƯA CHẠY) — nguyên văn:
+  lịch sử `## §1 mục 17–19/10 (chuyển khỏi WORKSPACE 24/10)`.
 
 - **16–17/10: đề xuất làm lại Brand workspace** — đã thay bằng cổng brand 21/10 (mục trên); nguyên văn số đo + cách giả lập role brand có che số:
   lịch sử `## §1 mục 16–17/10 brand workspace (chuyển khỏi WORKSPACE 21/10)`.
@@ -193,7 +186,8 @@
    qua piece `ads` của bản chụp (tháng report + tháng trước). Ads theo ca (`live_session_reports.ads_cost`) chỉ còn cho
    lãi/lỗ từng ca ở Finance, là một phần của file — không cộng hai số.
 4. **Report Tháng** đọc **bản chụp** (`brand_monthly_report_snapshots`, 0119) do ops bấm Tạo/Cập nhật — mở report không tính
-   lại. 7 phần: Kết luận · Thị trường hay vận hành · Vì sao · Sản phẩm · Host · Campaign & khung giờ · Tháng sau. Phát hành
+   lại. 10 trang (24/10): Tổng quan & KPI · Toàn shop · Nguyên nhân · Sản phẩm & khuyến mãi · Quảng cáo · Hủy, hoàn & NMV · Host & khung giờ · Affiliate ·
+   Tháng sau · Key Metrics (`SECTIONS` ở report/theme.ts). Phát hành
    cho brand qua RPC; brand chỉ thấy số của tháng đã phát hành (view `live_sessions_secure`, 0107). **Phát hành = đóng
    sổ** (0133): chỉ phát hành tháng đã hết; tháng đã phát hành thì mọi ghi số/lịch/người/loại/huỷ/thêm/xoá ca của
    brand-tháng đó bị trigger `trg_guard_published_month_sessions` chặn (trừ vòng đời Upcoming→Completed) — muốn sửa thì
@@ -235,6 +229,10 @@
 - Nhãn vai trò talent qua `talentRoleLabel` (lib/talentName.ts) — DB lưu "Assistant", màn hình nói "Trợ live".
 - **App talent (11/10, bản 2 16/10):** màn talent đổi bố cục theo bề rộng (`useMediaQuery(TALENT_WIDE_QUERY)` / class `lg:`), KHÔNG theo user-agent (user-agent chỉ dùng để chọn nút Lịch iPhone hay Google Calendar). "ca của tôi / trùng giờ của tôi / giờ tháng" chỉ qua `lib/talent/myShifts.ts` (đi qua staffSegments); danh sách theo tuần, chấm đỏ, câu hiệu suất, tin Zalo chỉ qua `lib/talent/agenda.ts`. App talent KHÔNG nhắc giao ca (admin giao). Chấm đỏ chỉ đếm việc host làm được trên điện thoại. Mỗi ca hiện MỘT lần trên một màn (không lặp ở khối khác). File lịch .ics: luật đổi người giữa ca chép trong `server/calendarFeed.ts` (`personWindows`) — đổi `effectiveSegments` thì sửa cả hai; hiệu suất của talent chỉ `myChannelStanding` (so mặt bằng cùng kênh, không tên người khác). Thẻ ca của talent = `SessionEventCard` + `buildSessionMeta(..., meId)` (chip "Bạn"), không dựng thẻ riêng. Màn dùng chung với ops thì mở theo `currentRole === "talent"` + quyền ghi (`canEdit = canManageSlots && !!onUpdateSession`), không truyền callback ghi cho talent. "Đã nhận lịch" (0169) chỉ qua `lib/talent/acks.ts` (`ackState` so ngày/giờ đã nhận với giờ hiện tại của ca — không thêm cờ "đã nhận" vào `live_sessions`).
 - `strict` + `noUnusedLocals` bật; `@types/react*` phải có trong devDependencies (thiếu là JSX thành `any`, CI xanh giả).
+- **Chữ gửi brand (Report Tháng + câu Insight tự sinh, 24/10):** "phiên" (không "ca"), "YFB"/"livestream YFB" (không "agency"), "trung bình các host"
+  (không "mặt bằng"), "yếu tố" (không "thừa số"), "campaign" (không "camp"), "các kênh còn lại" (không "phần còn lại"), "Daily" (không "ngày thường"),
+  "có ý nghĩa / trong ngưỡng dao động" — KHÔNG BAO GIỜ "vượt biên" (nghĩa khác trong tiếng Việt). Tên kênh/loại ngày theo `CHANNEL`/`DAY_TYPE` (Product card,
+  Daily). Ghi chú nội bộ (bản chụp cũ, thiếu file) chỉ hiện cho ops (`canManage`). Màn ops nội bộ vẫn được nói "ca".
 - **Cho người mới (audit 04/10 tối):** (1) mỗi thông tin MỘT chỗ nhập — màn khác chỉ hiện để đọc + nút sang chỗ nhập. Bản đồ chỗ
   nhập (06/10): điều khoản thương mại + phòng mặc định ⇒ CRM "Hợp đồng & giá" (nút từ màn khác: `requestCrmFocus(brand, sàn)` + `navigateTo("crm")`
   bung sẵn đúng khối); giờ/GMV cam kết + target + khung camp của một tháng ⇒ Kế Hoạch Tháng; rate talent ⇒ Talent Pool; Ads tháng ⇒ file ở
@@ -403,7 +401,10 @@ live = `sessionHours`. GMV/giờ đem NHÂN với giờ lịch thì chia trên g
 - **Run-rate chỉ tính bằng `planRunRate`** (28/09): target = Σ target ca của Kế Hoạch Tháng đã chốt (không chia lại khi lịch
   đổi); ca kế hoạch huỷ GIỮ target; ca ngoài kế hoạch target 0; ca thêm vào lưới sau khi chốt nhận target = dự báo. **Ca tăng cường (0165, 10/10):** ca OP mở thêm sau chốt có dòng ở `plan_boost_slots` với target đề xuất của engine, KHÔNG cộng vào target tháng/run-rate — mọi chỗ cộng target tháng chỉ đọc `brand_month_plan_slots`, đừng đưa bảng boost vào đó. **Ngoại lệ do user chủ động "Chia lại theo lịch hiện có" (0164, 10/10):** ca huỷ về 0, ca OP thêm (kể cả đã qua) vào kế hoạch, Σ target = target mới.
 - **Report Tháng là nơi DUY NHẤT nói số một tháng SAU khi hết tháng** (đọc bản chụp; so cùng kỳ cắt 1..N khi tháng chưa hết).
-  Dashboard brand là màn TRONG tháng, dùng chung hàm. Phân tích mới thì thêm vào 1 trong 7 phần, không dựng trang riêng.
+  Dashboard brand là màn TRONG tháng, dùng chung hàm. Phân tích mới thì thêm vào 1 trong 10 trang, không dựng trang riêng.
+- **Report gửi brand (24/10):** mọi % thay đổi theo loại ngày / khung giờ / Key Metrics chỉ tô màu khi vượt **ngưỡng dao động** `noiseBand`
+  (1,96 × 26% × √(1/n₁+1/n₂), `SESSION_CV` ở brandReport.ts) — dưới ngưỡng ghi "trong ngưỡng dao động"; giờ live không đánh giá tốt/xấu. Mọi phép so có
+  dùng file shop đi qua `shopCompareWindow` (cắt cả hai tháng tới ngày cuối file shop); Key Metrics chỉ đọc số phiên nên chỉ cắt khi số PHIÊN còn dở.
 - Số "live agency" lấy TỪ CA; Shop Analytics "Linked account" chỉ dùng cho vế "phần còn lại của shop". File Live Performance
   Core Stats gồm cả creator affiliate — không dùng làm số agency. CTOR = Orders ÷ Product clicks. Kết luận về host cần
   khoảng tin cậy nhiều tháng (phân phối t). So sánh cắt theo **ngày cuối có số**, không theo lịch.
@@ -462,6 +463,8 @@ target khung camp ở Nhập Ads bỏ 06/10 — tháng không có kế hoạch c
 
 | Mục trong file lịch sử | Tóm tắt |
 |---|---|
+| `## Report Tháng 10 trang (2026-10-24)` | cấu trúc 10 trang, lỗi đối chứng (−38%/−51% → −15%/−36%), ngưỡng dao động, bộ từ brand, cách verify, việc còn mở |
+| `## §1 mục 17–19/10 (chuyển khỏi WORKSPACE 24/10)` | nguyên văn §1: bố cục 18–19/10 (3 đợt, số trước/sau) + audit toàn app 17/10 (0178, cách verify) |
 | `## Audit trùng màn (2026-10-23)` | đếm cửa trùng (chốt người 6, mở ca 5, tải người 4, host 6, việc cần làm 5, cam kết 4), quyết định user, 3 sửa đợt 3 + cách verify, việc còn mở |
 | `## Dashboard so cùng kỳ (2026-10-23)` + `## §1 mục 21–22/10 Dashboard (chuyển khỏi WORKSPACE 23/10)` | luật lấy từ audit demo (2 mốc cắt, chỉ số so chính kênh, trễ > 3 tiếng, chia target chưa xếp, host/trợ), số đo app thật 23/10, những gì bỏ so với 3 tab cũ; nguyên văn §1 21–22/10 |
 | `## Dashboard "một thẻ kênh" (2026-10-21)` | 9 mâu thuẫn đo trên app thật, độ dài từng màn, xu hướng 5 tháng, sổ dự báo, 4 quyết định, vá quyền brand (0179) + bộ kiểm |

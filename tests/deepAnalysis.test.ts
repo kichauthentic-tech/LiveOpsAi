@@ -20,7 +20,7 @@ import {
   reliabilityText,
   t95
 } from "../src/lib/report/deepAnalysis";
-import { compareWindow } from "../src/lib/report/monthlyReportInsights";
+import { compareWindow, shopCompareWindow } from "../src/lib/report/monthlyReportInsights";
 import type { LiveSession } from "../src/types";
 
 // [tên, GMV, GMV live, orders, skuOrders, items, impressions, clicks]
@@ -57,7 +57,7 @@ test("quà tặng: SKU dưới 20k/món là quà; UPT tính trên hàng bán th�
   expect(g9.uptExGift).toBeCloseTo(1.08, 2);
 
   expect(giftLine(g6, g9, "T6")).toBe(
-    "Quà tặng (hàng dưới 20K/món) giảm từ 0,66 xuống 0,00 món mỗi đơn cả shop (T6 → nay) — UPT giảm chủ yếu vì vậy; tính trên hàng bán thật, UPT cả shop 1,09 → 1,08."
+    "Quà tặng kèm (sản phẩm giá dưới 20K) giảm từ 0,66 xuống 0,00 món mỗi đơn toàn shop (T6 → nay) — đây là lý do chính UPT giảm; không tính quà tặng, UPT toàn shop 1,09 → 1,08."
   );
   expect(giftLine(g9, { ...g9, giftPerOrder: 0.05 }, "T8")).toBeNull();
   expect(giftStats(null, days("2026-09", 30, 1))).toBeNull();
@@ -89,11 +89,11 @@ test("cơ cấu lịch vs hiệu suất: mix + rate = ΔGMV/giờ; giữ nguyên
     ["camp", 31.2, 26.5]
   ]);
   expect(dailyGapLine(groups[0])).toBe(
-    "Nếu ngày thường giữ GMV/giờ kỳ trước (28,8M/giờ, nay 17,9M/giờ) với 100 giờ live đã chạy, LIVE GMV có thêm ~1,09B."
+    "Nếu Daily giữ GMV/giờ kỳ trước (28,8M/giờ, nay 17,9M/giờ) với 100 giờ live đã chạy, LIVE GMV có thêm ~1,09B."
   );
 });
 
-test("nhóm đối chứng CROCS 1–22/09: ngày thường hụt do vận hành, ngày camp agency giữ tốt hơn thị trường", () => {
+test("nhóm đối chứng CROCS 1–22/09: ngày thường hụt do vận hành, campaign livestream YFB giữ tốt hơn thị trường", () => {
   // Shop Analytics thật (triệu đ): ngày thường T8 live 2.285 / còn lại 1.165, T9 1.855 / 1.177; camp T8 1.987 / 1.311, T9 1.770 / 405.
   const day = (date: string, live: number, rest: number, visitors: number, orders: number): ShopDayLite => ({
     date, gmv: (live + rest) * 1e6, liveLinked: live * 1e6, refunds: 0, orders, visitors, affiliate: 0, video: 0
@@ -109,7 +109,7 @@ test("nhóm đối chứng CROCS 1–22/09: ngày thường hụt do vận hành
   expect(controlVerdict(by.camp)).toBe("agency_better");
   expect(controlVerdict(by.all)).toBe("agency_better");
   expect(controlLine(rows)).toBe(
-    "So với phần còn lại của shop (ngày thường): live agency −19%, phần còn lại +1%, lượt vào shop −4% ⇒ khoảng hụt nằm ở vận hành live."
+    "So với các kênh còn lại của shop (Daily): livestream YFB −19%, các kênh còn lại +1%, lượt vào shop −4% ⇒ phần giảm nằm ở vận hành livestream."
   );
   // Cùng chiều, lệch < 10 điểm ⇒ đi cùng thị trường; không có ngày nào ⇒ không có dòng.
   expect(controlVerdict({ ...by.all, liveChg: -12, restChg: -8 })).toBe("market");
@@ -128,6 +128,26 @@ test("nhóm đối chứng CROCS 1–22/09: ngày thường hụt do vận hành
   expect(Math.round(fromCa.all.liveChg! * 10) / 10).toBe(-18.4);
   expect(controlVerdict(fromCa.daily)).toBe("ops");
   expect(controlVerdict(fromCa.camp)).toBe("agency_better");
+});
+
+test("nhóm đối chứng tháng đã hết mà file shop chỉ tới 22/09: cắt CẢ hai tháng tới 22 (không so 1–22/09 với trọn tháng 8)", () => {
+  const day = (date: string, live: number, rest: number): ShopDayLite => ({
+    date, gmv: (live + rest) * 1e6, liveLinked: live * 1e6, refunds: 0, orders: 100, visitors: 1000, affiliate: 0, video: 0
+  });
+  // Tháng 8 có đủ 31 ngày; ngày 25/08 nằm ngoài 1–22 nên không được cộng.
+  const prev = [day("2026-08-03", 100, 100), day("2026-08-25", 100, 100)];
+  const cur = [day("2026-09-03", 85, 63)];
+  const full = compareWindow("2026-09", null); // ca đã có số tới 30/09 ⇒ cửa sổ trọn tháng
+  const cut = shopCompareWindow("2026-09", full, "2026-09-22");
+  expect([cut.curEnd, cut.prevEnd]).toEqual(["2026-09-22", "2026-08-22"]);
+  const all = (w: typeof full) => controlGroup(prev, cur, w, bucket([8]), bucket([9])).find((r) => r.key === "all")!;
+  expect(Math.round(all(cut).liveChg!)).toBe(-15);
+  expect(Math.round(all(cut).restChg!)).toBe(-37);
+  // Lỗi trước 24/10: cửa sổ trọn tháng ⇒ tháng 8 bị cộng cả ngày 25 ⇒ −57% (85M so với 200M).
+  expect(Math.round(all(full).liveChg!)).toBe(-57);
+  // File shop đủ tháng ⇒ giữ nguyên cửa sổ.
+  expect(shopCompareWindow("2026-09", full, "2026-09-30")).toBe(full);
+  expect(shopCompareWindow("2026-09", full, null)).toBe(full);
 });
 
 test("độ tin cậy host: chỉ kết luận khi khoảng tin cậy nằm hẳn một phía; mặt bằng theo tháng × loại ngày × buổi; tất định", () => {

@@ -55,7 +55,7 @@ export const HostPerformancePanel: React.FC<{
   const keyRows: Row[] = KEY_METRICS.map((d) => ({
     label: d.label,
     value: (m: DayTypeMetrics) =>
-      d.key === "hours" ? `${fmtHours(m.hours)} · ${m.sessions} ca` : fmtKeyMetric(d, keyMetricValue(m, d.key)),
+      d.key === "hours" ? `${fmtHours(m.hours)} · ${m.sessions} phiên` : fmtKeyMetric(d, keyMetricValue(m, d.key)),
     cmp: CMP_KEYS.has(d.key) ? (d.key as Row["cmp"]) : undefined,
     bold: d.key === "gmvPerHour" || d.key === "gmv"
   }));
@@ -63,7 +63,7 @@ export const HostPerformancePanel: React.FC<{
     {
       // Cột chính để so host (Report Tháng chuyên sâu 2026-09-26): backtest CROCS — so mặt bằng từng tháng không
       // dự báo được tháng sau (Spearman −0,04) ⇒ gộp nhiều tháng, chỉ tô màu khi khoảng tin cậy nằm hẳn một phía.
-      label: `So mặt bằng ${relMonths} tháng`,
+      label: `So trung bình ${relMonths} tháng`,
       onlyAll: true,
       bold: true,
       value: (_m, h) => {
@@ -71,15 +71,15 @@ export const HostPerformancePanel: React.FC<{
         if (!r) return "—";
         const color = r.verdict === "above" ? PAL.green : r.verdict === "below" ? PAL.red : PAL.cream;
         return (
-          <span style={{ color }} title={`${r.name}: ${reliabilityText(r)} qua ${r.sessions} ca${r.lo == null ? " — dưới 3 ca, chưa tính khoảng tin cậy" : ""}`}>
+          <span style={{ color }} title={`${r.name}: ${reliabilityText(r)} qua ${r.sessions} phiên${r.lo == null ? " — dưới 3 phiên, chưa tính khoảng tin cậy" : ""}`}>
             {reliabilityText({ ratio: r.ratio, lo: null, hi: null })}
-            <span className="font-normal" style={{ color: PAL.muted }}> · {r.sessions} ca</span>
+            <span className="font-normal" style={{ color: PAL.muted }}> · {r.sessions} phiên</span>
           </span>
         );
       }
     },
     {
-      label: "So mặt bằng tháng này",
+      label: "So trung bình tháng này",
       onlyAll: true,
       value: (_m, h) => {
         if (!h) return "—";
@@ -104,7 +104,7 @@ export const HostPerformancePanel: React.FC<{
       icon={<Users className="w-4 h-4" />}
       sub={
         isAll
-          ? "GMV của ca tính trọn cho host; trợ live chỉ ghi giờ. Bấm tab loại ngày để xem thừa số của từng Daily / campaign"
+          ? "GMV của phiên tính cho host chính; trợ live chỉ tính giờ. Bấm tab loại ngày để xem các yếu tố của Daily / từng đợt campaign"
           : "GMV/giờ = Views/giờ × LIVE CTR × CTOR × AOV (CTOR = Orders ÷ Product clicks)"
       }
     >
@@ -124,7 +124,7 @@ export const HostPerformancePanel: React.FC<{
               style={{ background: on ? PAL.gold : PAL.panel2, color: on ? PAL.bg : PAL.cream, border: `1px solid ${on ? PAL.gold : PAL.line}` }}
             >
               {t.label}
-              <span className="font-normal opacity-80"> · {empty ? "chưa có ca" : `${t.sessions} ca`}</span>
+              <span className="font-normal opacity-80"> · {empty ? "chưa có phiên" : `${t.sessions} phiên`}</span>
             </button>
           );
         })}
@@ -134,19 +134,19 @@ export const HostPerformancePanel: React.FC<{
       {isAll ? (
         <div className="mb-2">
           <p className="text-[11px]" style={{ color: PAL.muted }}>
-            <span style={{ color: PAL.green }}>Xanh</span> / <span style={{ color: PAL.red }}>đỏ</span> = trên / dưới mặt bằng của nhóm chắc chắn (gộp {relMonths} tháng, khoảng tin cậy 95%; rê chuột để xem khoảng).
+            <span style={{ color: PAL.green }}>Xanh</span> / <span style={{ color: PAL.red }}>đỏ</span> = cao hơn / thấp hơn trung bình có ý nghĩa (gộp {relMonths} tháng, khoảng tin cậy 95%; rê chuột để xem khoảng).
           </p>
           <MethodNote className="mt-0.5">
-            So mặt bằng = GMV/giờ của host so với cả nhóm ở cùng tháng × loại ngày × buổi (ngày/tối) của từng ca. Chỉ tô{" "}
+            So trung bình = GMV/giờ của host so với trung bình các host cùng tháng × loại ngày × buổi (ngày/tối) của từng phiên. Chỉ tô{" "}
             <span style={{ color: PAL.green }}>xanh</span> / <span style={{ color: PAL.red }}>đỏ</span> khi gộp {relMonths} tháng mà khoảng tin cậy 95% vẫn
-            nằm hẳn trên / dưới mặt bằng (rê chuột để xem khoảng). Số của riêng tháng này để tham khảo: một tháng vài ca thì chênh
+            nằm hẳn trên / dưới mức trung bình (rê chuột để xem khoảng). Số của riêng tháng này để tham khảo: một tháng vài phiên thì chênh
             15–25% vẫn có thể là ngẫu nhiên.
           </MethodNote>
         </div>
       ) : (
         <p className="text-[11px] mb-2" style={{ color: PAL.muted }}>
           <span style={{ color: PAL.green }}>▲ xanh</span> / <span style={{ color: PAL.red }}>▼ đỏ</span> = cao / thấp hơn cột Cả team từ {DAY_TYPE_DIFF_THRESHOLD}% trở lên (cùng loại ngày). Host
-          chỉ có 1 ca không so. Dùng để hiểu thừa số nào kéo GMV/giờ, không dùng để xếp hạng host (xếp hạng xem tab Cả tháng).
+          chỉ có 1 phiên không so. Dùng để hiểu yếu tố nào kéo GMV/giờ, không dùng để xếp hạng host (xếp hạng xem tab Cả tháng).
         </p>
       )}
       <ReportTable
@@ -155,7 +155,7 @@ export const HostPerformancePanel: React.FC<{
           // Cả team đứng ngay sau tên chỉ số: là mốc so sánh nên phải luôn thấy, không bị đẩy khuất khi bảng cuộn ngang.
           "Cả team",
           // Host dưới ngưỡng ca ghi thẳng trên tiêu đề (không làm mờ cột — user thấy cột đậm/nhạt khó hiểu).
-          ...hosts.map((h) => `${shortName(h.name)}${!isAll && h.m.sessions < MIN_SESSIONS_TO_COMPARE ? ` · ${h.m.sessions} ca` : ""}`)
+          ...hosts.map((h) => `${shortName(h.name)}${!isAll && h.m.sessions < MIN_SESSIONS_TO_COMPARE ? ` · ${h.m.sessions} phiên` : ""}`)
         ]}
       >
         {shownRows.map((r, idx) => (
@@ -175,7 +175,7 @@ export const HostPerformancePanel: React.FC<{
                   key={h.key}
                   className={`py-2 px-3 text-right font-mono whitespace-nowrap ${r.bold ? "font-bold" : ""}`}
                   style={{ color: arrow === "up" ? PAL.green : arrow === "down" ? PAL.red : PAL.cream }}
-                  title={d != null ? `${h.name}: ${d >= 0 ? "+" : "−"}${fmtFixed(Math.abs(d), 0)}% so với Cả team` : thin ? `${h.name}: ${h.m.sessions} ca — quá ít để so` : h.name}
+                  title={d != null ? `${h.name}: ${d >= 0 ? "+" : "−"}${fmtFixed(Math.abs(d), 0)}% so với Cả team` : thin ? `${h.name}: ${h.m.sessions} phiên — quá ít để so` : h.name}
                 >
                   {r.value(h.m, h)}
                   {arrow === "up" ? " ▲" : arrow === "down" ? " ▼" : ""}
@@ -194,7 +194,7 @@ export const HostPerformancePanel: React.FC<{
       </ReportTable>
       {assistOnly.length > 0 && (
         <p className="mt-2 text-[11px]" style={{ color: PAL.muted }}>
-          Chỉ làm trợ live: {assistOnly.map((r) => `${r.name} ${fmtHours(r.assist.hours)} · ${r.assist.sessions} ca`).join(" · ")}
+          Chỉ làm trợ live: {assistOnly.map((r) => `${r.name} ${fmtHours(r.assist.hours)} · ${r.assist.sessions} phiên`).join(" · ")}
         </p>
       )}
       {lines.length > 0 && (

@@ -107,7 +107,7 @@ export function shopInsight(i: ShopInsightInput): SectionInsight | null {
   const shopChg = i.shopPrev ? pctChange(i.shopPrev.gmv, i.shopCur.gmv) : null;
   const totalLine =
     `Total GMV ${money(i.shopCur.gmv)}${shopChg != null ? ` (${signed(shopChg)}, ${i.windowLabel})` : ""}` +
-    (aCur != null ? `; agency live chiếm ${pctTxt(aCur)}${aPrev != null ? ` (${prevLabel}: ${pctTxt(aPrev)})` : ""}.` : ".");
+    (aCur != null ? `; livestream YFB chiếm ${pctTxt(aCur)}${aPrev != null ? ` (${prevLabel}: ${pctTxt(aPrev)})` : ""}.` : ".");
 
   // controlLine đã là 1 câu của Kết luận ⇒ tiêu đề phần là nhóm ngày Kết luận CHƯA nói (CROCS T9: ngày camp —
   // thị trường −69%, agency −14%); không còn nhóm nào thì Total GMV. Bảng đối chứng ngay dưới vẫn có đủ 3 dòng.
@@ -116,8 +116,8 @@ export function shopInsight(i: ShopInsightInput): SectionInsight | null {
   const groupLines: string[] = [];
   for (const r of control) {
     const v = controlVerdict(r);
-    if (!v || r.key === "all" || cLine?.includes(`(${controlLabel(r.key).toLowerCase()})`)) continue;
-    groupLines.push(`${controlLabel(r.key)}: live agency ${signed(r.liveChg!, 0)}, phần còn lại ${signed(r.restChg!, 0)} ⇒ ${VERDICT_TEXT[v]}.`);
+    if (!v || r.key === "all" || cLine?.includes(`(${controlLabel(r.key)})`)) continue;
+    groupLines.push(`${controlLabel(r.key)}: livestream YFB ${signed(r.liveChg!, 0)}, các kênh còn lại ${signed(r.restChg!, 0)} ⇒ ${VERDICT_TEXT[v]}.`);
   }
   const [headline, ...points] = [...groupLines, totalLine];
   let affiliateDelta: number | null = null;
@@ -143,7 +143,7 @@ export function shopInsight(i: ShopInsightInput): SectionInsight | null {
 
   const opsRow = control.find((r) => r.key !== "all" && controlVerdict(r) === "ops");
   const action = opsRow
-    ? `${controlLabel(opsRow.key)} hụt vì vận hành live, không phải thị trường — xem phần Vì sao để biết thừa số nào tụt và sửa ở lịch tháng sau.`
+    ? `${controlLabel(opsRow.key)} giảm do vận hành livestream, không phải do thị trường — xem trang Phân tích nguyên nhân để biết yếu tố nào giảm và điều chỉnh lịch tháng sau.`
     : affiliateDelta != null && affiliateDelta <= -1
       ? "Tỷ trọng Affiliate LIVE giảm — rà lịch creator và gói hỗ trợ affiliate cho tháng sau."
       : refundDelta != null && refundDelta >= 2
@@ -193,8 +193,8 @@ export function whyInsight(prev: LiveStats, cur: LiveStats, x: WhyExtras = {}): 
   let headline = factorLine;
   const points: string[] = [];
   if (dChg != null && cChg != null && Math.abs(dChg - cChg) >= 10) {
-    const lead = gh < 0 ? (dChg < cChg ? "ngày thường" : "ngày camp") : dChg > cChg ? "ngày thường" : "ngày camp";
-    headline = `${gh < 0 ? "Hụt dồn vào" : "Tăng chủ yếu nhờ"} ${lead}: GMV/giờ ngày thường ${signed(dChg, 0)}, ngày camp ${signed(cChg, 0)}.`;
+    const lead = gh < 0 ? (dChg < cChg ? "Daily" : "campaign") : dChg > cChg ? "Daily" : "campaign";
+    headline = `${gh < 0 ? "Phần giảm dồn vào" : "Tăng chủ yếu nhờ"} ${lead}: GMV/giờ Daily ${signed(dChg, 0)}, campaign ${signed(cChg, 0)}.`;
     points.push(factorLine);
   } else {
     const groupTxt = (k: DayGroup, label: string) => {
@@ -202,7 +202,7 @@ export function whyInsight(prev: LiveStats, cur: LiveStats, x: WhyExtras = {}): 
       const c = chgOf(k);
       return r && c != null ? `${label}: ${money(r.prev.gmvPerHour!)} → ${money(r.cur.gmvPerHour!)}/giờ (${signed(c, 0)})` : null;
     };
-    const groups = [groupTxt("daily", "Ngày thường"), groupTxt("camp", "ngày camp")].filter(Boolean);
+    const groups = [groupTxt("daily", "Daily"), groupTxt("camp", "campaign")].filter(Boolean);
     if (groups.length) points.push(groups.join("; ") + ".");
   }
   const mr = x.mixRate;
@@ -211,7 +211,7 @@ export function whyInsight(prev: LiveStats, cur: LiveStats, x: WhyExtras = {}): 
     const m = (v: number) => `${v >= 0 ? "+" : "−"}${money(Math.round(Math.abs(v) / 1000) * 1000)}/giờ`;
     points.push(
       Math.abs(mr.mix) < Math.abs(mr.delta) * 0.25
-        ? `Không phải do lịch camp: cơ cấu giờ live giữa các loại ngày chỉ giải thích ${m(mr.mix)}, hiệu suất trong từng loại ngày ${m(mr.rate)}.`
+        ? `Không phải do lịch campaign: thay đổi cơ cấu giờ live giữa các loại ngày chỉ giải thích ${m(mr.mix)}, hiệu suất trong từng loại ngày ${m(mr.rate)}.`
         : `Một phần do lịch: cơ cấu giờ live giữa các loại ngày ${m(mr.mix)}, hiệu suất trong từng loại ngày ${m(mr.rate)}.`
     );
   }
@@ -273,23 +273,23 @@ export function peopleInsight(hosts: HostInsightRow[], rel: HostReliability[] = 
   const headline =
     `${top.name} dẫn đầu GMV (${money(top.gmv)}, ${pctTxt((top.gmv / total) * 100, 0)} tổng host)` +
     (topRel && topRel.verdict === "above"
-      ? `; ${rel.filter((r) => r.verdict === "above").length > 1 ? "" : "là host duy nhất "}vượt mặt bằng với khoảng tin cậy 95% nằm hẳn trên mặt bằng (${topRel.sessions} ca): ${reliabilityText(topRel)}${borderlineTail(topRel)}.`
+      ? `; ${rel.filter((r) => r.verdict === "above").length > 1 ? "" : "là host duy nhất "}cao hơn trung bình có ý nghĩa thống kê (khoảng tin cậy 95%, ${topRel.sessions} phiên): ${reliabilityText(topRel)}${borderlineTail(topRel)}.`
       : ".");
 
   const points: string[] = [];
   const above = rel.filter((r) => r.verdict === "above" && r.name !== top.name);
   const below = rel.filter((r) => r.verdict === "below");
-  for (const r of above) points.push(`${r.name}: vượt mặt bằng ${reliabilityText(r)} qua ${r.sessions} ca${borderlineTail(r)}.`);
-  for (const r of below) points.push(`${r.name}: dưới mặt bằng ${reliabilityText(r)} qua ${r.sessions} ca${borderlineTail(r)}.`);
+  for (const r of above) points.push(`${r.name}: cao hơn trung bình ${reliabilityText(r)} qua ${r.sessions} phiên${borderlineTail(r)}.`);
+  for (const r of below) points.push(`${r.name}: thấp hơn trung bình ${reliabilityText(r)} qua ${r.sessions} phiên${borderlineTail(r)}.`);
   const unclear = rel.filter((r) => r.verdict === "unclear").length;
-  if (unclear > 0) points.push(`${unclear} host còn lại: khoảng tin cậy còn cắt qua mặt bằng — chưa đủ ca để kết luận hơn hay kém.`);
+  if (unclear > 0) points.push(`${unclear} host còn lại chưa khác biệt rõ so với trung bình (khoảng tin cậy còn cắt qua mức trung bình).`);
 
   const medHours = median(live.map((h) => h.hours)) ?? 0;
   const underUsed = rel.find((r) => r.verdict === "above" && (live.find((h) => h.name === r.name)?.hours ?? Infinity) <= medHours);
   const action = underUsed
-    ? `Cân nhắc thêm ca cho ${underUsed.name} — vượt mặt bằng ${reliabilityText(underUsed)} nhưng tháng này live ít giờ hơn trung vị nhóm.`
+    ? `Cân nhắc thêm phiên cho ${underUsed.name} — cao hơn trung bình ${reliabilityText(underUsed)} nhưng tháng này live ít giờ hơn trung vị nhóm.`
     : below[0]
-      ? `Xem lại khung ca và nhóm SKU của ${below[0].name} — dưới mặt bằng ổn định qua ${below[0].sessions} ca.`
+      ? `Xem lại khung giờ và nhóm SKU của ${below[0].name} — thấp hơn trung bình ổn định qua ${below[0].sessions} phiên.`
       : null;
   return { headline, points, action };
 }
@@ -407,7 +407,7 @@ export function contextInsight(camps: CampCompareRow[], slots: SlotInsightRow[],
   const sorted = [...usable].sort((a, b) => b.cur.gmvPerHour! - a.cur.gmvPerHour!);
   const bestSlot = sorted[0], worstSlot = sorted[sorted.length - 1];
   if (bestSlot && worstSlot && bestSlot !== worstSlot) {
-    points.push(`Khung giờ bắt đầu ca: ${bestSlot.label.toLowerCase()} bán tốt nhất (${money(bestSlot.cur.gmvPerHour!)}/giờ), ${worstSlot.label.toLowerCase()} thấp nhất (${money(worstSlot.cur.gmvPerHour!)}/giờ, ${worstSlot.cur.n} ca).`);
+    points.push(`Khung giờ bắt đầu phiên: ${bestSlot.label.toLowerCase()} bán tốt nhất (${money(bestSlot.cur.gmvPerHour!)}/giờ), ${worstSlot.label.toLowerCase()} thấp nhất (${money(worstSlot.cur.gmvPerHour!)}/giờ, ${worstSlot.cur.n} phiên).`);
   }
   if (hasAds) points.push(adsLine(ads!));
 
@@ -418,7 +418,7 @@ export function contextInsight(camps: CampCompareRow[], slots: SlotInsightRow[],
   const action = worstCamp
     ? `Xem lại cách chạy ${worstCamp.r.key === "daily" ? DAY_TYPE.daily : CAMP_SHORT[worstCamp.r.key]}: GMV/giờ ${signed(worstCamp.h, 0)} so với cùng ${worstCamp.r.key === "daily" ? "kỳ" : "khung"} tháng trước.`
     : bestSlot && worstSlot && bestSlot !== worstSlot && worstSlot.cur.gmvPerHour! <= bestSlot.cur.gmvPerHour! * 0.8
-      ? `Cân nhắc dời bớt ca ${worstSlot.label.toLowerCase()} sang ${bestSlot.label.toLowerCase()}.`
+      ? `Cân nhắc dời bớt phiên ${worstSlot.label.toLowerCase()} sang ${bestSlot.label.toLowerCase()}.`
       : null;
   return { headline, points, action };
 }

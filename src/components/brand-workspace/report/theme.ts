@@ -31,19 +31,23 @@ export const PAL = {
 
 export const chartTooltipStyle = { background: PAL.panel2, border: `1px solid ${PAL.line}`, borderRadius: 8, fontSize: 11, color: PAL.cream };
 
-// ---------- Bố cục 7 phần, kết luận trước (Report Tháng chuyên sâu, 2026-09-26) ----------
-// Thứ tự theo câu brand hỏi: kết quả thế nào → thị trường hay vận hành → vì sao → hàng → người → lịch → tháng sau.
-// Công cụ nhập liệu của ops (khung camp, kế hoạch tháng sau) đã chuyển sang tab Nhập Ads; bảng creator
-// affiliate nhập tay nằm ở trang Affiliate — report chỉ còn phần để đọc.
+// ---------- Bố cục 10 trang gửi brand (user duyệt demo CROCS T9, 24/10/2026) ----------
+// Thứ tự theo câu brand hỏi: đạt gì → shop & phần của livestream → nguyên nhân → hàng & khuyến mãi → Ads → hủy/hoàn & NMV →
+// host & khung giờ → affiliate → tháng sau → bảng Key Metrics tra cứu. Trang không có dữ liệu thì ẩn với brand (ops vẫn thấy
+// kèm lời nhắc tải file), số trang đánh lại theo các trang đang hiện. Công cụ nhập liệu nằm ở Nhập Ads / Affiliate / Kế Hoạch Tháng.
 
-export const SECTIONS: { id: string; label: string }[] = [
-  { id: "summary", label: "1 · Kết luận" },
-  { id: "shop", label: "2 · Thị trường hay vận hành" },
-  { id: "why", label: "3 · Vì sao" },
-  { id: "products", label: "4 · Sản phẩm" },
-  { id: "people", label: "5 · Host" },
-  { id: "context", label: "6 · Campaign & khung giờ" },
-  { id: "next", label: "7 · Tháng sau" }
+export type ReportSectionId = "summary" | "shop" | "why" | "products" | "ads" | "nmv" | "people" | "affiliate" | "next" | "keymetrics";
+export const SECTIONS: { id: ReportSectionId; label: string; title: string }[] = [
+  { id: "summary", label: "Tổng quan", title: "Tổng quan & KPI" },
+  { id: "shop", label: "Toàn shop", title: "Toàn shop & đóng góp của livestream" },
+  { id: "why", label: "Nguyên nhân", title: "Phân tích nguyên nhân" },
+  { id: "products", label: "Sản phẩm", title: "Sản phẩm & khuyến mãi" },
+  { id: "ads", label: "Ads", title: "Quảng cáo" },
+  { id: "nmv", label: "NMV", title: "Hủy, hoàn & NMV" },
+  { id: "people", label: "Host", title: "Host & khung giờ" },
+  { id: "affiliate", label: "Affiliate", title: "Affiliate" },
+  { id: "next", label: "Tháng sau", title: "Kế hoạch tháng sau & hành động" },
+  { id: "keymetrics", label: "Key Metrics", title: "Key Metrics" }
 ];
 
 // 4 kênh — màu phân loại theo thứ tự cố định (blue/orange/aqua/yellow, bước tối của bảng màu đã kiểm

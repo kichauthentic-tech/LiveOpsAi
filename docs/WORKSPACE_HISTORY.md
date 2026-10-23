@@ -6099,3 +6099,38 @@ Console: chỉ 2 request 400 `live_sessions_secure` đã biết (0178 chưa ch�
 Còn mở (chưa làm, cần user): khối Shop/SKU/Ads/Khuyến mãi của Dashboard Brand rơi về file tháng trước khi tháng này chưa có file (là số
 sau-tháng); 6 nơi phân tích host (quyết định "bỏ bảng xếp host" từ 14/10 còn treo); tạo talent ở 2 chỗ; khuyến mãi vs khung camp; Nhập Ads tách khỏi
 Dữ Liệu Gốc; TikTok API "Chưa dùng" vẫn ở menu; trainer xem cả Finance.
+
+## §1 mục 17–19/10 (chuyển khỏi WORKSPACE 24/10)
+
+- **18–19/10: SẮP LẠI BỐ CỤC CHO BỚT RỐI (đã commit + push `9426932` 19/10, không migration)** — user: "quá rối mắt, không đẹp"; số đo + cách đo: 3 mục bố cục 18–19/10 ở §8.
+  Đợt 1 (18/10): đầu trang hết là thẻ hộp; "Sàn" lên thanh trên cùng; "Tất cả kênh" một tiêu đề; tab đang chọn hết vàng đặc; sidebar 9 → 6 nhóm
+  (brand 1 → 3); Bảng Vận Hành thẳng cột; Sổ Ca mở vào hôm nay; Finance bỏ 215 nhãn đỏ lặp; tuần bắt đầu Thứ 2. Đợt 2 (19/10): ô KPI = `StatTile`
+  nhãn chữ thường; "Số đủ tới" một chỗ; Report Tháng 137 → 0 chữ viết hoa, hộp lồng 44 → 1; AI Training 159 → 70 dòng giải thích. Đợt 2b (19/10):
+  `uppercase` toàn app 61 → 14 (giữ cố ý: logo, avatar, mã role, dải camp). Đợt 3 (19/10): xem màn talent + brand bằng giả lập vai (ổn, 0 tràn);
+  Lịch brand 9.546 → 3.363px (bỏ danh sách ca lặp dưới lưới, ô ngày không viền); Bàn Trainer hộp lồng 92 → 1; Cửa sổ ca 27 hộp chỉ số → 1 khung;
+  cửa sổ chốt người lấy ngày giờ làm tiêu đề. Verify: tsc/eslint 0 lỗi, vitest 966/966 (cả CI), audit:dead, build OK; app thật 1440 + 375 (0 tràn).
+
+- **17/10: AUDIT TOÀN APP THEO SIDEBAR + SỬA (đã commit + push `9426932` 19/10; migration `0178` CHƯA CHẠY).** ~25 lỗi phi logic/gãy vận hành đã sửa — nguyên
+  văn: lịch sử `## §1 mục 17/10 (chuyển khỏi WORKSPACE 19/10)`, chi tiết từng module: `## Audit toàn app theo sidebar (2026-10-17)`. Chính:
+  sửa ca ghi theo TRƯỜNG đã đổi (`update_session_fields` 0178 + `updateSession(next, base)`); đóng ca quá giờ không vấp cặp trùng người cũ;
+  người đứng ca theo đoạn được up file/báo bận; app tự nạp lại danh sách ca (≥ 2 phút / 5 phút); brand không đếm ca chờ xác nhận thành giờ
+  đã giao (cờ `live_evidence` 0178); Finance chỉ cộng ca đủ dữ liệu; Report Tháng/Tuần so cùng độ dài kỳ; Hiệu Suất Host xếp trong MỘT brand.
+  Verify: vitest 947/947, replay 0001→0178 sạch, `supabase/tests/0178_ops_flow_integrity.sql` 10/10.
+
+## Report Tháng 10 trang (2026-10-24)
+
+- **24/10: REPORT THÁNG GỬI BRAND 10 TRANG (BUILT, chưa commit, không migration)** — user duyệt demo CROCS T9 (artifact
+  `ERnVBex8eJpa9NTVhkDxQz`, đề xuất `UFMqmQe7sNewA3qBttpdNU`) rồi "triển khai đi". `MonthlyReportTabs` (TikTok) 7 phần → 10 trang: Tổng quan & KPI (thêm
+  **bảng điểm** target từng loại ngày + KPI toàn shop) · Toàn shop & đóng góp của livestream · Phân tích nguyên nhân (thác 5 yếu tố + **bảng nhiệt loại ngày ×
+  yếu tố** có ngưỡng dao động; bảng Xu hướng 4 tháng bỏ khỏi màn, còn trong Excel) · Sản phẩm & khuyến mãi (+ bảng quà tặng 4 tháng) · Quảng cáo (tách từ
+  phần 6) · **Hủy, hoàn & NMV** · Host & khung giờ (khung giờ có ngưỡng, Insight bối cảnh, phân bố + top 10; bỏ bảng Campaign — bảng điểm + bảng nhiệt thay) ·
+  **Affiliate** (phiên creator tháng này từ tab Affiliate) · Kế hoạch tháng sau & hành động (+ **lịch creator tháng sau** so GMV/giờ mục tiêu với phiên tốt
+  nhất của creator) · **Key Metrics** 5 tab (Cả tháng / Daily / D-Day / Mid-Month / Pay Day) × 3 tháng. Trang Ads/NMV/Affiliate ẩn với brand khi không có số;
+  số trang tự đánh theo trang đang hiện. Logic thuần `lib/report/brandReport.ts` (test `tests/brandReport.test.ts`), UI `report/BrandPages.tsx`; đọc thêm Kế Hoạch
+  Tháng T−2 + affiliate tháng này/tháng sau (không vào bản chụp). **Sửa lỗi:** nhóm đối chứng khi tháng đã hết mà file shop ngắn hơn cộng 1–22/09 rồi so với
+  CẢ tháng 8 (CROCS T9 ra live −38% / còn lại −51%; đúng −15% / −36%) ⇒ `shopCompareWindow` dùng chung cho tỷ trọng + đối chứng. **Đổi từ ngữ theo bộ từ
+  brand** (§5.2) ở UI + câu Insight/Kết luận tự sinh + test. Verify: vitest 1002/1002 (cả CI env), tsc/eslint 0 lỗi ở file của đợt này, audit:dead sạch
+  phần mình (gỡ `ProgressBar`, `trendSignal`), vite build OK; app thật (bản build, admin) CROCS T9 đủ 10 trang, 375px không tràn. Chưa thử: role brand,
+  file Excel tải thật, tháng có Kế Hoạch Tháng chốt + lịch affiliate tháng sau thật (CROCS T10 chưa dán kế hoạch Affiliate). Còn mở (chờ user chốt): brand
+  nào là whole shop (bảng điểm theo dịch vụ), xuất deck/PDF, song ngữ, loại file Order cho tỷ lệ hủy, bảng "việc tháng trước → kết quả". Phiên Dashboard
+  song song (App.tsx, AgencyDashboard, accountOverview) đang sửa cùng lúc — không đụng file của nhau.

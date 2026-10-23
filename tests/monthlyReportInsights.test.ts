@@ -14,8 +14,7 @@ import {
   planCampAllocation,
   shopKpiProgress,
   shopTotals,
-  skuMoves,
-  trendSignal
+  skuMoves
 } from "../src/lib/report/monthlyReportInsights";
 import type { CreatorLivePerfRow } from "../src/lib/dataraw/creatorLivePerfSlice";
 
@@ -81,16 +80,6 @@ test("tách nguyên nhân: GMV = Giờ live × Views/giờ × LIVE CTR × CTOR �
   expect(flat.parts.every((p) => Number.isFinite(p.value))).toBe(true);
 });
 
-test("dấu hiệu xu hướng: CTOR CROCS giảm 4 tháng liên tiếp; dao động nhỏ hoặc đổi chiều thì không báo", () => {
-  const ctor = trendSignal("CTOR", [1.99, 1.73, 1.54, 1.25])!;
-  expect(ctor).toMatchObject({ direction: "down", streak: 4 });
-  expect(Math.round(ctor.totalChange)).toBe(-37);
-  expect(trendSignal("CTR", [2.99, 3.1, 3.12, 3.17])).toBeNull(); // tăng liền nhưng tổng < 10%
-  expect(trendSignal("X", [10, 12, 9, 8])).toMatchObject({ direction: "down", streak: 3 });
-  expect(trendSignal("X", [10, 8, 12, 9])).toBeNull(); // chỉ 1 bước
-  expect(trendSignal("X", [10, null, 8, 6])).toBeNull(); // thiếu tháng ⇒ không kết luận
-});
-
 test("toàn shop: cộng theo ngày trong cửa sổ; 4 kênh ÷ tổng để kiểm chéo", () => {
   const slice = {
     hasAnyBatch: true,
@@ -121,10 +110,10 @@ test("kết luận trước: kết quả, nguyên nhân quy ra tiền, thị tr�
     targetGmv: null,
     nextMonth: "2026-10",
     nextPlan: { targetGmv: 5_500_000_000, status: "draft" as const, slotCount: 75 },
-    controlLine: "So với phần còn lại của shop (ngày thường): live agency −19%, phần còn lại +1%, lượt vào shop −4% ⇒ khoảng hụt nằm ở vận hành live.",
+    controlLine: "So với các kênh còn lại của shop (Daily): livestream YFB −19%, các kênh còn lại +1%, lượt vào shop −4% ⇒ phần giảm nằm ở vận hành livestream.",
     controlOpsGroup: "daily" as const,
-    dailyGap: { line: "Nếu ngày thường giữ GMV/giờ kỳ trước (28,8M/giờ, nay 17,9M/giờ) với 98,2 giờ live đã chạy, LIVE GMV có thêm ~1,07B.", value: 1_070_000_000 },
-    giftLine: "Quà tặng (hàng dưới 20K/món) giảm từ 0,13 xuống 0,00 món mỗi đơn cả shop (T8 → nay) — UPT giảm chủ yếu vì vậy; tính trên hàng bán thật, UPT cả shop 1,11 → 1,08."
+    dailyGap: { line: "Nếu Daily giữ GMV/giờ kỳ trước (28,8M/giờ, nay 17,9M/giờ) với 98,2 giờ live đã chạy, LIVE GMV có thêm ~1,07B.", value: 1_070_000_000 },
+    giftLine: "Quà tặng kèm (sản phẩm giá dưới 20K) giảm từ 0,13 xuống 0,00 món mỗi đơn toàn shop (T8 → nay) — đây là lý do chính UPT giảm; không tính quà tặng, UPT toàn shop 1,11 → 1,08."
   };
   const lines = autoSummary(input);
   const summary = lines.join("\n");
@@ -134,9 +123,9 @@ test("kết luận trước: kết quả, nguyên nhân quy ra tiền, thị tr�
   expect(lines[1]).toContain("−18,4%");
   expect(lines[1]).toMatch(/GMV\/giờ giảm chủ yếu do Views\/giờ \(−19%, −[\d,]+M\) và CTOR \(−13%/);
   expect(lines[1]).toContain("AOV +6% bù lại");
-  expect(summary).toContain("khoảng hụt nằm ở vận hành live");
+  expect(summary).toContain("phần giảm nằm ở vận hành livestream");
   // Cơ hội ngày thường (1,07 tỷ) lớn hơn đưa Views/giờ về mức cũ (~800tr) ⇒ chọn ngày thường.
-  expect(summary).toContain("Cơ hội lớn nhất: nếu ngày thường giữ GMV/giờ kỳ trước");
+  expect(summary).toContain("Cơ hội lớn nhất: nếu Daily giữ GMV/giờ kỳ trước");
   expect(summary).toContain("Quà tặng");
   // Không còn các câu dựa trên UPT/CTOR "giảm N tháng liên tiếp" (bị quà tặng làm méo).
   expect(summary).not.toMatch(/tháng liên tiếp/);
@@ -144,7 +133,7 @@ test("kết luận trước: kết quả, nguyên nhân quy ra tiền, thị tr�
 
   const next = autoNextSteps(input).join("\n");
   expect(next).toContain("Views/giờ −19% so với cùng kỳ. Điểm nghẽn ở traffic");
-  expect(next).toContain("Ngày thường là chỗ hụt của riêng live");
+  expect(next).toContain("Daily là chỗ giảm của riêng livestream");
   expect(next).toContain("Hỏi brand về chương trình quà tặng");
   // Target + số ca tháng sau đã ở 2 ô ngay dưới danh sách — không viết lại thành 1 việc.
   expect(next).not.toContain("5,5B");
@@ -237,6 +226,6 @@ test("KPI cả shop: tháng đủ so thẳng (deck Crocs T8 9,1 tỷ vs KPI 8,4 
     month: "2026-08", window: compareWindow("2026-08", "2026-08-31"), shopCur: shop(9_100_000_000, "2026-08-31"), shopPrev: null,
     liveCur: t9, livePrev: t8, drivers: null, targetGmv: null, nextMonth: "2026-09", nextPlan: null
   };
-  expect(autoSummary({ ...base, shopKpi: full })[0]).toContain("Cả shop đạt 108% KPI 8,4B (vượt 700M).");
-  expect(autoSummary({ ...base, shopKpi: sep })[0]).toMatch(/Cả shop đạt 65% KPI 8B; theo nhịp cùng kỳ tháng trước, dự kiến cuối tháng ~7,02B \(88% KPI\)\./);
+  expect(autoSummary({ ...base, shopKpi: full })[0]).toContain("Total GMV đạt 108% KPI 8,4B (vượt 700M).");
+  expect(autoSummary({ ...base, shopKpi: sep })[0]).toMatch(/Total GMV đạt 65% KPI 8B; theo nhịp cùng kỳ tháng trước, dự kiến cuối tháng ~7,02B \(88% KPI\)\./);
 });
