@@ -47,6 +47,8 @@ import { myBadgeCount } from "./lib/talent/agenda";
 import { myPendingAcks } from "./lib/talent/acks";
 import { useShiftAcks } from "./hooks/useShiftAcks";
 import { useSessionDrafts } from "./hooks/useSessionDrafts";
+import { useShiftExpectations } from "./hooks/useShiftExpectations";
+import type { BoardView } from "./lib/todoList";
 import type { OpsView } from "./components/OpsBoard";
 import { getTodayDate } from "./lib/dateUtils";
 import { Header, WorkspaceContext } from "./components/Header";
@@ -112,7 +114,7 @@ const TalentToday = lazyNamed(() => import("./components/talent/TalentToday"), "
 const TalentAgency = lazyNamed(() => import("./components/talent/TalentAgency"), "TalentAgency");
 const OpsPlanningTodo = lazyNamed(() => import("./components/OpsPlanningTodo"), "default");
 const MonthPlan = lazyNamed(() => import("./components/MonthPlan"), "default");
-const OpsSupportTab = lazyNamed(() => import("./components/OpsSupportTab"), "default");
+const OpsSupport = lazyNamed(() => import("./components/OpsSupport"), "default");
 const OpsMonthView = lazyNamed(() => import("./components/OpsMonthView"), "default");
 const RosterBoard = lazyNamed(() => import("./components/RosterBoard"), "RosterBoard");
 const AgencyDashboard = lazyNamed(() => import("./components/AgencyDashboard"), "AgencyDashboard");
@@ -126,7 +128,7 @@ const renamedTab = (t: string) => RENAMED_TABS[t] ?? t;
 // Chunk của từng tab — để tải SONG SONG với đợt nạp dữ liệu (xem `preload` ở lib/lazyNamed.ts). Phải
 // khớp với khối render tab bên dưới; thiếu một tab thì tab đó chỉ chậm như trước, không hỏng.
 const TAB_CHUNKS: Record<string, { preload: () => void }[]> = {
-  calendar: [OpsBoard, TodoPanel, OpsPlanningTodo, OpsSupportTab, OpsMonthView],
+  calendar: [OpsBoard, TodoPanel, OpsPlanningTodo, OpsSupport, OpsMonthView],
   studio_calendar: [LiveCalendar],
   sessions: [SessionLedger],
   roster: [RosterBoard],
@@ -253,7 +255,7 @@ export default function App() {
     setActiveTab("calendar");
   }, [activeTab]);
   // Việc "N ca nháp chờ xác nhận" → Bảng Vận Hành mở sẵn bộ lọc Ca nháp (OpsBoard tiêu thụ rồi xoá).
-  const [opsRangeRequest, setOpsRangeRequest] = useState<"drafts" | null>(null);
+  const [opsRangeRequest, setOpsRangeRequest] = useState<BoardView | null>(null);
   // Q4: ca cần mở sau khi bấm thông báo (OpsBoard tiêu thụ rồi xoá).
   const [notifOpenSessionId, setNotifOpenSessionId] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -670,6 +672,8 @@ export default function App() {
     () => brandChannels ?? deriveChannels([...sessions, ...shiftSlots, ...brandStudios, ...brandPlatformRates]),
     [brandChannels, sessions, shiftSlots, brandStudios, brandPlatformRates]
   );
+  // Kỳ vọng GMV trên dòng ca của Bảng Vận Hành (25/10) — tính sau khi danh sách đã vẽ.
+  const shiftExpect = useShiftExpectations({ enabled: activeTab === "calendar" && isOpsRole, today: todayVn(), sessions: activeSessions, shiftSlots, brands, channels, params: engineParams });
   // Sàn agency đang chạy (có ít nhất một kênh).
   const agencyPlatforms: ReportPlatform[] = useMemo(() => {
     const ps = REPORT_PLATFORMS.filter((p) => channels.some((c) => c.platform === p));
@@ -1955,9 +1959,9 @@ export default function App() {
                         draftCount={sessionDrafts.drafts.length}
                         canOpenTab={canOpenTab}
                         onOpen={(t) => {
-                          if (t.view === "drafts") {
+                          if (t.view) {
                             setOpsView("day");
-                            setOpsRangeRequest("drafts");
+                            setOpsRangeRequest(t.view);
                           }
                           if (t.rememberBrandId) { if (t.tab === "crm") requestCrmFocus(t.rememberBrandId, t.rememberPlatform); else rememberBrandId(t.rememberBrandId); }
                           // Việc của một kênh (vd "Kế hoạch VERA Shopee còn nháp") mở màn đích ĐÚNG sàn đó.
@@ -1992,6 +1996,19 @@ export default function App() {
                       view={isOpsRole ? opsView : "day"}
                       onViewChange={setOpsView}
                       monthView={isOpsRole ? (
+                        <>
+                        {/* Khối lập kế hoạch + cam kết giờ là việc THÁNG — 25/10 chuyển từ "Hôm nay & tuần" sang đây (audit 24/10, user chốt). */}
+                        <OpsPlanningTodo
+                          brands={brands}
+                          channels={channels}
+                          sessions={activeSessions}
+                          talents={activeTalents}
+                          shiftSlots={shiftSlots}
+                          shiftRegistrations={shiftRegistrations}
+                          fatigueWeekHours={engineParams.fatigueWeekHours}
+                          onFinalizeSlot={handleFinalizeShiftSlot}
+                          onOpenMonthPlan={(brandId, platform) => openMonthPlanFor(brandId, platform)}
+                        />
                         <OpsMonthView
                           sessions={activeSessions}
                           brands={brands}
@@ -2008,38 +2025,25 @@ export default function App() {
                             setOpsRangeRequest("drafts");
                           }}
                         />
+                        </>
                       ) : undefined}
                       drafts={isOpsRole ? sessionDrafts.drafts : []}
                       onAcceptDraft={sessionDrafts.accept}
                       onDismissDrafts={sessionDrafts.dismiss}
                       requestRange={opsRangeRequest}
                       onRangeRequestHandled={() => setOpsRangeRequest(null)}
+                      expectedOf={isOpsRole ? (id) => (shiftExpect.byId ? shiftExpect.byId.get(id) : null) : undefined}
+                      renderExpectDetail={isOpsRole ? (win) => (
+                        <OpsSupport
+                          win={win}
+                          expected={shiftExpect.byId ? shiftExpect.byId.get(win.id) : null}
+                          sessions={activeSessions}
+                          promoSchemes={promoSchemes}
+                          engineParams={engineParams}
+                          camp={shiftExpect.campOf(win.brandId, win.platform)}
+                        />
+                      ) : undefined}
                     />
-                    {/* Khối lập kế hoạch + benchmark ca sắp live thuộc "Hôm nay & tuần"; "Cả tháng" chỉ có sa bàn, ca xoay chuyển, tải người. */}
-                    {isOpsRole && opsView === "day" && (
-                      <OpsPlanningTodo
-                        brands={brands}
-                        channels={channels}
-                        sessions={activeSessions}
-                        talents={activeTalents}
-                        shiftSlots={shiftSlots}
-                        shiftRegistrations={shiftRegistrations}
-                        fatigueWeekHours={engineParams.fatigueWeekHours}
-                        onFinalizeSlot={handleFinalizeShiftSlot}
-                        onOpenMonthPlan={(brandId, platform) => openMonthPlanFor(brandId, platform)}
-                      />
-                    )}
-                    {isOpsRole && opsView === "day" && (
-                      <OpsSupportTab
-                        platform={agencyPlatformState}
-                        brandsOn={brandsOn}
-                        sessions={activeSessions}
-                        shiftSlots={shiftSlots}
-                        promoSchemes={promoSchemes}
-                        engineParams={engineParams}
-                        onOpenSession={(id) => setNotifOpenSessionId(id)}
-                      />
-                    )}
                   </div>
                 )}
 

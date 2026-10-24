@@ -365,14 +365,19 @@ test("Nút icon: padding phải đủ để vùng bấm đạt 24px", () => {
   expect(hits, hits.join("\n")).toEqual([]);
 });
 
-test("Bảng Vận Hành: không bày 4 ô 0 khi không có ca nào", () => {
+test("Bảng Vận Hành: khối Cần xử lý + nhãn \"chưa có số\" thay ô số và nhãn form (audit 24/10, user chốt 25/10)", () => {
   const src = readFileSync(join(SRC, "components/OpsBoard.tsx"), "utf8");
-  // `summary` tính hoàn toàn từ `rows` (summary.total = số dòng ca/ca mở, không đếm ca nháp — 24/10) nên điều kiện này đúng
-  // bằng "cả 4 ô đều 0" — không thể giấu nhầm hàng ô đang có số; ngày chỉ có ca nháp cũng không bày 4 ô 0.
-  expect(src).toMatch(/const summary = useMemo\(\(\) => \{\s*const ss = rows\.filter/);
-  expect(src).toMatch(/total: rows\.filter\(\(r\) => r\.kind !== "draft"\)\.length/);
-  expect(src).toMatch(/\{summary\.total > 0 && \(\s*<div className="grid grid-cols-2 sm:grid-cols-4 gap-2">/);
+  // Ca đã qua giờ chưa có số = CÙNG isUnconfirmedPast với việc cần làm; nhãn vàng theo form Giao ca đã bỏ (180/216 ca mang nhãn đã có số).
+  expect(src).toMatch(/const backlog = useMemo\(\(\) => sessions\.filter\(isUnconfirmedPast\)/);
+  expect(src).not.toMatch(/missingSteps\(|"chưa giao ca"|"chưa up file"|MISSING_LABEL/);
+  // Không bày ô 0: tóm tắt chỉ hiện khi khoảng đang xem có ca; kỳ vọng / GMV tách theo sàn.
+  expect(src).toMatch(/\{summary\.total > 0 && range !== "drafts" && \(/);
+  expect(src).toMatch(/label=\{`Kỳ vọng \$\{p\}`\}/);
+  // Dòng ca là component ngoài hàm vẽ (không dựng lại cả danh sách mỗi lần cập nhật).
+  expect(src).toMatch(/^const SessionRow: React\.FC</m);
+  expect(src).not.toMatch(/^\s+const SessionRow = \(/m);
 });
+
 
 test("Report Tháng: cột tên chỉ số dính trái khi bảng cuộn ngang", () => {
   // `ReportTable` đã tách sang report/ui.tsx (2026-10-01) — test đi theo code.

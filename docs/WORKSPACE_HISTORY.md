@@ -6262,3 +6262,69 @@ dismissed) → việc + bộ lọc tự mất. Benchmark VERA TikTok 24/10 10h: 
   chưa thử trên app thật: Giao ca Shopee bằng file, Ca nối/ngắt room với DB thật, "Sinh ca" VERA Shopee, lưu/tải target
   nhóm, đăng ký ca bằng tài khoản talent, góc nhìn role brand; `apply_segment_checkpoint_file` vẫn lấy mốc ngầm; nhập tay thực tế chưa có Orders/Views.
   Bước tiếp của lộ trình đa sàn: chạy thật 2–4 tuần (không tính năng mới).
+
+## Audit Bảng Vận Hành (2026-10-24)
+
+User: "tự audit lại cái Bảng vận hành và đề xuất tối ưu nó". Chỉ đo + đề xuất, chưa sửa code. Trang: https://claude.ai/artifact/VJXrAH9Mj1iris1LcWgKTu
+(nguồn HTML ở scratchpad phiên, không lưu repo). Đo 24/10 8h35 trên app dev (dữ liệu thật, admin), màn 1440×900 (vùng cuộn 835px), hàm thuần gọi qua
+`import('/src/...')` trong trang dev (Vite) — cách này đọc được dữ liệu thật mà không cần script riêng; Browser pane không ghi request Supabase.
+
+**Số đo.**
+- Ca app tạo, không huỷ, 01–23/10: 267. `missingSteps` (bỏ reconcile) gắn nhãn vàng 216 ca; 180 trong đó có `actualGmv > 0`, 186 đã `reconciled` —
+  bước "report" (`report.submittedAt`) gần như không ai nộp vì số về bằng file. Ca chưa có số thật: `isUnconfirmedPast` = 30 (23/10: 16, 22/10: 7,
+  21/10: 5, 20/10: 1, 18/10: 1). Theo ngày 14–23/10 (n / chưa có số): 22/2, 22/3, 10/1, 12/1, 13/1, 3/0, 12/1, 9/5, 8/7, 16/16.
+- Màn mặc định "Hôm nay": 22 ca đều Sắp tới, ô "Chưa giao ca" = 0; dòng ca đầu ở y = 451px, thấy 8/22 ca ở màn đầu. Trang cao 2.052px: tiêu đề + ô ~150,
+  khối trùng người ~250, 22 dòng ~996, "Việc lập kế hoạch ca" 472, "Kỳ vọng ca sắp live" (đóng) 104.
+- Việc cần làm 31: đỏ 6 / vàng 17 / xanh 8. Việc ngày 11 (số liệu cũ ×6, ca chưa giao, trùng người, chưa nhận lịch, chưa phòng, ca chưa gán host); việc tháng 20
+  (kế hoạch T11 ×6, report T9 ×5, giá ×4, ca tăng cường ×2, rate, Affiliate, FUJIWA). 3 việc trỏ `tab: "calendar"` khi đang ở chính màn này (trùng người,
+  chưa phòng, chưa nhận lịch); dòng ca không hiện trạng thái "đã nhận lịch" ⇒ việc "27 người chưa nhận lịch" là ngõ cụt.
+- Lặp trên một màn: "chưa giao ca" 3 nghĩa (ô = ca hôm nay chưa nộp form; việc = `isUnconfirmedPast`; nhãn dòng = chưa nộp form); kế hoạch T11 6 việc vs 7
+  chip khối lập kế hoạch (FUJIWA idle bị todo bỏ); trùng người 3 chỗ (4/5 là 25/10); ca chưa có người 3 chỗ.
+- "Cả tháng": longtask 785/745ms mỗi lần chuyển (dev), "Hôm nay & tuần" 59ms. Hàm thuần trên 1.560 ca: buildChannelRoom 153ms, sandboxCandidates 110ms
+  (70 ô), hostOrder 21ms, suggestHosts 20ms, peopleLoad 1ms. Dòng ca (SessionRow/SlotRow/DraftRow) khai báo trong hàm vẽ ⇒ dựng lại mỗi lần cập nhật
+  (bấm dòng nháp bị "ref stale" khi test). Kỳ vọng thật CROCS TikTok 24/10 09h = 56,4M (`expectedNowById`, camp theo kế hoạch).
+- Chuẩn ngoài: EEMUA 191 / ISA-18.2 (phân bố cảnh báo ~5/15/80, ~1 cảnh báo/10 phút/người trực), Google SRE Practical Alerting (cảnh báo phải dẫn tới hành
+  động; việc không gấp = ticket), Stephen Few (một màn, ngoại lệ nổi lên), Eckerson (dashboard vận hành = báo ngoại lệ). Link trong trang đề xuất.
+
+**Đề xuất (3 bước).** (1) Khối "Cần xử lý" đầu trang: ca qua giờ chưa có số theo ngày + trùng người theo hạn + chip lọc (chưa host, chưa phòng); nhãn đỏ
+"chưa có số" thay nhãn vàng theo form; bỏ khối trùng người riêng. (2) `todoList`: "Hôm nay phải xong" (hạn ≤ 48 giờ, mức theo hạn) + "Việc tháng" gom theo
+loại; bỏ việc tự trỏ về Bảng Vận Hành. (3) Khối lập kế hoạch sang "Cả tháng"; kỳ vọng ca lên dòng ca sắp live (bỏ khối chọn brand); giữ kết quả tính khi
+chuyển chế độ; tách component dòng ca. **Chờ user chốt:** form giao ca khi đã có số (bỏ cảnh báo / chấm xám / giữ); việc tháng (gom dưới / sang Cả tháng /
+giữ); khối lập kế hoạch (sang Cả tháng / giữ thu gọn).
+**Demo (24/10, sau "làm demo đi"):** https://claude.ai/artifact/HTPVorM52vK9VyYvooyzVW — khung app + Bảng Vận Hành mới theo theme YFB/Sand, dữ liệu thật đọc từ app
+dev lúc 08:35 24/10: 84 ca 24–30/10 kèm kỳ vọng `expectedNowById` (Franklin Shopee chưa đủ lịch sử ⇒ "—"), trùng người, phòng, người chưa nhận lịch
+(`unackedSoon`, 27 người); 30 ca tồn; 73 ca 17–23/10 (có số = GMV > 0 hoặc đã đối soát); tải người top 12; cam kết giờ đọc từ khối "Việc lập kế hoạch ca".
+Có công tắc 3 quyết định, "Giao ca" chỉ đổi trong demo. Bài học khi dựng: chip "chưa nhận lịch" trên dòng hiện 16/22 ca (chưa ai dùng app talent) ⇒ chỉ hiện
+khi lọc; xem thử file ngoài repo bằng cách chép tạm vào gốc repo (Vite phục vụ) rồi xoá — nhớ thêm meta charset/viewport cho bản xem thử.
+
+## Bảng Vận Hành theo audit (2026-10-25)
+
+User chốt cả 3 đề xuất của audit 24/10 ("không cảnh báo khi đã có số, gộp việc tháng dưới việc ngày, khối lập kế hoạch sang Cả tháng. Làm vào app như
+demo"). Không migration.
+
+**Đã làm.**
+- `OpsBoard.tsx` viết lại: khối `NeedsQueue` ("Cần xử lý") — ca `isUnconfirmedPast` theo ngày (nút "Xem & giao ca" mở khoảng `backlog`, mới nhất trước),
+  chỗ trùng người gom theo ngày (nút mở đúng ngày), chip lọc ca HÔM NAY chưa host / chưa phòng / chưa nhận lịch trong 12 giờ (`unackedSoon(…, 12)`, đọc
+  `fetchShiftAcks` trong bảng). Bỏ khối trùng người đỏ riêng và 4 ô số; thay bằng một hàng `StatTile frame="plain"`: số ca + kỳ vọng (sắp tới) hoặc GMV đã
+  ghi nhận (đã qua) TÁCH theo sàn, "Chưa có số" ở 7 ngày qua. Khoảng mới "7 ngày qua". Nhãn dòng: đỏ "chưa có số", vàng "chưa có phòng", "trùng người",
+  "chưa nhận lịch" (chỉ khi đang lọc). SessionRow/SlotRow/DraftRow/NeedsQueue là component cấp module. Hai chế độ giữ nguyên khi chuyển (`hidden`).
+  Thứ tự DOM = màn hẹp: Cần xử lý → Việc cần làm → danh sách; ≥ xl: lưới 2 cột, việc cần làm cột phải `row-span-2` dính khi cuộn.
+- `hooks/useShiftExpectations.ts`: `buildChannelRoom` tháng này (camp của Kế Hoạch Tháng) + tháng sau (lịch cố định) cho mọi kênh, chạy trong `setTimeout(0)`
+  sau khi danh sách vẽ; dòng hiện "…" khi đang tính, "—" khi kênh chưa đủ lịch sử (Franklin Shopee).
+- `OpsSupport.tsx` = chi tiết một ca (kỳ vọng, GMV/giờ, target ca vàng khi > `highExpectationRatio` × kỳ vọng, phễu `benchmarkForWindow` theo đúng sàn).
+  Giữ tên file vì `layoutCalm.test.ts` (phiên song song đang sửa) liệt kê nó. `OpsSupportTab.tsx` xoá.
+- `todoList.ts`: `BoardView` (`drafts` | `backlog` | `unack` | `day:YYYY-MM-DD`), `unconfirmed` → "N ca đã qua giờ chưa có số" mở `backlog`; trùng người
+  mức theo hạn (≤ ngày mai đỏ) mở ngày sớm nhất; mới `no-host-soon` (ca 48 giờ tới chưa host); `no-room` chỉ 48 giờ tới + `no-room-later` (việc tháng, CRM);
+  `unacked-shifts` mức thấp mở bộ lọc; `open-slots` mức theo hạn. `groupTodos()` chia `today` (DAY_IDS; số liệu cũ từng kênh thành con của `unconfirmed`) và
+  `month` (MONTH_GROUPS, tối đa vàng). `TodoPanel` vẽ hai phần, "Việc tháng · N nhóm, M việc" thu gọn mặc định, nhóm nhiều việc mở ra từng việc + nút.
+- `App.tsx`: `OpsPlanningTodo` vào `monthView` (trên OpsMonthView); `t.view` → `opsView = "day"` + `requestRange`.
+
+**Chỗ khác demo có chủ đích.** Bấm chip lọc thì LỌC danh sách (demo chỉ tô); chip "chưa nhận lịch" trên dòng chỉ hiện khi lọc (16/22 ca hôm nay chưa ai
+nhận vì chưa ai dùng app talent). Dòng ca bấm vẫn mở Cửa sổ Ca Live; chi tiết kỳ vọng mở bằng mũi tên riêng. Việc cần làm vẫn lặp "30 ca chưa có số" và
+"trùng người" của khối Cần xử lý như demo đã duyệt.
+
+**Verify.** 1014 test (sửa theo luật mới: personClash mức theo hạn + `no-room-later`, talentAcks mức thấp + `view`, layoutConventions khối Cần xử lý thay
+"4 ô 0", bỏ OpsSupportTab khỏi danh sách duyệt channelCard), tsc, eslint 0 lỗi. App thật 1440×900: 22 ca hôm nay, "Xem & giao ca" → 30 ca nhãn đỏ;
+7 ngày qua 78 dòng, 30 "chưa có số", không còn "chưa giao ca"; mũi tên VERA Shopee 10h: kỳ vọng 11,3M · 3,8M/giờ · target 13,9M · viewers/giờ 1.202;
+"Xem và đổi người" → Ngày mai, 14 chip trùng; "Cả tháng" lần đầu 816ms, lần sau 66ms; khối lập kế hoạch chỉ ở Cả tháng; việc tháng 9 nhóm/22 việc;
+375px không tràn ngang; không lỗi console. Chưa thử: bấm "Xác nhận thành ca" (tạo ca thật).

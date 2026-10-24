@@ -96,7 +96,7 @@ describe("unackedSoon (cho OP)", () => {
     expect(out.find((p) => p.talentId === "thy")!.sessions.map((s) => s.id)).toEqual(["seg"]);
   });
 
-  test("việc cần làm của OP: đỏ khi có ca ≤ 12 giờ; vắng dữ liệu nhận (DB chưa chạy 0169) thì không có việc", () => {
+  test("việc cần làm của OP: chưa nhận lịch là việc mức thấp mở bộ lọc; vắng dữ liệu nhận (DB chưa chạy 0169) thì không có việc", () => {
     const base = {
       today: "2026-10-11",
       brands: [],
@@ -113,11 +113,13 @@ describe("unackedSoon (cho OP)", () => {
     const sessions = [ca("a", { startTime: "06:00", endTime: "09:00" })];
     const all = buildTodos({ ...base, sessions, acks: [], nowMs: NOW });
     const todo = all.find((t) => t.id === "unacked-shifts");
-    expect(todo?.level).toBe("high");
+    // 25/10: mức thấp — chưa ai dùng app talent nên việc này gần như luôn có (audit 24/10: 27/27 người); bấm mở bộ lọc trên Bảng Vận Hành.
+    expect(todo?.level).toBe("low");
+    expect(todo?.view).toBe("unack");
     expect(todo?.title).toBe("2 người chưa nhận lịch 1 ca trong 48 giờ tới");
     expect(buildTodos({ ...base, sessions, nowMs: NOW }).some((t) => t.id === "unacked-shifts")).toBe(false);
     const later = [ca("b", { date: "2026-10-12", startTime: "20:00", endTime: "23:00" })];
-    expect(buildTodos({ ...base, sessions: later, acks: [], nowMs: NOW }).find((t) => t.id === "unacked-shifts")?.level).toBe("medium");
+    expect(buildTodos({ ...base, sessions: later, acks: [], nowMs: NOW }).find((t) => t.id === "unacked-shifts")?.level).toBe("low");
   });
 });
 

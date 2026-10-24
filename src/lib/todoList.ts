@@ -20,6 +20,9 @@ import { unackedSoon } from "./talent/acks";
 
 export type TodoLevel = "high" | "medium" | "low";
 
+/** Bảng Vận Hành mở sẵn chỗ này khi bấm việc: bộ lọc ca nháp / ca đã qua giờ chưa có số / chưa nhận lịch, hoặc một ngày cụ thể. */
+export type BoardView = "drafts" | "backlog" | "unack" | `day:${string}`;
+
 export interface Todo {
   id: string;
   level: TodoLevel;
@@ -32,8 +35,8 @@ export interface Todo {
   rememberBrandId?: string;
   /** Sàn đi kèm brand đã nhớ (kế hoạch theo sàn, 0140). */
   rememberPlatform?: "TikTok" | "Shopee";
-  /** Bảng Vận Hành mở sẵn bộ lọc này (24/10: "drafts" = ca nháp của sa bàn). */
-  view?: "drafts";
+  /** Bảng Vận Hành mở sẵn bộ lọc này (24/10: ca nháp, ca chưa có số, chưa nhận lịch, một ngày). */
+  view?: BoardView;
   action: string;
 }
 
@@ -281,7 +284,8 @@ export function buildTodos(input: TodoInput): Todo[] {
   // 9. Ca đã qua giờ mà chưa có bằng chứng diễn ra.
   const unconfirmed = sessions.filter(isUnconfirmedPast);
   if (unconfirmed.length > 0) {
-    out.push({ id: "unconfirmed", level: "high", title: `${unconfirmed.length} ca đã qua giờ chưa giao ca`, detail: "Ca có diễn ra: mở ca → Giao ca (up file số liệu của sàn: TikTok Creator-Live-Performance, Shopee Live List; trợ live giao, ca không trợ thì OPS). Không diễn ra: huỷ ca.", tab: "sessions", action: "Mở Sổ Ca" });
+    // 25/10 (audit Bảng Vận Hành): "chưa có số" — cùng định nghĩa với khối Cần xử lý và nhãn đỏ trên dòng ca; mở thẳng danh sách đó.
+    out.push({ id: "unconfirmed", level: "high", title: `${unconfirmed.length} ca đã qua giờ chưa có số`, detail: "Ca có diễn ra: mở ca → Giao ca (up file số liệu của sàn: TikTok Creator-Live-Performance, Shopee Live List; trợ live giao, ca không trợ thì OPS). Không diễn ra: huỷ ca.", tab: "calendar", view: "backlog", action: "Xem & giao ca" });
   }
 
   // 9b. Trùng người từ hôm nay (user chốt 06/10: một người chỉ đứng MỘT ca tại một thời điểm). Lịch nạp hàng loạt
@@ -289,27 +293,45 @@ export function buildTodos(input: TodoInput): Todo[] {
   const clashes = findPersonClashes(sessions, { from: today });
   if (clashes.length > 0) {
     const people = [...new Set(clashes.map((c) => c.talentName).filter(Boolean))];
+    // Mức theo HẠN (audit 24/10, chuẩn cảnh báo vận hành): chỗ trùng trong 48 giờ tới mới đỏ; mở thẳng ngày trùng sớm nhất.
+    const first = clashes.reduce((a, c) => (c.session.date < a ? c.session.date : a), clashes[0].session.date);
     out.push({
       id: "person-clash",
-      level: "high",
-      title: `${clashes.length} chỗ trùng người trên lịch từ hôm nay`,
+      level: first <= addDays(today, 1) ? "high" : "medium",
+      title: `${clashes.length} chỗ trùng người, sớm nhất ${fmtDateVn(first, false)}`,
       detail: `${people.slice(0, 4).join(", ")}${people.length > 4 ? ` và ${people.length - 4} người khác` : ""} đang được xếp hai ca cùng giờ (hoặc vừa host vừa trợ một ca).`,
       tab: "calendar",
+      view: `day:${first}`,
       action: "Xem và đổi người"
     });
   }
 
-  // 9c. Ca sắp tới chưa có phòng — không kiểm được trùng phòng (32 ca Franklin Shopee T10, 06/10).
-  const noRoom = sessions.filter((s) => s.status !== "Cancelled" && !s.isBackfill && s.date >= today && !s.studioId);
-  if (noRoom.length > 0) {
+  // 9a. Ca 48 giờ tới chưa gán host (ca đã tạo, không phải ca chờ đăng ký) — trước 25/10 không việc nào nhắc, chỉ thấy dòng đỏ nếu đúng ngày đang xem.
+  const soonNoHost = sessions.filter((s) => s.status !== "Cancelled" && !s.isBackfill && s.date >= today && s.date <= addDays(today, 1) && !s.hostId);
+  if (soonNoHost.length > 0) {
+    const first = soonNoHost.reduce((a, s) => (s.date < a ? s.date : a), soonNoHost[0].date);
     out.push({
-      id: "no-room",
-      level: "medium",
-      title: `${noRoom.length} ca sắp tới chưa có phòng live`,
-      detail: "Đặt phòng mặc định cho brand × sàn ở CRM → Hợp đồng & giá (ca mới tự nhận), ca đã tạo thì mở ca → Sửa ca để chọn phòng.",
+      id: "no-host-soon",
+      level: "high",
+      title: `${soonNoHost.length} ca 48 giờ tới chưa có host`,
+      detail: soonNoHost.slice(0, 3).map((s) => `${s.brandName} ${platformOf(s)} ${fmtDateVn(s.date, false)} ${s.startTime}`).join(" · "),
       tab: "calendar",
-      action: "Mở Bảng Vận Hành"
+      view: `day:${first}`,
+      action: "Gán host"
     });
+  }
+
+  // 9c. Ca sắp tới chưa có phòng — không kiểm được trùng phòng (32 ca Franklin Shopee T10, 06/10).
+  // 25/10: tách 48 giờ tới (việc ngày, mở đúng ngày) khỏi phần sau (việc tháng: sửa phòng mặc định ở CRM).
+  const noRoom = sessions.filter((s) => s.status !== "Cancelled" && !s.isBackfill && s.date >= today && !s.studioId);
+  const noRoomSoon = noRoom.filter((s) => s.date <= addDays(today, 1));
+  const roomHint = "Đặt phòng mặc định cho brand × sàn ở CRM → Hợp đồng & giá (ca mới tự nhận), ca đã tạo thì mở ca → Sửa ca để chọn phòng.";
+  if (noRoomSoon.length > 0) {
+    const first = noRoomSoon.reduce((a, s) => (s.date < a ? s.date : a), noRoomSoon[0].date);
+    out.push({ id: "no-room", level: "medium", title: `${noRoomSoon.length} ca 48 giờ tới chưa có phòng live`, detail: roomHint, tab: "calendar", view: `day:${first}`, action: "Xem ca" });
+  }
+  if (noRoom.length > noRoomSoon.length) {
+    out.push({ id: "no-room-later", level: "low", title: `${noRoom.length - noRoomSoon.length} ca sau 48 giờ chưa có phòng live`, detail: roomHint, tab: "crm", action: "Phòng mặc định ở CRM" });
   }
 
   // 9b. Người đứng ca trong 48 giờ tới chưa bấm "Đã nhận" lịch (app talent T2, 0169). Ca sát giờ (≤ 12 giờ) ⇒ đỏ: gọi nhắc
@@ -320,13 +342,16 @@ export function buildTodos(input: TodoInput): Todo[] {
     if (people.length > 0) {
       const shifts = new Set(people.flatMap((p) => p.sessions.map((s) => s.id))).size;
       const first = (p: (typeof people)[number]) => `${fmtDateVn(p.sessions[0].date, false)} ${p.sessions[0].startTime}`;
+      // 25/10: mức thấp — chưa ai dùng app talent nên số này gần như bằng tổng số người đứng ca (audit 24/10: 27/27); bấm mở bộ lọc
+      // "chưa nhận lịch" trên Bảng Vận Hành (ca trong 12 giờ tới). Khi talent dùng app thật thì xem lại mức.
       out.push({
         id: "unacked-shifts",
-        level: people.some((p) => p.firstStartMs - now <= 12 * 3600_000) ? "high" : "medium",
+        level: "low",
         title: `${people.length} người chưa nhận lịch ${shifts} ca trong 48 giờ tới`,
         detail: `${people.slice(0, 4).map((p) => `${p.name} (${p.sessions.length} ca, sớm nhất ${first(p)})`).join(", ")}${people.length > 4 ? ` và ${people.length - 4} người khác` : ""}. Talent bấm "Đã xem" ở tab Ca của tôi của app; chưa xem thì nhắn/gọi nhắc.`,
         tab: "calendar",
-        action: "Mở Bảng Vận Hành"
+        view: "unack",
+        action: "Lọc ca"
       });
     }
   }
@@ -335,7 +360,8 @@ export function buildTodos(input: TodoInput): Todo[] {
   const week = addDays(today, 7);
   const open = input.shiftSlots.filter((sl) => sl.status === "open" && !sl.sessionId && sl.date >= today && sl.date <= week);
   if (open.length > 0) {
-    out.push({ id: "open-slots", level: "high", title: `${open.length} ca trong 7 ngày tới chưa có người`, tab: "calendar", action: "Chốt người ở Bảng Vận Hành" });
+    const first = open.reduce((a, sl) => (sl.date < a ? sl.date : a), open[0].date);
+    out.push({ id: "open-slots", level: first <= addDays(today, 1) ? "high" : "medium", title: `${open.length} ca trong 7 ngày tới chưa có người`, tab: "calendar", view: `day:${first}`, action: "Chốt người" });
   }
 
   // Rate talent (chỉ CEO/admin thấy rate): host/trợ đã chạy ca mà chưa có rate nào.
@@ -354,3 +380,58 @@ export function buildTodos(input: TodoInput): Todo[] {
 
   return out.sort((a, b) => LEVEL_ORDER[a.level] - LEVEL_ORDER[b.level]);
 }
+
+// ---------------------------------------------------------------------------
+// Hai phần của "Việc cần làm" (audit Bảng Vận Hành 24/10, user chốt 25/10): HÔM NAY PHẢI XONG (hạn ≤ 48 giờ, mức theo hạn) và
+// VIỆC THÁNG gom theo loại, thu gọn (31 việc rời ⇒ ~11 dòng). Số liệu cũ từng kênh là con của "ca đã qua giờ chưa có số"
+// (cùng một việc: up file / Giao ca). Việc tháng tối đa mức vàng — không việc tháng nào đỏ cạnh việc phải xong hôm nay.
+// ---------------------------------------------------------------------------
+
+export interface TodoRow extends Todo {
+  /** Việc con hiện khi mở dòng (vd số liệu cũ từng kênh dưới "ca chưa có số"). */
+  children?: Todo[];
+}
+export interface TodoGroup {
+  key: string;
+  label: string;
+  level: TodoLevel;
+  items: Todo[];
+}
+
+const DAY_IDS = new Set(["session-drafts", "unconfirmed", "person-clash", "no-host-soon", "no-room", "unacked-shifts", "open-slots"]);
+const MONTH_GROUPS: { key: string; label: string; match: (id: string) => boolean }[] = [
+  { key: "plan-next", label: "Kế hoạch tháng sau chưa chốt", match: (id) => id.startsWith("plan-next-") },
+  { key: "plan-now", label: "Kế hoạch tháng này còn nháp / chưa có", match: (id) => id.startsWith("plan-draft-") || id.startsWith("plan-none-") },
+  { key: "plan-fix", label: "Ca chưa có target (ngoài kế hoạch / tăng cường)", match: (id) => id.startsWith("plan-outside-") || id.startsWith("plan-boost-") },
+  { key: "report", label: "Report tháng trước chưa phát hành", match: (id) => id.startsWith("report-") },
+  { key: "price", label: "Chưa có giá ở CRM", match: (id) => id.startsWith("rate-") },
+  { key: "commit", label: "Chưa có cam kết giờ", match: (id) => id.startsWith("commit-") },
+  { key: "affiliate", label: "Affiliate", match: (id) => id.startsWith("aff-") },
+  { key: "channel", label: "Brand chưa có kênh", match: (id) => id.startsWith("channel-") }
+];
+const CAP: Record<TodoLevel, TodoLevel> = { high: "medium", medium: "medium", low: "low" };
+
+export function groupTodos(todos: Todo[]): { today: TodoRow[]; month: TodoGroup[] } {
+  const stale = todos.filter((t) => t.id.startsWith("stale-"));
+  const today: TodoRow[] = [];
+  const month: TodoGroup[] = [];
+  for (const t of todos) {
+    if (t.id.startsWith("stale-")) continue;
+    if (DAY_IDS.has(t.id)) {
+      today.push(t.id === "unconfirmed" && stale.length ? { ...t, children: stale, detail: `Số liệu cũ ở ${stale.length} kênh — mở dòng để up file từng kênh. ${t.detail ?? ""}`.trim() } : t);
+      continue;
+    }
+    const g = MONTH_GROUPS.find((x) => x.match(t.id));
+    const key = g?.key ?? t.id;
+    const cur = month.find((m) => m.key === key);
+    if (cur) cur.items.push(t);
+    else month.push({ key, label: g?.label ?? t.title, level: CAP[t.level], items: [t] });
+  }
+  // Không có ca nào thiếu số mà vẫn có kênh số cũ (kênh chỉ nạp file tổng) ⇒ số cũ đứng riêng ở phần hôm nay.
+  if (stale.length && !todos.some((t) => t.id === "unconfirmed")) today.push(...stale);
+  for (const m of month) for (const t of m.items) if (LEVEL_ORDER[CAP[t.level]] < LEVEL_ORDER[m.level]) m.level = CAP[t.level];
+  today.sort((a, b) => LEVEL_ORDER[a.level] - LEVEL_ORDER[b.level]);
+  month.sort((a, b) => LEVEL_ORDER[a.level] - LEVEL_ORDER[b.level]);
+  return { today, month };
+}
+

@@ -164,8 +164,6 @@ describe("một thang nhãn, một chỗ tính (21/10)", () => {
     const allowed = new Set([
       // Sa bàn: điểm % khi thêm ca (cùng engine, không chữ kết luận).
       "components/OpsMonthView.tsx",
-      // Benchmark ca sắp live: kỳ vọng từng ca = expectedNowById (cùng số với sa bàn, 24/10).
-      "components/OpsSupportTab.tsx",
       // Report Tháng / Tuần: bản chụp sau tháng.
       "components/brand-workspace/MonthlyReportTabs.tsx",
       "components/brand-workspace/BrandWeeklyReport.tsx"

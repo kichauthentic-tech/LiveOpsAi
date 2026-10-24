@@ -13,6 +13,13 @@
 
 ## 1. Giai đoạn hiện tại (cập nhật 2026-10-24)
 
+- **25/10: BẢNG VẬN HÀNH THEO AUDIT 24/10 (BUILT, commit riêng, không migration)** — user chốt cả 3 đề xuất, làm như demo
+  https://claude.ai/artifact/HTPVorM52vK9VyYvooyzVW (audit https://claude.ai/artifact/VJXrAH9Mj1iris1LcWgKTu). Khối **Cần xử lý** đầu trang (ca qua giờ chưa có số
+  theo ngày + "Xem & giao ca", trùng người theo ngày, chip lọc hôm nay chưa host/phòng/chưa nhận lịch); nhãn đỏ **"chưa có số"** = `isUnconfirmedPast`, bỏ nhãn
+  vàng theo form Giao ca; khoảng **7 ngày qua**; **kỳ vọng GMV trên dòng ca** (`hooks/useShiftExpectations.ts` → expectedNowById) + mũi tên mở phễu
+  (`OpsSupport.tsx` nay là chi tiết một ca; `OpsSupportTab.tsx` đã xoá); **Việc cần làm** = "Hôm nay phải xong" (≤ 48 giờ, mức theo hạn) + "Việc tháng"
+  gom nhóm thu gọn (`groupTodos`, `Todo.view` mở đúng chỗ trên bảng); khối **lập kế hoạch + cam kết giờ sang "Cả tháng"**; hai chế độ giữ nguyên khi chuyển
+  (Cả tháng lần 2: 66ms, lần đầu ~0,8s); dòng ca là component ngoài hàm vẽ. Verify + số đo: lịch sử `## Bảng Vận Hành theo audit (2026-10-25)`.
 - **24/10: GỘP PHÒNG ĐIỀU HÀNH VÀO BẢNG VẬN HÀNH (đã commit, chưa push, không migration)** — Bảng Vận Hành có 2 chế độ (`opsView` ở App): **Hôm nay &
   tuần** và **Cả tháng** (`OpsMonthView.tsx`, đổi tên từ `ControlRoom.tsx`); sidebar bỏ mục Phòng Điều Hành, id/link cũ `control_room`/`/phong-dieu-hanh` mở
   "Cả tháng". Ca nháp (`hooks/useSessionDrafts.ts`) = việc cần làm `session-drafts` + dòng nháp + bộ lọc "Ca nháp · N" + cửa sổ xác nhận. Một bảng tải người
@@ -354,7 +361,7 @@ màn; chỉ khung của Kế Hoạch Tháng, thiếu khung thì lịch cố đ�
 `brandPriceSet`/`brandPriceLabel` (lib/brandPricing.ts) · cam kết của một tháng = `monthCommitmentOf` (dòng tháng thắng `contractCovering`) ·
 rate talent đang áp = `talentRateLabel` · tháng mở sẵn của màn = `lib/defaultMonth.ts` (xem số: tháng gần nhất có ca;
 Report/Nhập Ads: tháng đã hết gần nhất; Kế Hoạch Tháng: tháng này nếu brand đang mở còn nháp) · việc cần làm =
-`buildTodos` (lib/todoList.ts) · GMV kỳ vọng của ca / khả năng về đích theo ngày / ca xoay chuyển / ca có thể thêm = `controlRoom.ts` (khả năng = `pHitOf`, đúng công thức `landingOf`; kỳ vọng ca sắp tới ở mọi màn = `ChannelRoom.expectedNowById`, 24/10) · thứ tự host gợi ý = `suggestHosts` / `hostOrder` (một cách xếp cho cửa sổ chốt ca, chốt hàng loạt, sa bàn) · giờ tuần của một người = phút theo lịch của đoạn đứng ca (`peopleLoad` = `suggestHosts.weekHours`) · dự kiến cuối tháng = `projectMonthEnd` /
+`buildTodos` (lib/todoList.ts) · GMV kỳ vọng của ca / khả năng về đích theo ngày / ca xoay chuyển / ca có thể thêm = `controlRoom.ts` (khả năng = `pHitOf`, đúng công thức `landingOf`; kỳ vọng ca sắp tới ở mọi màn = `ChannelRoom.expectedNowById`, 24/10) · ca "chưa có số" (nhãn đỏ dòng ca, khối Cần xử lý, việc cần làm) = `isUnconfirmedPast` — không cảnh báo thiếu form Giao ca khi ca đã có số (user chốt 25/10) · việc cần làm mới: khai `id` vào `DAY_IDS` (hạn ≤ 48 giờ, mức theo hạn) hoặc một nhóm `MONTH_GROUPS` (todoList.ts), việc mở Bảng Vận Hành dùng `view` (BoardView) chứ không trỏ trơn `tab: "calendar"` · thứ tự host gợi ý = `suggestHosts` / `hostOrder` (một cách xếp cho cửa sổ chốt ca, chốt hàng loạt, sa bàn) · giờ tuần của một người = phút theo lịch của đoạn đứng ca (`peopleLoad` = `suggestHosts.weekHours`) · dự kiến cuối tháng = `projectMonthEnd` /
 `MonthOutlook` · trùng lịch = `personClash`/`studioClash` (scheduling/conflicts) · giờ kế hoạch = `sessionDurationHours`, giờ
 live = `sessionHours`. GMV/giờ đem NHÂN với giờ lịch thì chia trên giờ kế hoạch; GMV/giờ BÁO CÁO chia trên giờ live. Thước
 đo xếp host là **GMV/giờ**, không phải GMV/ca. Cam kết hợp đồng đếm **giờ ca theo lịch** (kể cả ca GMV 0 đã có bằng chứng diễn ra), loại ca huỷ và ca chờ xác nhận.
@@ -437,6 +444,8 @@ target khung camp ở Nhập Ads bỏ 06/10 — tháng không có kế hoạch c
 
 | Mục trong file lịch sử | Tóm tắt |
 |---|---|
+| `## Bảng Vận Hành theo audit (2026-10-25)` | những gì đã đổi theo 3 quyết định, chỗ khác demo có chủ đích, cách verify trên app thật |
+| `## Audit Bảng Vận Hành (2026-10-24)` | số đo nhãn giả, hàng đợi ẩn, 31 việc, lặp trên một màn, tốc độ Cả tháng, chuẩn ngoài, 3 quyết định chờ |
 | `## Gộp Phòng Điều Hành vào Bảng Vận Hành (2026-10-24)` | 4 chỗ trùng đã gộp, chỗ còn khác nhau có chủ đích, cách verify trên app thật, việc còn mở |
 | `## §1 mục 23/10 audit trùng màn + Kế Toán K1 (chuyển khỏi WORKSPACE 24/10)` | nguyên văn hai mục §1 ngày 23/10 trước khi rút gọn |
 | `## §1 mục 07–16/10 (chuyển khỏi WORKSPACE 24/10)` | nguyên văn 3 mục §1 (13–16/10, 10–11/10, 07–09/10) trước khi gộp thành một dòng |

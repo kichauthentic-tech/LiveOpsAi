@@ -95,10 +95,16 @@ describe("Việc cần làm", () => {
     talents: [],
     canSeeMoney: false
   });
-  test("trùng người sắp tới ⇒ việc đỏ; ca sắp tới chưa có phòng ⇒ việc vàng", () => {
-    const t = buildTodos(input([ca("a"), ca("b", { startTime: "19:00", studioId: "" })]));
-    expect(t.find((x) => x.id === "person-clash")).toMatchObject({ level: "high", title: "1 chỗ trùng người trên lịch từ hôm nay", tab: "calendar" });
-    expect(t.find((x) => x.id === "no-room")).toMatchObject({ level: "medium", title: "1 ca sắp tới chưa có phòng live" });
+  test("mức theo hạn (25/10): trùng người / chưa phòng trong 48 giờ ⇒ việc ngày, mở đúng ngày; xa hơn ⇒ vàng / việc tháng", () => {
+    // Ca 20/10, hôm nay 06/10: còn 14 ngày.
+    const far = buildTodos(input([ca("a"), ca("b", { startTime: "19:00", studioId: "" })]));
+    expect(far.find((x) => x.id === "person-clash")).toMatchObject({ level: "medium", title: "1 chỗ trùng người, sớm nhất 20/10", tab: "calendar", view: "day:2026-10-20" });
+    expect(far.find((x) => x.id === "no-room")).toBeUndefined();
+    expect(far.find((x) => x.id === "no-room-later")).toMatchObject({ level: "low", title: "1 ca sau 48 giờ chưa có phòng live" });
+    // Ngày mai 07/10.
+    const soon = buildTodos(input([ca("a", { date: "2026-10-07" }), ca("b", { date: "2026-10-07", startTime: "19:00", studioId: "" })]));
+    expect(soon.find((x) => x.id === "person-clash")).toMatchObject({ level: "high", view: "day:2026-10-07" });
+    expect(soon.find((x) => x.id === "no-room")).toMatchObject({ level: "medium", title: "1 ca 48 giờ tới chưa có phòng live", view: "day:2026-10-07" });
   });
   test("trùng đã qua ngày thì không nhắc", () => {
     const t = buildTodos(input([ca("a", { date: "2026-10-01" }), ca("b", { date: "2026-10-01", startTime: "19:00" })]));
