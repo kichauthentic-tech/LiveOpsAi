@@ -37,7 +37,6 @@
 - **CHẠY THỬ THẬT trên dữ liệu thật** (từ 2026-09-18; mock đã xoá sạch 19/09). DB: 33 hồ sơ talent thật, CROCS T6–T9 nạp
   bù từ file Creator-Live-Performance (229 ca, còn ca chưa gán host). **Không đề xuất tính năng mới**; hỏi user chạy thử
   tới đâu, cái gì kêu, rồi sửa đúng chỗ đó. **Không seed mock lại.**
-- **Nợ kỹ thuật đã hết** (P2a, 01–02/10) + **audit code chết xong** (02/10): ESLint 0 lỗi (33 warning `set-state-in-effect` = nợ đã đo, cố ý `warn`).
 - **Các đợt 04–07/10 trước audit đa sàn** (lịch 2 sàn 0143–0145, giao ca, cấp 27 tài khoản host/trợ, gộp cấu hình một chỗ nhập 0146,
   tách sàn 0139–0142, đổi người giữa ca 0138/0147/0148, nạp Working File, audit 0133–0136) — nguyên văn: lịch sử `## §1 các đợt 04–07/10 (chuyển khỏi WORKSPACE 07/10)`.
 - **Quyết định user đã chốt — đừng nêu lại:** luật run-rate (§5.6); Target GMV từng ca ở "Kế Hoạch Tháng Sau" brand ĐƯỢC
@@ -53,16 +52,13 @@
   view chưa có cột ⇒ đọc lại không có `live_evidence`, mỗi lần mở app tốn 2 request 400 tới khi chạy). Sau khi chạy: Bảng Vận Hành / Sổ Ca
   thấy ca quá giờ tự "Đã xong" lại (trước đó `complete_past_sessions` lỗi cả lô vì cặp trùng người). Nên bật pg_cron (Database → Extensions)
   để ca được đóng cả khi không ai mở app. Code đã push `9426932` (19/10, gồm run-rate theo ca 11/10 + bố cục 18–19/10) — Vercel tự deploy từ main.
-- **Điều Phối Lịch Live (24/10):** `0180` ĐÃ CHẠY (kiểm trên DB thật: `roster_months`, `early_leave_reason`, `manage_month_plan`, RPC giao ca 6/7 tham số).
-  Còn: (code đã push 24/10, Vercel tự deploy) tạo tài khoản Trainer ở Phân Quyền, thử Kế Hoạch Tháng + Tháng sau → đặt hạn tháng; nhập rate (Talent Pool) + giá (CRM); sửa GMV hợp đồng FUJIWA (450 → 450M).
-  Câu hỏi mở: tiền brand theo giờ có theo giờ live thật không; có người trả theo ca không.
+- **Điều Phối Lịch Live (24/10):** `0180` ĐÃ CHẠY + code đã push (3ca9999). Còn: tạo tài khoản Trainer ở Phân Quyền, thử Kế Hoạch Tháng + Tháng sau → đặt hạn tháng;
+  nhập rate (Talent Pool) + giá (CRM); sửa GMV hợp đồng FUJIWA (450 → 450M). Câu hỏi mở: tiền brand theo giờ có theo giờ live thật không; có người trả theo ca không.
 - **Đối soát / GMV ca (13/10):** 0174 ĐÃ CHẠY. Còn: deploy client; Áp dụng lô CROCS T10 01–13/10, Áp Dụng Lại lô VERA Shopee 08–10/10 (Claude bị chặn bấm — user bấm); ca CROCS 11/10 09–12 (file tải 13:35) nên gõ GMV đúng ở form Giao ca trước khi Áp dụng.
 - **Bảng Vận Hành · Cả tháng (Phòng Điều Hành cũ, 0170 ĐÃ CHẠY):** đặt `ANTHROPIC_API_KEY` trên Vercel nếu muốn hỏi bằng Claude (thiếu thì chỉ Gemini). Role brand chỉ thấy điểm của ngày sổ dự báo đã ghi (Dashboard được mở ngày đó).
-- **0168 ĐÃ CHẠY 11/10.** Còn lại: deploy client rồi thử up Live List giữa phiên ở một ca nối Shopee thật.
+- **0166–0168 ĐÃ CHẠY 11/10.** Còn thử thật: (0168) deploy rồi up Live List giữa phiên ở một ca nối Shopee; (0167) xem lại rồi Áp dụng lô VERA Shopee 01–10/10 đã gộp, TikTok chưa kiểm nhóm restart; (0166) bỏ tick vài phiên → Áp dụng → ca khớp phiên bỏ tick phải giữ nguyên số.
 - **App talent bản 2 (16/10): ĐÃ deploy + 0177 ĐÃ chạy (phiên 16/10 tối kiểm trên bản thật, link .ics chạy).** Còn lại: deploy → ở Bàn Trainer bấm "Chép tin Zalo" dán vào nhóm host → nhờ 1–2 host mở link, bấm "Đã xem", thêm lịch vào điện thoại. Đo lại ~30/10: số người mở app (`ui_tab_views` role talent), số người có dòng `shift_acks`, số dòng `talent_calendar_feeds`.
 - **App talent T1+T2 (11/10, đã commit):** đăng nhập thử bằng một tài khoản host/trợ thật trên điện thoại rồi báo chỗ sai; muốn tab Đăng ký có nội dung thì OP mở ca qua Kế Hoạch Tháng → Chốt (hiện lịch xếp từ sheet nên 0 ca mở); nhập rate ở Talent Pool để Hồ Sơ có thu nhập. Đo lại sau 2 tuần: lượt mở của role talent (Lượt Mở Tab) + tỷ lệ ca có trợ được giao trong app.
-- **0167 ĐÃ CHẠY + đã gộp VERA Shopee 01–10/10.** Còn lại: xem lại bảng rồi Áp dụng lô đó; TikTok chưa kiểm xem có nhóm restart nào cần gộp.
-- **0166 ĐÃ CHẠY 11/10.** Còn lại: thử thật bỏ tick vài phiên → Áp dụng → ca khớp phiên bỏ tick phải giữ nguyên số.
 - **0165 ĐÃ CHẠY + kiểm trên DB thật 10/10; code đã commit `bb5eab8` trên nhánh `feat/ca-tang-cuong-0164-0165` (CHƯA merge vào main / chưa deploy — client mới chỉ có sau khi merge).** Còn lại: nhờ OP mở thử một ca ở Lịch & Studio cho kênh đã chốt: dòng "Ca tăng cường" phải hiện ở Kế Hoạch Tháng, target đề xuất tự điền, target tháng không đổi (tôi không tự tạo ca trên dữ liệu thật).
 - **0164 ĐÃ CHẠY + áp dụng 10/10** (VERA Shopee T10, CROCS TikTok T10). Còn lại: chưa thử bằng tài khoản ops (phải bị chặn); JOCKEY Shopee T10 chưa chốt kế hoạch; chạy lại "Chia lại theo lịch hiện có…" khi có ca nạp bù/OP thêm mới.
 - Sửa **giờ cam kết VERA TikTok T10** ở Kế Hoạch Tháng: đang lưu 550.000.000 giờ (target gõ nhầm vào ô giờ), ô Target GMV trống. Nhập ô Ngân sách Ads mỗi tháng từ T11 để đo tín hiệu dẫn.
@@ -79,8 +75,6 @@
 7. Nhánh `503 ai_not_configured` đầu-cuối; đợt fetch lúc đăng nhập của role talent/brand.
 
 **Hoãn có chủ đích (có lý do, không phải quên):**
-8. Gộp menu / IA — chờ số liệu `ui_tab_views`. Đo 04/10: 1.309 lượt mở đều của MỘT tài khoản (admin — phần lớn là các
-   phiên Claude verify) ⇒ chưa có tín hiệu nào; cần người dùng thật khác vài tuần.
 8b. Cột/bảng client KHÔNG còn đọc/ghi — drop sau khi đếm dòng trên production (khuôn 0126/0132): bảng `brand_affiliate_plans`;
    `brand_monthly_reports`: `plan_target_gmv/nmv/hours`, `plan_pct_*` (04/10), `ads_spend`, `roas`, 3 cột ghi chú (05/10), `camp_*_start/end/target_gmv`
    (06/10, gộp cấu hình); `session_finance`: `agency_commission_rate`, `ads_cost` (06/10, pnl.ts không đọc), `host_fix_rate_override`,

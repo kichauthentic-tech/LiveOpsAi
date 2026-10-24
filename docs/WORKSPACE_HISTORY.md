@@ -6458,3 +6458,15 @@ mỗi giờ khi có rate + giá. Câu hỏi mở: tiền brand theo giờ có th
 có, `role_permissions.manage_month_plan` = ceo/admin/operations/trainer true, brand/talent false; `submit_file_handover` gọi 7 tham số và 6 tham số đều vào
 thân hàm (mã ca giả ⇒ "Không thấy ca.", không ghi gì). Màn: Tháng sau hiện "Chưa đặt hạn" + ô gợi ý 17:00 27/10 (không bấm đặt — dữ liệu thật); Ma Trận Phân
 Quyền có dòng "Kế Hoạch Tháng". Chưa thử bằng tài khoản role trainer thật.
+
+## Dòng rút khỏi WORKSPACE §1–2 (2026-10-24, giữ dưới 500 dòng)
+
+Nguyên văn các dòng đã bỏ/gộp:
+
+- **Nợ kỹ thuật đã hết** (P2a, 01–02/10) + **audit code chết xong** (02/10): ESLint 0 lỗi (33 warning `set-state-in-effect` = nợ đã đo, cố ý `warn`).
+8. Gộp menu / IA — chờ số liệu `ui_tab_views`. Đo 04/10: 1.309 lượt mở đều của MỘT tài khoản (admin — phần lớn là các
+   phiên Claude verify) ⇒ chưa có tín hiệu nào; cần người dùng thật khác vài tuần.
+- **0168 ĐÃ CHẠY 11/10.** Còn lại: deploy client rồi thử up Live List giữa phiên ở một ca nối Shopee thật.
+- **0167 ĐÃ CHẠY + đã gộp VERA Shopee 01–10/10.** Còn lại: xem lại bảng rồi Áp dụng lô đó; TikTok chưa kiểm xem có nhóm restart nào cần gộp.
+- **0166 ĐÃ CHẠY 11/10.** Còn lại: thử thật bỏ tick vài phiên → Áp dụng → ca khớp phiên bỏ tick phải giữ nguyên số.
+
