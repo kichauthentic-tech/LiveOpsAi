@@ -13,7 +13,12 @@
 
 ## 1. Giai đoạn hiện tại (cập nhật 2026-10-24)
 
-- **24/10: DASHBOARD "TỔNG QUAN ACCOUNT" + CHUẨN HOÁ TỪ NGỮ (đã commit, chưa push, không migration)** — user duyệt demo
+- **24/10: GỘP PHÒNG ĐIỀU HÀNH VÀO BẢNG VẬN HÀNH (đã commit, chưa push, không migration)** — Bảng Vận Hành có 2 chế độ (`opsView` ở App): **Hôm nay &
+  tuần** và **Cả tháng** (`OpsMonthView.tsx`, đổi tên từ `ControlRoom.tsx`); sidebar bỏ mục Phòng Điều Hành, id/link cũ `control_room`/`/phong-dieu-hanh` mở
+  "Cả tháng". Ca nháp (`hooks/useSessionDrafts.ts`) = việc cần làm `session-drafts` + dòng nháp + bộ lọc "Ca nháp · N" + cửa sổ xác nhận. Một bảng tải người
+  (`suggestHosts.weekHours` = `peopleLoad`), một cách xếp host (`hostOrder`; bỏ `hostSkillTable`), một số kỳ vọng mỗi ca (`ChannelRoom.expectedNowById`;
+  benchmark ca sắp live đọc số này, gỡ `trackMonth`). Verify + chỗ cố ý khác: lịch sử `## Gộp Phòng Điều Hành vào Bảng Vận Hành (2026-10-24)`.
+- **24/10: DASHBOARD "TỔNG QUAN ACCOUNT" + CHUẨN HOÁ TỪ NGỮ (đã push 9f31121 24/10, không migration)** — user duyệt demo
   https://claude.ai/artifact/AQtXSSHpTxFgbNC8tYTFCH ("áp dụng vào code app cùng lúc build"). Tab đầu mới **Tổng quan account** (`period/OverviewTab.tsx`,
   logic `lib/performance/accountOverview.ts`: `accountRow`/`sortAccounts`/`platformPace`/`accountActions`/`landingText`, test `tests/accountOverview.test.ts`):
   mọi kênh brand × sàn của MỌI sàn, một dòng, xếp theo rủi ro; tổng riêng từng sàn; không theo thanh Sàn/bộ chọn kỳ. Không công thức mới — đọc thẻ kênh
@@ -29,45 +34,18 @@
   sau, Key Metrics 5 tab × 3 tháng. Logic `lib/report/brandReport.ts` (test `tests/brandReport.test.ts`), UI `report/BrandPages.tsx`. Sửa lỗi nhóm đối chứng
   khi file shop ngắn hơn tháng (`shopCompareWindow`). Đổi từ ngữ theo bộ từ brand (§5.2). Verify + việc còn mở + quyết định chờ user: lịch sử
   `## Report Tháng 10 trang (2026-10-24)`. Phiên Dashboard song song (App.tsx, AgencyDashboard, accountOverview) đang sửa cùng lúc — không đụng file của nhau.
-- **23/10 tối: AUDIT TRÙNG MÀN + "mỗi loại số một màn" (đã commit + push 23/10, không migration)** — User chốt: OP VẪN chốt người + mở/huỷ/dời ca
-  như trainer (không gom về Bàn Trainer, giữ Phòng Điều Hành). Đã làm: Dashboard chỉ xem trong tháng (kỳ `"month" | "7d"`); Điều Phối Phát Hành gộp
-  vào Toàn Cảnh Brand (`hooks/useReportPublish.ts`, id/link cũ → `brands_overview`); "Việc cần làm" Dashboard chỉ còn "Báo sớm brand" + dẫn sang Bảng
-  Vận Hành; Toàn Cảnh Brand tháng đã hết không còn nút "Lập kế hoạch"/"Đặt cam kết tháng". Số đo audit, cách verify, việc còn mở: lịch sử `## Audit trùng màn (2026-10-23)`.
-- **23/10: TAB KẾ TOÁN K1 (BUILT, chưa commit, không migration)** — user: kế toán trên app CHỈ tính từ dữ liệu app (không thuế/hoá đơn/thu tiền/khấu hao/chi phí khác/kê khai).
-  Menu Quản trị → "Kế Toán" (`accounting`, ceo/admin, URL `/ke-toan`): `Accounting.tsx` + logic thuần `lib/accounting/monthClose.ts` (`buildMonthClose`, test
-  `tests/accountingMonthClose.test.ts`). Bốn số: doanh thu theo HỢP ĐỒNG (brand × sàn × `contractCovering`; không có hợp đồng hiệu lực ⇒ dòng riêng), công talent theo người,
-  chi phí ca (studio + Ads), lãi gộp; **Đối chiếu giờ theo brand × sàn** (Σ giờ tính lương các ca = Σ giờ host mọi người, `HourCheckRow`; trợ chỉ hiện phần chênh = giờ không có trợ); công tách 2 bảng **Host / Trợ live** (ai có làm host thì vai chính là host, giờ trợ của họ ở cột riêng; bấm dòng ra giờ từ brand nào); Tải Excel (5 sheet). Mọi tiền qua `computeSessionPnl` (không công thức thứ hai), chỉ cộng ca đủ dữ liệu + "tính được X/Y ca".
-  **Hợp đồng % NMV:** trước `monthEnd + 15` ngày = "ước tính" (% hoàn dự kiến CRM); sau đó, nếu file Shop Analytics phủ hết tháng, NMV = GMV × (1 − Σ Hoàn tiền ÷ Σ GMV CẢ SHOP)
-  — xấp xỉ (user chấp nhận), chỉ sàn có `shop_analytics` trong `profileOf().dataRawTypes` (Shopee luôn ước tính). Kế hoạch + câu chốt: `docs/ACCOUNTING_MODULE_PLAN.md`.
-  Đo app thật T10: 0/237 ca đủ dữ liệu (rate host/trợ chưa nhập, % commission chưa đặt, % hoàn dự kiến 0, không brand nào có hợp đồng "hiệu lực") — tab nói đúng vậy, số
-  chỉ hiện khi nhập xong. **Còn mở:** K2 (bản chụp "Chốt tháng": báo lệch hay khoá — chờ user), role kế toán riêng, kiểm cột Hoàn tiền tính theo ngày đặt hay ngày hoàn.
+- **23/10:** audit trùng màn + "mỗi loại số một màn" (đã push 11b2069; user chốt OP vẫn chốt người/mở/huỷ/dời ca như trainer) và **tab Kế Toán K1**
+  (`Accounting.tsx`, `lib/accounting/monthClose.ts`, chưa commit) — nguyên văn: lịch sử `## §1 mục 23/10 audit trùng màn + Kế Toán K1 (chuyển khỏi WORKSPACE 24/10)`.
 - **23/10: Dashboard "so cùng kỳ"** (2 tab + chọn kỳ + so cùng kỳ, gộp Chi tiết kênh vào tab Brand, `lib/performance/periodCompare.ts`/`brandLens.ts`,
   UI `components/dashboard/period/`) — đã push b7d8315; 24/10 thêm tab Tổng quan account (mục trên). Nguyên văn: lịch sử `## §1 mục 23/10 Dashboard so cùng kỳ (chuyển khỏi WORKSPACE 24/10)`.
-- **21–22/10 (thay bởi mục trên):** "một thẻ kênh" (`buildChannelCard` + `useChannelCards`, `0179` ĐÃ CHẠY, cổng brand `BrandPortal` + bản tin) và module
-  Run-rate gộp vào Dashboard — nguyên văn: lịch sử `## §1 mục 21–22/10 Dashboard (chuyển khỏi WORKSPACE 23/10)`.
-
-- **17–19/10** (đã commit + push `9426932`): sắp lại bố cục cho bớt rối 3 đợt + audit toàn app theo sidebar (~25 lỗi, `0178` CHƯA CHẠY) — nguyên văn:
-  lịch sử `## §1 mục 17–19/10 (chuyển khỏi WORKSPACE 24/10)`.
-
-- **16–17/10: đề xuất làm lại Brand workspace** — đã thay bằng cổng brand 21/10 (mục trên); nguyên văn số đo + cách giả lập role brand có che số:
-  lịch sử `## §1 mục 16–17/10 brand workspace (chuyển khỏi WORKSPACE 21/10)`.
-- **13–16/10** (nguyên văn + cách verify: lịch sử `## §1 các đợt 13–16/10 (chuyển khỏi WORKSPACE 18/10)`): **app talent bản 2**
-  (4 tab Ca của tôi / Cả agency / Đăng ký ca / Tôi, `lib/talent/agenda.ts`, link lịch .ics `0177` ĐÃ CHẠY + đã push `c7bb61a`);
-  **audit Dashboard 14/10** (chỉ đề xuất; chờ user chốt: thu gọn Phòng Điều Hành, 4 nhãn khả năng đạt, bỏ bảng xếp host, dấu
-  "target đổi"); **Bàn Trainer + role `trainer`** (đã gộp main, chưa push;
-  `0175` rồi `0176` CHƯA CHẠY; `lib/roster/*`, `RosterBoard`); **đối soát chia theo mốc + gõ GMV ca** (`0171`–`0174` ĐÃ CHẠY;
-  `private.recon_shares` là phép chia duy nhất; mốc snapshot = giờ tải file; `set_session_snapshot_gmv`, `recon_gmv_overrides`).
-- **Các đợt 10–11/10** (Phòng Điều Hành 0170, run-rate tới ca mới nhất, chọn phòng lúc up file 0168, app talent T1/T2 0169, đối soát
-  gộp restart 0167 / chọn phiên 0166, module Run-rate, ca tăng cường 0165, chia lại theo lịch 0164, Dashboard đợt 1, engine target v3
-  0163, sắp lại bố cục — chi tiết nguyên văn + cách verify: lịch sử `## §1 các đợt 10–11/10 (chuyển khỏi WORKSPACE 17/10)`).
-- **Các đợt 07–09/10** (audit đa sàn Bước 0–4 0149–0151, gộp Đối Soát vào Dữ Liệu Gốc, thẻ ca mới, Talent Pool, bỏ "Nhân sự ca",
-  0152–0161, engine chia target v2, Dashboard agency 4 tab — nguyên văn + cách verify: lịch sử `## §1 các đợt 07–09/10 (chuyển khỏi WORKSPACE 10/10)`).
-  Mọi migration 0149–0161 ĐÃ CHẠY. **Còn treo từ các đợt này:** brand `JEW` (36 ca TikTok T10) chưa tạo; 15 cặp trùng người do sheet chờ user rà;
-  hồ sơ `C.Đình`/`P.Thảo` chưa có rate; `create_backfill_sessions` chưa tự bỏ room inhouse (chỉ client lọc);
-  chưa thử trên app thật: Giao ca Shopee bằng file, Ca nối/ngắt room với DB thật, "Sinh ca" VERA Shopee, lưu/tải target
-  nhóm, đăng ký ca bằng tài khoản talent, góc nhìn role brand; `apply_segment_checkpoint_file` vẫn lấy mốc ngầm; nhập tay thực tế chưa có Orders/Views.
-  Bước tiếp của lộ trình đa sàn: chạy thật 2–4 tuần (không tính năng mới).
-
+- **16–22/10** (đã thay bởi các mục trên): "một thẻ kênh" + cổng brand (`0179` ĐÃ CHẠY), Run-rate gộp Dashboard, bố cục bớt rối 3 đợt + audit theo
+  sidebar (`0178` CHƯA CHẠY), đề xuất Brand workspace — nguyên văn: lịch sử `## §1 mục 21–22/10 Dashboard (chuyển khỏi WORKSPACE 23/10)`,
+  `## §1 mục 17–19/10 (chuyển khỏi WORKSPACE 24/10)`, `## §1 mục 16–17/10 brand workspace (chuyển khỏi WORKSPACE 21/10)`.
+- **07–16/10** (nguyên văn: lịch sử `## §1 mục 07–16/10 (chuyển khỏi WORKSPACE 24/10)`, từ đó trỏ tiếp mục chi tiết từng đợt): app talent bản 2
+  (0177 ĐÃ CHẠY), Bàn Trainer + role `trainer` (0175 rồi 0176 CHƯA CHẠY), đối soát chia theo mốc (0171–0174 ĐÃ CHẠY, `private.recon_shares` là phép
+  chia duy nhất), Phòng Điều Hành 0170 (24/10 gộp vào Bảng Vận Hành), run-rate theo ca, audit đa sàn 0149–0161 (ĐÃ CHẠY). **Còn treo:** brand `JEW`
+  chưa tạo; 15 cặp trùng người do sheet chờ user rà; `C.Đình`/`P.Thảo` chưa có rate; `create_backfill_sessions` chưa tự bỏ room inhouse; chưa thử
+  trên app thật: Giao ca Shopee bằng file, Ca nối/ngắt room, "Sinh ca" VERA Shopee, đăng ký ca bằng tài khoản talent, góc nhìn role brand.
 - **CHẠY THỬ THẬT trên dữ liệu thật** (từ 2026-09-18; mock đã xoá sạch 19/09). DB: 33 hồ sơ talent thật, CROCS T6–T9 nạp
   bù từ file Creator-Live-Performance (229 ca, còn ca chưa gán host). **Không đề xuất tính năng mới**; hỏi user chạy thử
   tới đâu, cái gì kêu, rồi sửa đúng chỗ đó. **Không seed mock lại.**
@@ -89,7 +67,7 @@
   để ca được đóng cả khi không ai mở app. Code đã push `9426932` (19/10, gồm run-rate theo ca 11/10 + bố cục 18–19/10) — Vercel tự deploy từ main.
 - **Bàn Trainer (13/10, đã gộp main, chưa push):** chạy `0175_trainer_role.sql` RỒI MỚI chạy `0176_trainer_roster.sql` (hai lần chạy riêng; 0176 cần giá trị enum đã commit) → deploy. Tạo tài khoản role Trainer ở Phân Quyền rồi đăng nhập thử. Nhập rate ở Talent Pool để có chi phí ca. Muốn dùng quy trình tuần thì Kế Hoạch Tháng 11 phải chốt để có ca mở (lịch T10 nhập từ sheet nên tuần T10 chỉ có ca đã lên lịch). Còn mở: host/trợ trả theo giờ hay có người trả theo ca.
 - **Đối soát / GMV ca (13/10):** 0174 ĐÃ CHẠY. Còn: deploy client; Áp dụng lô CROCS T10 01–13/10, Áp Dụng Lại lô VERA Shopee 08–10/10 (Claude bị chặn bấm — user bấm); ca CROCS 11/10 09–12 (file tải 13:35) nên gõ GMV đúng ở form Giao ca trước khi Áp dụng.
-- **Phòng Điều Hành (11/10):** chạy `0170_control_room.sql` (trước hay sau deploy đều được — client tự báo "chưa chạy 0170" ở khối ca nháp; thẻ brand ẩn khi chưa có RPC); đặt `ANTHROPIC_API_KEY` trên Vercel nếu muốn hỏi bằng Claude (thiếu thì chỉ Gemini). Role brand chỉ thấy điểm của ngày sổ dự báo đã ghi (Dashboard / Phòng Điều Hành được mở ngày đó).
+- **Bảng Vận Hành · Cả tháng (Phòng Điều Hành cũ, 0170 ĐÃ CHẠY):** đặt `ANTHROPIC_API_KEY` trên Vercel nếu muốn hỏi bằng Claude (thiếu thì chỉ Gemini). Role brand chỉ thấy điểm của ngày sổ dự báo đã ghi (Dashboard được mở ngày đó).
 - **0168 ĐÃ CHẠY 11/10.** Còn lại: deploy client rồi thử up Live List giữa phiên ở một ca nối Shopee thật.
 - **App talent bản 2 (16/10): ĐÃ deploy + 0177 ĐÃ chạy (phiên 16/10 tối kiểm trên bản thật, link .ics chạy).** Còn lại: deploy → ở Bàn Trainer bấm "Chép tin Zalo" dán vào nhóm host → nhờ 1–2 host mở link, bấm "Đã xem", thêm lịch vào điện thoại. Đo lại ~30/10: số người mở app (`ui_tab_views` role talent), số người có dòng `shift_acks`, số dòng `talent_calendar_feeds`.
 - **App talent T1+T2 (11/10, đã commit):** đăng nhập thử bằng một tài khoản host/trợ thật trên điện thoại rồi báo chỗ sai; muốn tab Đăng ký có nội dung thì OP mở ca qua Kế Hoạch Tháng → Chốt (hiện lịch xếp từ sheet nên 0 ca mở); nhập rate ở Talent Pool để Hồ Sơ có thu nhập. Đo lại sau 2 tuần: lượt mở của role talent (Lượt Mở Tab) + tỷ lệ ca có trợ được giao trong app.
@@ -141,8 +119,8 @@
   ẩn khỏi sidebar khi MỌI kênh của brand đều không có nguồn; thanh sàn chỉ liệt kê sàn hợp lệ cho tab.
   Có URL route (`src/lib/routes.ts`): `/so-ca`, `/brand/crocs/report-thang`…
 - **Nguồn sự thật của menu:** `agencyNavGroups()`/`brandNavGroups()` ở [src/lib/appNav.ts](src/lib/appNav.ts). Ảnh chụp (nhóm gộp 18/10):
-  - Agency: Dashboard · Phòng Điều Hành — **Kế hoạch:** Kế Hoạch Tháng · Bàn Trainer — **Vận hành hằng ngày:** Bảng Vận Hành (id `calendar`, khối
-    Hỗ Trợ Vận Hành cuối trang) · Lịch & Studio (`studio_calendar`) · Sổ Ca (Run-rate gộp vào Dashboard 22/10) — **Phân tích:** Hiệu Suất Host · Toàn Cảnh Brand (gồm phát hành Report
+  - Agency: Dashboard — **Kế hoạch:** Kế Hoạch Tháng · Bàn Trainer — **Vận hành hằng ngày:** Bảng Vận Hành (id `calendar`; 2 chế độ "Hôm nay & tuần" /
+    "Cả tháng" = Phòng Điều Hành cũ, 24/10; khối Hỗ Trợ Vận Hành cuối trang) · Lịch & Studio (`studio_calendar`) · Sổ Ca (Run-rate gộp vào Dashboard 22/10) — **Phân tích:** Hiệu Suất Host · Toàn Cảnh Brand (gồm phát hành Report
     Tháng, 23/10) — **Nguồn lực & khách hàng:** Talent Pool · Studios & Gear · CRM ("Hợp đồng & giá") · TikTok API — **Quản trị:** Kế Toán (ceo/admin, 23/10) · Finance & P&L (ceo/admin,
     trainer chỉ đọc) · Phân Quyền & Role · AI Training Center (admin). Talent: Ca Của Tôi · Cả Agency · Đăng Ký Ca · Tôi (điện thoại: thanh tab dưới đáy).
   - Brand: Dashboard · Lịch Vận Hành · Sổ Ca — **Kế hoạch & báo cáo:** Kế Hoạch Tháng Sau · Sản phẩm lên live · Report Tháng · Affiliate · Hợp Đồng
@@ -376,7 +354,7 @@ màn; chỉ khung của Kế Hoạch Tháng, thiếu khung thì lịch cố đ�
 `brandPriceSet`/`brandPriceLabel` (lib/brandPricing.ts) · cam kết của một tháng = `monthCommitmentOf` (dòng tháng thắng `contractCovering`) ·
 rate talent đang áp = `talentRateLabel` · tháng mở sẵn của màn = `lib/defaultMonth.ts` (xem số: tháng gần nhất có ca;
 Report/Nhập Ads: tháng đã hết gần nhất; Kế Hoạch Tháng: tháng này nếu brand đang mở còn nháp) · việc cần làm =
-`buildTodos` (lib/todoList.ts) · GMV kỳ vọng của ca / khả năng về đích theo ngày / ca xoay chuyển / ca có thể thêm = `controlRoom.ts` (khả năng = `pHitOf`, đúng công thức `landingOf`) · dự kiến cuối tháng = `projectMonthEnd` /
+`buildTodos` (lib/todoList.ts) · GMV kỳ vọng của ca / khả năng về đích theo ngày / ca xoay chuyển / ca có thể thêm = `controlRoom.ts` (khả năng = `pHitOf`, đúng công thức `landingOf`; kỳ vọng ca sắp tới ở mọi màn = `ChannelRoom.expectedNowById`, 24/10) · thứ tự host gợi ý = `suggestHosts` / `hostOrder` (một cách xếp cho cửa sổ chốt ca, chốt hàng loạt, sa bàn) · giờ tuần của một người = phút theo lịch của đoạn đứng ca (`peopleLoad` = `suggestHosts.weekHours`) · dự kiến cuối tháng = `projectMonthEnd` /
 `MonthOutlook` · trùng lịch = `personClash`/`studioClash` (scheduling/conflicts) · giờ kế hoạch = `sessionDurationHours`, giờ
 live = `sessionHours`. GMV/giờ đem NHÂN với giờ lịch thì chia trên giờ kế hoạch; GMV/giờ BÁO CÁO chia trên giờ live. Thước
 đo xếp host là **GMV/giờ**, không phải GMV/ca. Cam kết hợp đồng đếm **giờ ca theo lịch** (kể cả ca GMV 0 đã có bằng chứng diễn ra), loại ca huỷ và ca chờ xác nhận.
@@ -459,6 +437,9 @@ target khung camp ở Nhập Ads bỏ 06/10 — tháng không có kế hoạch c
 
 | Mục trong file lịch sử | Tóm tắt |
 |---|---|
+| `## Gộp Phòng Điều Hành vào Bảng Vận Hành (2026-10-24)` | 4 chỗ trùng đã gộp, chỗ còn khác nhau có chủ đích, cách verify trên app thật, việc còn mở |
+| `## §1 mục 23/10 audit trùng màn + Kế Toán K1 (chuyển khỏi WORKSPACE 24/10)` | nguyên văn hai mục §1 ngày 23/10 trước khi rút gọn |
+| `## §1 mục 07–16/10 (chuyển khỏi WORKSPACE 24/10)` | nguyên văn 3 mục §1 (13–16/10, 10–11/10, 07–09/10) trước khi gộp thành một dòng |
 | `## Dashboard Tổng quan account (2026-10-24)` | tab mới mọi account, nguồn số từ thẻ kênh, bộ từ ngữ cũ → mới, chuyển 4 khối sang Hiệu Suất Host, số đo app thật, cách verify |
 | `## §1 mục 23/10 Dashboard so cùng kỳ (chuyển khỏi WORKSPACE 24/10)` | nguyên văn §1: Dashboard 2 tab so cùng kỳ, gộp Chi tiết kênh, bỏ/thêm khối theo demo |
 | `## Report Tháng 10 trang (2026-10-24)` | cấu trúc 10 trang, lỗi đối chứng (−38%/−51% → −15%/−36%), ngưỡng dao động, bộ từ brand, cách verify, việc còn mở |

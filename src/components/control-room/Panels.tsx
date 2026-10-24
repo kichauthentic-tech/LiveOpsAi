@@ -4,12 +4,7 @@ import type { PersonLoad } from "../../lib/performance/channelHealth";
 import { ddmm, money, pct } from "../dashboard/shared";
 import type { RoomChannel } from "./types";
 
-// Các khối phân tích của Phòng Điều Hành. Chỉ trình bày — số từ lib/performance/controlRoom.ts.
-
-const signedPct = (logv: number) => {
-  const v = Math.exp(logv) - 1;
-  return `${v >= 0 ? "+" : "−"}${Math.abs(Math.round(v * 100))}%`;
-};
+// Các khối phân tích của Bảng Vận Hành · Cả tháng (Phòng Điều Hành cũ). Chỉ trình bày — số từ lib/performance/controlRoom.ts.
 
 export const ChannelChips: React.FC<{ channels: RoomChannel[]; value: string; onChange: (k: string) => void; filter?: (c: RoomChannel) => boolean }> = ({ channels, value, onChange, filter }) => (
   <div className="flex flex-wrap gap-1.5" role="group" aria-label="Chọn kênh">
@@ -18,51 +13,6 @@ export const ChannelChips: React.FC<{ channels: RoomChannel[]; value: string; on
     ))}
   </div>
 );
-
-// ---------- Cầu GMV ----------
-export const HostSkillTable: React.FC<{ channel: RoomChannel }> = ({ channel }) => {
-  const rows = channel.hosts;
-  if (rows.length === 0) return <p className="text-sm text-[var(--text-faint)]">Chưa host nào đủ 8 ca trong kênh ở 3 tháng gần nhất.</p>;
-  const W = 120, mid = W / 2, sc = (v: number) => Math.max(4, Math.min(W - 4, mid + v * W / 1.2));
-  return (
-    <div className="space-y-2">
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-[11px] text-[var(--text-faint)] text-left">
-              <th className="py-1.5 pr-2">Host</th><th className="py-1.5 pr-2 text-right">Ca</th><th className="py-1.5 pr-2 text-right" title="GMV/giờ so mặt bằng kênh — cách xếp thô">Thô</th>
-              <th className="py-1.5 pr-2 text-right" title="Phần chênh do lịch cho sẵn: khung giờ, ngày camp, độ dài ca">Do khung giờ</th><th className="py-1.5 pr-2 text-right">Tay nghề</th><th className="py-1.5 pr-2">Khoảng 90%</th><th className="py-1.5">Kết luận</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => {
-              const lo = r.skill - r.ci90, hi = r.skill + r.ci90;
-              const s = (v: number) => sc(Math.exp(v) - 1);
-              return (
-                <tr key={r.talentId} className="border-t border-[var(--border)]">
-                  <td className="py-1.5 pr-2 text-[var(--text)] whitespace-nowrap">{r.name}</td>
-                  <td className="py-1.5 pr-2 text-right tabular-nums">{r.sessions}</td>
-                  <td className={`py-1.5 pr-2 text-right tabular-nums ${r.raw >= 0 ? "text-emerald-400" : "text-rose-400"}`}>{signedPct(r.raw)}</td>
-                  <td className="py-1.5 pr-2 text-right tabular-nums text-[var(--text-muted)]">{signedPct(r.slotLuck)}</td>
-                  <td className="py-1.5 pr-2 text-right tabular-nums font-bold text-[var(--text)]">{signedPct(r.skill)}</td>
-                  <td className="py-1.5 pr-2">
-                    <svg viewBox={`0 0 ${W} 14`} width={W} height={14} aria-hidden="true">
-                      <line x1={mid} x2={mid} y1={0} y2={14} style={{ stroke: "var(--border)" }} />
-                      <line x1={s(lo)} x2={s(hi)} y1={7} y2={7} style={{ stroke: "var(--text-faint)", strokeWidth: 2 }} />
-                      <circle cx={s(r.skill)} cy={7} r={4} style={{ fill: r.sure ? (r.skill > 0 ? "#2fb57f" : "#e5484d") : "var(--text-faint)" }} />
-                    </svg>
-                  </td>
-                  <td className="py-1.5 text-xs whitespace-nowrap">{r.sure ? (r.skill > 0 ? <span className="text-emerald-400 font-bold">Hơn mặt bằng</span> : <span className="text-rose-400 font-bold">Kém mặt bằng</span>) : <span className="text-[var(--text-faint)]">Chưa đủ chắc</span>}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      <p className="text-[11px] text-[var(--text-faint)]">3 tháng gần nhất, chỉ trong kênh này. Đo trên 942 ca thật: một ca dao động ±56% nên cần khoảng 46 ca mới tin được một host; trợ live không có khác biệt đo được nên không chấm trợ bằng GMV.</p>
-    </div>
-  );
-};
 
 // ---------- Ca xoay chuyển ----------
 export const SwingList: React.FC<{ channel: RoomChannel }> = ({ channel }) => {

@@ -1,5 +1,5 @@
 import React from "react";
-import { BookOpen, BrainCircuit, Calculator, ClipboardList, Briefcase, Building2, CalendarCheck, CalendarCheck2, CalendarDays, Clapperboard, CalendarClock, Crosshair, Calendar as CalendarIcon, CalendarRange, Database, DollarSign, FileSignature, FileText, LayoutDashboard, LayoutGrid, Link2, Megaphone, Package, ShieldCheck, TrendingUp, User, Users } from "lucide-react";
+import { BookOpen, BrainCircuit, Calculator, ClipboardList, Briefcase, Building2, CalendarCheck, CalendarCheck2, CalendarDays, Clapperboard, CalendarClock, Calendar as CalendarIcon, CalendarRange, Database, DollarSign, FileSignature, FileText, LayoutDashboard, LayoutGrid, Link2, Megaphone, Package, ShieldCheck, TrendingUp, User, Users } from "lucide-react";
 import { PermissionKey, UserRole } from "../types";
 
 // Cấu hình sidebar + vài hằng số điều hướng, tách khỏi App.tsx 2026-10-01 (App.tsx 2.867 dòng).
@@ -113,9 +113,8 @@ export function agencyNavGroups(currentRole: UserRole): NavGroup[] {
             // "agency_overview" cũ để activeTab trong localStorage không gãy.
             label: "",
             items: [
-              { id: "agency_overview", label: "Dashboard", icon: LayoutDashboard, perm: "manage_sessions" as PermissionKey },
-              // Phòng Điều Hành (11/10): khả năng về đích từng kênh, bản đồ tháng, sa bàn thêm ca (tạo ca nháp cho OP), hỏi số liệu bằng lời.
-              { id: "control_room", label: "Phòng Điều Hành", icon: Crosshair, perm: "manage_sessions" as PermissionKey }
+              // Phòng Điều Hành (11/10) đã gộp vào Bảng Vận Hành 24/10 — chế độ "Cả tháng" (sa bàn thêm ca, ca xoay chuyển, tải người).
+              { id: "agency_overview", label: "Dashboard", icon: LayoutDashboard, perm: "manage_sessions" as PermissionKey }
             ]
           },
           {

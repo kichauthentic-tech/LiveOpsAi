@@ -15,6 +15,12 @@ test("agency: tab ↔ link hai chiều", () => {
   expect(parsePath("/ke-hoach-thang/")).toEqual({ type: "agency", tab: "month_plan" });
 });
 
+test("link /phong-dieu-hanh cũ mở Bảng Vận Hành · Cả tháng (gộp 24/10): parse ra id cũ để App chọn chế độ, không còn sinh link riêng", () => {
+  expect(parsePath("/phong-dieu-hanh")).toEqual({ type: "agency", tab: "control_room" });
+  expect(routeToPath({ type: "agency" }, "control_room", brands)).toBeNull();
+  expect(routeToPath({ type: "agency" }, "calendar", brands)).toBe("/bang-van-hanh");
+});
+
 test("link /run-rate cũ mở Dashboard (module Run-rate gộp vào tab Tháng này, 22/10)", () => {
   expect(parsePath("/run-rate")).toEqual({ type: "agency", tab: "agency_overview" });
   expect(routeToPath({ type: "agency" }, "agency_overview", brands)).toBe("/dashboard");

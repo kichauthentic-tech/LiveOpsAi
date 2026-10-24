@@ -6184,3 +6184,81 @@ bản 3 "làm 1 bảng full" = phần giữ nguyên là bản chụp thật củ
   đã có dự báo engine v3 so target), Host so mặt bằng (thay bằng bảng Host chỉ số kênh), dòng % live trong Total GMV (ô % LIVE GMV ở Shop). Thêm theo
   demo: "Cặp host + trợ live" (`pairRows`, Toàn sàn), bảng Affiliate (`fetchAffiliateActuals`, mục Quảng cáo). Commit + push 23/10 (trừ 6 file giao ca
   của phiên song song + `.claude/launch.json`).
+
+## §1 mục 23/10 audit trùng màn + Kế Toán K1 (chuyển khỏi WORKSPACE 24/10)
+
+- **23/10 tối: AUDIT TRÙNG MÀN + "mỗi loại số một màn" (đã commit + push 23/10, không migration)** — User chốt: OP VẪN chốt người + mở/huỷ/dời ca
+  như trainer (không gom về Bàn Trainer, giữ chức năng Phòng Điều Hành — 24/10 gộp vào Bảng Vận Hành). Đã làm: Dashboard chỉ xem trong tháng (kỳ `"month" | "7d"`); Điều Phối Phát Hành gộp
+  vào Toàn Cảnh Brand (`hooks/useReportPublish.ts`, id/link cũ → `brands_overview`); "Việc cần làm" Dashboard chỉ còn "Báo sớm brand" + dẫn sang Bảng
+  Vận Hành; Toàn Cảnh Brand tháng đã hết không còn nút "Lập kế hoạch"/"Đặt cam kết tháng". Số đo audit, cách verify, việc còn mở: lịch sử `## Audit trùng màn (2026-10-23)`.
+- **23/10: TAB KẾ TOÁN K1 (BUILT, chưa commit, không migration)** — user: kế toán trên app CHỈ tính từ dữ liệu app (không thuế/hoá đơn/thu tiền/khấu hao/chi phí khác/kê khai).
+  Menu Quản trị → "Kế Toán" (`accounting`, ceo/admin, URL `/ke-toan`): `Accounting.tsx` + logic thuần `lib/accounting/monthClose.ts` (`buildMonthClose`, test
+  `tests/accountingMonthClose.test.ts`). Bốn số: doanh thu theo HỢP ĐỒNG (brand × sàn × `contractCovering`; không có hợp đồng hiệu lực ⇒ dòng riêng), công talent theo người,
+  chi phí ca (studio + Ads), lãi gộp; **Đối chiếu giờ theo brand × sàn** (Σ giờ tính lương các ca = Σ giờ host mọi người, `HourCheckRow`; trợ chỉ hiện phần chênh = giờ không có trợ); công tách 2 bảng **Host / Trợ live** (ai có làm host thì vai chính là host, giờ trợ của họ ở cột riêng; bấm dòng ra giờ từ brand nào); Tải Excel (5 sheet). Mọi tiền qua `computeSessionPnl` (không công thức thứ hai), chỉ cộng ca đủ dữ liệu + "tính được X/Y ca".
+  **Hợp đồng % NMV:** trước `monthEnd + 15` ngày = "ước tính" (% hoàn dự kiến CRM); sau đó, nếu file Shop Analytics phủ hết tháng, NMV = GMV × (1 − Σ Hoàn tiền ÷ Σ GMV CẢ SHOP)
+  — xấp xỉ (user chấp nhận), chỉ sàn có `shop_analytics` trong `profileOf().dataRawTypes` (Shopee luôn ước tính). Kế hoạch + câu chốt: `docs/ACCOUNTING_MODULE_PLAN.md`.
+  Đo app thật T10: 0/237 ca đủ dữ liệu (rate host/trợ chưa nhập, % commission chưa đặt, % hoàn dự kiến 0, không brand nào có hợp đồng "hiệu lực") — tab nói đúng vậy, số
+  chỉ hiện khi nhập xong. **Còn mở:** K2 (bản chụp "Chốt tháng": báo lệch hay khoá — chờ user), role kế toán riêng, kiểm cột Hoàn tiền tính theo ngày đặt hay ngày hoàn.
+
+## Gộp Phòng Điều Hành vào Bảng Vận Hành (2026-10-24)
+
+**Bối cảnh.** User hỏi "Phòng điều hành và bảng vận hành có thể gộp làm 1 không?". Đọc mã: cùng người dùng (ceo/admin/operations), cùng đối tượng
+"ca sắp tới", khác tầm nhìn (hôm nay/tuần vs cả tháng). 4 chỗ trùng: ca nháp (khối riêng vs dòng ca chưa có người + việc cần làm), tải người (bảng
+`peopleLoad` vs `weekHours` của `suggestHosts` nhân theo giờ live thật), gợi ý host (`hostSkillTable` trừ khung giờ + co về 0 vs `suggestHosts` GMV/giờ
+brand 90 ngày), kỳ vọng từng ca (sa bàn `slotForecasts` engine v3 vs benchmark `estimateSlots` ô thứ × giờ × hệ số k). User duyệt 5 điểm: 2 chế độ xem,
+ca nháp thành việc cần làm, một bảng tải người, một cách xếp host, một số kỳ vọng mỗi ca. User 23/10 đã chốt giữ chức năng (OP vẫn chốt người/mở ca) —
+lần này chỉ gộp chỗ đặt, không bỏ chức năng nào.
+
+**Đã làm (không migration).**
+- `App.tsx`: `opsView: "day" | "month"`; `RENAMED_TABS.control_room = "calendar"`; `navigateTo("control_room")` / link `/phong-dieu-hanh` (routes alias → id
+  cũ) đặt `opsView = "month"`. Sidebar (`appNav.ts`) bỏ mục. `tabLabels.control_room` giữ cho Lượt Mở Tab cũ. Khối Việc lập kế hoạch ca + Kỳ vọng ca sắp
+  live chỉ hiện ở "Hôm nay & tuần".
+- `OpsBoard.tsx`: nút chế độ ở tiêu đề; bộ lọc ngày chỉ hiện ở "Hôm nay & tuần"; dòng `kind: "draft"` (viền nét đứt vàng) trong mọi khoảng có ngày của nháp;
+  bộ lọc "Ca nháp · N" (chỉ nháp, có "Bỏ cả N"); cửa sổ xác nhận dùng `DraftsPanel` (nhận `nameOf` thay vì kênh của Phòng Điều Hành). Hàng 4 ô chỉ đếm ca
+  thật/ca mở (`summary.total` bỏ nháp) ⇒ ngày chỉ có nháp không bày 4 ô 0.
+- `hooks/useSessionDrafts.ts`: một bản ca nháp ở App (nạp khi đứng Bảng Vận Hành + role ops), `accept` (RPC 0170 + nạp lại ca/ca mở), `dismiss`, `reload`.
+- `todoList.ts`: việc `session-drafts` (đỏ, `view: "drafts"`) — App bấm ⇒ `opsView = "day"` + yêu cầu bộ lọc Ca nháp (`requestRange`, cùng mẫu `requestOpenSessionId`).
+- `OpsMonthView.tsx` (đổi tên `ControlRoom.tsx`): bỏ PageHeader (mô tả tháng nằm ở tiêu đề Bảng Vận Hành), bỏ khối ca nháp (thay bằng nút "N ca nháp chờ
+  xác nhận"), bỏ bảng tay nghề; Ca xoay chuyển | Tải người đứng cạnh nhau ở màn rộng.
+- Một cách xếp host: `hostOrder()` (hostSuggestion.ts) = thứ tự `suggestHosts`; `sandboxCandidates` nhận `hostRankOf` (bỏ `skillOf`). Gỡ `hostSkillTable`,
+  `HostSkillRow`, `HOST_SKILL_SD`, `HOST_MIN_SESSIONS`, `HostSkillTable` (Panels). "Hỏi số liệu" gửi host theo thứ tự gợi ý (số ca + GMV/giờ brand) thay bảng tay nghề.
+  Lưu ý cho lần sau: số đo 11/10 (tay nghề ±13%, cần ~46 ca để tin một host) vẫn đúng — xếp nào cũng gần nhiễu (audit 14/10), nên chọn MỘT cách cho nhất quán.
+- Một bảng tải người: `suggestHosts.weekHours` = phút theo lịch của đoạn đứng ca ÷ 60 (trước: `sessionHours` × phần phút ⇒ ca live dài hơn lịch bị tính
+  thêm). Cảnh báo mệt lúc chốt ca, chốt hàng loạt (`bulkFinalize`) và bảng Tải người nay cùng số.
+- Một số kỳ vọng mỗi ca: `ChannelRoom.expectedNowById` (id ca / id ca chờ đăng ký → `nowP.perItem`, đúng phần còn lại của dự kiến cuối tháng). Benchmark
+  "Kỳ vọng các ca sắp live" (`OpsSupportTab` dựng room tháng này theo khung camp của kế hoạch + tháng sau theo lịch cố định) đọc số này; bỏ "Hệ số ngày",
+  bỏ k; gỡ `trackMonth`/`MonthTracking`/`TrackedSlot` (opsSupport.ts, chỉ còn test dùng). Phễu (view/giờ, CVR, CTR, AOV, ads/giờ) vẫn theo ô thứ × giờ.
+  "Hỏi số liệu" mục CA SẮP TỚI cũng đọc `expectedNowById`.
+
+**Cố ý không đổi.** Các màn khác vẫn có host/tải người riêng (Hiệu Suất Host, Bàn Trainer `lib/roster`, Dashboard Đội live) — ngoài phạm vi lần gộp này
+(audit 23/10: host giỏi 6 chỗ, tải người 4 chỗ). Kế Hoạch Tháng vẫn dùng `slotForecasts` lúc lập (mức đầu tháng) — khác `expectedNowById` (mức hiện tại) có chủ đích.
+
+**Verify.** `npx vitest run` 1006 test (mới: expectedNowById = dự kiến − đã có, có ca chờ đăng ký; sa bàn theo `hostOrder` và đảo thứ hạng đảo gợi ý;
+`suggestHosts.weekHours` = `peopleLoad` khi giờ live ≠ lịch; việc `session-drafts`; `/phong-dieu-hanh` → `control_room`, không sinh link riêng); `tsc`
+sạch; `npm run audit:dead` sạch; eslint các file đã sửa 0 lỗi. App thật (dev, tài khoản admin): `/phong-dieu-hanh` mở Bảng Vận Hành · Cả tháng (URL về
+`/bang-van-hanh`), sidebar không còn mục; sa bàn "Tự xếp" 1 ca → "Tạo 1 ca nháp" → nút "1 ca nháp chờ xác nhận" → "Hôm nay & tuần" bộ lọc "Ca nháp · 1",
+việc cần làm đứng đầu, dòng nháp JOCKEY TikTok 26/10 20–23h → cửa sổ xác nhận → **Bỏ** (không tạo ca thật; DB còn 1 dòng `session_drafts` trạng thái
+dismissed) → việc + bộ lọc tự mất. Benchmark VERA TikTok 24/10 10h: kỳ vọng 4,5M, target ca 8,1M tô vàng. Màn 375px không tràn ngang. Chưa thử: bấm
+"Xác nhận thành ca" (tạo ca thật).
+**Lỗi tìm thấy khi verify + đã sửa:** nút "Mô phỏng thêm ca" (Dashboard tab Brand, CROCS) rơi vào màn "Quyền truy cập bị hạn chế" — Dashboard gọi THẲNG
+`setActiveTab("control_room")`, không qua `navigateTo`. Sửa: MỘT `useLayoutEffect` ở App đổi mọi `activeTab === "control_room"` thành `calendar` + `opsView
+"month"` (bỏ nhánh riêng trong `navigateTo`/popstate). Thử lại: nút mở Bảng Vận Hành · Cả tháng; `/phong-dieu-hanh` vẫn mở Cả tháng.
+
+## §1 mục 07–16/10 (chuyển khỏi WORKSPACE 24/10)
+
+- **13–16/10** (nguyên văn + cách verify: lịch sử `## §1 các đợt 13–16/10 (chuyển khỏi WORKSPACE 18/10)`): **app talent bản 2**
+  (4 tab Ca của tôi / Cả agency / Đăng ký ca / Tôi, `lib/talent/agenda.ts`, link lịch .ics `0177` ĐÃ CHẠY + đã push `c7bb61a`);
+  **audit Dashboard 14/10** (chỉ đề xuất; chờ user chốt: thu gọn Phòng Điều Hành, 4 nhãn khả năng đạt, bỏ bảng xếp host, dấu
+  "target đổi"); **Bàn Trainer + role `trainer`** (đã gộp main, chưa push;
+  `0175` rồi `0176` CHƯA CHẠY; `lib/roster/*`, `RosterBoard`); **đối soát chia theo mốc + gõ GMV ca** (`0171`–`0174` ĐÃ CHẠY;
+  `private.recon_shares` là phép chia duy nhất; mốc snapshot = giờ tải file; `set_session_snapshot_gmv`, `recon_gmv_overrides`).
+- **Các đợt 10–11/10** (Phòng Điều Hành 0170, run-rate tới ca mới nhất, chọn phòng lúc up file 0168, app talent T1/T2 0169, đối soát
+  gộp restart 0167 / chọn phiên 0166, module Run-rate, ca tăng cường 0165, chia lại theo lịch 0164, Dashboard đợt 1, engine target v3
+  0163, sắp lại bố cục — chi tiết nguyên văn + cách verify: lịch sử `## §1 các đợt 10–11/10 (chuyển khỏi WORKSPACE 17/10)`).
+- **Các đợt 07–09/10** (audit đa sàn Bước 0–4 0149–0151, gộp Đối Soát vào Dữ Liệu Gốc, thẻ ca mới, Talent Pool, bỏ "Nhân sự ca",
+  0152–0161, engine chia target v2, Dashboard agency 4 tab — nguyên văn + cách verify: lịch sử `## §1 các đợt 07–09/10 (chuyển khỏi WORKSPACE 10/10)`).
+  Mọi migration 0149–0161 ĐÃ CHẠY. **Còn treo từ các đợt này:** brand `JEW` (36 ca TikTok T10) chưa tạo; 15 cặp trùng người do sheet chờ user rà;
+  hồ sơ `C.Đình`/`P.Thảo` chưa có rate; `create_backfill_sessions` chưa tự bỏ room inhouse (chỉ client lọc);
+  chưa thử trên app thật: Giao ca Shopee bằng file, Ca nối/ngắt room với DB thật, "Sinh ca" VERA Shopee, lưu/tải target
+  nhóm, đăng ký ca bằng tài khoản talent, góc nhìn role brand; `apply_segment_checkpoint_file` vẫn lấy mốc ngầm; nhập tay thực tế chưa có Orders/Views.
+  Bước tiếp của lộ trình đa sàn: chạy thật 2–4 tuần (không tính năng mới).

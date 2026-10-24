@@ -1,6 +1,6 @@
 import { LiveSession } from "../../types";
 import { hostPortions, isCountable, sessionHours, weekdayOf } from "./hostPerformance";
-import { personRoleMinutes, sessionMinutes } from "../staffSegments";
+import { personRoleMinutes } from "../staffSegments";
 import { platformOf, type ReportPlatform } from "../reportPlatform";
 import { fmtFixed, fmtVndShort } from "../format";
 
@@ -110,13 +110,14 @@ export function suggestHosts(
   for (const s of sessions) {
     // Mệt mỏi / công bằng: đếm cả vai trò trợ, cả ca sắp tới, trừ ca huỷ.
     if (s.status !== "Cancelled") {
-      // Đổi người giữa ca (0138): chỉ tính phần giờ người đó đứng ca.
-      const dur = sessionMinutes(s);
+      // Đổi người giữa ca (0138): chỉ tính phần giờ người đó đứng ca. Giờ = phút theo LỊCH của đoạn đứng ca — đúng luật bảng
+      // "Tải người" (channelHealth.peopleLoad) để cảnh báo mệt lúc chốt ca và bảng tải người nói cùng một số (24/10; trước đó
+      // nhân theo giờ live thật của file nên lệch bảng).
       for (const pid of new Set([s.hostId, s.coHostId, ...(s.staffSegments ?? []).map((g) => g.talentId)])) {
         if (!pid || !ids.has(pid)) continue;
         const mins = personRoleMinutes(s, pid, "host") + personRoleMinutes(s, pid, "co_host");
         if (mins <= 0) continue;
-        if (s.date >= weekStart && s.date <= weekEnd) weekHours.set(pid, (weekHours.get(pid) ?? 0) + (dur > 0 ? sessionHours(s) * (mins / dur) : 0));
+        if (s.date >= weekStart && s.date <= weekEnd) weekHours.set(pid, (weekHours.get(pid) ?? 0) + mins / 60);
         if (s.date.startsWith(monthKey)) monthSessions.set(pid, (monthSessions.get(pid) ?? 0) + 1);
       }
     }
@@ -163,6 +164,15 @@ export function suggestHosts(
     if (a.overallSessions > 0 !== b.overallSessions > 0) return a.overallSessions > 0 ? -1 : 1;
     return b.overallGmvPerHour - a.overallGmvPerHour;
   });
+}
+
+/**
+ * Thứ tự host (0 = đứng đầu) của một kênh brand × sàn — CÙNG cách xếp của cửa sổ chốt ca (suggestHosts, mốc `sinceDate`). Sa bàn
+ * dùng để chọn host gợi ý cho ca thêm: Bảng Vận Hành chỉ có một cách xếp host (24/10). Thứ tự không phụ thuộc ngày/khung của ca.
+ */
+export function hostOrder(candidateIds: string[], sessions: LiveSession[], brandId: string, platform: ReportPlatform, sinceDate: string): Map<string, number> {
+  const rows = suggestHosts(candidateIds, new Map(), sessions, brandId, weekdayOf(sinceDate), sinceDate, { date: sinceDate, startTime: "00:00", endTime: "00:00", platform });
+  return new Map(rows.map((r, i) => [r.talentId, i]));
 }
 
 // Con số đại diện để gắn cạnh tên trong dropdown: ưu tiên số của đúng brand, không có thì số

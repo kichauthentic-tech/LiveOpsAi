@@ -3,10 +3,9 @@ import { Activity, ChevronDown } from "lucide-react";
 import { Brand, BrandMonthPlan, BrandMonthPlanSlot, LiveSession, PromoScheme, ShiftSlot } from "../types";
 import { EngineParams } from "../lib/scheduling/engineParams";
 import { monthPlanRead } from "../lib/db/monthPlans";
-import { effectiveCamp } from "../lib/campaignDays";
+import { effectiveCamp, resolveCampBucketType } from "../lib/campaignDays";
 import { todayVn } from "../lib/performance/brandCommitment";
-import { monthOutlook } from "../lib/performance/ceoBrief";
-import { planRunRate, projectMonthEnd } from "../lib/performance/planRunRate";
+import { buildChannelRoom } from "../lib/performance/controlRoom";
 import { platformOf, REPORT_PLATFORMS, type ReportPlatform } from "../lib/reportPlatform";
 import { loadRememberedBrandId, pickDefaultBrandId, rememberBrandId } from "../lib/defaultBrand";
 import OpsSupport from "./OpsSupport";
@@ -14,8 +13,9 @@ import OpsSupport from "./OpsSupport";
 // Hỗ Trợ Vận Hành — 08/10 gộp vào Bảng Vận Hành (user: hai màn trùng nhau, cùng là "ca sắp tới"): nằm ở cuối Bảng Vận Hành như một khối
 // thu gọn, tự chọn brand × sàn (Bảng Vận Hành không có bộ chọn sàn của workspace), chỉ nạp kế hoạch/benchmark khi mở khối.
 // (Trước đó: tab agency, khôi phục 07/10 theo user chốt): benchmark ca sắp live 7 ngày tới của MỘT brand × sàn. Không
-// còn nằm ở Dashboard brand (Dashboard là màn xem số, brand cũng thấy; benchmark là công cụ của ops lúc điều ca). Tính run-rate,
-// dự kiến cuối tháng và hệ số k đúng như Dashboard (planRunRate + projectMonthEnd) để benchmark hai nơi không lệch số.
+// còn nằm ở Dashboard brand (Dashboard là màn xem số, brand cũng thấy; benchmark là công cụ của ops lúc điều ca).
+// 24/10 (gộp Phòng Điều Hành): GMV kỳ vọng của từng ca = `expectedNowById` của buildChannelRoom — ĐÚNG số sa bàn "Cả tháng" và phần
+// còn lại của dự kiến cuối tháng dùng (engine v3, mức hiện tại của kênh). Bỏ engine ô thứ × giờ + hệ số k cho số này: một ca, một kỳ vọng.
 
 interface Props {
   /** Sàn mặc định khi mở khối. */
@@ -64,14 +64,19 @@ export default function OpsSupportTab({ platform: defaultPlatform, brandsOn, ses
   }, [open, brandId, month, platform, key]);
 
   const camp = useMemo(() => effectiveCamp(plan?.plan.campRanges), [plan]);
-  const locked = !planLoading && plan?.plan.status === "locked";
-  const rr = useMemo(() => (locked && plan ? planRunRate(month, plan.slots, slots, brandSessions, today, camp) : null), [locked, plan, month, slots, brandSessions, today, camp]);
-  const outlook = useMemo(() => {
-    if (!rr) return null;
-    const open = slots.filter((sl) => sl.brandId === brandId && sl.status === "open" && !sl.sessionId);
-    return monthOutlook(month, today, brandSessions, open, null, camp, engineParams);
-  }, [rr, slots, brandId, month, today, brandSessions, camp, engineParams]);
-  const projection = useMemo(() => projectMonthEnd(rr, outlook), [rr, outlook]);
+  // Kỳ vọng từng ca: tháng này theo khung camp của kế hoạch, tháng sau (cửa sổ 7 ngày vắt qua cuối tháng) theo lịch cố định.
+  const rooms = useMemo(() => {
+    if (!open || planLoading || brandSessions.length === 0) return new Map<string, ReturnType<typeof buildChannelRoom>>();
+    const openSlots = slots.filter((sl) => sl.brandId === brandId && platformOf(sl) === platform);
+    const next = (() => { const [y, m] = month.split("-").map(Number); return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`; })();
+    return new Map(
+      [month, next].map((m) => [
+        m,
+        buildChannelRoom({ sessions: brandSessions, month: m, today, target: null, bucketOf: m === month ? (d) => resolveCampBucketType(d, camp) : (d) => resolveCampBucketType(d), params: engineParams, openSlots })
+      ])
+    );
+  }, [open, planLoading, brandSessions, slots, brandId, platform, month, today, camp, engineParams]);
+  const expectedOf = (id: string, date: string) => rooms.get(date.slice(0, 7))?.expectedNowById.get(id) ?? null;
 
   return (
     <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl shadow-xl">
@@ -97,8 +102,7 @@ export default function OpsSupportTab({ platform: defaultPlatform, brandsOn, ses
           </div>
       {brand && (
         <OpsSupport
-          rr={rr}
-          projection={projection}
+          expectedOf={expectedOf}
           brandId={brandId}
           brandName={`${brand.name} · ${platform}`}
           platform={platform}

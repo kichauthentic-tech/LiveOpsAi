@@ -2,36 +2,27 @@ import React, { useState } from "react";
 import { Check, Loader2, X } from "lucide-react";
 import type { Talent } from "../../types";
 import type { SessionDraft } from "../../lib/db/sessionDrafts";
-import { brandPlatformKey } from "../../lib/reportPlatform";
+import type { DraftEdit as Edit } from "../../hooks/useSessionDrafts";
 import { ddmm, money } from "../dashboard/shared";
-import type { RoomChannel } from "./types";
 
 // Ca nháp chờ OP xác nhận (0170). Mỗi dòng sửa được ngày, giờ, host, trợ, phòng; "Xác nhận" gọi accept_session_draft — tạo ca chờ
 // đăng ký + chốt người trong MỘT transaction, DB chặn trùng người/phòng như ca thường. Lỗi hiện ngay tại dòng.
-
-interface Edit {
-  date: string;
-  startTime: string;
-  endTime: string;
-  hostId: string;
-  coHostId: string;
-  studioId: string;
-}
+// 24/10: mở từ dòng ca nháp / bộ lọc "Ca nháp" của Bảng Vận Hành (không còn khối riêng ở màn khác).
 
 export const DraftsPanel: React.FC<{
   drafts: SessionDraft[];
-  channels: RoomChannel[];
+  /** Tên kênh của ca nháp ("CROCS", "VERA · Shopee"). */
+  nameOf: (d: SessionDraft) => string;
   talents: Talent[];
   studios: { id: string; name: string }[];
   today: string;
   onAccept: (d: SessionDraft, e: Edit) => Promise<void>;
   onDismiss: (ids: string[]) => Promise<void>;
-}> = ({ drafts, channels, talents, studios, today, onAccept, onDismiss }) => {
+}> = ({ drafts, nameOf, talents, studios, today, onAccept, onDismiss }) => {
   const [edits, setEdits] = useState<Record<string, Edit>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  if (drafts.length === 0) return <p className="text-sm text-[var(--text-faint)]">Không có ca nháp nào đang chờ. Tạo từ sa bàn ở trên.</p>;
-  const nameOf = (d: SessionDraft) => channels.find((c) => c.key === brandPlatformKey(d.brandId, d.platform))?.name ?? "Kênh";
+  if (drafts.length === 0) return <p className="text-sm text-[var(--text-faint)]">Không có ca nháp nào đang chờ. Tạo từ sa bàn ở chế độ "Cả tháng".</p>;
   const editOf = (d: SessionDraft): Edit => edits[d.id] ?? { date: d.date, startTime: d.startTime, endTime: d.endTime, hostId: d.hostId ?? "", coHostId: d.coHostId ?? "", studioId: d.studioId ?? "" };
   const set = (d: SessionDraft, patch: Partial<Edit>) => setEdits((m) => ({ ...m, [d.id]: { ...editOf(d), ...patch } }));
   const people = [...talents].sort((a, b) => a.name.localeCompare(b.name, "vi"));
@@ -49,9 +40,9 @@ export const DraftsPanel: React.FC<{
   };
   return (
     <div className="space-y-2">
-      <div className="flex justify-end">
+      {drafts.length > 1 && <div className="flex justify-end">
         <button type="button" disabled={busy != null} onClick={() => run("all", () => onDismiss(drafts.map((d) => d.id)))} className="text-xs font-bold text-[var(--text-muted)] hover:text-rose-400 min-h-[28px]">Bỏ cả {drafts.length} ca nháp</button>
-      </div>
+      </div>}
       {drafts.map((d) => {
         const e = editOf(d);
         return (

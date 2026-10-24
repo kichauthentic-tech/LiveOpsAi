@@ -7,7 +7,7 @@ import { personClash, studioClash } from "../scheduling/conflicts";
 import { assertOnePlatform } from "../platforms/perf";
 import { glmWeights } from "./allocationModel";
 import { normalCdf } from "./forecastCone";
-import { hostPortions, isCountable, sessionHours } from "./hostPerformance";
+import { isCountable } from "./hostPerformance";
 import { buildMonthForecaster, inMonthProjection, slotForecasts, type ForecastParams, type MonthForecaster, type MonthItem } from "./monthForecast";
 
 // PHÒNG ĐIỀU HÀNH (11/10/2026) — đề xuất + bản thử trên số thật: https://claude.ai/artifact/Hu2U23dfazeNpkbfJ518n9.
@@ -20,16 +20,13 @@ import { buildMonthForecaster, inMonthProjection, slotForecasts, type ForecastPa
 //   • Ca xoay chuyển           = khả năng hiện tại − khả năng nếu ca đó chỉ đạt đúng kỳ vọng (bỏ số thật của riêng ca đó).
 // Số đo backtest (11/10, 956 ca T7–T10, walk-forward): kỳ vọng từng ca sai 29% so với 34% của GMV/giờ 28 ngày × giờ; dải 80%
 // chứa kết quả thật 82% số lần (445 lần đo). Tay nghề host sau khi trừ khung giờ chênh ±13%, một ca dao động ±56% (log) ⇒
-// cần ~46 ca mới tin được một host; trợ live không có khác biệt bền (không chấm trợ bằng GMV).
+// cần ~46 ca mới tin được một host; trợ live không có khác biệt bền (không chấm trợ bằng GMV). 24/10 gộp vào Bảng Vận Hành: bỏ bảng
+// tay nghề riêng — host gợi ý của sa bàn xếp theo ĐÚNG thứ tự của cửa sổ chốt ca (hostSuggestion.hostOrder), một cách xếp host.
 // Mỗi hàm nhận ca của MỘT kênh (brand × sàn) — không cộng hiệu suất hai sàn (luật 07/10).
 
 const Z80 = 1.2816;
 /** Giờ thêm ra ít GMV hơn giờ sẵn có: co giãn giờ 0,82 (CROCS ngày thường, đo 09/10) ⇒ ca thêm tính 0,8 lần kỳ vọng. */
 export const MARGINAL_SESSION_FACTOR = 0.8;
-/** Độ lệch chuẩn tay nghề giữa các host (log GMV/giờ, sau khi trừ khung giờ) — đo 11/10 trên 942 ca có host, 49 cặp host-kênh. */
-export const HOST_SKILL_SD = 0.13;
-/** Host cần ít nhất ngần này ca trong kênh mới vào bảng tay nghề. */
-export const HOST_MIN_SESSIONS = 8;
 /** Giờ đứng tối đa một ngày khi gợi ý người cho ca thêm (host + trợ cộng lại). */
 export const SUGGEST_DAY_HOURS_MAX = 9;
 
@@ -105,6 +102,11 @@ export interface ChannelRoom {
   start: { p50: number; p80: number; pHit: number | null };
   curve: DayPoint[];
   swings: SessionSwing[];
+  /**
+   * GMV kỳ vọng ở mức hiện tại của từng ca CHƯA có số (id ca, hoặc id ca chờ đăng ký) — đúng phần còn lại của dự kiến cuối tháng.
+   * Một số kỳ vọng cho mỗi ca: benchmark ca sắp live, sa bàn và "Hỏi số liệu" đều đọc từ đây (24/10).
+   */
+  expectedNowById: Map<string, number>;
   /** Tháng đã ngã ngũ: khả năng < 5% (hoặc ≥ 95%) — đo bằng vượt/hụt kỳ vọng thay vì điểm xác suất. */
   decided: boolean;
 }
@@ -118,7 +120,7 @@ export interface ChannelRoomInput {
   bucketOf: (date: string) => CampDayBucket;
   params: ForecastParams;
   /** Ca chờ đăng ký còn mở (chưa có người) của kênh — vào phần còn lại như Dashboard. */
-  openSlots?: Pick<ShiftSlot, "date" | "startTime" | "endTime" | "status" | "sessionId">[];
+  openSlots?: (Pick<ShiftSlot, "date" | "startTime" | "endTime" | "status" | "sessionId"> & { id?: string })[];
 }
 
 const countableBy = (s: LiveSession, asOf: string) => s.date <= asOf && isCountable(s);
@@ -144,6 +146,10 @@ export function buildChannelRoom(input: ChannelRoomInput): ChannelRoom | null {
   const projectAt = (asOf: string, drop?: string) => inMonthProjection(f, itemsAt(asOf, drop), bucketOf);
 
   const nowP = projectAt(asOfNow);
+  const expectedNowById = new Map<string, number>();
+  [...inMonth.map((s) => s.id), ...open.map((sl) => sl.id)].forEach((id, i) => {
+    if (id && nowP.perItem[i] > 0) expectedNowById.set(id, nowP.perItem[i]);
+  });
   const pNow = pHitOf(nowP.projected, nowP.actual, f.band, target);
   const half = f.band * Math.max(0, nowP.projected - nowP.actual);
 
@@ -207,6 +213,7 @@ export function buildChannelRoom(input: ChannelRoomInput): ChannelRoom | null {
     start,
     curve,
     swings,
+    expectedNowById,
     decided: pNow != null && (pNow < 0.05 || pNow > 0.95)
   };
 }
@@ -229,7 +236,7 @@ export interface Candidate {
   bucket: CampDayBucket;
   /** GMV kỳ vọng của ca thêm (mức hiện tại × hệ số giờ thêm). */
   expected: number;
-  /** Host quen kênh đang rảnh, người có tay nghề ước tính cao nhất trước. */
+  /** Host quen kênh đang rảnh, theo thứ tự gợi ý của cửa sổ chốt ca (hostOrder). */
   hosts: PersonRef[];
   /** Trợ live quen kênh đang rảnh, người ít giờ nhất tháng trước. */
   assistants: PersonRef[];
@@ -249,8 +256,8 @@ export interface CandidateInput {
   /** Giờ bắt đầu các khung thử (mặc định 10h, 14h, 20h) và độ dài ca. */
   starts?: string[];
   hours?: number;
-  /** Tay nghề ước tính (log) theo talentId — xếp host gợi ý. */
-  skillOf?: (talentId: string) => number;
+  /** Thứ hạng host (0 = đứng đầu) — cùng thứ tự gợi ý của cửa sổ chốt ca (hostSuggestion.hostOrder). Vắng = giữ thứ tự gặp. */
+  hostRankOf?: (talentId: string) => number;
 }
 
 const addHours = (t: string, h: number) => {
@@ -296,7 +303,7 @@ export function sandboxCandidates(input: CandidateInput): Candidate[] {
     if (s.status === "Cancelled" || !s.date.startsWith(room.month)) continue;
     for (const g of effectiveSegments(s)) monthHours.set(g.talentId, (monthHours.get(g.talentId) ?? 0) + (g.toMin - g.fromMin) / 60);
   }
-  const skill = input.skillOf ?? (() => 0);
+  const rank = input.hostRankOf ?? (() => 0);
   const f = room.forecaster;
   const out: Candidate[] = [];
   for (const date of eachDay(from, mEnd)) {
@@ -308,7 +315,7 @@ export function sandboxCandidates(input: CandidateInput): Candidate[] {
         (studioId ? studioClash(allSessions, shiftSlots, { ...want, studioId }) != null : false);
       if (roomBusy) continue;
       const free = (p: PersonRef) => personClash(allSessions, want, p.id) == null && personDayHours(allSessions, p.id, date) + hours <= SUGGEST_DAY_HOURS_MAX;
-      const hosts = hostsAll.filter(free).sort((a, b) => skill(b.id) - skill(a.id));
+      const hosts = hostsAll.filter(free).sort((a, b) => rank(a.id) - rank(b.id));
       const assistants = asstAll.filter((p) => free(p) && !hosts.slice(0, 1).some((h) => h.id === p.id)).sort((a, b) => (monthHours.get(a.id) ?? 0) - (monthHours.get(b.id) ?? 0));
       if (hosts.length === 0 || assistants.length === 0) continue;
       const base = slotForecasts(f, [want], bucketOf)[0] ?? 0;
@@ -376,80 +383,6 @@ export function autoPlan(rooms: Map<string, ChannelRoom>, candidates: Candidate[
     busy.add(slotKey(best.assistant.id, best.c));
   }
   return picked;
-}
-
-// ---------------------------------------------------------------------------
-// Tay nghề host: tách phần do được xếp ca tốt khỏi phần do người
-// ---------------------------------------------------------------------------
-
-export interface HostSkillRow {
-  talentId: string;
-  name: string;
-  sessions: number;
-  /** GMV/giờ so mặt bằng kênh (log) — cách xếp thô. */
-  raw: number;
-  /** Phần chênh do lịch đã cho sẵn (khung giờ, ngày camp, độ dài ca) — log. */
-  slotLuck: number;
-  /** Tay nghề ước tính, đã co về 0 theo số ca (log). */
-  skill: number;
-  /** Nửa khoảng tin cậy 90% của `skill` (log). */
-  ci90: number;
-  /** Khoảng tin cậy không chạm 0. */
-  sure: boolean;
-}
-
-/**
- * Bảng tay nghề host của một kênh trên các tháng `months` (mỗi tháng engine học từ lịch sử TRƯỚC tháng đó — không nhìn trước).
- * Số theo người đi qua hostPortions (đổi host giữa ca chia đúng phần từng người). Kỳ vọng phần của một host = kỳ vọng ca × phần giờ.
- */
-export function hostSkillTable(channelSessions: LiveSession[], months: string[], bucketOfMonth: (month: string) => (date: string) => CampDayBucket, params: ForecastParams): HostSkillRow[] {
-  assertOnePlatform(channelSessions, "hostSkillTable");
-  const parts: { id: string; name: string; res: number; raw: number; luck: number }[] = [];
-  for (const m of months) {
-    const f = buildMonthForecaster(channelSessions, m, params);
-    if (!f) continue;
-    const xs = channelSessions.filter((s) => s.date.startsWith(m) && !s.excludedFromReports && isCountable(s) && (s.actualGmv ?? 0) > 0);
-    if (xs.length === 0) continue;
-    const exp = slotForecasts(f, xs, bucketOfMonth(m));
-    xs.forEach((s, i) => {
-      const total = sessionHours(s);
-      if (!(total > 0) || !(exp[i] > 0)) return;
-      for (const p of hostPortions(s)) {
-        if (!p.hostId) continue;
-        const h = sessionHours(p);
-        const g = p.actualGmv ?? 0;
-        if (!(h > 0.25) || !(g > 0)) continue;
-        const e = exp[i] * (h / total);
-        parts.push({ id: p.hostId, name: p.hostName ?? "", res: Math.log(g / e), raw: Math.log(g / h), luck: Math.log(e / h) });
-      }
-    });
-  }
-  if (parts.length < 10) return [];
-  const mean = (xs: number[]) => xs.reduce((a, v) => a + v, 0) / xs.length;
-  const mRes = mean(parts.map((p) => p.res)), mRaw = mean(parts.map((p) => p.raw)), mLuck = mean(parts.map((p) => p.luck));
-  const sw = Math.sqrt(mean(parts.map((p) => (p.res - mRes) ** 2)));
-  const by = new Map<string, typeof parts>();
-  for (const p of parts) (by.get(p.id) ?? by.set(p.id, []).get(p.id)!).push(p);
-  const rows: HostSkillRow[] = [];
-  for (const [id, xs] of by) {
-    if (xs.length < HOST_MIN_SESSIONS) continue;
-    const n = xs.length;
-    const k = (n * HOST_SKILL_SD ** 2) / (n * HOST_SKILL_SD ** 2 + sw ** 2);
-    const skill = k * (mean(xs.map((p) => p.res)) - mRes);
-    const sdPost = Math.sqrt(1 / (1 / HOST_SKILL_SD ** 2 + n / Math.max(1e-6, sw ** 2)));
-    const ci90 = 1.645 * sdPost;
-    rows.push({
-      talentId: id,
-      name: xs.find((p) => p.name)?.name ?? id,
-      sessions: n,
-      raw: mean(xs.map((p) => p.raw)) - mRaw,
-      slotLuck: mean(xs.map((p) => p.luck)) - mLuck,
-      skill,
-      ci90,
-      sure: Math.abs(skill) > ci90
-    });
-  }
-  return rows.sort((a, b) => b.raw - a.raw);
 }
 
 // ---------------------------------------------------------------------------

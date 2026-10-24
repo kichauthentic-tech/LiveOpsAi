@@ -27,6 +27,11 @@ const base = (over: Partial<TodoInput> = {}): TodoInput => ({
 const ids = (input: TodoInput) => buildTodos(input).map((t) => t.id);
 
 describe("buildTodos", () => {
+  test("ca nháp sa bàn (24/10): một việc đỏ mở Bảng Vận Hành ở bộ lọc Ca nháp; không có nháp thì không nhắc", () => {
+    const t = buildTodos(base({ draftCount: 3 })).find((x) => x.id === "session-drafts")!;
+    expect([t.level, t.tab, t.view, t.title]).toEqual(["high", "calendar", "drafts", "3 ca nháp chờ xác nhận"]);
+    expect(ids(base({ draftCount: 0 }))).not.toContain("session-drafts");
+  });
   test("tình huống 04/10: đủ các việc của CROCS, Franklin gộp một dòng", () => {
     expect(ids(base()).sort()).toEqual(["commit-crocs", "idle", "no-host", "plan-draft-crocs", "rate-crocs", "report-crocs", "stale-crocs", "unconfirmed"].sort());
   });

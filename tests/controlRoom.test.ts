@@ -1,10 +1,9 @@
-// Phòng Điều Hành (11/10/2026) — luật của lib/performance/controlRoom.ts.
+// Phòng Điều Hành (11/10/2026; 24/10 là Bảng Vận Hành · Cả tháng) — luật của lib/performance/controlRoom.ts.
 // Chạy: npx vitest run tests/controlRoom.test.ts
 import { describe, expect, test } from "vitest";
 import {
   autoPlan,
   buildChannelRoom,
-  hostSkillTable,
   MARGINAL_SESSION_FACTOR,
   monthBridge,
   pHitOf,
@@ -14,6 +13,7 @@ import {
 } from "../src/lib/performance/controlRoom";
 import { landingOf } from "../src/lib/performance/forecastCone";
 import { resolveCampBucketType } from "../src/lib/campaignDays";
+import { hostOrder } from "../src/lib/performance/hostSuggestion";
 import { eachDay } from "../src/lib/dateUtils";
 import { DEFAULT_ENGINE_PARAMS } from "../src/lib/scheduling/engineParams";
 import type { LiveSession } from "../src/types";
@@ -156,20 +156,31 @@ describe("sa bàn", () => {
   });
 });
 
-describe("tay nghề host tách khỏi khung giờ", () => {
-  test("host luôn được xếp ca camp có phần 'do khung giờ' dương; tay nghề không vượt thô", () => {
-    const xs: LiveSession[] = [];
-    for (const d of eachDay("2026-06-01", "2026-09-30")) {
-      const camp = resolveCampBucketType(d) !== "daily";
-      // h1 đứng mọi ca camp, h2 mọi ngày thường; cùng tay nghề (GMV đúng theo loại ngày).
-      xs.push(ca(d, { hostId: camp ? "h1" : "h2", hostName: camp ? "Host 1" : "Host 2", actualGmv: (camp ? 60 : 30) * 1e6 * (1 + ((Number(d.slice(8)) * 7) % 5) / 25) }));
-    }
-    const rows = hostSkillTable(xs, ["2026-08", "2026-09"], () => bucketOf, params);
-    const h1 = rows.find((r) => r.talentId === "h1")!;
-    const h2 = rows.find((r) => r.talentId === "h2")!;
-    expect(h1.raw).toBeGreaterThan(h2.raw);
-    expect(h1.slotLuck).toBeGreaterThan(0);
-    expect(Math.abs(h1.skill)).toBeLessThan(Math.abs(h1.raw));
+describe("một số kỳ vọng mỗi ca (24/10)", () => {
+  test("expectedNowById = phần còn lại của dự kiến cuối tháng, có cả ca chờ đăng ký; ca đã có số không có kỳ vọng", () => {
+    const all = [...history(), ...october()];
+    const open = [{ id: "slot-1", date: "2026-10-20", startTime: "10:00", endTime: "13:00", status: "open" as const, sessionId: undefined }];
+    const r = buildChannelRoom({ sessions: all, month: "2026-10", today: "2026-10-10", target: 1_200e6, bucketOf, params, openSlots: open })!;
+    const future = [...r.expectedNowById.values()].reduce((a, v) => a + v, 0);
+    expect(r.now.actual + future).toBeCloseTo(r.now.projected, 0);
+    expect(r.expectedNowById.get("slot-1")!).toBeGreaterThan(0);
+    const past = r.sessions.find((s) => s.date === "2026-10-05")!;
+    expect(r.expectedNowById.has(past.id)).toBe(false);
+  });
+});
+
+describe("một cách xếp host (24/10)", () => {
+  test("sa bàn xếp host theo hostOrder — cùng thứ tự gợi ý của cửa sổ chốt ca", () => {
+    const all = [...history(), ...october()];
+    const room = buildChannelRoom({ sessions: all, month: "2026-10", today: "2026-10-10", target: 1_200e6, bucketOf, params })!;
+    const order = hostOrder(["h1", "h2", "h3"], all, "crocs", "TikTok", "2026-07-12");
+    const cands = sandboxCandidates({ channelKey: "crocs", room, channelSessions: all, allSessions: all, shiftSlots: [], studioId: "room-crocs", bucketOf, hostRankOf: (id) => order.get(id) ?? 99 });
+    const c = cands.find((x) => x.hosts.length >= 2)!;
+    const ranks = c.hosts.map((h) => order.get(h.id) ?? 99);
+    expect(ranks).toEqual([...ranks].sort((x, y) => x - y));
+    // Đảo thứ hạng ⇒ đảo thứ tự gợi ý.
+    const rev = sandboxCandidates({ channelKey: "crocs", room, channelSessions: all, allSessions: all, shiftSlots: [], studioId: "room-crocs", bucketOf, hostRankOf: (id) => -(order.get(id) ?? 99) });
+    expect(rev.find((x) => x.key === c.key)!.hosts[0].id).toBe(c.hosts[c.hosts.length - 1].id);
   });
 });
 

@@ -1,8 +1,9 @@
 import type { CampDayBucket } from "../campaignDays";
 import type { PersonLoad } from "./channelHealth";
-import type { ChannelRoom, HostSkillRow, MonthBridge, PlannedSession } from "./controlRoom";
+import type { ChannelRoom, MonthBridge, PlannedSession } from "./controlRoom";
+import type { HostSuggestion } from "./hostSuggestion";
 
-// Bản tóm tắt số liệu gửi kèm câu hỏi ở "Hỏi số liệu" (Phòng Điều Hành, 11/10/2026). Thuần — chỉ định dạng lại ĐÚNG các số màn
+// Bản tóm tắt số liệu gửi kèm câu hỏi ở "Hỏi số liệu" (Phòng Điều Hành 11/10/2026; từ 24/10 là Bảng Vận Hành · Cả tháng). Thuần — chỉ định dạng lại ĐÚNG các số màn
 // đang hiện (một nguồn số), không tính gì mới. Không có tiền lương, rate, SĐT. Mỗi kênh brand × sàn đứng riêng.
 
 const BUCKET: Record<CampDayBucket, string> = { daily: "ngày thường", dday: "D-Day", midmonth: "Mid-Month", payday: "Pay Day" };
@@ -16,12 +17,12 @@ const m = (v: number | null | undefined) => {
 };
 const p = (v: number | null | undefined) => (v == null || !Number.isFinite(v) ? "—" : `${Math.round(v * 100)}%`);
 const d = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
-const lg = (v: number) => `${v >= 0 ? "+" : ""}${Math.round((Math.exp(v) - 1) * 100)}%`;
 
 export interface AskChannel {
   name: string;
   room: ChannelRoom | null;
-  hosts: HostSkillRow[];
+  /** Host đã live cho kênh, theo thứ tự gợi ý của cửa sổ chốt ca (suggestHosts, 90 ngày, cùng sàn). */
+  hosts: HostSuggestion[];
   bridge: MonthBridge | null;
   /** Lịch sử theo tháng (ca có số): tháng, số ca, giờ, GMV. */
   history: { month: string; sessions: number; hours: number; gmv: number }[];
@@ -61,11 +62,11 @@ export function buildAskContext(x: { today: string; month: string; channels: Ask
   for (const c of x.channels) {
     const r = c.room;
     if (!r) continue;
-    for (const s of r.sessions) if (s.actual == null) L.push(`${c.name} | ${d(s.date)} | ${s.startTime}–${s.endTime} | ${BUCKET[s.bucket]} | ${s.hostName || "chưa gán"} | ${s.coHostName || "—"} | ${m(s.expected * r.levelFactor)}`);
+    for (const s of r.sessions) if (s.actual == null) L.push(`${c.name} | ${d(s.date)} | ${s.startTime}–${s.endTime} | ${BUCKET[s.bucket]} | ${s.hostName || "chưa gán"} | ${s.coHostName || "—"} | ${m(r.expectedNowById.get(s.id) ?? s.expected * r.levelFactor)}`);
   }
   L.push("");
-  L.push("## TAY NGHỀ HOST (3 tháng gần nhất, trong cùng kênh; % so mặt bằng kênh) — kênh | host | số ca | GMV/giờ thô | phần do khung giờ | tay nghề ước tính | ±90% | đủ chắc");
-  for (const c of x.channels) for (const h of c.hosts) L.push(`${c.name} | ${h.name} | ${h.sessions} | ${lg(h.raw)} | ${lg(h.slotLuck)} | ${lg(h.skill)} | ±${Math.round(h.ci90 * 100)}% | ${h.sure ? "đủ chắc" : "chưa đủ chắc"}`);
+  L.push("## HOST THEO THỨ TỰ GỢI Ý LÚC CHỐT CA (90 ngày, cùng kênh; GMV/giờ chưa trừ khung giờ — chênh giữa host phần lớn do được xếp ca nào) — kênh | host | số ca | GMV/giờ");
+  for (const c of x.channels) for (const h of c.hosts) L.push(`${c.name} | ${h.name} | ${h.brandSessions} | ${m(h.brandGmvPerHour)}`);
   L.push("");
   L.push("## CẦU GMV THÁNG TRƯỚC SO THÁNG TRƯỚC NỮA — kênh | tháng | GMV đầu | do giờ | do cơ cấu ca (camp, khung giờ, độ dài) | do năng suất nền (thị trường + đội) | GMV cuối | giờ");
   for (const c of x.channels) {

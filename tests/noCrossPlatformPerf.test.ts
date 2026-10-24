@@ -88,7 +88,7 @@ const SINGLE_PLATFORM_FILES: Record<string, string> = {
   "components/dashboard/period/PlatformTab.tsx": "tab Toàn sàn nhận ca của MỘT sàn (AgencyDashboard lọc platformOf trước khi truyền)",
   "lib/performance/channelCard.ts": "buildChannelCard có assertOnePlatform; monthlyTrend / GMV tháng cộng ca của MỘT kênh brand × sàn",
   "lib/performance/controlRoom.ts": "Phòng Điều Hành: mọi hàm nhận ca của MỘT kênh brand × sàn và gọi assertOnePlatform trước khi cộng",
-  "components/ControlRoom.tsx": "lịch sử tháng cộng trên `c.sessions` — ca của một kênh brand × sàn (lọc platformOf ở chỗ dựng kênh)",
+  "components/OpsMonthView.tsx": "lịch sử tháng cộng trên `c.sessions` — ca của một kênh brand × sàn (lọc platformOf ở chỗ dựng kênh)",
   "lib/affiliate/plan.ts": "kế hoạch Affiliate chỉ có ở TikTok (hồ sơ Shopee ẩn tab brand_affiliate), tổng theo một brand × tháng",
   "components/ForecastTrainingCard.tsx": "thẻ lọc ca theo brand + sàn đã chọn (`channel`) trước khi cộng",
   "components/dashboard/period/brandExtras.tsx": "tab Brand: ca của MỘT kênh brand × sàn (AgencyDashboard lọc platformOf + brand) — GMV/giờ 28 ngày cho đề xuất",

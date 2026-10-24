@@ -20,6 +20,7 @@ import { resolveCampBucketType } from "../src/lib/campaignDays";
 import { profileOf } from "../src/lib/platforms/profiles";
 import { METRIC } from "../src/lib/metricGlossary";
 import type { LiveSession } from "../src/types";
+import { suggestHosts } from "../src/lib/performance/hostSuggestion";
 
 let seq = 0;
 function ca(date: string, extra: Partial<LiveSession> = {}): LiveSession {
@@ -215,5 +216,21 @@ describe("peopleLoad — giờ người theo đoạn, cả hai sàn", () => {
     expect(a.channels).toEqual(["Shopee", "TikTok"]);
     expect(rows.find((r) => r.talentId === "C")!.hostHours).toBe(2);
     expect(rows.find((r) => r.talentId === "B")!.assistantHours).toBe(4);
+  });
+});
+
+describe("một bảng tải người (24/10, gộp Phòng Điều Hành)", () => {
+  test("giờ tuần của cảnh báo mệt lúc chốt ca = giờ tuần của bảng Tải người, kể cả khi giờ live thật khác lịch", () => {
+    const xs = [
+      // Ca 4 giờ theo lịch nhưng file ghi live 5 giờ — trước 24/10 cảnh báo mệt tính 5h, bảng tải người tính 4h.
+      ca("2026-10-05", { platform: "TikTok", startTime: "09:00", endTime: "13:00", hostId: "A", hostName: "A", coHostId: "B", coHostName: "B", liveDurationMinutes: 300 }),
+      ca("2026-10-07", { platform: "Shopee", startTime: "14:00", endTime: "18:00", hostId: "A", hostName: "A", coHostId: "", coHostName: "",
+        staffSegments: [{ talentId: "A", talentName: "A", role: "host", fromMin: 0, toMin: 120 }, { talentId: "C", talentName: "C", role: "host", fromMin: 120, toMin: 240 }] })
+    ];
+    const load = peopleLoad(xs, "2026-10-01", "2026-10-31", (s) => s.platform, 6);
+    const sugg = suggestHosts(["A", "B", "C"], new Map(), xs, "crocs", 3, undefined, { date: "2026-10-08", startTime: "20:00", endTime: "23:00", platform: "TikTok" });
+    for (const id of ["A", "B", "C"]) {
+      expect(sugg.find((r) => r.talentId === id)!.weekHours).toBeCloseTo(load.find((r) => r.talentId === id)!.peakWeek!.hours, 6);
+    }
   });
 });

@@ -46,6 +46,8 @@ import { myClashes, mySessions, openSlotsFrom } from "./lib/talent/myShifts";
 import { myBadgeCount } from "./lib/talent/agenda";
 import { myPendingAcks } from "./lib/talent/acks";
 import { useShiftAcks } from "./hooks/useShiftAcks";
+import { useSessionDrafts } from "./hooks/useSessionDrafts";
+import type { OpsView } from "./components/OpsBoard";
 import { getTodayDate } from "./lib/dateUtils";
 import { Header, WorkspaceContext } from "./components/Header";
 import { Login } from "./components/Login";
@@ -111,22 +113,22 @@ const TalentAgency = lazyNamed(() => import("./components/talent/TalentAgency"),
 const OpsPlanningTodo = lazyNamed(() => import("./components/OpsPlanningTodo"), "default");
 const MonthPlan = lazyNamed(() => import("./components/MonthPlan"), "default");
 const OpsSupportTab = lazyNamed(() => import("./components/OpsSupportTab"), "default");
-const ControlRoom = lazyNamed(() => import("./components/ControlRoom"), "default");
+const OpsMonthView = lazyNamed(() => import("./components/OpsMonthView"), "default");
 const RosterBoard = lazyNamed(() => import("./components/RosterBoard"), "RosterBoard");
 const AgencyDashboard = lazyNamed(() => import("./components/AgencyDashboard"), "AgencyDashboard");
 
 // Tab đã gộp (08/10: Hỗ Trợ Vận Hành → Bảng Vận Hành) — activeTab đã lưu ở localStorage không được rơi vào màn "Quyền Truy Cập Bị Hạn Chế".
-// Tab đã gộp: Hỗ Trợ Vận Hành → Bảng Vận Hành; Run-rate → Dashboard (22/10, tab "Tháng này"); Điều Phối Phát Hành → Toàn Cảnh Brand (23/10).
-const RENAMED_TABS: Record<string, string> = { ops_support: "calendar", run_rate: "agency_overview", report_publish_board: "brands_overview" };
+// Tab đã gộp: Hỗ Trợ Vận Hành → Bảng Vận Hành; Run-rate → Dashboard (22/10, tab "Tháng này"); Điều Phối Phát Hành → Toàn Cảnh Brand (23/10);
+// Phòng Điều Hành → Bảng Vận Hành chế độ "Cả tháng" (24/10 — `opsView`, link /phong-dieu-hanh vẫn mở đúng chế độ).
+const RENAMED_TABS: Record<string, string> = { ops_support: "calendar", run_rate: "agency_overview", report_publish_board: "brands_overview", control_room: "calendar" };
 const renamedTab = (t: string) => RENAMED_TABS[t] ?? t;
 
 // Chunk của từng tab — để tải SONG SONG với đợt nạp dữ liệu (xem `preload` ở lib/lazyNamed.ts). Phải
 // khớp với khối render tab bên dưới; thiếu một tab thì tab đó chỉ chậm như trước, không hỏng.
 const TAB_CHUNKS: Record<string, { preload: () => void }[]> = {
-  calendar: [OpsBoard, TodoPanel, OpsPlanningTodo, OpsSupportTab],
+  calendar: [OpsBoard, TodoPanel, OpsPlanningTodo, OpsSupportTab, OpsMonthView],
   studio_calendar: [LiveCalendar],
   sessions: [SessionLedger],
-  control_room: [ControlRoom],
   roster: [RosterBoard],
   my_shifts: [TalentToday],
   talent_calendar: [TalentAgency, LiveCalendar],
@@ -236,10 +238,22 @@ export default function App() {
   // thắng localStorage. Brand chỉ biết slug lúc này — đối chiếu khi danh sách brand nạp xong (bên dưới).
   const [initialRoute] = useState(() => parsePath(window.location.pathname));
   const [activeTab, setActiveTab] = useState<string>(() =>
-    initialRoute ? initialRoute.tab ?? "brand_calendar" : renamedTab(loadStorage("activeTab", "shift_scheduling"))
+    initialRoute ? renamedTab(initialRoute.tab ?? "brand_calendar") : renamedTab(loadStorage("activeTab", "shift_scheduling"))
   );
-  // Bảng Vận Hành ("calendar") và Lịch & Studio ("studio_calendar") là hai mục sidebar riêng (2026-10-07; trước đó là
-  // hai tab con của "calendar" chọn bằng state opsView).
+  // Bảng Vận Hành ("calendar") và Lịch & Studio ("studio_calendar") là hai mục sidebar riêng (2026-10-07). Từ 24/10 `opsView` là chế
+  // độ xem của Bảng Vận Hành: "Hôm nay & tuần" | "Cả tháng" (Phòng Điều Hành cũ — id/link cũ `control_room` mở thẳng "Cả tháng").
+  const [opsView, setOpsView] = useState<OpsView>(() =>
+    (initialRoute ? initialRoute.tab : loadStorage("activeTab", "")) === "control_room" ? "month" : "day"
+  );
+  // Mọi đường mở tab cũ "control_room" (nút "Mô phỏng thêm ca" ở Dashboard gọi thẳng setActiveTab, Back/Forward, navigateTo) đi qua MỘT chỗ:
+  // đổi sang Bảng Vận Hành · Cả tháng trước khi vẽ (không lọt vào màn "Quyền truy cập bị hạn chế" — tab không còn trong menu).
+  useLayoutEffect(() => {
+    if (activeTab !== "control_room") return;
+    setOpsView("month");
+    setActiveTab("calendar");
+  }, [activeTab]);
+  // Việc "N ca nháp chờ xác nhận" → Bảng Vận Hành mở sẵn bộ lọc Ca nháp (OpsBoard tiêu thụ rồi xoá).
+  const [opsRangeRequest, setOpsRangeRequest] = useState<"drafts" | null>(null);
   // Q4: ca cần mở sau khi bấm thông báo (OpsBoard tiêu thụ rồi xoá).
   const [notifOpenSessionId, setNotifOpenSessionId] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -604,6 +618,13 @@ export default function App() {
   }, [shiftSlots, shiftRegistrations, myTalentIdForApp]);
   // T2 (0169): ca mới xếp / đổi giờ chưa bấm "Đã nhận".
   const { acks: talentAcks, loadedAt: talentAcksAt, ack: handleAckShifts } = useShiftAcks(!!myTalentIdForApp);
+  // Ca nháp sa bàn (0170) — một bản cho việc cần làm, dòng nháp của Bảng Vận Hành và chế độ "Cả tháng" (24/10).
+  const reloadSessionsAndSlots = React.useCallback(async () => {
+    const [s, sl] = await Promise.all([fetchSessions(), fetchShiftSlots()]);
+    setSessions(s);
+    setShiftSlots(sl);
+  }, [setSessions, setShiftSlots]);
+  const sessionDrafts = useSessionDrafts(activeTab === "calendar" && isOpsRole, reloadSessionsAndSlots);
   const talentAckCount = useMemo(
     () => (talentAcks ? myPendingAcks(activeSessions, myTalentIdForApp, talentAcks, talentAcksAt).length : 0),
     [activeSessions, myTalentIdForApp, talentAcks, talentAcksAt]
@@ -1889,26 +1910,6 @@ export default function App() {
                   />
                 )}
 
-                {activeTab === "control_room" && (
-                  <ControlRoom
-                    sessions={activeSessions}
-                    brands={brands}
-                    brandChannels={channels}
-                    shiftSlots={shiftSlots}
-                    talents={talents}
-                    studios={studios}
-                    brandStudios={brandStudios}
-                    planSlotTargets={planSlotTargets}
-                    planMonthTotals={planMonthTotals}
-                    engineParams={engineParams}
-                    onSessionsChanged={async () => {
-                      const [s, sl] = await Promise.all([fetchSessions(), fetchShiftSlots()]);
-                      setSessions(s);
-                      setShiftSlots(sl);
-                    }}
-                  />
-                )}
-
                 {activeTab === "roster" && (
                   <RosterBoard
                     sessions={sessions}
@@ -1951,8 +1952,13 @@ export default function App() {
                         monthlyReports={monthlyReports}
                         talents={activeTalents}
                         canSeeMoney={currentRole === "ceo" || currentRole === "admin"}
+                        draftCount={sessionDrafts.drafts.length}
                         canOpenTab={canOpenTab}
                         onOpen={(t) => {
+                          if (t.view === "drafts") {
+                            setOpsView("day");
+                            setOpsRangeRequest("drafts");
+                          }
                           if (t.rememberBrandId) { if (t.tab === "crm") requestCrmFocus(t.rememberBrandId, t.rememberPlatform); else rememberBrandId(t.rememberBrandId); }
                           // Việc của một kênh (vd "Kế hoạch VERA Shopee còn nháp") mở màn đích ĐÚNG sàn đó.
                           if (t.rememberPlatform && TAB_CHANNEL_SCOPE[t.tab]) {
@@ -1983,8 +1989,34 @@ export default function App() {
                       fatigueWeekHours={engineParams.fatigueWeekHours}
                       requestOpenSessionId={notifOpenSessionId}
                       onOpenRequestHandled={() => setNotifOpenSessionId(null)}
+                      view={isOpsRole ? opsView : "day"}
+                      onViewChange={setOpsView}
+                      monthView={isOpsRole ? (
+                        <OpsMonthView
+                          sessions={activeSessions}
+                          brands={brands}
+                          brandChannels={channels}
+                          shiftSlots={shiftSlots}
+                          brandStudios={brandStudios}
+                          planSlotTargets={planSlotTargets}
+                          planMonthTotals={planMonthTotals}
+                          engineParams={engineParams}
+                          draftCount={sessionDrafts.drafts.length}
+                          onDraftsCreated={sessionDrafts.reload}
+                          onShowDrafts={() => {
+                            setOpsView("day");
+                            setOpsRangeRequest("drafts");
+                          }}
+                        />
+                      ) : undefined}
+                      drafts={isOpsRole ? sessionDrafts.drafts : []}
+                      onAcceptDraft={sessionDrafts.accept}
+                      onDismissDrafts={sessionDrafts.dismiss}
+                      requestRange={opsRangeRequest}
+                      onRangeRequestHandled={() => setOpsRangeRequest(null)}
                     />
-                    {isOpsRole && (
+                    {/* Khối lập kế hoạch + benchmark ca sắp live thuộc "Hôm nay & tuần"; "Cả tháng" chỉ có sa bàn, ca xoay chuyển, tải người. */}
+                    {isOpsRole && opsView === "day" && (
                       <OpsPlanningTodo
                         brands={brands}
                         channels={channels}
@@ -1997,7 +2029,7 @@ export default function App() {
                         onOpenMonthPlan={(brandId, platform) => openMonthPlanFor(brandId, platform)}
                       />
                     )}
-                    {isOpsRole && (
+                    {isOpsRole && opsView === "day" && (
                       <OpsSupportTab
                         platform={agencyPlatformState}
                         brandsOn={brandsOn}

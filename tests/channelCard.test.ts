@@ -163,8 +163,8 @@ describe("một thang nhãn, một chỗ tính (21/10)", () => {
   test("component chỉ dựng kết luận kênh qua thẻ kênh (landingOf / monthOutlook / buildChannelRoom chỉ ở các màn đã duyệt)", () => {
     const allowed = new Set([
       // Sa bàn: điểm % khi thêm ca (cùng engine, không chữ kết luận).
-      "components/ControlRoom.tsx",
-      // Benchmark ca sắp live: hệ số k của engine.
+      "components/OpsMonthView.tsx",
+      // Benchmark ca sắp live: kỳ vọng từng ca = expectedNowById (cùng số với sa bàn, 24/10).
       "components/OpsSupportTab.tsx",
       // Report Tháng / Tuần: bản chụp sau tháng.
       "components/brand-workspace/MonthlyReportTabs.tsx",

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { SESSION_STATUS_CLS, SESSION_STATUS_LABEL_VI } from "../lib/sessionStatusUi";
-import { AlertTriangle, CalendarClock, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Radio, UserX } from "lucide-react";
+import { AlertTriangle, CalendarClock, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, FileClock, Radio, UserX, X } from "lucide-react";
 import { Brand, LiveSession, ShiftRegistration, ShiftSlot, Studio, Talent, UserRole, AuditLogEntry } from "../types";
 import { getTodayDate } from "../lib/dateUtils";
 import { fmtVndShort } from "../lib/format";
@@ -14,6 +14,9 @@ import { SessionWindow } from "./SessionWindow";
 import { PageHeader } from "./common/PageHeader";
 import { StatTile } from "./common/StatTile";
 import { SlotDetailModal } from "./scheduling/SlotDetailModal";
+import { DraftsPanel } from "./control-room/DraftsPanel";
+import type { SessionDraft } from "../lib/db/sessionDrafts";
+import type { DraftEdit } from "../hooks/useSessionDrafts";
 
 const WARN = "text-amber-300";
 const OK = "text-emerald-300";
@@ -24,6 +27,8 @@ const OK = "text-emerald-300";
 // (Kế Hoạch Tháng / Đăng Ký & Chốt Lịch).
 //  Mọi brand, mặc định hôm nay, chuyển ngày/tuần. Màn "Ca của tôi" của talent (mode "mine" cũ) đã thay bằng app talent
 //  (components/talent/TalentToday, 11/10).
+//  24/10: gộp Phòng Điều Hành — hai chế độ xem trên cùng một màn: "Hôm nay & tuần" (danh sách ca) và "Cả tháng" (`monthView`:
+//  sa bàn thêm ca, ca xoay chuyển, tải người). Ca nháp của sa bàn là dòng trong danh sách ca + bộ lọc "Ca nháp" + một việc cần làm.
 
 export interface OpsBoardProps {
   sessions: LiveSession[];
@@ -50,9 +55,23 @@ export interface OpsBoardProps {
   onOpenRequestHandled?: () => void;
   // Cột phải (Việc cần làm): màn rộng đứng cạnh danh sách ca và dính khi cuộn; màn hẹp nằm ngay dưới tiêu đề.
   aside?: React.ReactNode;
+  /** Chế độ xem (App giữ — việc cần làm / nút "Mô phỏng thêm ca" ở Dashboard đổi được). Vắng = chỉ "Hôm nay & tuần". */
+  view?: OpsView;
+  onViewChange?: (v: OpsView) => void;
+  /** Nội dung chế độ "Cả tháng" (OpsMonthView). */
+  monthView?: React.ReactNode;
+  /** Ca nháp sa bàn đang chờ (0170). */
+  drafts?: SessionDraft[];
+  onAcceptDraft?: (d: SessionDraft, e: DraftEdit) => Promise<void>;
+  onDismissDrafts?: (ids: string[]) => Promise<void>;
+  /** App yêu cầu mở sẵn một bộ lọc (việc "N ca nháp chờ xác nhận") — bảng đặt bộ lọc rồi báo lại để App xoá yêu cầu. */
+  requestRange?: "drafts" | null;
+  onRangeRequestHandled?: () => void;
 }
 
-type Range = "today" | "tomorrow" | "week" | "day";
+export type OpsView = "day" | "month";
+
+type Range = "today" | "tomorrow" | "week" | "day" | "drafts";
 
 const WEEKDAY = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
 const MISSING_LABEL: Record<MissingStep, string> = { snapshot: "chưa up file", report: "chưa giao ca", reconcile: "chưa đối soát" };
@@ -74,10 +93,11 @@ function fmtDay(d: string): string {
   return `${WEEKDAY[new Date(y, m - 1, day).getDay()]} ${String(day).padStart(2, "0")}/${String(m).padStart(2, "0")}`;
 }
 
-// Một dòng của bảng: ca thật (session) hoặc ca mở chưa chốt người (slot).
+// Một dòng của bảng: ca thật (session), ca mở chưa chốt người (slot), hoặc ca nháp của sa bàn chờ xác nhận (draft).
 type Row =
   | { kind: "session"; date: string; startTime: string; endTime: string; session: LiveSession }
-  | { kind: "slot"; date: string; startTime: string; endTime: string; slot: ShiftSlot; registered: number };
+  | { kind: "slot"; date: string; startTime: string; endTime: string; slot: ShiftSlot; registered: number }
+  | { kind: "draft"; date: string; startTime: string; endTime: string; draft: SessionDraft };
 
 export const OpsBoard: React.FC<OpsBoardProps> = ({
   sessions,
@@ -100,20 +120,39 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
   fatigueWeekHours,
   requestOpenSessionId = null,
   onOpenRequestHandled,
-  aside
+  aside,
+  view = "day",
+  onViewChange,
+  monthView,
+  drafts = [],
+  onAcceptDraft,
+  onDismissDrafts,
+  requestRange = null,
+  onRangeRequestHandled
 }) => {
   const today = getTodayDate();
-  const [range, setRange] = useState<Range>("today");
+  const [rangeState, setRange] = useState<Range>("today");
+  // Hết nháp khi đang ở bộ lọc Ca nháp ⇒ về hôm nay (nút lọc biến mất cùng lúc).
+  const range: Range = rangeState === "drafts" && drafts.length === 0 ? "today" : rangeState;
   const [anchor, setAnchor] = useState(today);
   const [openId, setOpenId] = useState<string | null>(null);
   const [openSlotId, setOpenSlotId] = useState<string | null>(null);
+  const [openDraftId, setOpenDraftId] = useState<string | null>(null);
   useEffect(() => {
     if (!requestOpenSessionId) return;
     setOpenId(requestOpenSessionId);
     onOpenRequestHandled?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestOpenSessionId]);
+  useEffect(() => {
+    if (!requestRange) return;
+    setRange(requestRange);
+    onRangeRequestHandled?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestRange]);
   const brandById = useMemo(() => new Map(brands.map((b) => [b.id, b])), [brands]);
+  const draftName = (d: SessionDraft) => `${brandById.get(d.brandId)?.name ?? "Brand"} · ${d.platform}`;
+  const talentName = (id: string | null) => (id ? talents.find((t) => t.id === id)?.name ?? "?" : "");
   const regsBySlot = useMemo(() => {
     const m = new Map<string, number>();
     for (const r of shiftRegistrations) m.set(r.slotId, (m.get(r.slotId) ?? 0) + 1);
@@ -124,12 +163,18 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
     if (range === "today") return [today, today];
     if (range === "tomorrow") return [addDays(today, 1), addDays(today, 1)];
     if (range === "week") { const mon = mondayOf(anchor); return [mon, addDays(mon, 6)]; }
+    if (range === "drafts") return [today, "9999-12-31"];
     return [anchor, anchor];
   }, [range, anchor, today]);
 
   // Ops: mọi ca (session + slot mở chưa chốt) trong khoảng đang xem.
   const rows = useMemo<Row[]>(() => {
     const out: Row[] = [];
+    for (const d of drafts) {
+      if (d.date < from || d.date > to) continue;
+      out.push({ kind: "draft", date: d.date, startTime: d.startTime, endTime: d.endTime, draft: d });
+    }
+    if (range === "drafts") return out.sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
     for (const s of sessions) {
       if (s.date < from || s.date > to || s.isBackfill) continue;
       out.push({ kind: "session", date: s.date, startTime: s.startTime, endTime: s.endTime, session: s });
@@ -139,13 +184,13 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
       out.push({ kind: "slot", date: sl.date, startTime: sl.startTime, endTime: sl.endTime, slot: sl, registered: regsBySlot.get(sl.id) ?? 0 });
     }
     return out.sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
-  }, [sessions, shiftSlots, from, to, regsBySlot]);
+  }, [sessions, shiftSlots, drafts, range, from, to, regsBySlot]);
 
   const summary = useMemo(() => {
     const ss = rows.filter((r): r is Extract<Row, { kind: "session" }> => r.kind === "session").map((r) => r.session);
     return {
-      total: rows.length,
-      noHost: rows.filter((r) => r.kind === "slot" || !r.session.hostId).length,
+      total: rows.filter((r) => r.kind !== "draft").length,
+      noHost: rows.filter((r) => r.kind === "slot" || (r.kind === "session" && !r.session.hostId)).length,
       pending: ss.filter((s) => missingSteps(s, today).some((m) => m !== "reconcile")).length,
       // GMV tách theo sàn — user chốt 07/10: không bao giờ cộng GMV TikTok với Shopee.
       gmv: sumGmvByPlatform(ss)
@@ -215,6 +260,25 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
     </button>
   );
 
+  // Ca nháp (sa bàn, 0170): viền nét đứt vàng — chưa phải ca thật; bấm để sửa giờ/người/phòng rồi xác nhận.
+  const DraftRow = ({ d }: { d: SessionDraft }) => (
+    <button onClick={() => setOpenDraftId(d.id)} className={`${ROW_CLS} border border-dashed border-amber-500/40 bg-amber-500/[0.05] hover:bg-amber-500/10`} title="Ca nháp từ sa bàn — mở để xác nhận thành ca">
+      <span className="font-mono text-sm font-black text-[var(--text)] w-[104px] shrink-0">{d.startTime}–{d.endTime}</span>
+      <span className="flex items-center gap-1.5 min-w-0 sm:w-[168px] shrink-0">
+        <BrandLogo brand={brandById.get(d.brandId)} size="xs" />
+        <span className="text-sm font-bold text-[var(--text)] truncate">{brandById.get(d.brandId)?.name ?? "Brand"}</span>
+        <PlatformChip platform={d.platform} />
+      </span>
+      <span className="order-4 md:order-none flex-1 basis-40 min-w-0 md:basis-auto text-xs text-[var(--text-muted)] truncate">
+        {d.hostId ? <span className="text-[var(--text)]">{talentName(d.hostId)}</span> : <span className="text-rose-300 font-bold">chưa chọn host</span>}
+        {d.coHostId ? <span className="text-[var(--text-faint)]"> · Trợ {talentName(d.coHostId)}</span> : ""}
+        <span className="text-[var(--text-faint)]"> · kỳ vọng {fmtVndShort(d.expectedGmv)}</span>
+      </span>
+      <span className="order-5 md:order-none ml-auto md:ml-0 text-[11px] font-bold text-amber-300 truncate">{d.reason}</span>
+      <span className="order-3 md:order-none ml-auto md:ml-0 text-[11px] font-bold text-amber-300 flex items-center justify-center gap-1"><FileClock className="w-3.5 h-3.5" /> Nháp</span>
+    </button>
+  );
+
   const groupedByDay = (list: Row[]) => {
     const m = new Map<string, Row[]>();
     for (const r of list) { const l = m.get(r.date) ?? []; l.push(r); m.set(r.date, l); }
@@ -226,15 +290,29 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
       <PageHeader
         icon={Radio}
         title="Bảng Vận Hành"
-        description="Hôm nay có ca nào, ai trực, còn thiếu gì. Bấm vào ca để mở cửa sổ ca."
+        description={view === "month" ? `Tháng ${Number(today.slice(5, 7))}: thử thêm ca để kịp target, xem ai đang gánh nhiều giờ. Tình hình từng kênh ở Dashboard.` : "Hôm nay có ca nào, ai trực, còn thiếu gì. Bấm vào ca để mở cửa sổ ca."}
         actions={
           <>
-            {(["today", "tomorrow", "week", "day"] as Range[]).map((r) => (
+            {monthView && onViewChange && (
+              <div className="flex rounded-lg border border-[var(--border)] p-0.5 mr-1" role="group" aria-label="Chế độ xem">
+                {(["day", "month"] as OpsView[]).map((v) => (
+                  <button key={v} type="button" aria-pressed={view === v} onClick={() => onViewChange(v)} className={`px-3 py-1.5 rounded-md text-xs font-bold ${view === v ? "seg-on" : "text-[var(--text-muted)] hover:text-[var(--text)]"}`}>
+                    {v === "day" ? "Hôm nay & tuần" : "Cả tháng"}
+                  </button>
+                ))}
+              </div>
+            )}
+            {view === "day" && (["today", "tomorrow", "week", "day"] as Range[]).map((r) => (
               <button key={r} onClick={() => { setRange(r); if (r === "today") setAnchor(today); }} className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${range === r ? "seg-on" : "border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]"}`}>
                 {r === "today" ? "Hôm nay" : r === "tomorrow" ? "Ngày mai" : r === "week" ? "Tuần" : "Ngày…"}
               </button>
             ))}
-            {(range === "week" || range === "day") && (
+            {view === "day" && drafts.length > 0 && (
+              <button onClick={() => setRange("drafts")} className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${range === "drafts" ? "seg-on" : "border-amber-500/50 text-amber-300 hover:text-[var(--text)]"}`}>
+                Ca nháp · {drafts.length}
+              </button>
+            )}
+            {view === "day" && (range === "week" || range === "day") && (
               <div className="flex items-center gap-1">
                 <button onClick={() => setAnchor(addDays(anchor, range === "week" ? -7 : -1))} className="p-1.5 rounded-lg border border-[var(--border)] text-[var(--text-muted)]"><ChevronLeft className="w-4 h-4" /></button>
                 <input type="date" value={anchor} onChange={(e) => e.target.value && setAnchor(e.target.value)} className="bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-xs font-mono text-[var(--text)]" />
@@ -245,13 +323,15 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
         }
       />
 
+      {view === "month" && monthView}
+      {view === "day" && (
         <div className={aside ? "grid gap-4 xl:grid-cols-[minmax(0,1fr)_400px] items-start" : ""}>
           {aside && <aside className="min-w-0 xl:col-start-2 xl:row-start-1 xl:sticky xl:top-0">{aside}</aside>}
           <div className="space-y-4 min-w-0 xl:col-start-1 xl:row-start-1">
           {/* Không có ca nào thì 4 ô "0 / 0 / 0 / —" không nói gì mà câu trạng thái ngay dưới đã nói đủ
               (kèm chỗ mở ca) — bỏ luôn hàng ô thay vì bày 4 số 0 (audit UX lần 2 — M7, cùng luật với
               Run-rate ở Dashboard brand M2). */}
-          {rows.length > 0 && (
+          {summary.total > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <StatTile frame="card" label={range === "week" ? "Ca trong tuần" : "Ca trong ngày"} value={String(summary.total)} />
               <StatTile frame="card" label="Chưa có người" value={String(summary.noHost)} tone={summary.noHost > 0 ? WARN : OK} />
@@ -294,6 +374,12 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
             </details>
           )}
           <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-2 sm:p-3 space-y-4">
+            {range === "drafts" && rows.length > 0 && (
+              <div className="flex flex-wrap items-center justify-between gap-2 px-2 sm:px-3 pt-1 text-xs text-[var(--text-muted)]">
+                <span>{rows.length} ca nháp từ sa bàn (chế độ Cả tháng). Bấm từng ca để sửa giờ, người, phòng rồi xác nhận thành ca.</span>
+                {onDismissDrafts && <button type="button" onClick={() => void onDismissDrafts(drafts.map((d) => d.id))} className="font-bold text-[var(--text-muted)] hover:text-rose-400 min-h-[28px]">Bỏ cả {drafts.length} ca nháp</button>}
+              </div>
+            )}
             {rows.length === 0 && (
               <p className="text-sm text-[var(--text-faint)] italic py-6 text-center">
                 Không có ca nào {range === "today" ? "hôm nay" : range === "tomorrow" ? "ngày mai" : "trong khoảng này"}. Ca được mở từ Kế Hoạch Tháng hoặc nút "Mở ca chờ đăng ký" ở Lịch & Studio.
@@ -303,13 +389,42 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
               <div key={day}>
                 {range !== "today" && range !== "tomorrow" && <p className={`px-2 sm:px-3 pb-1 text-xs font-black ${day === today ? "text-[var(--accent-text)]" : "text-[var(--text-faint)]"}`}>{fmtDay(day)}{day === today ? " · hôm nay" : ""}</p>}
                 <div className="divide-y divide-[var(--border-muted)]">
-                  {list.map((r) => (r.kind === "session" ? <SessionRow key={r.session.id} s={r.session} /> : <SlotRow key={r.slot.id} r={r} />))}
+                  {list.map((r) => (r.kind === "session" ? <SessionRow key={r.session.id} s={r.session} /> : r.kind === "slot" ? <SlotRow key={r.slot.id} r={r} /> : <DraftRow key={r.draft.id} d={r.draft} />))}
                 </div>
               </div>
             ))}
           </div>
           </div>
         </div>
+      )}
+
+      {openDraftId && onAcceptDraft && onDismissDrafts && (() => {
+        const d = drafts.find((x) => x.id === openDraftId);
+        if (!d) return null;
+        const close = () => setOpenDraftId(null);
+        return (
+          <div className="fixed inset-0 z-50 bg-[var(--surface-base)]/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4" role="dialog" aria-label="Xác nhận ca nháp">
+            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl max-w-3xl w-full p-4 sm:p-6 space-y-3 shadow-2xl">
+              <div className="flex justify-between items-start gap-3">
+                <div className="min-w-0">
+                  <p className="font-black text-[var(--text)]">Ca nháp · {fmtDay(d.date)}</p>
+                  <p className="text-xs text-[var(--text-muted)]">Xác nhận = tạo ca thật và chốt người. Trùng người/phòng bị chặn như ca thường.</p>
+                </div>
+                <button type="button" onClick={close} aria-label="Đóng" className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text)]"><X className="w-4 h-4" /></button>
+              </div>
+              <DraftsPanel
+                drafts={[d]}
+                nameOf={draftName}
+                talents={talents}
+                studios={studios}
+                today={today}
+                onAccept={async (x, e) => { await onAcceptDraft(x, e); close(); }}
+                onDismiss={async (ids) => { await onDismissDrafts(ids); close(); }}
+              />
+            </div>
+          </div>
+        );
+      })()}
 
       {openSlotId && (() => {
         const slot = shiftSlots.find((x) => x.id === openSlotId);

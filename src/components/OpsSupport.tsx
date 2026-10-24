@@ -5,8 +5,7 @@ import { EngineParams } from "../lib/scheduling/engineParams";
 import { buildHistory } from "../lib/scheduling/suggestEngine";
 import { buildCalibration, evaluatePlan } from "../lib/scheduling/planEvaluation";
 import { calendarEventsRead, lockedPlanSlotsRead } from "../lib/db/monthPlans";
-import { EstimateCtx, MonthTracking, benchmarkForWindow, trackMonth } from "../lib/opsSupport";
-import { MonthEndProjection, PlanRunRate } from "../lib/performance/planRunRate";
+import { EstimateCtx, benchmarkForWindow } from "../lib/opsSupport";
 import { todayVn } from "../lib/performance/brandCommitment";
 import { fmtVndShort } from "../lib/format";
 import type { CampOverrides } from "../lib/campaignDays";
@@ -17,12 +16,12 @@ import { profileOf } from "../lib/platforms/profiles";
 // Hỗ Trợ Vận Hành — khối cuối Bảng Vận Hành (OpsSupportTab). Không đụng target cam kết, không ghi DB. Chỉ còn MỘT việc:
 // benchmark ca sắp live (21/10 bỏ "phương án bù A/B" — phương án của một kênh nay chỉ ở Chi tiết kênh, engine handlingPlan) — — ops so bằng mắt với dashboard TikTok trong phiên: view thấp → đẩy traffic, CTR/CVR thấp
 // → tối ưu, ads đốt mạnh → hãm. Run-rate, % Target, bảng từng ca kế hoạch và ca ngoài plan nay nằm ở
-// Dashboard (planRunRate — luật plan ban đầu), không lặp ở đây.
+// Dashboard (planRunRate — luật plan ban đầu), không lặp ở đây. 24/10: GMV kỳ vọng nhận từ `expectedOf` (engine v3, cùng số với sa bàn
+// "Cả tháng"); phễu (view, CVR, CTR, AOV, ads) vẫn theo ô thứ × giờ của lịch sử brand.
 
 interface OpsSupportProps {
-  /** planRunRate của Dashboard — null khi tháng chưa có kế hoạch chốt. */
-  rr: PlanRunRate | null;
-  projection: MonthEndProjection;
+  /** GMV kỳ vọng của một ca (id ca / id ca chờ đăng ký) ở mức hiện tại của kênh — null khi kênh chưa đủ lịch sử để chiếu. */
+  expectedOf: (id: string, date: string) => number | null;
   brandId: string;
   brandName: string;
   /** Sàn đang xem — Dashboard đã lọc `sessions`/`shiftSlots` của brand theo sàn này; kế hoạch đã chốt đọc theo sàn. */
@@ -47,7 +46,7 @@ const addDays = (d: string, n: number) => {
   return `${x.getFullYear()}-${`${x.getMonth() + 1}`.padStart(2, "0")}-${`${x.getDate()}`.padStart(2, "0")}`;
 };
 
-export default function OpsSupport({ rr, projection, brandId, brandName, platform, month, camp, sessions, shiftSlots, promoSchemes, engineParams, onOpenSession }: OpsSupportProps) {
+export default function OpsSupport({ expectedOf, brandId, brandName, platform, month, camp, sessions, shiftSlots, promoSchemes, engineParams, onOpenSession }: OpsSupportProps) {
   const today = todayVn();
   const [lockedSlots, setLockedSlots] = useState<BrandMonthPlanSlot[]>([]);
   const [events, setEvents] = useState<CalendarEventRow[]>([]);
@@ -87,24 +86,6 @@ export default function OpsSupport({ rr, projection, brandId, brandName, platfor
   }, [lockedSlots, month, shiftSlots, sessions, engineParams]);
   const ctx = useMemo<EstimateCtx>(() => ({ camp, events, schemes: brandSchemes, calibration }), [camp, events, brandSchemes, calibration]);
 
-  // Trạng thái ca + dự kiến cuối tháng nhận từ Dashboard (planRunRate + projectMonthEnd) — cùng một số với thẻ
-  // run-rate phía trên và Bản Tin CEO (audit 2026-09-28 mục 3). Engine chỉ còn lo dự báo từng ca, k và phương án bù.
-  const engineTracking = useMemo(() => (rr ? trackMonth(rr, history, ctx) : null), [rr, history, ctx]);
-  const tracking = useMemo<MonthTracking | null>(() => {
-    if (!engineTracking || projection.value == null) return null;
-    const projected = projection.value;
-    const futureForecast = projected - engineTracking.actualAll;
-    const gap = engineTracking.targetTotal - projected;
-    const remaining = Math.max(0, engineTracking.targetTotal - engineTracking.actualAll);
-    const pendingCount = engineTracking.pendingCount + engineTracking.noDataCount;
-    return {
-      ...engineTracking,
-      projected,
-      gap,
-      gapPct: engineTracking.targetTotal > 0 ? gap / engineTracking.targetTotal : 0,
-      upliftPct: pendingCount > 0 && futureForecast > 0 ? (remaining - futureForecast) / futureForecast : null
-    };
-  }, [engineTracking, projection]);
   // Benchmark: ca sắp live 7 ngày tới (đã chốt) + ca mở chưa có người (vẫn cần biết kỳ vọng để chọn host).
   const upcoming = useMemo(() => {
     const to = addDays(today, 7);
@@ -124,7 +105,7 @@ export default function OpsSupport({ rr, projection, brandId, brandName, platfor
         <div>
           <h3 className="font-bold text-[var(--text)] flex items-center gap-2"><Radio className="w-4 h-4 text-[var(--accent-text)]" /> Benchmark ca sắp live (7 ngày) — {brandName}</h3>
           <p className="text-xs text-[var(--text-muted)] mt-1">
-            Kỳ vọng theo ô thứ × giờ của lịch sử brand (median, đã nhân hệ số camp/lễ/scheme{tracking?.realityFactor ? `, k=${tracking.realityFactor.toLocaleString("vi-VN", { maximumFractionDigits: 2 })}` : ""}). {funnel.inSessionTip}
+            GMV kỳ vọng: cùng số với sa bàn ở chế độ Cả tháng (mức hiện tại của kênh). View, CVR, CTR, AOV, ads: theo thứ × giờ trong lịch sử brand. {funnel.inSessionTip}
           </p>
         </div>
         {history.brandGmvPerHour <= 0 ? (
@@ -135,7 +116,8 @@ export default function OpsSupport({ rr, projection, brandId, brandName, platfor
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
             {upcoming.map((u) => {
               const b = benchmarkForWindow(history, brandSessions, u, ctx);
-              const k = tracking?.realityFactor ?? 1;
+              const exp = expectedOf(u.key, u.date);
+              const hours = b?.hours ?? 0;
               const target = u.session?.targetGmv ?? 0;
               return (
                 <div key={u.key} className={`rounded-xl border p-3 space-y-2 ${u.session ? "bg-[var(--surface-base)] border-[var(--border)]" : "bg-[var(--surface-base)]/50 border-dashed border-[var(--border)]"}`}>
@@ -157,9 +139,9 @@ export default function OpsSupport({ rr, projection, brandId, brandName, platfor
                   ) : (
                     <>
                       <div className="grid grid-cols-3 gap-x-2 gap-y-1.5 text-[11px]">
-                        <div><p className="text-[11px] text-[var(--text-faint)]">GMV kỳ vọng</p><p className="font-bold text-[var(--text)]">{fmtVndShort(b.expectedGmv * k)}</p></div>
-                        <div><p className="text-[11px] text-[var(--text-faint)]">GMV/giờ</p><p className="font-bold text-[var(--text)]">{fmtVndShort(b.gmvPerHour * k)}</p></div>
-                        <div><p className="text-[11px] text-[var(--text-faint)]">Target GMV ca</p><p className={`font-bold ${target > 0 && target > b.expectedGmv * k * engineParams.highExpectationRatio ? "text-amber-300" : "text-[var(--text)]"}`}>{target > 0 ? fmtVndShort(target) : "—"}</p></div>
+                        <div><p className="text-[11px] text-[var(--text-faint)]">GMV kỳ vọng</p><p className="font-bold text-[var(--text)]">{exp != null ? fmtVndShort(exp) : "—"}</p></div>
+                        <div><p className="text-[11px] text-[var(--text-faint)]">GMV/giờ</p><p className="font-bold text-[var(--text)]">{exp != null && hours > 0 ? fmtVndShort(exp / hours) : "—"}</p></div>
+                        <div><p className="text-[11px] text-[var(--text-faint)]">Target GMV ca</p><p className={`font-bold ${target > 0 && exp != null && target > exp * engineParams.highExpectationRatio ? "text-amber-300" : "text-[var(--text)]"}`}>{target > 0 ? fmtVndShort(target) : "—"}</p></div>
                         <div><p className="text-[11px] text-[var(--text-faint)]">{viewsLabel}/giờ</p><p className="font-mono text-[var(--text)]">{fmtN(b.viewsPerHour)}</p></div>
                         <div><p className="text-[11px] text-[var(--text-faint)]">Tổng {viewsLabel.toLowerCase()}</p><p className="font-mono text-[var(--text)]">{fmtN(b.expectedViews)}</p></div>
                         {funnel.hasOrderFunnel && <div><p className="text-[11px] text-[var(--text-faint)]">Orders kỳ vọng</p><p className="font-mono text-[var(--text)]">{fmtN(b.expectedOrders)}</p></div>}
@@ -167,7 +149,6 @@ export default function OpsSupport({ rr, projection, brandId, brandName, platfor
                         {funnel.hasOrderFunnel && <div><p className="text-[11px] text-[var(--text-faint)]">LIVE CTR</p><p className="font-mono text-[var(--text)]">{b.liveCtr === null ? "—" : `${b.liveCtr.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}%`}</p></div>}
                         {funnel.hasOrderFunnel && <div><p className="text-[11px] text-[var(--text-faint)]">AOV</p><p className="font-mono text-[var(--text)]">{b.aov > 0 ? fmtVndShort(b.aov) : "—"}</p></div>}
                         {funnel.hasOrderFunnel && <div><p className="text-[11px] text-[var(--text-faint)]">Ads / giờ</p><p className="font-mono text-[var(--text)]">{b.adsPerHour === null ? "chưa có report" : fmtVndShort(b.adsPerHour)}</p></div>}
-                        <div className="col-span-2"><p className="text-[11px] text-[var(--text-faint)]">Hệ số ngày</p><p className="font-mono text-[var(--text)]">×{b.dayFactor.toLocaleString("vi-VN", { maximumFractionDigits: 2 })}{b.dayFactor > 1.05 ? " (camp/lễ/scheme)" : ""}</p></div>
                       </div>
                       {(b.thin || b.cellTags.includes("weak") || b.cellTags.includes("traffic_low_cvr")) && (
                         <p className="text-[11px] text-amber-300">

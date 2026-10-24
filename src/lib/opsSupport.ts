@@ -1,8 +1,7 @@
-import { BrandMonthPlan, BrandMonthPlanSlot, LiveSession, ShiftSlot } from "../types";
+import { BrandMonthPlan, LiveSession } from "../types";
 import { CalendarEvent, DateRange, HistorySummary, cellsForWindow, estimateSlots } from "./scheduling/suggestEngine";
 import { sessionHours } from "./performance/hostPerformance";
 import { sessionDurationHours } from "./pnl";
-import type { PlanRunRate } from "./performance/planRunRate";
 
 // Module hỗ trợ vận hành (2026-09-21, user chốt): tầng "target vận hành" TÁCH khỏi target cam kết của
 // Kế Hoạch Tháng đã chốt. Không ghi gì vào DB, không đọc số realtime — chỉ tính từ ca đã xong + kế
@@ -15,115 +14,6 @@ export interface EstimateCtx {
   events?: CalendarEvent[];
   schemes?: DateRange[];
   calibration?: Map<string, number>;
-}
-
-export type TrackedSlotState = "done" | "pending" | "cancelled" | "no_data";
-
-export interface TrackedSlot {
-  planSlot: BrandMonthPlanSlot;
-  slot?: ShiftSlot;
-  session?: LiveSession;
-  state: TrackedSlotState;
-  target: number;
-  forecast: number; // engine dự báo cho khung giờ này (0 = không đủ lịch sử)
-  actual: number;
-}
-
-export interface MonthTracking {
-  targetTotal: number;
-  slots: TrackedSlot[];
-  doneCount: number;
-  pendingCount: number;
-  cancelledCount: number;
-  noDataCount: number; // ca đã qua giờ nhưng chưa có số → chưa tính vào run-rate
-  actualDone: number;
-  targetDone: number;
-  forecastDone: number;
-  targetPending: number;
-  forecastPending: number;
-  targetLost: number; // target của ca đã huỷ — mất hẳn, phải bù chỗ khác
-  // ĐỪNG hiện số này dưới nhãn "Run-rate". Mẫu số của nó là target các ca ĐÃ XONG, khác hẳn luật
-  // run-rate user chốt 2026-09-28 (mẫu số = target mọi ca kế hoạch có ngày ≤ ngày cuối có số, ca huỷ
-  // GIỮ target) — nguồn duy nhất cho con số hiện ra màn hình là `planRunRate().total.runRate`, và
-  // `tests/planRunRate.test.ts` chốt nó khớp `monthOutlook` của Bản Tin CEO. Ở đây cố ý dùng mẫu số
-  // hẹp hơn vì công dụng khác: nó là hệ số CHIẾU cho các ca còn lại, nên chỉ được học từ những ca
-  // thật sự đã chạy và có số — cộng ca huỷ vào mẫu số sẽ kéo hệ số xuống và chiếu thiếu.
-  executionRate: number | null; // thực tế ÷ target của ca đã xong — hệ số chiếu, KHÔNG phải run-rate
-  realityFactor: number | null; // thực tế ÷ dự báo engine của ca đã xong (k) — dùng để chiếu phần còn lại
-  // Ca CÓ SỐ của brand trong tháng nhưng KHÔNG nằm trong lưới kế hoạch (ops mở tay ở Lịch & Studio,
-  // ca thay thế sau khi huỷ, ca nạp bù). Tiền của chúng là tiền thật đã vào, nên phải cộng vào
-  // `projected`/`gap`; nhưng chúng không mang target nào nên cố ý KHÔNG đụng vào executionRate/k —
-  // hai số đó đo chất lượng THỰC THI KẾ HOẠCH, cộng doanh thu không có mẫu số vào là làm hỏng.
-  offPlanSessions: LiveSession[];
-  offPlanCount: number;
-  offPlanActual: number;
-  actualAll: number; // actualDone + offPlanActual — tiền thật của brand trong tháng, dùng cho thanh tiến độ/gap
-  projected: number; // thực tế (kế hoạch + ngoài kế hoạch) + dự báo còn lại × k
-  gap: number; // target − dự kiến (dương = thiếu)
-  gapPct: number;
-  requiredPerPending: number; // mỗi ca còn lại phải đạt bao nhiêu để về đích
-  avgActualDone: number;
-  upliftPct: number | null; // phần còn lại phải nhỉnh hơn dự kiến bao nhiêu % (null = không có ca còn lại)
-}
-
-// Trạng thái từng ca kế hoạch lấy THẲNG từ planRunRate (audit 2026-09-28 mục 3). Trước đây hàm này tự nối
-// plan → shift_slot → ca với định nghĩa "xong" riêng (`isDone`) và coi ca kế hoạch mất shift_slot là "huỷ", trong
-// khi planRunRate khớp ngày + giờ — cùng trang Dashboard ra hai con số "còn N ca".
-export function trackMonth(rr: PlanRunRate, history: HistorySummary, ctx: EstimateCtx): MonthTracking {
-  const planSlots = rr.slots.map((t) => t.planSlot);
-  const forecasts = history.brandGmvPerHour > 0 ? estimateSlots(history, planSlots, ctx) : planSlots.map((ps) => ps.expectedGmv ?? 0);
-  const slots: TrackedSlot[] = rr.slots.map((t, i) => ({ planSlot: t.planSlot, session: t.session, state: t.state, target: t.target, forecast: forecasts[i] ?? 0, actual: t.actual }));
-  const by = (st: TrackedSlotState) => slots.filter((t) => t.state === st);
-  const done = by("done");
-  const pending = [...by("pending"), ...by("no_data")];
-  const sum = (xs: TrackedSlot[], f: (t: TrackedSlot) => number) => xs.reduce((a, t) => a + f(t), 0);
-  const targetTotal = sum(slots, (t) => t.target);
-  const actualDone = sum(done, (t) => t.actual);
-  const targetDone = sum(done, (t) => t.target);
-  const forecastDone = sum(done, (t) => t.forecast);
-  const targetPending = sum(pending, (t) => t.target);
-  const forecastPendingRaw = sum(pending, (t) => t.forecast);
-  const executionRate = targetDone > 0 ? actualDone / targetDone : null;
-  const realityFactor = forecastDone > 0 && done.length >= 3 ? actualDone / forecastDone : null;
-  // Không có dự báo (thiếu lịch sử) thì phần còn lại chiếu theo target × run-rate; có dự báo thì dự
-  // báo × k. k chỉ tin khi đã ≥ 3 ca xong.
-  const forecastPending = forecastPendingRaw > 0 ? forecastPendingRaw * (realityFactor ?? 1) : targetPending * (executionRate ?? 1);
-
-  // Ca ngoài kế hoạch: planRunRate đã tách (ca có số, không huỷ, không khớp dòng kế hoạch nào).
-  const offPlanSessions = rr.offPlan.map((x) => x.session);
-  const offPlanActual = rr.offPlanActual;
-
-  const actualAll = actualDone + offPlanActual;
-  const projected = actualAll + forecastPending;
-  const gap = targetTotal - projected;
-  const gapPct = targetTotal > 0 ? gap / targetTotal : 0;
-  const remainingToTarget = Math.max(0, targetTotal - actualAll);
-  return {
-    targetTotal,
-    slots,
-    doneCount: done.length,
-    pendingCount: by("pending").length,
-    cancelledCount: by("cancelled").length,
-    noDataCount: by("no_data").length,
-    actualDone,
-    targetDone,
-    forecastDone,
-    targetPending,
-    forecastPending,
-    targetLost: sum(by("cancelled"), (t) => t.target),
-    executionRate,
-    realityFactor,
-    offPlanSessions,
-    offPlanCount: offPlanSessions.length,
-    offPlanActual,
-    actualAll,
-    projected,
-    gap,
-    gapPct,
-    requiredPerPending: pending.length > 0 ? remainingToTarget / pending.length : 0,
-    avgActualDone: done.length > 0 ? actualDone / done.length : 0,
-    upliftPct: pending.length > 0 && forecastPending > 0 ? (remainingToTarget - forecastPending) / forecastPending : null
-  };
 }
 
 // ============ Benchmark cho ca sắp live ============

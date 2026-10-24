@@ -3,9 +3,7 @@
 import { describe, expect, test } from "vitest";
 import { planRunRate, projectMonthEnd } from "../src/lib/performance/planRunRate";
 import { monthOutlook, monthTargetOf } from "../src/lib/performance/ceoBrief";
-import { trackMonth } from "../src/lib/opsSupport";
 import { BrandMonthPlanSlot, LiveSession, ShiftSlot } from "../src/types";
-import type { HistorySummary } from "../src/lib/scheduling/suggestEngine";
 
 let seq = 0;
 function ca(date: string, gmv: number, extra: Partial<LiveSession> = {}): LiveSession {
@@ -22,7 +20,6 @@ const planSlot = (id: string, date: string, target: number, slotId?: string): Br
   ({ id, planId: "p", date, startTime: "20:00", endTime: "22:00", targetGmv: target, expectedGmv: 0, slotId, note: "" });
 const openSlot = (id: string, date: string): ShiftSlot =>
   ({ id, date, startTime: "20:00", endTime: "22:00", brandId: "vera", brandName: "VERA", platform: "TikTok", studioName: "", notes: "", status: "open" }) as ShiftSlot;
-const noHistory = { brandGmvPerHour: 0 } as unknown as HistorySummary;
 
 describe("Dự kiến cuối tháng — brand chưa có lịch sử 28 ngày (lỗi E2E #4)", () => {
   // Đúng hình lượt E2E VERA: 2 ca × 50M, ca 1 đã qua giờ nhưng chưa có số, ca 2 còn chờ đăng ký.
@@ -52,18 +49,5 @@ describe("Dự kiến cuối tháng — brand chưa có lịch sử 28 ngày (l�
     expect(dash).toEqual({ value: 80e6, method: "gmv_per_hour" });
     expect(ceo.projected).toBe(80e6);
     expect(ceo.projectionMethod).toBe("gmv_per_hour");
-  });
-});
-
-describe("trackMonth đọc trạng thái ca từ planRunRate", () => {
-  test("ca kế hoạch mất shift_slot nhưng khớp ngày + giờ ⇒ 'done', không phải 'huỷ' như bản cũ", () => {
-    const plan = [planSlot("p1", "2026-10-05", 50e6 /* slot_id null — ca chờ đăng ký đã bị xoá rồi chốt tay */)];
-    const s1 = ca("2026-10-05", 40e6);
-    const rr = planRunRate("2026-10", plan, [], [s1], "2026-10-07");
-    const t = trackMonth(rr, noHistory, {});
-    expect(t.slots.map((x) => x.state)).toEqual(["done"]);
-    expect(t.cancelledCount).toBe(0);
-    expect(t.offPlanCount).toBe(0);
-    expect(t.actualAll).toBe(40e6);
   });
 });
