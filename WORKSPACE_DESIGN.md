@@ -13,7 +13,7 @@
 
 ## 1. Giai đoạn hiện tại (cập nhật 2026-10-24)
 
-- **24/10: ĐIỀU PHỐI LỊCH LIVE ĐỢT 1 + 2 (Bàn Trainer cũ; đã commit, chưa push; `0180` CHƯA CHẠY)** — đề xuất https://claude.ai/artifact/Rjp94U78WQfT1UehDwAPNX.
+- **24/10: ĐIỀU PHỐI LỊCH LIVE ĐỢT 1 + 2 (Bàn Trainer cũ; đã push 3ca9999 24/10; `0180` ĐÃ CHẠY 24/10)** — đề xuất https://claude.ai/artifact/Rjp94U78WQfT1UehDwAPNX.
   3 chế độ Tháng này · Tháng sau · Tuần (`roster/MonthDesk.tsx`, `lib/roster/monthDesk.ts`); giờ cam kết = giờ live thật cả app; 0180: trainer lập + chốt
   Kế Hoạch Tháng (`manage_month_plan`), hạn đăng ký theo tháng, lý do off sớm ở giao ca. Chi tiết: lịch sử `## Điều Phối Lịch Live đợt 1/đợt 2 (2026-10-24)`.
 - **24–25/10: BẢNG VẬN HÀNH (gộp Phòng Điều Hành e5d9364 + làm theo audit 073c231; đã push, không migration)** — 2 chế độ "Hôm nay & tuần" /
@@ -53,8 +53,8 @@
   view chưa có cột ⇒ đọc lại không có `live_evidence`, mỗi lần mở app tốn 2 request 400 tới khi chạy). Sau khi chạy: Bảng Vận Hành / Sổ Ca
   thấy ca quá giờ tự "Đã xong" lại (trước đó `complete_past_sessions` lỗi cả lô vì cặp trùng người). Nên bật pg_cron (Database → Extensions)
   để ca được đóng cả khi không ai mở app. Code đã push `9426932` (19/10, gồm run-rate theo ca 11/10 + bố cục 18–19/10) — Vercel tự deploy từ main.
-- **Điều Phối Lịch Live (24/10):** chạy `0180_month_desk.sql` TRƯỚC deploy client (0175/0176 có vẻ đã chạy — bảng 0176 đọc được). Rồi tạo tài khoản
-  Trainer ở Phân Quyền, thử Kế Hoạch Tháng + Tháng sau → đặt hạn tháng; nhập rate (Talent Pool) + giá (CRM); sửa GMV hợp đồng FUJIWA (450 → 450M).
+- **Điều Phối Lịch Live (24/10):** `0180` ĐÃ CHẠY (kiểm trên DB thật: `roster_months`, `early_leave_reason`, `manage_month_plan`, RPC giao ca 6/7 tham số).
+  Còn: (code đã push 24/10, Vercel tự deploy) tạo tài khoản Trainer ở Phân Quyền, thử Kế Hoạch Tháng + Tháng sau → đặt hạn tháng; nhập rate (Talent Pool) + giá (CRM); sửa GMV hợp đồng FUJIWA (450 → 450M).
   Câu hỏi mở: tiền brand theo giờ có theo giờ live thật không; có người trả theo ca không.
 - **Đối soát / GMV ca (13/10):** 0174 ĐÃ CHẠY. Còn: deploy client; Áp dụng lô CROCS T10 01–13/10, Áp Dụng Lại lô VERA Shopee 08–10/10 (Claude bị chặn bấm — user bấm); ca CROCS 11/10 09–12 (file tải 13:35) nên gõ GMV đúng ở form Giao ca trước khi Áp dụng.
 - **Bảng Vận Hành · Cả tháng (Phòng Điều Hành cũ, 0170 ĐÃ CHẠY):** đặt `ANTHROPIC_API_KEY` trên Vercel nếu muốn hỏi bằng Claude (thiếu thì chỉ Gemini). Role brand chỉ thấy điểm của ngày sổ dự báo đã ghi (Dashboard được mở ngày đó).

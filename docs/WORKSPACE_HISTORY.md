@@ -6453,3 +6453,8 @@ mà chưa giao ca trong app; 7 ca đã giao có Off sớm.
 
 **Còn lại.** User chạy 0180 rồi deploy; tạo tài khoản trainer thật để thử quyền đầu-cuối (RLS chỉ kiểm trên replay). Đợt 3: chi phí người/giờ, /1M GMV, biên
 mỗi giờ khi có rate + giá. Câu hỏi mở: tiền brand theo giờ có theo giờ live thật không.
+
+**0180 ĐÃ CHẠY trên DB thật (24/10, user chạy).** Kiểm bằng phiên admin trong app dev: `roster_months` đọc được (0 dòng), `live_session_reports.early_leave_reason`
+có, `role_permissions.manage_month_plan` = ceo/admin/operations/trainer true, brand/talent false; `submit_file_handover` gọi 7 tham số và 6 tham số đều vào
+thân hàm (mã ca giả ⇒ "Không thấy ca.", không ghi gì). Màn: Tháng sau hiện "Chưa đặt hạn" + ô gợi ý 17:00 27/10 (không bấm đặt — dữ liệu thật); Ma Trận Phân
+Quyền có dòng "Kế Hoạch Tháng". Chưa thử bằng tài khoản role trainer thật.
