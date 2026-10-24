@@ -39,12 +39,14 @@ export const WeekGrid: React.FC<{
   canAdd: boolean;
   onSelect: (key: string) => void;
   onAdd: (channel: ChannelRow, date: string) => void;
-}> = ({ weekStart, channels, shifts, analysis, nameOf, selectedKey, canAdd, onSelect, onAdd }) => {
+  /** Bản gọn 25/10: giờ tháng + một kết luận dưới tên kênh (thay chế độ "Tháng này"). */
+  channelMeta?: (channel: ChannelRow) => React.ReactNode;
+}> = ({ weekStart, channels, shifts, analysis, nameOf, selectedKey, canAdd, onSelect, onAdd, channelMeta }) => {
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   return (
     <div className="space-y-2">
       <div className="overflow-x-auto rounded-xl border border-[var(--border)]">
-        <div className="grid min-w-[1040px]" style={{ gridTemplateColumns: "140px repeat(7, minmax(126px, 1fr))" }}>
+        <div className="grid min-w-[1060px]" style={{ gridTemplateColumns: `${channelMeta ? 168 : 140}px repeat(7, minmax(126px, 1fr))` }}>
           <div className="sticky left-0 z-10 bg-[var(--surface-elevated)] px-2 py-2 text-xs font-bold text-[var(--text-muted)] border-b border-r border-[var(--border)]">Kênh</div>
           {days.map((d) => (
             <div key={d} className="bg-[var(--surface-elevated)] px-2 py-2 text-xs font-bold text-[var(--text)] border-b border-r border-[var(--border)]">
@@ -56,6 +58,7 @@ export const WeekGrid: React.FC<{
               <div className="sticky left-0 z-10 bg-[var(--surface-elevated)] px-2 py-2 border-b border-r border-[var(--border)] text-xs">
                 <p className="font-black text-[var(--text)]">{ch.brandName}</p>
                 <PlatformChip platform={ch.platform} />
+                {channelMeta?.(ch)}
               </div>
               {days.map((d) => {
                 const list = shifts.filter((s) => s.channelKey === ch.key && s.date === d);

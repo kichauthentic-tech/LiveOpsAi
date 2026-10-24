@@ -31,7 +31,8 @@ interface Props {
   readOnly: boolean;
   busy: boolean;
   onClose: () => void;
-  onAssign: (shift: RosterShift, role: RosterRole, talentId: string | undefined) => void;
+  /** `reason` có sẵn (vd "Báo nghỉ: …") ⇒ ca đã lên lịch đổi người không hỏi lý do nữa. */
+  onAssign: (shift: RosterShift, role: RosterRole, talentId: string | undefined, reason?: string) => void;
   onMove: (shift: RosterShift, v: { date: string; startTime: string; endTime: string }) => void;
   onRemove: (shift: RosterShift) => void;
 }
@@ -44,6 +45,8 @@ export const ShiftPanel: React.FC<Props> = ({ shift, analysis, ctx, talents, his
   const [moveDate, setMoveDate] = useState(shift.date);
   const [moveStart, setMoveStart] = useState(shift.startTime);
   const [moveEnd, setMoveEnd] = useState(shift.endTime);
+  // Bản gọn 25/10: tab "Báo nghỉ" riêng thành nút ngay trong thẻ ca — bấm rồi chọn người thay, lý do ghi sẵn.
+  const [absent, setAbsent] = useState<RosterRole | null>(null);
 
   const past = shift.date < getTodayDate();
   const lockedPeople = readOnly || past || shift.segmented;
@@ -64,15 +67,40 @@ export const ShiftPanel: React.FC<Props> = ({ shift, analysis, ctx, talents, his
             {cur ? <span>{nm(cur)}</span> : <span className="text-red-300">chưa có</span>}
           </h4>
           {cur && !lockedPeople && (
-            <button type="button" disabled={busy} onClick={() => onAssign(shift, role, undefined)} className="text-xs font-bold text-[var(--text-muted)] hover:text-[var(--text)] px-2 py-1 rounded-lg border border-[var(--border)]">
-              Bỏ người
-            </button>
+            <span className="flex gap-1.5">
+              {shift.kind === "session" && (
+                <button
+                  type="button"
+                  disabled={busy}
+                  aria-pressed={absent === role}
+                  onClick={() => setAbsent(absent === role ? null : role)}
+                  className={`text-xs font-bold px-2 py-1 rounded-lg border ${absent === role ? "border-[var(--accent)] text-[var(--text)] bg-[var(--accent)]/10" : "border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]"}`}
+                >
+                  Người này báo nghỉ
+                </button>
+              )}
+              {(shift.kind === "open" || role === "co_host") && (
+                <button type="button" disabled={busy} onClick={() => onAssign(shift, role, undefined)} className="text-xs font-bold text-[var(--text-muted)] hover:text-[var(--text)] px-2 py-1 rounded-lg border border-[var(--border)]">
+                  Bỏ người
+                </button>
+              )}
+            </span>
           )}
         </div>
+        {absent === role && cur && <p className="text-[11px] text-[var(--accent-text)]">Chọn người thay {nm(cur)} bên dưới — lý do "Báo nghỉ" ghi sẵn vào nhật ký, cả hai người nhận thông báo.</p>}
         {!lockedPeople && (
           <ul className="space-y-1.5">
             {ok.map((c) => (
-              <CandidateRow key={c.talentId} c={c} role={role} name={nm(c.talentId)} showCost={showCost} busy={busy} onPick={() => onAssign(shift, role, c.talentId)} currentCost={curCost && !curCost.missing ? curCost.amount : undefined} />
+              <CandidateRow
+                key={c.talentId}
+                c={c}
+                role={role}
+                name={nm(c.talentId)}
+                showCost={showCost}
+                busy={busy}
+                onPick={() => onAssign(shift, role, c.talentId, absent === role && cur ? `Báo nghỉ: ${nm(cur)}` : undefined)}
+                currentCost={curCost && !curCost.missing ? curCost.amount : undefined}
+              />
             ))}
             {ok.length === 0 && <li className="text-xs text-[var(--text-muted)]">Không còn ai rảnh và đủ điều kiện.</li>}
           </ul>

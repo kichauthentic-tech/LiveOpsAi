@@ -6470,3 +6470,28 @@ Nguyên văn các dòng đã bỏ/gộp:
 - **0167 ĐÃ CHẠY + đã gộp VERA Shopee 01–10/10.** Còn lại: xem lại bảng rồi Áp dụng lô đó; TikTok chưa kiểm xem có nhóm restart nào cần gộp.
 - **0166 ĐÃ CHẠY 11/10.** Còn lại: thử thật bỏ tick vài phiên → Áp dụng → ca khớp phiên bỏ tick phải giữ nguyên số.
 
+
+## Điều Phối Lịch Live — vì sao khó dùng (2026-10-24)
+
+User đọc tài liệu hướng dẫn (Claude Docs https://claude.ai/artifact/V78nnoGAZHdnCXh5rAjbmC, 2 tab Hướng dẫn / Tra cứu) rồi nói module "khó dùng"
+(chọn: chính module, không phải tài liệu). Đề xuất + demo: https://claude.ai/artifact/K39uEqHtPE74gwXjoPqK5w (nguồn ở scratchpad phiên, không commit).
+
+**Số đo (app thật cổng 3100, admin, 1440 px; DB thật qua `supabaseClient` trong trang).**
+- Nút / ô nhập / chữ trong `<main>`: Tháng này 3 / 0 / 528; Tháng sau 11 / 2 / 336; Tuần 120 / 0 / 453; Kế Hoạch Tháng (FUJIWA T11) 75 / 23 / 568.
+  Mở lịch một tháng = 10 màn: 3 chế độ + 6 tab con của Tuần + Kế Hoạch Tháng (bước 1–2 của 6 bước nằm ở module khác).
+- Luồng trong app chưa ai đi: 0 `roster_weeks`, 0 `roster_drafts`, 0 `roster_months`, 0 `roster_changes`, 0 `session_availability`, 0 profile role trainer.
+  369/394 ca T10 (không huỷ) có created_at 05/10 = lần nạp Working File; `shift_slots` 375 dòng, 0 dòng ≥ 01/11. 0 `brand_month_plans` cho T11.
+- Tháng sau (24/10): 5/7 kênh "Nhập cam kết tháng" (CROCS, Franklin TikTok, JOCKEY, VERA ×2), Franklin Shopee 90 giờ, FUJIWA 180 giờ; cần mở 300, đã mở 0.
+- Tháng này: 2/6 kênh vừa "Xếp thêm ~N giờ" vừa "Không thêm giờ vì GMV" (VERA TikTok 62 giờ, VERA Shopee 56 giờ); lời khuyên không có nút làm.
+- Tuần 26/10: "Chưa công bố" dù 55 ca đã có người (0 ca mở, 0 nháp); 1 ca thiếu host, 13 thiếu trợ; 19 cảnh báo.
+- Lặp tuần (884 ca, tuần 10/08 → 19/10, so với tuần liền trước theo kênh + thứ + giờ): cùng ngày + giờ bắt đầu 44%, y hệt giờ 20%, cùng host 4,8%, cùng host + trợ 1,6%
+  ⇒ "chép tuần trước" chỉ nên chép khung giờ, không chép người.
+- Bên ngoài: Deputy (copy week / copy from previous week, ca chép ở dạng chưa công bố, open shift), ZoomShift (nháp/publish), Oracle (chép chỉ ca → ca mở, hoặc chép cả người).
+
+**Đề xuất.** Đợt 1 (không migration): màn chính = Lịch tuần; thanh giờ tháng cạnh mỗi kênh thay chế độ Tháng này; khối "Việc cần làm" có nút; một kết luận mỗi
+kênh; lỗi lịch trên thẻ ca + số trên nút Công bố; Báo nghỉ thành nút trong thẻ ca; Ma trận / Giờ & chi phí / Luật / Nhật ký vào menu "Thêm". Đợt 2: "Mở lịch tháng
+sau" 3 bước trong module (giờ cam kết → chép khung giờ → ca mở + hạn) + "Chép khung giờ tuần trước". Đợt 3: "Dán lịch từ Sheet" nếu trainer vẫn lập ở Sheet.
+**4 quyết định chờ:** (1) Lịch tuần làm màn chính, bỏ 3 chế độ; (2) giờ cam kết + mở ca tháng sau trong module, target vẫn ở Kế Hoạch Tháng (đổi lại quyết định
+24/10 "trainer lập + chốt Kế Hoạch Tháng"); (3) T11 lập lịch trong app hay Google Sheet; (4) gom 4 tab vào menu Thêm.
+Demo đầy đủ (user "làm demo đi"): https://claude.ai/artifact/6YoM6U3rE89iGcSNESPUyq — màn Lịch tuần + Việc cần làm + thẻ ca (lý do, báo nghỉ) + "Mở lịch tháng 11" 3 bước
+(chép khung tháng 10 khớp giờ cần mở, hoặc dán từ Sheet). Luật trùng như app (2 ca đã lên lịch trùng = vàng). Ca trùng thật: Khanh host JOCKEY 11–13 + Franklin Shopee 10–13 ngày 29/10.

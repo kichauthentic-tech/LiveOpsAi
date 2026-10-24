@@ -9,7 +9,8 @@ import type { EngineParams } from "../../lib/scheduling/engineParams";
 import { fetchRosterMonths, isRosterBackendMissing, setRosterMonthDeadline, type RosterDraft, type RosterMonth, type RosterWeek } from "../../lib/db/roster";
 import { commitmentsRead, contractsRead } from "../../lib/db/brandContracts";
 import { monthCommitmentOf } from "../../lib/performance/brandCommitment";
-import { accountRow, sortAccounts, type RowTone } from "../../lib/performance/accountOverview";
+import { accountRow, sortAccounts, type AccountRow, type RowTone } from "../../lib/performance/accountOverview";
+import { channelVerdict, type ChannelVerdict } from "../../lib/roster/monthStatus";
 import { brandPlatformKey, type ReportPlatform } from "../../lib/reportPlatform";
 import { channelShrinkage, nextRow, nowActions, nowHours, shrinkSums, NEXT_STEPS, type ChannelShrinkage, type DeskTone, type NextRow, type NowHours } from "../../lib/roster/monthDesk";
 import { channelRefs, useChannelCards } from "../dashboard/useChannelCards";
@@ -126,6 +127,72 @@ const HourBar: React.FC<{ h: NowHours }> = ({ h }) => {
 };
 
 // ---------------------------------------------------------------------------------------------------------------------------
+
+export interface NowChannel {
+  brandId: string;
+  platform: ReportPlatform;
+  brandName: string;
+  row: AccountRow;
+  h: NowHours;
+  committed: number;
+  verdict: ChannelVerdict | null;
+}
+export interface NextChannel {
+  brandId: string;
+  platform: ReportPlatform;
+  brandName: string;
+  committedHours: number | null;
+  r: NextRow;
+}
+
+/**
+ * Số theo tháng cho màn chính bản gọn (25/10): giờ + một kết luận mỗi kênh tháng này (cùng accountRow/nowHours của NowDesk) và
+ * bước mở lịch mỗi kênh tháng sau (cùng nextRow của NextDesk). Hai màn chi tiết cũ vẫn tự tính khi mở từ menu.
+ */
+export function useRosterDesk(p: DeskProps & { registrations: ShiftRegistration[]; drafts: RosterDraft[]; weeks: RosterWeek[] }) {
+  const month = p.today.slice(0, 7);
+  const next = nextMonthOf(month);
+  const now = useDeskCards(p, month);
+  const nx = useDeskCards(p, next);
+  const cm = useCommitments();
+  const nowRows: NowChannel[] = useMemo(() => {
+    if (!cm) return [];
+    return now.cards
+      .map((card) => {
+        const row = accountRow(card, now.reportSessions);
+        const c = monthCommitmentOf(cm.commitments, cm.contracts, row.brandId, row.platform, `${month}-01`);
+        const s = channelShrinkage(now.shrink, brandPlatformKey(row.brandId, row.platform));
+        const h = nowHours(now.reportSessions, p.shiftSlots, row.brandId, row.platform, month, p.today, c.hours, s.applied);
+        const saveExtra = row.rescue.kind === "save" ? row.rescue.extraHours : null;
+        return { brandId: row.brandId, platform: row.platform, brandName: row.brandName, row, h, committed: c.hours, verdict: channelVerdict(c.hours > 0 ? h : null, saveExtra) };
+      })
+      .filter((r) => r.row.state !== "off" || r.committed > 0);
+  }, [now.cards, now.reportSessions, now.shrink, cm, month, p.shiftSlots, p.today]);
+  const nextRows: NextChannel[] = useMemo(() => {
+    if (!cm) return [];
+    return nx.cards.map((card) => {
+      const c = monthCommitmentOf(cm.commitments, cm.contracts, card.brandId, card.platform, `${next}-01`);
+      const s = channelShrinkage(nx.shrink, brandPlatformKey(card.brandId, card.platform));
+      const committedHours = c.source === "none" ? null : c.hours;
+      const r = nextRow({
+        brandId: card.brandId,
+        platform: card.platform,
+        month: next,
+        committedHours,
+        committedGmv: c.gmv ?? null,
+        planStatus: card.planStatus,
+        shrink: s.applied,
+        sessions: nx.reportSessions,
+        slots: p.shiftSlots,
+        registrations: p.registrations,
+        drafts: p.drafts,
+        weeks: p.weeks
+      });
+      return { brandId: card.brandId, platform: card.platform, brandName: card.brandName, committedHours, r };
+    });
+  }, [nx.cards, nx.shrink, nx.reportSessions, cm, next, p.shiftSlots, p.registrations, p.drafts, p.weeks]);
+  return { month, next, nowRows, nextRows, loading: now.loading || nx.loading || !cm, commitError: !!cm?.error };
+}
 
 export const NowDesk: React.FC<DeskProps> = (p) => {
   const month = p.today.slice(0, 7);
@@ -369,7 +436,7 @@ export const NextDesk: React.FC<DeskProps & { registrations: ShiftRegistration[]
         </table>
       </div>
       <p className="text-[11px] text-[var(--text-faint)]">
-        6 bước: {NEXT_STEPS.map((s) => s.label).join(" → ")}. Cam kết tháng nhập ở Kế Hoạch Tháng (mặc định lấy từ hợp đồng ở CRM). Đăng ký, xếp người, công bố làm ở tab Tuần.
+        6 bước: {NEXT_STEPS.map((s) => s.label).join(" → ")}. Cam kết tháng nhập ở Kế Hoạch Tháng (mặc định lấy từ hợp đồng ở CRM). Đăng ký, xếp người, công bố làm ở lịch tuần phía trên.
       </p>
     </div>
   );
