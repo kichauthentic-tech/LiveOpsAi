@@ -39,7 +39,8 @@ test("cụm dữ liệu dùng chung KHÔNG được khai isOpsRole trong dep", (
   // 6 fetch này không phụ thuộc role. Thêm `isOpsRole` vào dep là cả cụm chạy lại lần hai ngay khi
   // hồ sơ về. Tham số engine (chỉ ops dùng) phải nằm ở effect RIÊNG.
   expect(depsOf(APP, "fetchBrandPlatformRates()")).toBe("authUserId");
-  expect(depsOf(APP, "fetchEngineParams()")).toBe("authUserId, isOpsRole");
+  // currentRole (0180, 24/10): trainer cũng đọc tham số engine (Kế Hoạch Tháng + Điều Phối Lịch Live).
+  expect(depsOf(APP, "fetchEngineParams()")).toBe("authUserId, isOpsRole, currentRole");
 });
 
 test("dữ liệu chỉ một màn đọc phải gate theo activeTab", () => {

@@ -11,7 +11,10 @@ export async function fetchRolePermissions(): Promise<RolePermissionsMap> {
   if (error) throw error;
   const map = {} as RolePermissionsMap;
   for (const row of data as DbRolePermissionRow[]) {
-    map[row.role] = row.permissions;
+    // DB chưa chạy 0180 thì chưa có key manage_month_plan — Kế Hoạch Tháng đi theo manage_sessions như trước, OP không mất màn.
+    const p = { ...row.permissions };
+    if (p.manage_month_plan === undefined) p.manage_month_plan = !!p.manage_sessions;
+    map[row.role] = p;
   }
   return map;
 }

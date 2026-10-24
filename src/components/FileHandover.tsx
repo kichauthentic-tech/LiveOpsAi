@@ -10,6 +10,7 @@ import { HandoverIncidents, incidentsFromReport, incidentValues } from "./Handov
 import { fetchSnapshotParts } from "../lib/db/sessionRoomLinks";
 import { suggestedRestartCount } from "../lib/liveSnapshot/roomCases";
 import { profileOf } from "../lib/platforms/profiles";
+import { durationDeviationInfo } from "../lib/sessionStatus";
 
 // Giao ca, MỘT luồng cho cả hai sàn (TikTok user chốt 06/10 tối; Shopee chuyển sang file 08/10, migration 0154): (1) up file số liệu
 // tải từ sàn ngay khi hết ca — TikTok Creator-Live-Performance, Shopee Live List — file giữ đúng ranh giới ca nối (số cộng dồn của
@@ -49,11 +50,23 @@ export function FileHandover({ session: s, isOps = false, allSessions, onSaved, 
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chạy theo ca + số room, không theo state sự cố đang gõ
   }, [s.id, roomCount]);
 
+  // File cho thấy live ngắn hơn lịch (≥ 10 phút) mà ca chưa giao: hiện sẵn "Off sớm" đúng số phút để trợ chỉ cần chọn lý do (0180 —
+  // Điều Phối Lịch Live đo giờ mất theo lý do). Gợi ý tính lúc vẽ; trợ đổi bất kỳ ô nào thì giữ đúng thứ trợ chọn.
+  const [touched, setTouched] = useState(false);
+  const early = durationDeviationInfo(s);
+  const earlyMin = early?.kind === "early" ? early.minutes : 0;
+  const shown =
+    !touched && !s.report?.handoverAt && earlyMin > 0 && !incidents.on.includes("early") ? { ...incidents, on: [...incidents.on, "early" as const], earlyMinutes: earlyMin } : incidents;
+  const changeIncidents = (v: typeof incidents) => {
+    setTouched(true);
+    setIncidents(v);
+  };
+
   const submit = async () => {
     setSaving(true);
     setError(null);
     try {
-      onSaved([await submitFileHandover(s.id, incidentValues(incidents))]);
+      onSaved([await submitFileHandover(s.id, incidentValues(shown))]);
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -69,10 +82,10 @@ export function FileHandover({ session: s, isOps = false, allSessions, onSaved, 
           <SessionLiveSnapshotUpload session={s} onApplied={(u) => onSaved([u])} />
         </Step>
         <Step no={2} state={stepState(false, fileDone)} title="Lượt live & ca nối" hint="chỉ khi có restart / chạy sang ca sau">
-          <SessionRoomCase key={s.id} session={s} canEdit isOps={isOps} allSessions={allSessions} onSessionsUpdated={onSaved} embedded restartFlagged={incidents.on.includes("restart")} />
+          <SessionRoomCase key={s.id} session={s} canEdit isOps={isOps} allSessions={allSessions} onSessionsUpdated={onSaved} embedded restartFlagged={shown.on.includes("restart")} />
         </Step>
         <Step no={3} state={stepState(false, fileDone)} title="Ca này có gì?" last>
-          <HandoverIncidents value={incidents} onChange={setIncidents} />
+          <HandoverIncidents value={shown} onChange={changeIncidents} />
         </Step>
       </ol>
       {error && <p className="text-xs text-rose-300 bg-rose-950/50 border border-rose-800 rounded-xl px-3 py-2">{error}</p>}

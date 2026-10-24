@@ -62,7 +62,7 @@ interface BrandCalendarProps {
   onLogAudit?: (entry: { action: string; details: string; category: AuditLogEntry["category"] }) => Promise<void>;
 }
 
-// Tuần bắt đầu Thứ 2 như Lịch & Studio / Bàn Trainer / app talent (bố cục 18/10 — trước lịch brand là lịch duy nhất bắt đầu Chủ Nhật).
+// Tuần bắt đầu Thứ 2 như Lịch & Studio / Điều Phối Lịch Live / app talent (bố cục 18/10 — trước lịch brand là lịch duy nhất bắt đầu Chủ Nhật).
 const WEEKDAY_LABELS = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
 const WEEKEND_COLUMNS = [5, 6];
 

@@ -1,5 +1,5 @@
-import { LiveSessionReport } from "../types";
-import { MINUTE_PRESETS, parseCount } from "../lib/handover";
+import { EarlyLeaveReason, LiveSessionReport } from "../types";
+import { EARLY_REASON_LABEL, MINUTE_PRESETS, parseCount } from "../lib/handover";
 
 // Phần "Ca này có gì?" của Giao ca — dùng chung cho ca TikTok (sau khi up file) và ca Shopee (sau 3 số). Mặc định là
 // "Đúng giờ, không sự cố" (Working File T8–T9: ô sự cố trống 76–100%, không phân biệt được "không có" với "quên ghi").
@@ -12,6 +12,8 @@ export interface IncidentState {
   otMinutes: number;
   earlyMinutes: number;
   restarts: number;
+  /** Lý do off sớm (0180) — Điều Phối Lịch Live tách phần giờ mất vì bán kém khỏi sự cố/người/brand. */
+  earlyReason: EarlyLeaveReason | null;
   note: string;
 }
 
@@ -21,7 +23,7 @@ export function incidentsFromReport(r: LiveSessionReport | undefined): IncidentS
   if (r?.earlyLeaveMinutes) on.push("early");
   if (r?.restartCount) on.push("restart");
   if (r?.hostLate) on.push("late");
-  return { on, otMinutes: r?.otMinutes || 30, earlyMinutes: r?.earlyLeaveMinutes || 30, restarts: r?.restartCount || 1, note: r?.statusNote ?? "" };
+  return { on, otMinutes: r?.otMinutes || 30, earlyMinutes: r?.earlyLeaveMinutes || 30, restarts: r?.restartCount || 1, earlyReason: r?.earlyLeaveReason ?? null, note: r?.statusNote ?? "" };
 }
 
 /** Giá trị gửi RPC: sự cố không chọn thì 0/false dù ô phút còn số cũ. */
@@ -29,6 +31,7 @@ export function incidentValues(v: IncidentState) {
   return {
     otMinutes: v.on.includes("ot") ? v.otMinutes : 0,
     earlyLeaveMinutes: v.on.includes("early") ? v.earlyMinutes : 0,
+    earlyLeaveReason: v.on.includes("early") ? v.earlyReason : null,
     restartCount: v.on.includes("restart") ? v.restarts : 0,
     hostLate: v.on.includes("late"),
     statusNote: v.note.trim()
@@ -79,6 +82,22 @@ export function HandoverIncidents({ value, onChange, label }: { value: IncidentS
           </div>
         );
       })}
+      {value.on.includes("early") && (
+        <div className="flex flex-wrap items-center gap-1.5 text-xs" role="group" aria-label="Lý do off sớm">
+          <span className="font-bold text-[var(--text-muted)] w-14">Vì sao</span>
+          {(Object.keys(EARLY_REASON_LABEL) as EarlyLeaveReason[]).map((k) => (
+            <button
+              key={k}
+              type="button"
+              aria-pressed={value.earlyReason === k}
+              onClick={() => onChange({ ...value, earlyReason: value.earlyReason === k ? null : k })}
+              className={`min-h-8 px-2.5 rounded-lg border font-bold ${value.earlyReason === k ? "seg-on" : "border-[var(--border)] text-[var(--text-muted)]"}`}
+            >
+              {EARLY_REASON_LABEL[k]}
+            </button>
+          ))}
+        </div>
+      )}
       {value.on.includes("restart") && (
         <div className="flex items-center gap-1.5 text-xs">
           <span className="font-bold text-[var(--text-muted)] w-14">Restart</span>

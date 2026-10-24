@@ -11,7 +11,13 @@ export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
     key: "manage_sessions",
     label: "Kế hoạch, ca và số liệu",
     category: "Vận hành",
-    description: "Mở Dashboard, Kế Hoạch Tháng, Sổ Ca, Hiệu Suất Host và Toàn Cảnh Brand (gồm phát hành Report Tháng)."
+    description: "Mở Dashboard, Sổ Ca, Hiệu Suất Host và Toàn Cảnh Brand (gồm phát hành Report Tháng)."
+  },
+  {
+    key: "manage_month_plan",
+    label: "Kế Hoạch Tháng",
+    category: "Vận hành",
+    description: "Mở Kế Hoạch Tháng: nhập cam kết tháng, lập lưới ca + target, chốt kế hoạch để mở ca chờ đăng ký."
   },
   {
     key: "manage_calendar",
@@ -21,9 +27,9 @@ export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
   },
   {
     key: "manage_roster",
-    label: "Bàn Trainer",
+    label: "Điều Phối Lịch Live",
     category: "Nhân sự",
-    description: "Mở Bàn Trainer: đặt hạn đăng ký ca theo tuần, xếp nháp host/trợ cho ca, kiểm luật giờ làm, công bố lịch tuần, đổi người/dời ca có ghi lý do."
+    description: "Mở Điều Phối Lịch Live: giờ cam kết + giờ phòng hờ từng kênh, mở lịch tháng sau, hạn đăng ký theo tháng, xếp nháp host/trợ, kiểm luật giờ làm, công bố lịch tuần, đổi người/dời ca có ghi lý do."
   },
   {
     key: "manage_talents",

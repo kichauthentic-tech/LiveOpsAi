@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Check, Circle, Clock3 } from "lucide-react";
 import type { Brand, LiveSession, ShiftRegistration, ShiftSlot } from "../types";
 import { addDays, getTodayDate, isoWeekStart } from "../lib/dateUtils";
-import { fetchRosterWeeks, type RosterWeek } from "../lib/db/roster";
+import { fetchRosterMonths, fetchRosterWeeks, signupDeadlineOf, type RosterMonth, type RosterWeek } from "../lib/db/roster";
 import { fmtDateVn, fmtNum } from "../lib/format";
 import { DAY_PART_LABEL, dayPartOf, openSlotsFrom, slotHours, type DayPart } from "../lib/talent/myShifts";
 import { BrandLogo } from "./ui/BrandLogo";
@@ -49,18 +49,23 @@ export default function TalentShiftSignup({ brands, shiftSlots, shiftRegistratio
   const today = getTodayDate();
   const [busy, setBusy] = useState<string | null>(null);
   const brandById = useMemo(() => new Map(brands.map((b) => [b.id, b])), [brands]);
-  // Hạn báo rảnh theo tuần do trainer đặt (0176). Qua hạn thì DB chặn — màn khoá ô trước cho khỏi bấm vô ích. Chưa chạy 0176 ⇒ không có hạn.
+  // Hạn đăng ký do trainer đặt: theo THÁNG (0180, 24/10) — hạn tuần cũ (0176) vẫn xét nếu còn dòng. Qua hạn thì DB chặn — màn khoá ô
+  // trước cho khỏi bấm vô ích. Chưa chạy migration ⇒ không có hạn.
   const [weeks, setWeeks] = useState<RosterWeek[]>([]);
+  const [rosterMonths, setRosterMonths] = useState<RosterMonth[]>([]);
   useEffect(() => {
     let cancelled = false;
     fetchRosterWeeks(isoWeekStart(today))
       .then((w) => !cancelled && setWeeks(w))
       .catch(() => undefined);
+    fetchRosterMonths(today.slice(0, 7))
+      .then((m) => !cancelled && setRosterMonths(m))
+      .catch(() => undefined);
     return () => {
       cancelled = true;
     };
   }, [today]);
-  const deadlineOf = (date: string) => weeks.find((w) => w.weekStart === isoWeekStart(date))?.signupDeadline;
+  const deadlineOf = (date: string) => signupDeadlineOf(date, rosterMonths, weeks, isoWeekStart);
   const closed = (date: string) => {
     const d = deadlineOf(date);
     return !!d && new Date(d) <= new Date();
@@ -105,7 +110,8 @@ export default function TalentShiftSignup({ brands, shiftSlots, shiftRegistratio
 
   const registeredInMonth = inMonth.filter((s) => mineBySlot.has(s.id));
   const bulkTargets = shown.filter((s) => !mineBySlot.has(s.id) && !closed(s.date));
-  const deadlines = [...new Set(monthWeeks.filter((ws) => weekPick === "all" || ws === weekPick).map((ws) => deadlineOf(ws)).filter((d): d is string => !!d))].sort();
+  // Theo NGÀY của ca (không theo thứ Hai đầu tuần): tuần 27/10–02/11 có thứ Hai thuộc tháng trước, hạn tháng phải lấy theo tháng của ca.
+  const deadlines = [...new Set(inMonth.filter(byWeek).map((s) => deadlineOf(s.date)).filter((d): d is string => !!d))].sort();
   const nextDeadline = deadlines.find((d) => new Date(d) > new Date());
   const filtered = weekPick !== "all" || part !== "all" || brandFilter !== "all" || onlyTodo;
 

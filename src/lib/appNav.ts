@@ -123,12 +123,12 @@ export function agencyNavGroups(currentRole: UserRole): NavGroup[] {
             label: "Kế hoạch",
             items: [
               // Kế Hoạch Tháng (0090) — lập lưới ca + target trước khi mở đăng ký; chốt là ca đổ xuống Bảng Vận Hành
-              // (ca chờ đăng ký). Chỉ ops (manage_sessions = ceo/admin/operations). Màn "Nhân sự ca" đã bỏ 08/10: chốt Host + Trợ live
+              // (ca chờ đăng ký). Quyền riêng manage_month_plan (0180, 24/10) = ceo/admin/operations/trainer. Màn "Nhân sự ca" đã bỏ 08/10: chốt Host + Trợ live
               // ở Bảng Vận Hành (bấm dòng ca chưa có người), việc lập kế hoạch tồn đọng nằm ở khối cuối Bảng Vận Hành.
-              { id: "month_plan", label: "Kế Hoạch Tháng", icon: CalendarRange, perm: "manage_sessions" as PermissionKey },
-              // Bàn Trainer (0176, 13/10): người quản lý nhân sự live xếp lịch TUẦN — hạn đăng ký, nháp người cho ca mở, kiểm luật
+              { id: "month_plan", label: "Kế Hoạch Tháng", icon: CalendarRange, perm: "manage_month_plan" as PermissionKey },
+              // Điều Phối Lịch Live (0176, 13/10): người quản lý nhân sự live xếp lịch TUẦN — hạn đăng ký, nháp người cho ca mở, kiểm luật
               // giờ làm, công bố tuần (mỗi người một tin), đổi người/dời ca sau công bố có lý do. Role trainer mở vào đây.
-              { id: "roster", label: "Bàn Trainer", icon: ClipboardList, perm: "manage_roster" as PermissionKey }
+              { id: "roster", label: "Điều Phối Lịch Live", icon: ClipboardList, perm: "manage_roster" as PermissionKey }
             ]
           },
           {

@@ -1,4 +1,4 @@
-// Bàn Trainer (13/10): luật lịch tuần, độ quen kênh, gợi ý người, chi phí, tự lấp chỗ trống, giảm chi phí trên nháp.
+// Điều Phối Lịch Live (13/10): luật lịch tuần, độ quen kênh, gợi ý người, chi phí, tự lấp chỗ trống, giảm chi phí trên nháp.
 // Tình huống lấy từ lịch thật T10: T.Toàn 51,5 giờ tuần 12/10, trùng ca CROCS/JOCKEY 14/10, tan 23:30 rồi vào 9:00 sáng.
 // Chạy: npx vitest run tests/roster.test.ts
 import { describe, expect, test, vi } from "vitest";

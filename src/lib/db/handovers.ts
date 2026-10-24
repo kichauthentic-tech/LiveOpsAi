@@ -1,5 +1,5 @@
 import { supabase } from "../supabaseClient";
-import { LiveSession } from "../../types";
+import { EarlyLeaveReason, LiveSession } from "../../types";
 import { fetchSessionById } from "./sessions";
 import type { SnapshotRoomRow } from "../liveSnapshot/extractRooms";
 
@@ -10,15 +10,17 @@ import type { SnapshotRoomRow } from "../liveSnapshot/extractRooms";
  *  DB từ chối khi ca chưa có file. */
 export async function submitFileHandover(
   sessionId: string,
-  v: { otMinutes: number; earlyLeaveMinutes: number; restartCount: number; hostLate: boolean; statusNote: string }
+  v: { otMinutes: number; earlyLeaveMinutes: number; earlyLeaveReason?: EarlyLeaveReason | null; restartCount: number; hostLate: boolean; statusNote: string }
 ): Promise<LiveSession> {
+  // p_early_leave_reason (0180) chỉ gửi khi có — DB chưa chạy 0180 vẫn nhận lời gọi 6 tham số như cũ.
   const { error } = await supabase.rpc("submit_file_handover", {
     p_session_id: sessionId,
     p_ot_minutes: v.otMinutes,
     p_early_leave_minutes: v.earlyLeaveMinutes,
     p_restart_count: v.restartCount,
     p_host_late: v.hostLate,
-    p_status_note: v.statusNote
+    p_status_note: v.statusNote,
+    ...(v.earlyLeaveMinutes > 0 && v.earlyLeaveReason ? { p_early_leave_reason: v.earlyLeaveReason } : {})
   });
   if (error) throw error;
   return fetchSessionById(sessionId);

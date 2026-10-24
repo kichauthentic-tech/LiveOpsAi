@@ -1,8 +1,8 @@
 // Cam kết hợp đồng (src/lib/performance/brandCommitment.ts) — 247 dòng thuần, chưa test nào chạm tới
 // (đo 2026-10-01). Module này nuôi 3 màn: Kế Hoạch Tháng + Toàn Cảnh Brand (agency), bản chỉ-đọc cho brand
 // (BrandCommitmentView), và cột "Cam kết" của Toàn Cảnh Brand — cộng thêm khối "cần mở thêm bao nhiêu
-// giờ" trên màn Đăng Ký & Chốt Lịch. Đây là giờ dùng để TÍNH TIỀN brand (file tự ghi: "cam kết hợp đồng
-// và hoá đơn phải đếm CÙNG một loại giờ"), nên sai ở đây là sai hoá đơn hoặc sai số giờ giao cho khách.
+// giờ" trên màn Đăng Ký & Chốt Lịch. Từ 24/10 cam kết đếm GIỜ LIVE THẬT (hoá đơn vẫn theo giờ lịch — xem đầu module),
+// sai ở đây là sai số giờ giao cho khách.
 import { expect, test } from "vitest";
 import {
   contractCovering,
@@ -15,9 +15,11 @@ import {
   elapsedFractionOf,
   isDelivered,
   isScheduled,
+  liveHoursOf,
   monthKeyOf,
   openSlotHoursByBrand,
-  plannedHoursOf
+  plannedHoursOf,
+  realLiveHoursOf
 } from "../src/lib/performance/brandCommitment";
 import { BrandContract, BrandMonthlyCommitment, LiveSession, ShiftSlot } from "../src/types";
 
@@ -121,14 +123,27 @@ test("'Live Now' tính là ĐÃ GIAO, 'Upcoming' tính là ĐÃ XẾP", () => {
   expect(isScheduled(ses("c", "2026-10-05", "09:00", "11:00", "Upcoming"))).toBe(true);
 });
 
-test("giờ cam kết là giờ CA THEO LỊCH, không phải giờ live thật", () => {
-  // Đúng quyết định ghi ở đầu module: cam kết và hoá đơn phải đếm cùng một loại giờ.
+test("giờ cam kết là giờ LIVE THẬT (user chốt 24/10), giờ lịch giữ để đối chiếu", () => {
   const s = ses("a", "2026-10-05", "09:00", "11:00", "Completed", { liveDurationMinutes: 45 });
   expect(plannedHoursOf(s)).toBe(2);
   const p = computeCommitmentProgress(commit(B1, 10), "CROCS", [s], "2026-10-20");
-  expect(p.deliveredHours).toBe(2); // 2h theo lịch
-  expect(p.actualLiveHours).toBe(0.75); // 45 phút thật — chỉ để cảnh báo
+  expect(p.deliveredHours).toBe(0.75); // tắt sớm: chỉ 45 phút được tính
+  expect(p.deliveredPlannedHours).toBe(2);
+  expect(p.deliveredEstimatedSessions).toBe(0);
+  expect(p.actualLiveHours).toBe(0.75);
   expect(p.sessionsWithRealHours).toBe(1);
+  expect(p.gapHours).toBe(9.25);
+});
+
+test("giờ live: ca chưa có giờ thật tính theo lịch, OT hợp lý được tính, OT quá 3 giờ lấy giờ lịch, ca nạp bù = giờ lịch", () => {
+  expect(realLiveHoursOf(ses("a", "2026-10-05", "09:00", "11:00", "Completed"))).toBeNull();
+  expect(liveHoursOf(ses("a", "2026-10-05", "09:00", "11:00", "Completed"))).toBe(2);
+  expect(liveHoursOf(ses("b", "2026-10-05", "09:00", "11:00", "Completed", { liveDurationMinutes: 135 }))).toBe(2.25);
+  expect(liveHoursOf(ses("c", "2026-10-05", "09:00", "11:00", "Completed", { liveDurationMinutes: 320 }))).toBe(2);
+  expect(liveHoursOf(ses("d", "2026-10-05", "09:00", "11:00", "Completed", { isBackfill: true, liveDurationMinutes: 90 }))).toBe(2);
+  const p = computeCommitmentProgress(commit(B1, 10), "CROCS", [ses("a", "2026-10-05", "09:00", "11:00", "Completed", { actualGmv: 5 })], "2026-10-20");
+  expect(p.deliveredHours).toBe(2);
+  expect(p.deliveredEstimatedSessions).toBe(1);
 });
 
 // ── computeCommitmentProgress ─────────────────────────────────────────────────────────────────────

@@ -29,8 +29,10 @@ export type PermissionKey =
   | "manage_crm_projects"
   | "manage_tiktok_api"
   | "manage_users_permissions"
-  // Bàn Trainer (0176): xếp nháp người cho ca, hạn đăng ký, công bố tuần.
-  | "manage_roster";
+  // Điều Phối Lịch Live (0176): xếp nháp người cho ca, hạn đăng ký, công bố tuần.
+  | "manage_roster"
+  // Kế Hoạch Tháng (0180, 24/10): tách khỏi manage_sessions để role trainer lập + chốt kế hoạch mà không mở Dashboard/Sổ Ca.
+  | "manage_month_plan";
 
 export interface PermissionDefinition {
   key: PermissionKey;
@@ -275,6 +277,9 @@ export interface LiveSession {
 // Report số liệu vận hành theo ca — đối chiếu file Excel thật (YFB Working File 2026), sidecar
 // 1-1 với LiveSession (migration 0046). Field chung mọi platform luôn có; field theo platform
 // (tiktok*/shopee*) chỉ điền đúng platform tương ứng của session, còn lại để trống.
+/** Lý do off sớm (0180, CHECK ở live_session_reports.early_leave_reason). Nhãn ở lib/handover.ts `EARLY_REASON_LABEL`. */
+export type EarlyLeaveReason = "low_sales" | "technical" | "staff" | "brand" | "other";
+
 export interface LiveSessionReport {
   sessionId: string;
   restartCount: number;
@@ -285,6 +290,8 @@ export interface LiveSessionReport {
   // cảnh báo lệch giờ, không ghi đè).
   otMinutes: number;
   earlyLeaveMinutes: number;
+  /** Lý do off sớm khai lúc giao ca (0180) — chỉ có khi earlyLeaveMinutes > 0. */
+  earlyLeaveReason?: EarlyLeaveReason;
   statusNote: string;
   gmvTotal?: number; // cột "GMV" riêng trong Excel, khác actualGmv ("GMV Live")
   dashboardLink1?: string;

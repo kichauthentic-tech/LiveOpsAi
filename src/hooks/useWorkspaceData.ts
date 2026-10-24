@@ -473,10 +473,10 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
     // ops dùng) đã tách xuống effect riêng bên dưới đúng vì lý do đó.
   }, [authUserId]);
 
-  // Tham số engine gợi ý lịch — chỉ màn Kế Hoạch Tháng / Hỗ Trợ Vận Hành dùng (ops). Khoá ở
-  // ceo/operations/admin trong 0105, nên role khác gọi cũng chỉ nhận về rỗng.
+  // Tham số engine gợi ý lịch — màn Kế Hoạch Tháng / Hỗ Trợ Vận Hành / Điều Phối Lịch Live dùng. Đọc được: ceo/operations/admin
+  // (0105) + trainer (0176); role khác gọi cũng chỉ nhận về rỗng.
   useEffect(() => {
-    if (!authUserId || !isOpsRole) return;
+    if (!authUserId || !(isOpsRole || currentRole === "trainer")) return;
     let cancelled = false;
     setEngineParamsLoading(true);
     fetchEngineParams()
@@ -486,7 +486,7 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
     return () => {
       cancelled = true;
     };
-  }, [authUserId, isOpsRole]);
+  }, [authUserId, isOpsRole, currentRole]);
 
   useEffect(() => {
     if (!authUserId) return;

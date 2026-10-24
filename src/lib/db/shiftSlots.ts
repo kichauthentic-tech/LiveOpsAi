@@ -100,7 +100,7 @@ export async function deleteShiftSlot(id: string): Promise<void> {
   assertAffected(data, "xoá ca chờ đăng ký");
 }
 
-/** Dời ngày/giờ một ca CÒN MỞ (chưa chốt người) — Bàn Trainer. Ca đã chốt thì dời qua RPC roster_move_session (có lý do). */
+/** Dời ngày/giờ một ca CÒN MỞ (chưa chốt người) — Điều Phối Lịch Live. Ca đã chốt thì dời qua RPC roster_move_session (có lý do). */
 export async function updateOpenSlotTime(id: string, v: { date: string; startTime: string; endTime: string }): Promise<ShiftSlot> {
   const { data, error } = await supabase
     .from("shift_slots")

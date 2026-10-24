@@ -11,7 +11,7 @@ import { dayLabel } from "./ShiftPanel";
 import type { RosterChange } from "../../lib/db/roster";
 import type { LiveSession } from "../../types";
 
-// Các tab con của Bàn Trainer. Chỉ vẽ + gọi callback; ghi DB ở RosterBoard.
+// Các tab con của Điều Phối Lịch Live. Chỉ vẽ + gọi callback; ghi DB ở RosterBoard.
 
 export interface ChannelRow {
   key: string;
@@ -547,7 +547,7 @@ export const ChangeLogPanel: React.FC<{ changes: RosterChange[] | null; sessions
   return (
     <section className="space-y-2 border-t border-[var(--border)] pt-4">
       <h4 className="text-sm font-black text-[var(--text)]">Nhật ký đổi lịch (30 ngày)</h4>
-      <p className="text-xs text-[var(--text-muted)]">Mỗi lần đổi người / dời giờ một ca đã lên lịch từ Bàn Trainer, kèm lý do. Đổi ở màn khác (Lịch & Studio, Cửa sổ Ca Live) không ghi vào đây.</p>
+      <p className="text-xs text-[var(--text-muted)]">Mỗi lần đổi người / dời giờ một ca đã lên lịch từ Điều Phối Lịch Live, kèm lý do. Đổi ở màn khác (Lịch & Studio, Cửa sổ Ca Live) không ghi vào đây.</p>
       {changes === null && <p className="text-xs text-[var(--text-muted)]">Đang tải…</p>}
       {changes && changes.length === 0 && <p className="text-xs text-[var(--text-muted)]">Chưa có lần đổi nào.</p>}
       {changes && changes.length > 0 && (

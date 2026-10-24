@@ -13,7 +13,7 @@ import {
   type RosterShift
 } from "./rules";
 
-// Bàn Trainer — ai hợp cho một ca. KHÔNG xếp theo GMV/giờ của host: đo 13/10 trên 1.197 ca, sau khi trừ kênh/khung giờ/camp host chỉ
+// Điều Phối Lịch Live — ai hợp cho một ca. KHÔNG xếp theo GMV/giờ của host: đo 13/10 trên 1.197 ca, sau khi trừ kênh/khung giờ/camp host chỉ
 // chênh ~±5%, xếp lại host theo thành tích tháng trước được +0,7% / −0,3% / +0,4% GMV (T8/T9/T10) và thành tích không lặp lại
 // tháng sau (r = 0,23 / −0,09 / −0,13). Thứ tự gợi ý dựa vào thứ trainer kiểm soát được: người đã báo rảnh, quen kênh, giờ tuần
 // còn thấp, không phạm luật nghỉ — và chi phí khi trainer chọn "Chi phí thấp".

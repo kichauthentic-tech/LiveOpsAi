@@ -3,6 +3,7 @@ import { assertOnePlatform } from "./platforms/perf";
 import { SnapshotCounters, SnapshotRatios, computeSnapshotRatios } from "./liveSnapshot/metrics";
 import { dataQuality, DataQuality, isCountable, sessionHours } from "./performance/hostPerformance";
 import { dataSourceTier } from "./dataSource";
+import { EARLY_REASON_LABEL } from "./handover";
 
 // Sổ Ca (2026-09-19): nhìn theo TỪNG CA đã/đang chạy — số thật của ca, số đó tin được tới đâu,
 // và còn thiếu bước nào để chốt tháng. Thay cho Live Sessions Hub (màn demo: chart phút/checklist/
@@ -234,6 +235,6 @@ export function sessionIncidents(s: LiveSession): SessionIncident[] {
   if (r.crossLive) out.push({ key: "crossLive", label: "Cross-live", internal: false });
   if (r.hostLate) out.push({ key: "hostLate", label: "Host trễ", internal: true });
   if (r.otMinutes > 0) out.push({ key: "ot", label: `OT ${r.otMinutes}'`, internal: true });
-  if (r.earlyLeaveMinutes > 0) out.push({ key: "earlyLeave", label: `Off sớm ${r.earlyLeaveMinutes}'`, internal: true });
+  if (r.earlyLeaveMinutes > 0) out.push({ key: "earlyLeave", label: `Off sớm ${r.earlyLeaveMinutes}'${r.earlyLeaveReason ? ` · ${EARLY_REASON_LABEL[r.earlyLeaveReason]}` : ""}`, internal: true });
   return out;
 }

@@ -21,7 +21,6 @@ import {
   rosterReassign,
   saveRosterDraft,
   saveRosterDrafts,
-  setRosterDeadline,
   updateRosterRules,
   type RosterChange,
   type RosterDraft,
@@ -31,10 +30,15 @@ import { analyzeRoster, buildRosterShifts, channelKeyOf, shiftHours, DEFAULT_ROS
 import { autofillWeek, buildFamiliarity, famOf, planCostCut, shiftCost, type CostMove, type RankContext, type RankMode } from "../lib/roster/candidates";
 import { ShiftPanel, dayLabel } from "./roster/ShiftPanel";
 import { AbsencePanel, ChangeLogPanel, ChecksPanel, HoursCostPanel, MatrixPanel, RulesPanel, WeekGrid, type ChannelRow } from "./roster/panels";
+import { NextDesk, NowDesk } from "./roster/MonthDesk";
+import type { EngineParams } from "../lib/scheduling/engineParams";
+import type { ReportPlatform } from "../lib/reportPlatform";
 
-// Bàn Trainer (0175/0176, 13/10). Quy trình tuần user chốt: Kế Hoạch Tháng chốt ⇒ ca mở → trainer đặt HẠN ĐĂNG KÝ → host/trợ báo rảnh
+// Điều Phối Lịch Live (0175/0176, 13/10). Quy trình tuần user chốt: Kế Hoạch Tháng chốt ⇒ ca mở → trainer đặt HẠN ĐĂNG KÝ → host/trợ báo rảnh
 // (tab Đăng Ký Ca) → trainer xếp NHÁP ở đây (talent/brand không thấy) → "Công bố tuần": chốt cả tuần trong một transaction, mỗi người
 // một tin. Sau công bố, đổi người / dời giờ phải có lý do (nhật ký roster_changes). Quá 48 giờ/tuần là luật chặn; còn lại cảnh báo.
+// Đợt 1 (24/10, đổi tên từ Bàn Trainer): thêm hai chế độ theo tháng trước lưới tuần — "Tháng này" (giờ live thật so cam kết, hao hụt,
+// việc nên làm) và "Tháng sau" (mọi kênh × 6 bước mở lịch, giờ cần mở theo hao hụt kênh). Vẽ ở roster/MonthDesk.tsx.
 
 interface Props {
   sessions: LiveSession[];
@@ -55,7 +59,27 @@ interface Props {
   onScheduleChanged: () => Promise<void>;
   onSessionUpdated: (s: LiveSession) => void;
   onSlotUpdated: (s: ShiftSlot) => void;
+  engineParams: EngineParams;
+  onOpenMonthPlan?: (brandId: string, platform: ReportPlatform) => void;
+  onOpenCrm?: (brandId: string, platform: ReportPlatform) => void;
+  /** Quyền manage_month_plan (0180) — nút mở Kế Hoạch Tháng ở tab Tháng sau. */
+  canOpenMonthPlan?: boolean;
 }
+
+type View = "now" | "next" | "week";
+const VIEWS: { id: View; label: string }[] = [
+  { id: "now", label: "Tháng này" },
+  { id: "next", label: "Tháng sau" },
+  { id: "week", label: "Tuần" }
+];
+const loadView = (): View => {
+  try {
+    const v = localStorage.getItem("roster.view");
+    return v === "next" || v === "week" ? v : "now";
+  } catch {
+    return "now";
+  }
+};
 
 type Tab = "grid" | "checks" | "absence" | "matrix" | "hours" | "rules";
 const TABS: { id: Tab; label: string }[] = [
@@ -88,6 +112,15 @@ export const RosterBoard: React.FC<Props> = (p) => {
   const canWrite = STAFF.includes(p.currentRole);
   const [weekStart, setWeekStart] = useState(() => isoWeekStart(addDays(getTodayDate(), 7)));
   const [tab, setTab] = useState<Tab>("grid");
+  const [view, setViewState] = useState<View>(loadView);
+  const setView = (v: View) => {
+    setViewState(v);
+    try {
+      localStorage.setItem("roster.view", v);
+    } catch {
+      /* nhớ chế độ chỉ là tiện ích */
+    }
+  };
   const [mode, setMode] = useState<RankMode>(loadMode);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -98,7 +131,6 @@ export const RosterBoard: React.FC<Props> = (p) => {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [costLimit, setCostLimit] = useState(10);
   const [costPlan, setCostPlan] = useState<{ moves: CostMove[]; save: number; shifts: RosterShift[] } | null>(null);
-  // Ô hạn đăng ký: giá trị đang gõ của đúng tuần đang xem; chưa gõ thì lấy hạn đã lưu, chưa có hạn thì gợi ý 17:00 thứ Năm tuần trước.
   const [changes, setChanges] = useState<RosterChange[] | null>(null);
   const [changesNonce, setChangesNonce] = useState(0);
   useEffect(() => {
@@ -111,7 +143,6 @@ export const RosterBoard: React.FC<Props> = (p) => {
       cancelled = true;
     };
   }, [tab, changesNonce]);
-  const [deadlineEdit, setDeadlineEdit] = useState<{ week: string; date?: string; time?: string } | null>(null);
 
   const applyRosterError = useCallback((e: unknown) => {
     if (isRosterBackendMissing(e)) setBackendMissing(true);
@@ -145,14 +176,6 @@ export const RosterBoard: React.FC<Props> = (p) => {
   const readOnly = !canWrite || backendMissing;
   const weekEnd = addDays(weekStart, 6);
   const week = weeks.find((w) => w.weekStart === weekStart);
-  const saved = week?.signupDeadline ? new Date(week.signupDeadline) : null;
-  const savedDate = saved ? `${saved.getFullYear()}-${String(saved.getMonth() + 1).padStart(2, "0")}-${String(saved.getDate()).padStart(2, "0")}` : addDays(weekStart, -4);
-  const savedTime = saved ? `${String(saved.getHours()).padStart(2, "0")}:${String(saved.getMinutes()).padStart(2, "0")}` : "17:00";
-  const edit = deadlineEdit?.week === weekStart ? deadlineEdit : null;
-  const deadlineDate = edit?.date ?? savedDate;
-  const deadlineTime = edit?.time ?? savedTime;
-  const setDeadlineDate = (v: string) => setDeadlineEdit({ week: weekStart, date: v, time: edit?.time });
-  const setDeadlineTime = (v: string) => setDeadlineEdit({ week: weekStart, date: edit?.date, time: v });
   const goWeek = (delta: number) => {
     setWeekStart(addDays(weekStart, delta));
     setSelectedKey(null);
@@ -324,16 +347,6 @@ export const RosterBoard: React.FC<Props> = (p) => {
       setCostPlan(null);
     });
 
-  const saveDeadline = (clear = false) =>
-    run(async () => {
-      const iso = clear ? null : new Date(`${deadlineDate}T${deadlineTime}:00`).toISOString();
-      if (iso && new Date(iso) <= new Date() && !(await confirm("Hạn này đã qua — talent sẽ không báo rảnh được nữa cho tuần này. Vẫn đặt?"))) return;
-      const n = await setRosterDeadline(weekStart, iso);
-      await reloadRoster();
-      setDeadlineEdit(null);
-      showToast(clear ? "Đã bỏ hạn đăng ký" : `Đã đặt hạn ${fmtDeadline(iso!)}${n > 0 ? ` — đã báo ${n} host/trợ` : ""}`);
-    });
-
   const publish = () =>
     run(async () => {
       const holes = openShifts.filter((s) => !s.hostId).length;
@@ -352,7 +365,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
     });
 
   // Tin Zalo cho nhóm host/trợ (app talent bản 2, 16/10): ca ĐÃ CHỐT của tuần đang xem theo từng người + link vào thẳng "Ca của
-  // tôi" để bấm "Đã xem". Không cần đã công bố qua Bàn Trainer — lịch xếp từ Google Sheet (ca thật) cũng chép được.
+  // tôi" để bấm "Đã xem". Không cần đã công bố qua Điều Phối Lịch Live — lịch xếp từ Google Sheet (ca thật) cũng chép được.
   const copyZalo = async () => {
     const text = weekScheduleMessage(p.sessions, weekStart, weekEnd, p.talents, `${window.location.origin}/ca-cua-toi`);
     try {
@@ -380,16 +393,24 @@ export const RosterBoard: React.FC<Props> = (p) => {
     }
   };
 
-  const deadlinePassed = !!week?.signupDeadline && new Date(week.signupDeadline) <= new Date();
 
   return (
     <div className="space-y-4">
       <PageHeader
         icon={ClipboardList}
-        title="Bàn Trainer"
-        description="Xếp người cho lịch tuần: đặt hạn đăng ký, xếp nháp host/trợ cho ca mở (gợi ý theo người đã báo rảnh, quen kênh, giờ tuần, luật nghỉ, chi phí), kiểm luật, rồi công bố cả tuần một lần."
+        title="Điều Phối Lịch Live"
+        description="Lịch live của mọi brand: giữ đủ giờ cam kết (tính cả giờ phòng hờ), mở lịch tháng sau theo cam kết, xếp người và công bố lịch tuần."
         actions={
           <>
+            <div className="flex items-center rounded-xl border border-[var(--border)] bg-[var(--surface-base)] p-1 text-xs font-bold" role="tablist" aria-label="Chế độ xem">
+              {VIEWS.map((v) => (
+                <button key={v.id} type="button" role="tab" aria-selected={view === v.id} onClick={() => setView(v.id)} className={`px-3 py-1.5 rounded-lg ${view === v.id ? "seg-on" : "text-[var(--text-muted)]"}`}>
+                  {v.label}
+                </button>
+              ))}
+            </div>
+            {view === "week" && (
+            <>
             <div className="flex items-center gap-1 rounded-xl border border-[var(--border)] bg-[var(--surface-base)] p-1">
               <button type="button" onClick={() => goWeek(-7)} className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text)]" aria-label="Tuần trước">
                 <ChevronLeft className="w-4 h-4" />
@@ -422,11 +443,14 @@ export const RosterBoard: React.FC<Props> = (p) => {
             <button type="button" disabled={readOnly || busy || blocks.length > 0 || draftedCount === 0} onClick={publish} title={blocks.length > 0 ? "Còn lỗi chặn — xem tab Kiểm lịch" : draftedCount === 0 ? "Chưa có ca nháp nào" : undefined} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--accent)] text-white text-xs font-black disabled:opacity-40">
               <Send className="w-4 h-4" /> Công bố tuần
             </button>
+            </>
+            )}
           </>
         }
       >
         {backendMissing && <p className="text-xs rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-300 px-3 py-2">Chưa chạy migration 0175 + 0176 trên DB: màn chỉ xem được lịch đã có, chưa đặt hạn / xếp nháp / công bố được.</p>}
-        {loadError && <p className="text-xs rounded-lg border border-red-500/30 bg-red-500/10 text-red-300 px-3 py-2">Không tải được dữ liệu Bàn Trainer: {loadError}</p>}
+        {loadError && <p className="text-xs rounded-lg border border-red-500/30 bg-red-500/10 text-red-300 px-3 py-2">Không tải được dữ liệu Điều Phối Lịch Live: {loadError}</p>}
+        {view === "week" && (
         <div className="flex flex-wrap items-end gap-x-4 gap-y-2 text-xs">
           <span className={`px-2 py-1 rounded-full font-bold ${week?.publishedAt ? "bg-emerald-500/15 text-emerald-300" : "bg-sky-500/15 text-sky-300"}`}>
             {week?.publishedAt ? `Đã công bố ${fmtDeadline(week.publishedAt)}` : "Chưa công bố"}
@@ -436,27 +460,37 @@ export const RosterBoard: React.FC<Props> = (p) => {
           </span>
           {!week?.publishedAt && openShifts.length === 0 && <span className="text-[var(--text-muted)]">Tuần này không có ca mở — các ca đã lên lịch từ trước; đổi người / dời ca ở thẻ ca (có ghi lý do).</span>}
           {!week?.publishedAt && openShifts.length > 0 && (
-            <span className="flex flex-wrap items-end gap-2">
-              <label className="flex flex-col gap-0.5 text-[var(--text-muted)]">
-                Hạn đăng ký
-                <span className="flex gap-1">
-                  <input type="date" value={deadlineDate} onChange={(e) => setDeadlineDate(e.target.value)} disabled={readOnly} className="px-2 py-1 rounded-lg bg-[var(--surface-base)] border border-[var(--border)] text-[var(--text)]" />
-                  <input type="time" value={deadlineTime} onChange={(e) => setDeadlineTime(e.target.value)} disabled={readOnly} className="px-2 py-1 rounded-lg bg-[var(--surface-base)] border border-[var(--border)] text-[var(--text)]" />
-                </span>
-              </label>
-              <button type="button" disabled={readOnly || busy || !deadlineDate || !deadlineTime} onClick={() => saveDeadline(false)} className="px-3 py-1.5 rounded-lg border border-[var(--border)] font-bold text-[var(--text)] disabled:opacity-40">
-                {week?.signupDeadline ? "Đổi hạn" : "Đặt hạn + báo talent"}
+            <span className="text-[var(--text-muted)]">
+              Hạn đăng ký đặt một lần cho cả tháng ở{" "}
+              <button type="button" onClick={() => setView("next")} className="font-bold text-[var(--accent-text)] hover:underline">
+                Tháng sau
               </button>
-              {week?.signupDeadline && (
-                <span className={deadlinePassed ? "text-amber-300" : "text-emerald-300"}>
-                  {deadlinePassed ? `Đã đóng đăng ký lúc ${fmtDeadline(week.signupDeadline)}` : `Đang nhận đăng ký tới ${fmtDeadline(week.signupDeadline)}`}
-                </span>
-              )}
+              .
             </span>
           )}
         </div>
+        )}
       </PageHeader>
 
+      {view !== "week" && (() => {
+        const desk = {
+          today: getTodayDate(),
+          sessions: p.sessions,
+          shiftSlots: p.shiftSlots,
+          brands: p.brands,
+          brandChannels: p.brandChannels,
+          engineParams: p.engineParams,
+          currentRole: p.currentRole,
+          onOpenMonthPlan: p.onOpenMonthPlan,
+          onOpenCrm: p.onOpenCrm,
+          canOpenMonthPlan: p.canOpenMonthPlan,
+          canWrite: !readOnly
+        };
+        return view === "now" ? <NowDesk {...desk} /> : <NextDesk {...desk} registrations={p.shiftRegistrations} drafts={drafts} weeks={weeks} />;
+      })()}
+
+      {view === "week" && (
+      <>
       <div className="grid gap-2 grid-cols-2 lg:grid-cols-5">
         {[
           { v: `${wk.length} ca · ${fmtH(wk.reduce((s, x) => s + shiftHours(x), 0))}h`, l: "Lịch tuần (ca thật + ca mở)", tone: "" },
@@ -542,6 +576,8 @@ export const RosterBoard: React.FC<Props> = (p) => {
           onMove={(s, v) => void move(s, v)}
           onRemove={(s) => void remove(s)}
         />
+      )}
+      </>
       )}
     </div>
   );

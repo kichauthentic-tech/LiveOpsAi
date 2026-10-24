@@ -6297,6 +6297,74 @@ dev lúc 08:35 24/10: 84 ca 24–30/10 kèm kỳ vọng `expectedNowById` (Frank
 Có công tắc 3 quyết định, "Giao ca" chỉ đổi trong demo. Bài học khi dựng: chip "chưa nhận lịch" trên dòng hiện 16/22 ca (chưa ai dùng app talent) ⇒ chỉ hiện
 khi lọc; xem thử file ngoài repo bằng cách chép tạm vào gốc repo (Vite phục vụ) rồi xoá — nhớ thêm meta charset/viewport cho bản xem thử.
 
+
+## Điều Phối Lịch Live — audit (2026-10-24)
+
+User: "đổi tên module bàn trainer cho chuyên nghiệp, phù hợp với role hơn; audit + đề xuất tối ưu" — module dùng cùng Kế Hoạch Tháng để mở lịch đăng ký
+tháng sau theo cam kết hợp đồng + cam kết tháng; người dùng lo xếp ca mọi brand, kế hoạch + chi phí mỗi ca tối ưu; cần đo giờ đã mở, GMV đủ target chưa,
+có cần giờ phòng hờ cho ca off sớm vì pfm thấp. Trang: https://claude.ai/artifact/Rjp94U78WQfT1UehDwAPNX (nguồn HTML ở scratchpad phiên, không lưu repo).
+
+**Đổi tên (đã sửa code, chưa commit):** "Bàn Trainer" → "Điều Phối Lịch Live" ở mọi chuỗi/ghi chú (`grep` 29 chỗ); slug `dieu-phoi-lich`, alias `ban-trainer`
+trong `AGENCY_SLUG_TO_TAB`. Giữ id `roster`, role `trainer`, quyền `manage_roster`. tsc sạch, 1.006 test qua; `parsePath` cả hai slug → `roster`.
+
+**Cách đo:** app dev (cổng 3102) + phiên admin sẵn có ở cổng 3100: trong trang 3100 `import('http://localhost:3102/src/lib/supabaseClient.ts')` dùng
+được phiên localStorage của 3100 (cùng key `sb-…-auth-token`) — đọc dữ liệu thật bằng hàm db của bản code mới mà không cần đăng nhập lại.
+
+**Số đo.**
+- T11 (24/10): 0 kế hoạch tháng; cam kết T11 có Franklin Shopee 90 giờ/250M, FUJIWA 180 giờ/450M; 0 ca mở tháng 11; roster_weeks/drafts 0, đăng ký 0;
+  profiles: 0 trainer (admin 1, ceo 1, operations 1, brand 1, talent 40). Mẫu quyền trainer `manage_sessions=false` ⇒ không mở Kế Hoạch Tháng; 0176 chỉ cho
+  trainer ĐỌC brand_month_plans. 368/369 ca T10 không gắn plan_id (nhập sheet). FUJIWA hợp đồng `monthly_gmv=450`, dòng 12/2026 `committed_gmv=450`.
+- Giờ T10 (Dashboard Tổng quan account 24/10, đã live + đã xếp / cam kết): VERA TT 149+55/250 (còn 47), VERA Shopee 151+60/250 (còn 40), Franklin Shopee
+  47+28/90 (còn 15), CROCS 179+70/250 (còn 2), Franklin TT 99+40/120 (vượt 19), JOCKEY TT không cam kết giờ.
+- GMV T10 (cùng nguồn): CROCS dự báo 101% đúng tiến độ; JOCKEY 93% bù được +6 giờ; VERA Shopee 82% (cần 5,8M/giờ, đang 2,7M), Franklin TT 66% (9,6M vs 3,3M),
+  VERA TT 55% (7M vs 1,6M) — không bù kịp (> +30% giờ); Franklin Shopee chưa có dự báo (18% target, 7,3M vs 1,1M).
+- Hao hụt (ca app tạo, không nạp bù, 01–23/10, 753 giờ lịch): huỷ 2,3% + live ngắn hơn lịch 5,0%. Theo kênh (huỷ / ngắn / tổng): CROCS 2,9/1,9/4,8;
+  Franklin Shopee 4,8/11,3/15,6; Franklin TT 2,7/5,8/8,3; JOCKEY 4,4/5,1/9,3; VERA Shopee 0/5,1/5,1; VERA TT 1,8/6,3/8,0. 9 ca huỷ = 26 giờ.
+- Tắt sớm (> 15' ngắn hơn lịch): 29/224 ca có giờ live + GMV, mất 26 giờ; 27 lên đúng giờ xuống sớm (2 ca gián đoạn giữa ca). GMV/giờ live so trung vị kênh:
+  tắt sớm 0,67×, đủ giờ 1,00×; < 0,7× ở 69% ca tắt sớm vs 21% ca còn lại. `computeCommitmentProgress` đếm giờ LỊCH ⇒ giờ tắt sớm vẫn tính đã giao.
+- Chi phí: talent_rate_history 47 dòng / 46 người, 1 dòng khác 0; `talents` rate 0/46. Giá bán/giờ (`brand_platform_rates`): Franklin TT + Shopee 750K,
+  FUJIWA 675K, JOCKEY TT 0, CROCS/VERA không có dòng. T10: 1.058 giờ live, 2.013 giờ-người; ca có trợ 87% (CROCS 99, Franklin 97–100, VERA TT 84,
+  VERA Shopee 75, JOCKEY 68%). Khung giờ T8–T10 không có khung yếu < 0,8× với ≥ 5 ca (không phải đòn bẩy lớn lúc này).
+- Ngoài: công thức shrinkage của WFM (giờ xếp = giờ cần ÷ (1 − hao hụt), chia không cộng; tổng đài 30–35%) — HiveDesk, NICE (link trong trang).
+
+**Đề xuất.** 3 tab: **Tháng sau** (mọi kênh × 6 bước cam kết → kế hoạch → ca mở → đăng ký → xếp → công bố; giờ cần mở theo hao hụt kênh, sàn 3% trần 15%,
+kênh mới = trung bình agency; trainer lập/chốt Kế Hoạch Tháng tại đây) · **Tuần** (lưới hiện có) · **Tháng này** (giờ live + xếp / cam kết, hao hụt,
+dự báo + "nên làm" đọc `accountRow` của Dashboard; chỉ gợi ý thêm giờ khi rescue = save). Chi phí: chi phí người/giờ live, /1M GMV, biên/giờ = giá − chi phí
+(bật khi có rate + giá). Đợt: Đ1 không migration (Tháng này + Tháng sau chỉ đọc), Đ2 migration 0180 (trainer ghi kế hoạch + chốt, hạn đăng ký theo tháng,
+lý do tắt sớm, giờ cam kết theo giờ live thật nếu user chọn), Đ3 chi phí. **Chờ user chốt:** tên; giờ cam kết đếm theo giờ live thật hay giờ lịch; trainer
+lập + chốt Kế Hoạch Tháng hay OP chốt; hạn đăng ký một lần cả tháng hay theo tuần; phòng hờ theo hao hụt kênh hay % cố định.
+
+## Điều Phối Lịch Live đợt 1 (2026-10-24)
+
+User chốt cả 5 điểm theo đề xuất (giữ tên; đếm giờ live thật; trainer lập + chốt kế hoạch; một hạn đăng ký cho cả tháng; phòng hờ theo hao hụt kênh) và
+"làm đợt 1". Chưa commit.
+
+**Đã làm.**
+- `RosterBoard.tsx`: thanh chế độ **Tháng này · Tháng sau · Tuần** (nhớ ở localStorage `roster.view`, mặc định Tháng này); nút tuần/hạn đăng ký/ô số/6 tab
+  con chỉ hiện ở Tuần. Props mới `engineParams`, `onOpenMonthPlan` (= `openMonthPlanFor`), `onOpenCrm` (App).
+- `roster/MonthDesk.tsx`: `NowDesk` (5 ô số + một khối mỗi kênh: trạng thái target từ `accountRow`, thanh giờ live thật + trong lịch + phải xếp thêm, vạch cam
+  kết, hao hụt, "Nên làm" từ `nowActions`) và `NextDesk` (4 ô số + bảng kênh: bước tiếp theo với 6 ô bước, cam kết giờ/GMV (cảnh báo GMV < 1M), hao hụt,
+  cần mở (+phòng hờ), đã mở, target + dự báo của lịch; nút Kế Hoạch Tháng chỉ cho ceo/admin/operations — trainer thấy "OP làm ở Kế Hoạch Tháng" tới đợt 2).
+  Thẻ kênh qua `useChannelCards` (cùng hàm Dashboard), cam kết qua `commitmentsRead`/`contractsRead` + `monthCommitmentOf`, ca = bỏ `excludedFromReports`
+  (đo: VERA TikTok có 14 ca loại khỏi báo cáo = 20 giờ, phần lớn dòng trùng — tính vào thì lệch Dashboard 18 giờ).
+- `lib/roster/monthDesk.ts`: `shrinkSums`, `channelShrinkage`, `hoursToSchedule`, `nowHours`, `nowActions` (thêm giờ vì GMV chỉ khi rescue = save; cannot ⇒ báo
+  brand; lịch dư mà không bù được target ⇒ cân nhắc bỏ ca), `nextRow` (commit → plan/lock → open → signup → staff → publish → done).
+- `brandCommitment.ts`: `deliveredHours` = giờ live thật (`realLiveHoursOf`/`liveHoursOf`), thêm `deliveredPlannedHours`, `deliveredEstimatedSessions`;
+  header đổi lý do. Test cũ "giờ cam kết là giờ CA THEO LỊCH" viết lại.
+- Glossary: mục "Hao hụt · giờ phòng hờ".
+
+**Verify (24/10).** tsc 0 lỗi, ESLint sạch các file đã sửa, vitest 1.014/1.014. App thật: tab cổng 3100 (bản build cũ, đã đăng nhập admin) — xoá `#root`,
+nạp preamble `@react-refresh` của 3102 rồi `import('http://localhost:3102/src/main.tsx')` ⇒ chạy code mới với phiên sẵn có (không cần mật khẩu; tải chậm
+~15s khi pane ẩn). Tháng này: 960 giờ cam kết, 609 giờ live thật (mất 18 giờ tắt sớm), 249 giờ trong lịch, cần xếp thêm 143 giờ (gồm phòng hờ), 4 kênh hụt
+target; VERA TikTok 147 + 55 / 250 (Dashboard cũng 147 sau khi đổi), Franklin TikTok "lịch dư ~11 giờ… cân nhắc bỏ bớt ca", JOCKEY "xếp thêm ~6 giờ là
+dự báo đạt target". Tháng sau: 0/7 kế hoạch, cam kết 270 giờ (Franklin Shopee 90, FUJIWA 180), cần mở 300 (106 + 194). Tuần: lưới cũ không đổi. 375px:
+không tràn ngang. Dashboard "còn X giờ chưa xếp" KHÔNG gồm phòng hờ (48 giờ VERA TikTok) — module "xếp thêm" có phòng hờ (57) — cố ý, nhãn khác nhau.
+
+**Còn lại.** Đợt 2 (migration 0180): RLS cho trainer đọc `brand_monthly_commitments`/`brand_contracts`/`forecast_snapshots` + ghi kế hoạch tháng + gọi
+`lock_month_plan`/rebase; mẫu quyền trainer bật Kế Hoạch Tháng; hạn đăng ký theo THÁNG (thay `roster_weeks.signup_deadline`); lý do tắt sớm ở form giao
+ca. Đợt 3: chi phí người/giờ, /1M GMV, biên/giờ (cần rate ở Talent Pool + giá ở CRM). Câu hỏi mở: tiền brand theo giờ (pnl.ts, Kế Toán) có chuyển sang giờ
+live thật như cam kết không.
+
 ## Bảng Vận Hành theo audit (2026-10-25)
 
 User chốt cả 3 đề xuất của audit 24/10 ("không cảnh báo khi đã có số, gộp việc tháng dưới việc ngày, khối lập kế hoạch sang Cả tháng. Làm vào app như
@@ -6347,3 +6415,41 @@ nhận vì chưa ai dùng app talent). Dòng ca bấm vẫn mở Cửa sổ Ca L
   sau, Key Metrics 5 tab × 3 tháng. Logic `lib/report/brandReport.ts` (test `tests/brandReport.test.ts`), UI `report/BrandPages.tsx`. Sửa lỗi nhóm đối chứng
   khi file shop ngắn hơn tháng (`shopCompareWindow`). Đổi từ ngữ theo bộ từ brand (§5.2). Verify + việc còn mở + quyết định chờ user: lịch sử
   `## Report Tháng 10 trang (2026-10-24)`. Phiên Dashboard song song (App.tsx, AgencyDashboard, accountOverview) đang sửa cùng lúc — không đụng file của nhau.
+
+## Điều Phối Lịch Live đợt 2 (2026-10-24)
+
+User: "làm tiếp đợt 2: migration 0180 cho trainer lập + chốt Kế Hoạch Tháng, đọc cam kết, hạn đăng ký theo tháng, lý do tắt sớm". Chưa commit,
+0180 CHƯA chạy trên DB thật.
+
+**0180 (`supabase/migrations/0180_month_desk.sql`).** (1) `role_permissions.manage_month_plan` = ceo/admin/operations/trainer. (2) Thêm trainer vào 6 policy
+(`brand_month_plans_write_ceo_ops`, `brand_month_plan_slots_write_ceo_ops`, `brand_monthly_commitments_ceo_admin_ops`, `forecast_snapshots_read_staff`,
+`plan_target_audit_read_staff`, `recurring_shift_templates_write_ceo_ops`) + policy mới `brand_contracts_read_trainer` (chỉ đọc). Định nghĩa lấy từ
+`pg_policies` của bản replay 0001→0179. (3) Guard 4 RPC nhận trainer: `lock_month_plan`, `delete_month_plan`, `set_boost_targets`,
+`record_forecast_snapshots` (thay đúng chuỗi guard như 0176; mỗi hàm đúng 1 lần gọi role — đã đếm). Giữ: `rebase_month_plan`/`retarget_month_plan`
+ceo/admin, `generate_contract_commitments` (CRM). (4) `roster_months(month, signup_deadline)` + RLS đọc staff/talent, không policy ghi;
+`set_roster_month_deadline(p_month, p_deadline)` (guard `roster_staff_guard`, báo mỗi talent Active một tin `signup_open` khi hạn mới ở tương lai và tháng
+còn ca mở, trả `{notified, open_slots}`); `private.slot_open_for_registration` xét hạn tháng VÀ hạn tuần cũ. (5) `live_session_reports.early_leave_reason`
+CHECK `low_sales|technical|staff|brand|other`; `submit_file_handover` drop chữ ký 6 tham số + create 7 tham số (`p_early_leave_reason` default null; lý
+do bị bỏ khi phút off sớm = 0). (6) Tự kiểm.
+
+**Kiểm SQL.** Script replay ở scratchpad phiên (không lưu repo) = công thức README `supabase/tests` (zsh không tách từ `$PS` — chạy bằng `bash` script).
+Replay 0001→0179 ~7 giây. `supabase/tests/0180_month_desk.sql`: 21 mục xanh khi có 0180 (trainer ghi kế hoạch + 3 ca, chốt ⇒ 3 ca mở, không rebase,
+ghi/đọc cam kết, đọc hợp đồng nhưng không sửa, ghi/đọc sổ dự báo; brand không đọc hợp đồng, không ghi kế hoạch; talent không đặt hạn; tháng phải ngày 1;
+đặt hạn ⇒ báo 1 talent / 3 ca; talent đọc hạn; trước hạn đăng ký được, qua hạn bị chặn, trainer vẫn đăng ký hộ; lưu lý do; off sớm 0 ⇒ lý do NULL; lý do
+lạ bị chặn; gọi 6 tham số vẫn chạy; role_permissions đúng). Không có 0180 ⇒ đỏ ngay mục 1. 0180 chạy lại lần hai sạch.
+
+**Client.** `PermissionKey` + định nghĩa + preset Phân Quyền + appNav (`month_plan` → `manage_month_plan`); `fetchRolePermissions` suy key từ
+`manage_sessions` khi DB chưa có. Tham số engine nạp cho cả trainer (`tests/loginFetch.test.ts` cập nhật dep). Tab Tháng sau: khối "Hạn đăng ký tháng"
+(gợi ý 17:00 năm ngày trước đầu tháng; báo "Chưa chạy migration 0180" khi bảng chưa có; ẩn ô khi đang tải), nút Kế Hoạch Tháng theo `manage_month_plan`,
+nút "Sửa GMV ở CRM" chỉ khi có `manage_crm_projects`. Tab Tuần: bỏ ô hạn tuần, dẫn sang Tháng sau. App talent: `signupDeadlineOf` (hạn sớm hơn giữa tháng
+và tuần; sửa lỗi lấy hạn theo thứ Hai đầu tuần — tuần 26/10–01/11). Giao ca: 5 nút lý do khi chọn Off sớm; file cho thấy live ngắn hơn lịch ≥ 10 phút thì
+Off sớm bật sẵn đúng số phút (tính lúc vẽ, không effect). Tháng này: "tắt sớm −5 (bán kém 3 · chưa ghi lý do 2)", ô "Đã live thật" ghi giờ mất vì bán kém.
+Sổ Ca chip "Off sớm 30' · Bán kém".
+
+**Verify (24/10).** tsc 0, vitest 1.016/1.016, ESLint không thêm cảnh báo. App dev cổng 3100 (phiên admin còn trong trình duyệt): DB thật chưa có 0180 ⇒
+mục Kế Hoạch Tháng vẫn hiện (suy từ manage_sessions), ô hạn tháng báo "Chưa chạy migration 0180", không có nút đặt. Form giao ca gắn tạm cho ca VERA
+22/10 10:00 (live ngắn 29 phút): Off sớm bật sẵn 29 phút, 5 lý do hiện, chọn "Bán kém" được; KHÔNG bấm Giao ca. Đo: 28 ca Completed có off sớm theo file
+mà chưa giao ca trong app; 7 ca đã giao có Off sớm.
+
+**Còn lại.** User chạy 0180 rồi deploy; tạo tài khoản trainer thật để thử quyền đầu-cuối (RLS chỉ kiểm trên replay). Đợt 3: chi phí người/giờ, /1M GMV, biên
+mỗi giờ khi có rate + giá. Câu hỏi mở: tiền brand theo giờ có theo giờ live thật không.

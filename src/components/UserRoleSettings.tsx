@@ -242,7 +242,8 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
         manage_crm_projects: true,
         manage_tiktok_api: true,
         manage_users_permissions: true,
-        manage_roster: true
+        manage_roster: true,
+        manage_month_plan: true
       };
     } else if (role === "ceo") {
       preset = {
@@ -253,7 +254,8 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
         manage_crm_projects: true,
         manage_tiktok_api: true,
         manage_users_permissions: true,
-        manage_roster: true
+        manage_roster: true,
+        manage_month_plan: true
       };
     } else if (role === "operations") {
       preset = {
@@ -264,10 +266,11 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
         manage_crm_projects: true,
         manage_tiktok_api: true,
         manage_users_permissions: false,
-        manage_roster: true
+        manage_roster: true,
+        manage_month_plan: true
       };
     } else if (role === "trainer") {
-      // Trainer (0176): Bàn Trainer + Lịch & Studio/Bảng Vận Hành + Talent Pool. Finance mở cứng theo role (appNav), không qua Ma Trận.
+      // Trainer (0176): Điều Phối Lịch Live + Lịch & Studio/Bảng Vận Hành + Talent Pool. Finance mở cứng theo role (appNav), không qua Ma Trận.
       preset = {
         manage_sessions: false,
         manage_calendar: true,
@@ -276,7 +279,8 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
         manage_crm_projects: false,
         manage_tiktok_api: false,
         manage_users_permissions: false,
-        manage_roster: true
+        manage_roster: true,
+        manage_month_plan: true
       };
     } else if (role === "brand") {
       preset = {
@@ -287,7 +291,8 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
         manage_crm_projects: false,
         manage_tiktok_api: false,
         manage_users_permissions: false,
-        manage_roster: false
+        manage_roster: false,
+        manage_month_plan: false
       };
     } else {
       // talent — hẹp nhất: 3 tab của chính mình (Ca Của Tôi / Đăng Ký Ca / Hồ Sơ) đều không gate
@@ -300,7 +305,8 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
         manage_crm_projects: false,
         manage_tiktok_api: false,
         manage_users_permissions: false,
-        manage_roster: false
+        manage_roster: false,
+        manage_month_plan: false
       };
     }
 

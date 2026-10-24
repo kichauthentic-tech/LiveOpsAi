@@ -4,7 +4,7 @@ import { hasStaffSegments, personRoleMinutes, personWindows } from "../staffSegm
 import { hasSessionData } from "../sessionStatus";
 import { sessionDurationHours } from "../pnl";
 
-// Bàn Trainer — luật lịch tuần. Hàm thuần: nhận ca thật + ca mở (kèm người nháp) của một khoảng ngày, trả lỗi/cảnh báo theo ca.
+// Điều Phối Lịch Live — luật lịch tuần. Hàm thuần: nhận ca thật + ca mở (kèm người nháp) của một khoảng ngày, trả lỗi/cảnh báo theo ca.
 // Ngưỡng ở bảng roster_rules (0176); DB chỉ CHẶN quá max_week_hours (lúc công bố/đổi người) và trùng người (0143) — mọi luật còn
 // lại là cảnh báo để trainer tự quyết (user chốt 13/10).
 
@@ -52,7 +52,7 @@ export interface RosterShift {
   coHostId?: string;
   /** Ca mở đã có người nháp (chưa công bố). */
   drafted: boolean;
-  /** Ca đã chia đoạn người (0138) — đổi người ở Cửa sổ Ca Live, không ở Bàn Trainer. */
+  /** Ca đã chia đoạn người (0138) — đổi người ở Cửa sổ Ca Live, không ở Điều Phối Lịch Live. */
   segmented: boolean;
   hasData: boolean;
   planId?: string;

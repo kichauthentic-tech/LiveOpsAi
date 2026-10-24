@@ -1,7 +1,7 @@
 import { supabase } from "../supabaseClient";
 import { assertAffected } from "./assertAffected";
 import { fetchAllPages } from "./fetchAllPages";
-import { LiveSession, LiveSessionReport, StaffCheckpoint, StaffSegment, UserRole } from "../../types";
+import { EarlyLeaveReason, LiveSession, LiveSessionReport, StaffCheckpoint, StaffSegment, UserRole } from "../../types";
 import { platformOf } from "../reportPlatform";
 
 // brands/studios/talents are all real Supabase tables now (Phases 1/3) and every
@@ -109,6 +109,7 @@ interface DbSessionReport {
   host_late: boolean;
   ot_minutes: number;
   early_leave_minutes: number;
+  early_leave_reason?: EarlyLeaveReason | null;
   status_note: string;
   gmv_total: number | null;
   dashboard_link_1: string | null;
@@ -149,6 +150,7 @@ function reportFromDb(row: DbSessionReport): LiveSessionReport {
     hostLate: row.host_late,
     otMinutes: row.ot_minutes ?? 0,
     earlyLeaveMinutes: row.early_leave_minutes ?? 0,
+    earlyLeaveReason: row.early_leave_reason ?? undefined,
     statusNote: row.status_note,
     gmvTotal: row.gmv_total ?? undefined,
     dashboardLink1: row.dashboard_link_1 ?? undefined,

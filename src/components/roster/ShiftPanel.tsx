@@ -8,7 +8,7 @@ import { shiftHours, type RosterAnalysis, type RosterRole, type RosterShift } fr
 import { plannedCost, rankCandidates, shiftCost, type Candidate, type RankContext } from "../../lib/roster/candidates";
 import { getTodayDate } from "../../lib/dateUtils";
 
-// Ngăn chi tiết một ca của Bàn Trainer: lỗi/cảnh báo, người đã báo rảnh, gợi ý người cho từng vai (kèm lý do + chi phí), dời giờ, bỏ ca.
+// Ngăn chi tiết một ca của Điều Phối Lịch Live: lỗi/cảnh báo, người đã báo rảnh, gợi ý người cho từng vai (kèm lý do + chi phí), dời giờ, bỏ ca.
 // Ca mở ⇒ ghi NHÁP (talent chưa thấy). Ca đã lên lịch ⇒ đổi người / dời giờ phải có lý do (RPC ghi nhật ký, DB báo người liên quan).
 
 const DOW = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];

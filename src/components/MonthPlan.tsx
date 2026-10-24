@@ -77,7 +77,7 @@ interface MonthPlanProps {
   talents: Talent[];
 }
 
-// Lưới bắt đầu Thứ 2 như Lịch & Studio / Bàn Trainer (bố cục 18/10).
+// Lưới bắt đầu Thứ 2 như Lịch & Studio / Điều Phối Lịch Live (bố cục 18/10).
 const WEEKDAY_LABELS = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
 const fmtH = (n: number) => n.toLocaleString("vi-VN", { maximumFractionDigits: 1 });
 const DEFAULT_SETTINGS: PlanSettings = { defaultSlotHours: 3, liveWindowStart: "09:00", liveWindowEnd: "23:00", maxSlotsPerDay: 3, notes: "", blackoutDates: [], targetGmv: 0, campRanges: {}, groupTargets: {}, shopTargetGmv: 0, adsBudget: 0 };

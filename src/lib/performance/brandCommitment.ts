@@ -1,6 +1,6 @@
 import { BrandContract, BrandMonthlyCommitment, LiveSession, ShiftSlot } from "../../types";
 import { sessionDurationHours } from "../pnl";
-import { isUnconfirmedPast } from "../sessionStatus";
+import { OT_MAX_MIN, isUnconfirmedPast } from "../sessionStatus";
 import { platformOf, brandPlatformKey } from "../reportPlatform";
 
 // Giai đoạn 4 của tầng dữ liệu gốc mới: đối chiếu CAM KẾT (brand ký bao nhiêu giờ/tháng) với
@@ -10,14 +10,13 @@ import { platformOf, brandPlatformKey } from "../reportPlatform";
 // ====================================================================================
 // GIỜ NÀO ĐƯỢC TÍNH VÀO CAM KẾT — quyết định quan trọng nhất của file này
 // ====================================================================================
-// Tính bằng GIỜ CA THEO LỊCH (`sessionDurationHours`), KHÔNG phải giờ live thật từ snapshot.
-// Lý do: `computeSessionPnl` (src/lib/pnl.ts) tính doanh thu brand hourly = giờ ca theo lịch ×
-// rate. Cam kết hợp đồng và hoá đơn phải đếm CÙNG một loại giờ, nếu không thì con số theo dõi
-// không bao giờ khớp con số xuất hoá đơn và mọi tranh luận với brand đều bế tắc.
+// Từ 24/10/2026 (user chốt khi duyệt Điều Phối Lịch Live): GIỜ LIVE THẬT (`liveHoursOf`). Trước đó là giờ ca theo lịch, nên ca
+// tắt sớm vẫn tính là đã giao đủ — đo T10: 29/224 ca tắt sớm > 15 phút, mất 26 giờ, không màn nào thấy. Ca chưa có giờ live thật
+// (chưa up file / Shopee gõ tay) tạm tính theo lịch và đếm riêng ở `deliveredEstimatedSessions`. OT (vào trễ thì cuối ca tự bù)
+// được tính, trừ khi lệch quá `OT_MAX_MIN` (nhiều khả năng room chưa tách ca) — khi đó lấy giờ lịch.
 //
-// Giờ live THẬT vẫn được tính song song (`actualLiveHours`) nhưng chỉ để CẢNH BÁO: xếp đủ 100h mà
-// chỉ lên sóng 92h là rủi ro brand khiếu nại, ops cần thấy sớm. Không bao giờ đem nó trừ vào cam
-// kết — đó là việc của đàm phán, không phải của phép tính.
+// Doanh thu brand theo giờ (`computeSessionPnl`, Kế Toán) VẪN tính giờ theo lịch — đổi cách tính tiền là quyết định riêng.
+// Giờ theo lịch của ca đã giao vẫn giữ ở `deliveredPlannedHours` để đối chiếu.
 // ====================================================================================
 
 export type CommitmentStatus = "no_commitment" | "met" | "on_track" | "at_risk" | "behind";
@@ -32,9 +31,13 @@ export interface CommitmentProgress {
   committedGmv?: number;
   isOverride: boolean;
 
-  // Giờ ca theo lịch của ca ĐÃ diễn ra (Completed/Live Now).
+  // Giờ LIVE THẬT của ca ĐÃ diễn ra (Completed/Live Now) — `liveHoursOf`; ca chưa có giờ live thật tính theo lịch.
   deliveredHours: number;
   deliveredSessions: number;
+  // Cùng các ca đó nhưng tính theo lịch — để thấy giờ mất vì tắt sớm (deliveredPlannedHours − deliveredHours).
+  deliveredPlannedHours: number;
+  // Ca đã giao chưa có giờ live thật (tạm tính theo lịch).
+  deliveredEstimatedSessions: number;
   // Giờ ca theo lịch của ca CÒN CHƯA diễn ra trong tháng (Upcoming).
   scheduledHours: number;
   scheduledSessions: number;
@@ -103,6 +106,20 @@ export function plannedHoursOf(s: LiveSession): number {
   return sessionDurationHours(s.startTime, s.endTime);
 }
 
+/** Giờ live thật của một ca (giờ tính cam kết, 24/10). `null` = chưa có giờ live thật (ca nạp bù: giờ lịch sinh từ room nên là giờ thật). */
+export function realLiveHoursOf(s: LiveSession): number | null {
+  const planned = plannedHoursOf(s);
+  if (s.isBackfill) return planned;
+  const m = s.liveDurationMinutes ?? 0;
+  if (!(m > 0)) return null;
+  return m - planned * 60 > OT_MAX_MIN ? planned : m / 60;
+}
+
+/** Giờ tính cam kết: giờ live thật, chưa có thì giờ theo lịch. */
+export function liveHoursOf(s: LiveSession): number {
+  return realLiveHoursOf(s) ?? plannedHoursOf(s);
+}
+
 // 0 = tháng chưa tới, 1 = tháng đã xong, ở giữa = đang chạy tới ngày thứ N.
 export function elapsedFractionOf(periodMonth: string, today: string = todayVn()): number {
   const currentMonth = monthKeyOf(today);
@@ -135,14 +152,17 @@ export function computeCommitmentProgress(
     (s) => s.brandId === commitment.brandId && platformOf(s) === platform && monthKeyOf(s.date) === commitment.periodMonth
   );
 
-  let deliveredHours = 0, deliveredSessions = 0, deliveredGmv = 0;
+  let deliveredHours = 0, deliveredSessions = 0, deliveredGmv = 0, deliveredPlannedHours = 0, deliveredEstimatedSessions = 0;
   let scheduledHours = 0, scheduledSessions = 0;
   let unconfirmedHours = 0, unconfirmedSessions = 0;
   let actualLiveHours = 0, sessionsWithRealHours = 0;
 
   for (const s of inScope) {
     if (isDelivered(s)) {
-      deliveredHours += plannedHoursOf(s);
+      const real = realLiveHoursOf(s);
+      deliveredHours += real ?? plannedHoursOf(s);
+      deliveredPlannedHours += plannedHoursOf(s);
+      if (real == null) deliveredEstimatedSessions += 1;
       deliveredSessions += 1;
       deliveredGmv += s.actualGmv ?? 0;
       if (s.liveDurationMinutes && s.liveDurationMinutes > 0) {
@@ -172,6 +192,8 @@ export function computeCommitmentProgress(
     isOverride: commitment.isOverride,
     deliveredHours,
     deliveredSessions,
+    deliveredPlannedHours,
+    deliveredEstimatedSessions,
     scheduledHours,
     scheduledSessions,
     unconfirmedHours,

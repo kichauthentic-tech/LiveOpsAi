@@ -1938,6 +1938,10 @@ export default function App() {
                     }}
                     onSessionUpdated={(saved) => setSessions((prev) => prev.map((x) => (x.id === saved.id ? saved : x)))}
                     onSlotUpdated={(saved) => setShiftSlots((prev) => prev.map((x) => (x.id === saved.id ? saved : x)))}
+                    engineParams={engineParams}
+                    onOpenMonthPlan={(brandId, platform) => openMonthPlanFor(brandId, platform)}
+                    onOpenCrm={checkPermission("manage_crm_projects") ? (brandId, platform) => { requestCrmFocus(brandId, platform); navigateTo("crm"); } : undefined}
+                    canOpenMonthPlan={checkPermission("manage_month_plan")}
                   />
                 )}
 

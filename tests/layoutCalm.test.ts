@@ -73,7 +73,7 @@ test("sidebar: không nhóm có tiêu đề nào chỉ một mục (9 nhóm/19 m
   expect(brandNavGroups("ceo").flatMap((g) => g.items.map((i) => i.id))).toHaveLength(10);
 });
 
-test("lịch tháng của brand và lưới Kế Hoạch Tháng bắt đầu Thứ 2 như Lịch & Studio / Bàn Trainer", () => {
+test("lịch tháng của brand và lưới Kế Hoạch Tháng bắt đầu Thứ 2 như Lịch & Studio / Điều Phối Lịch Live", () => {
   expect(read("components/brand-workspace/BrandCalendar.tsx")).toMatch(/const WEEKDAY_LABELS = \["T2", "T3", "T4", "T5", "T6", "T7", "CN"\];/);
   expect(read("components/brand-workspace/BrandCalendar.tsx")).toMatch(/const leadingBlanks = \(firstDay\.getDay\(\) \+ 6\) % 7;/);
   expect(read("components/MonthPlan.tsx")).toMatch(/const WEEKDAY_LABELS = \["T2", "T3", "T4", "T5", "T6", "T7", "CN"\];/);
@@ -127,7 +127,7 @@ test("không còn chữ viết hoa bằng CSS ở các màn có ô KPI, Dashboar
 
 test("chữ viết hoa bằng CSS toàn app: chỉ còn chỗ nhận diện cố ý (108 chỗ trước 19/10 → 14)", () => {
   // Đợt 19/10 dọn nốt 47 chỗ ở màn chưa dọn: tiêu đề mục Cửa sổ ca, tiêu đề bảng (Toàn Cảnh Brand, Phát hành Report, Finance,
-  // Kế Hoạch Tháng…), Lịch & Studio, ô scheme KM, nhãn form, Phân quyền, Bàn Trainer, màn talent. Màn mới đừng thêm `uppercase`;
+  // Kế Hoạch Tháng…), Lịch & Studio, ô scheme KM, nhãn form, Phân quyền, Điều Phối Lịch Live, màn talent. Màn mới đừng thêm `uppercase`;
   // chỗ nào thật sự cần thì thêm vào đây kèm lý do.
   const KEEP: Record<string, [number, string]> = {
     "components/Login.tsx": [1, "khẩu hiệu \"Agency Operating System\" dưới logo"],
@@ -201,7 +201,7 @@ test("StatTile vẽ nhãn chữ thường, tooltip công thức theo tên chỉ 
   expect(onlyChildren).toContain("3 đã đối soát");
 });
 
-// ── Đợt 3 (19/10): cửa sổ ca, cửa sổ chốt người, lịch tháng brand, lưới Bàn Trainer ───────────────────────────────────
+// ── Đợt 3 (19/10): cửa sổ ca, cửa sổ chốt người, lịch tháng brand, lưới Điều Phối Lịch Live ───────────────────────────────────
 
 test("Lịch Vận Hành brand: đầu trang PageHeader, danh sách ca dưới lưới tháng gập lại, ô ngày không viền", () => {
   const cal = read("components/brand-workspace/BrandCalendar.tsx");
@@ -223,7 +223,7 @@ test("Cửa sổ ca: chỉ số trong MỘT khung (không hộp từng ô); Lư�
   expect(read("components/SessionRoomCase.tsx")).toMatch(/embedded \? \(\s*<div className="space-y-2">\{body\}<\/div>/);
 });
 
-test("Bàn Trainer: thẻ ca chỉ còn vạch màu bên trái, nút + ca không viền", () => {
+test("Điều Phối Lịch Live: thẻ ca chỉ còn vạch màu bên trái, nút + ca không viền", () => {
   const p = read("components/roster/panels.tsx");
   const grid = p.slice(p.indexOf("export const WeekGrid"), p.indexOf("// ---------------- ", p.indexOf("export const WeekGrid") + 10));
   expect(grid).not.toMatch(/rounded-lg border border-\[var\(--border\)\] border-l-\[3px\]/);

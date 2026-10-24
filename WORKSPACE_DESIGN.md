@@ -13,6 +13,9 @@
 
 ## 1. Giai đoạn hiện tại (cập nhật 2026-10-24)
 
+- **24/10: ĐIỀU PHỐI LỊCH LIVE ĐỢT 1 + 2 (Bàn Trainer cũ; đã commit, chưa push; `0180` CHƯA CHẠY)** — đề xuất https://claude.ai/artifact/Rjp94U78WQfT1UehDwAPNX.
+  3 chế độ Tháng này · Tháng sau · Tuần (`roster/MonthDesk.tsx`, `lib/roster/monthDesk.ts`); giờ cam kết = giờ live thật cả app; 0180: trainer lập + chốt
+  Kế Hoạch Tháng (`manage_month_plan`), hạn đăng ký theo tháng, lý do off sớm ở giao ca. Chi tiết: lịch sử `## Điều Phối Lịch Live đợt 1/đợt 2 (2026-10-24)`.
 - **24–25/10: BẢNG VẬN HÀNH (gộp Phòng Điều Hành e5d9364 + làm theo audit 073c231; đã push, không migration)** — 2 chế độ "Hôm nay & tuần" /
   "Cả tháng" (`OpsMonthView`, khối lập kế hoạch + cam kết giờ ở đây); khối **Cần xử lý** (ca qua giờ chưa có số, trùng người theo ngày, chip lọc); nhãn đỏ
   "chưa có số" = `isUnconfirmedPast`; kỳ vọng GMV trên dòng ca (`useShiftExpectations`) + phễu (`OpsSupport`); Việc cần làm = hôm nay (≤ 48 giờ) + việc tháng
@@ -50,7 +53,9 @@
   view chưa có cột ⇒ đọc lại không có `live_evidence`, mỗi lần mở app tốn 2 request 400 tới khi chạy). Sau khi chạy: Bảng Vận Hành / Sổ Ca
   thấy ca quá giờ tự "Đã xong" lại (trước đó `complete_past_sessions` lỗi cả lô vì cặp trùng người). Nên bật pg_cron (Database → Extensions)
   để ca được đóng cả khi không ai mở app. Code đã push `9426932` (19/10, gồm run-rate theo ca 11/10 + bố cục 18–19/10) — Vercel tự deploy từ main.
-- **Bàn Trainer (13/10, đã gộp main, chưa push):** chạy `0175_trainer_role.sql` RỒI MỚI chạy `0176_trainer_roster.sql` (hai lần chạy riêng; 0176 cần giá trị enum đã commit) → deploy. Tạo tài khoản role Trainer ở Phân Quyền rồi đăng nhập thử. Nhập rate ở Talent Pool để có chi phí ca. Muốn dùng quy trình tuần thì Kế Hoạch Tháng 11 phải chốt để có ca mở (lịch T10 nhập từ sheet nên tuần T10 chỉ có ca đã lên lịch). Còn mở: host/trợ trả theo giờ hay có người trả theo ca.
+- **Điều Phối Lịch Live (24/10):** chạy `0180_month_desk.sql` TRƯỚC deploy client (0175/0176 có vẻ đã chạy — bảng 0176 đọc được). Rồi tạo tài khoản
+  Trainer ở Phân Quyền, thử Kế Hoạch Tháng + Tháng sau → đặt hạn tháng; nhập rate (Talent Pool) + giá (CRM); sửa GMV hợp đồng FUJIWA (450 → 450M).
+  Câu hỏi mở: tiền brand theo giờ có theo giờ live thật không; có người trả theo ca không.
 - **Đối soát / GMV ca (13/10):** 0174 ĐÃ CHẠY. Còn: deploy client; Áp dụng lô CROCS T10 01–13/10, Áp Dụng Lại lô VERA Shopee 08–10/10 (Claude bị chặn bấm — user bấm); ca CROCS 11/10 09–12 (file tải 13:35) nên gõ GMV đúng ở form Giao ca trước khi Áp dụng.
 - **Bảng Vận Hành · Cả tháng (Phòng Điều Hành cũ, 0170 ĐÃ CHẠY):** đặt `ANTHROPIC_API_KEY` trên Vercel nếu muốn hỏi bằng Claude (thiếu thì chỉ Gemini). Role brand chỉ thấy điểm của ngày sổ dự báo đã ghi (Dashboard được mở ngày đó).
 - **0168 ĐÃ CHẠY 11/10.** Còn lại: deploy client rồi thử up Live List giữa phiên ở một ca nối Shopee thật.
@@ -104,7 +109,7 @@
   ẩn khỏi sidebar khi MỌI kênh của brand đều không có nguồn; thanh sàn chỉ liệt kê sàn hợp lệ cho tab.
   Có URL route (`src/lib/routes.ts`): `/so-ca`, `/brand/crocs/report-thang`…
 - **Nguồn sự thật của menu:** `agencyNavGroups()`/`brandNavGroups()` ở [src/lib/appNav.ts](src/lib/appNav.ts). Ảnh chụp (nhóm gộp 18/10):
-  - Agency: Dashboard — **Kế hoạch:** Kế Hoạch Tháng · Bàn Trainer — **Vận hành hằng ngày:** Bảng Vận Hành (id `calendar`; 2 chế độ "Hôm nay & tuần" /
+  - Agency: Dashboard — **Kế hoạch:** Kế Hoạch Tháng · Điều Phối Lịch Live (Bàn Trainer cũ) — **Vận hành hằng ngày:** Bảng Vận Hành (id `calendar`; 2 chế độ "Hôm nay & tuần" /
     "Cả tháng" = Phòng Điều Hành cũ, 24/10; khối Hỗ Trợ Vận Hành cuối trang) · Lịch & Studio (`studio_calendar`) · Sổ Ca (Run-rate gộp vào Dashboard 22/10) — **Phân tích:** Hiệu Suất Host · Toàn Cảnh Brand (gồm phát hành Report
     Tháng, 23/10) — **Nguồn lực & khách hàng:** Talent Pool · Studios & Gear · CRM ("Hợp đồng & giá") · TikTok API — **Quản trị:** Kế Toán (ceo/admin, 23/10) · Finance & P&L (ceo/admin,
     trainer chỉ đọc) · Phân Quyền & Role · AI Training Center (admin). Talent: Ca Của Tôi · Cả Agency · Đăng Ký Ca · Tôi (điện thoại: thanh tab dưới đáy).
@@ -314,7 +319,13 @@ nhất / Đầu mối xử lý, vượt giới hạn +30%, hiển thị mờ, Nh
 qua `brandLens.weekRows/waveRows` (cộng đúng target tháng); Key Metrics/đội live theo nút qua `lensScope`. File brand (shop, SKU, ads, khuyến mãi, Shopee
 theo ngày) chỉ có số theo THÁNG ⇒ không hiện ở nút Đợt/Ngày/Ca. "Số đủ tới" hiển thị = `shownThroughOf` (không vượt ngày cuối có số).
 Ngưỡng giờ/tuần của người = `engineParams.fatigueWeekHours` (bỏ 40h riêng của PĐH). Bản tin brand = `bulletinFromCard`/`bulletinText` (lib/brand/bulletin.ts).
-**Bàn Trainer (13/10):** luật lịch tuần (trùng, quá giờ/tuần, nghỉ sau ca khuya, đổi phòng sát giờ, giờ/ngày, ngày liền, host chưa quen kênh) = `analyzeRoster` (lib/roster/rules.ts); gợi ý người + chi phí ca theo lịch = `rankCandidates` / `plannedCost` (lib/roster/candidates.ts, cùng luật rate của pnl.ts). Không xếp/gợi ý người theo GMV/giờ của host. Nháp chỉ cho ca MỞ; ca đã lên lịch đổi qua RPC có lý do.
+**0180:** Kế Hoạch Tháng gate bằng `manage_month_plan` (DB thiếu key ⇒ suy từ `manage_sessions`); hạn đăng ký theo THÁNG (`signupDeadlineOf` = hạn sớm
+hơn giữa tháng và tuần cũ, theo NGÀY của ca); lý do off sớm `EARLY_REASON_LABEL`, client chỉ gửi `p_early_leave_reason` khi có.
+**Giờ cam kết (24/10):** đếm GIỜ LIVE THẬT = `liveHoursOf`/`realLiveHoursOf` (brandCommitment.ts; ca chưa có giờ thật tính theo lịch, OT > `OT_MAX_MIN` lấy giờ
+lịch, ca nạp bù = giờ lịch); giờ lịch giữ ở `deliveredPlannedHours`. Doanh thu brand theo giờ (pnl.ts, Kế Toán) vẫn theo giờ lịch. **Hao hụt / giờ phòng
+hờ** = `shrinkSums`/`channelShrinkage`/`hoursToSchedule` (lib/roster/monthDesk.ts: huỷ + ngắn hơn lịch, 60 ngày, kẹp 3–15%, kênh < 30 giờ dùng TB agency;
+CHIA cho 1 − hao hụt). Màn theo tháng của Điều Phối Lịch Live đọc dự báo/khả năng bù từ `accountRow` (một nguồn với Dashboard), dùng `activeSessions`.
+**Điều Phối Lịch Live (Bàn Trainer cũ, 13/10):** luật lịch tuần (trùng, quá giờ/tuần, nghỉ sau ca khuya, đổi phòng sát giờ, giờ/ngày, ngày liền, host chưa quen kênh) = `analyzeRoster` (lib/roster/rules.ts); gợi ý người + chi phí ca theo lịch = `rankCandidates` / `plannedCost` (lib/roster/candidates.ts, cùng luật rate của pnl.ts). Không xếp/gợi ý người theo GMV/giờ của host. Nháp chỉ cho ca MỞ; ca đã lên lịch đổi qua RPC có lý do.
 **Đa sàn (lộ trình 07/10, bắt buộc):** (1) brand chạy sàn nào = bảng `brand_channels` qua `lib/channels.ts` (`platformsOfBrand`), KHÔNG suy
 từ ca/phòng; thêm kênh chỉ ở CRM; DB chặn dòng của kênh chưa tạo (0149). (2) Khác biệt giữa sàn = hồ sơ sàn `profileOf(...)`
 (`lib/platforms/profiles.ts`) hoặc `Record<ReportPlatform, …>` (REPORT_ENGINES, REPORT_VIEWS, ADS_PANELS, RECON_FILE_READERS) — không viết
@@ -422,6 +433,9 @@ target khung camp ở Nhập Ads bỏ 06/10 — tháng không có kế hoạch c
 
 | Mục trong file lịch sử | Tóm tắt |
 |---|---|
+| `## Điều Phối Lịch Live đợt 2 (2026-10-24)` | 0180 (quyền Kế Hoạch Tháng cho trainer, hạn tháng, lý do off sớm), bộ kiểm SQL 21 mục, verify trên app |
+| `## Điều Phối Lịch Live đợt 1 (2026-10-24)` | 3 chế độ tháng/tuần, giờ live thật cho cam kết, cách verify bằng tab 3100 nạp code 3102, việc đợt 2–3 |
+| `## Điều Phối Lịch Live — audit (2026-10-24)` | đổi tên, pipeline T11, giờ/GMV T10, hao hụt (huỷ + tắt sớm) theo kênh, ca tắt sớm = ca yếu, rate/giá, cách đo, 5 quyết định chờ |
 | `## §1 mục 24/10 Dashboard + Report Tháng (chuyển khỏi WORKSPACE 25/10)` | nguyên văn 2 mục §1 ngày 24/10 trước khi rút gọn |
 | `## Bảng Vận Hành theo audit (2026-10-25)` | những gì đã đổi theo 3 quyết định, chỗ khác demo có chủ đích, cách verify trên app thật |
 | `## Audit Bảng Vận Hành (2026-10-24)` | số đo nhãn giả, hàng đợi ẩn, 31 việc, lặp trên một màn, tốc độ Cả tháng, chuẩn ngoài, 3 quyết định chờ |
