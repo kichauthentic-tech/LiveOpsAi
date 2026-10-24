@@ -6328,3 +6328,22 @@ nhận vì chưa ai dùng app talent). Dòng ca bấm vẫn mở Cửa sổ Ca L
 7 ngày qua 78 dòng, 30 "chưa có số", không còn "chưa giao ca"; mũi tên VERA Shopee 10h: kỳ vọng 11,3M · 3,8M/giờ · target 13,9M · viewers/giờ 1.202;
 "Xem và đổi người" → Ngày mai, 14 chip trùng; "Cả tháng" lần đầu 816ms, lần sau 66ms; khối lập kế hoạch chỉ ở Cả tháng; việc tháng 9 nhóm/22 việc;
 375px không tràn ngang; không lỗi console. Chưa thử: bấm "Xác nhận thành ca" (tạo ca thật).
+
+## §1 mục 24/10 Dashboard + Report Tháng (chuyển khỏi WORKSPACE 25/10)
+
+- **24/10: DASHBOARD "TỔNG QUAN ACCOUNT" + CHUẨN HOÁ TỪ NGỮ (đã push 9f31121 24/10, không migration)** — user duyệt demo
+  https://claude.ai/artifact/AQtXSSHpTxFgbNC8tYTFCH ("áp dụng vào code app cùng lúc build"). Tab đầu mới **Tổng quan account** (`period/OverviewTab.tsx`,
+  logic `lib/performance/accountOverview.ts`: `accountRow`/`sortAccounts`/`platformPace`/`accountActions`/`landingText`, test `tests/accountOverview.test.ts`):
+  mọi kênh brand × sàn của MỌI sàn, một dòng, xếp theo rủi ro; tổng riêng từng sàn; không theo thanh Sàn/bộ chọn kỳ. Không công thức mới — đọc thẻ kênh
+  (`useChannelCards` nạp MỘT lần cho mọi sàn, tab theo sàn lọc lại; `AgencyDashboard` nhận `platforms`/`allBrands`/`onPickPlatform`, bỏ `key` theo sàn).
+  Toàn sàn: bỏ hàng ô vận hành (một dòng), bỏ thẻ run-rate từng brand (gỡ `runrate/AccountCard`, `PctBar`, `runRateVerdict`), một số "ca chưa có số liệu",
+  cột "T10 dự báo"; Host/Cặp/Khung giờ/Độ dài ca chuyển sang cuối **Hiệu Suất Host** (`period/TeamBlocks.tsx`, mờ chỉ số host < 8 ca, cặp < 4 ca).
+  Bộ từ ngữ (§5.5): `LANDING_LABEL` = Đạt target / Sát target / Rủi ro / Hụt target, "xác suất đạt", "dự báo" (bỏ dự phóng/dự kiến), Target luỹ kế,
+  "Dữ liệu đầy đủ đến", "ca chưa có số liệu", Phân rã GMV/giờ · ngày Daily (`WAVE_NAME.daily` = "Daily"), Đầu mối xử lý (`LEVER_OWNER`), Lên live trễ,
+  Nhân sự live; bỏ chữ kỹ thuật lộ ra (Engine, monthOutlook.pending, Sa bàn, trần). Chưa đổi: Report Tháng (phiên song song đang sửa), cổng brand/bản tin,
+  các màn khác ngoài Dashboard + Hiệu Suất Host. Verify + số đo: lịch sử `## Dashboard Tổng quan account (2026-10-24)`.
+- **24/10: REPORT THÁNG GỬI BRAND 10 TRANG (BUILT, đã commit, chưa push, không migration)** — user duyệt demo CROCS T9 rồi "triển khai đi". `MonthlyReportTabs`
+  (TikTok) 7 phần → 10 trang (§4 mục 4); trang mới: bảng điểm, bảng nhiệt loại ngày × yếu tố, Quảng cáo riêng, Hủy/hoàn & NMV, Affiliate, lịch creator tháng
+  sau, Key Metrics 5 tab × 3 tháng. Logic `lib/report/brandReport.ts` (test `tests/brandReport.test.ts`), UI `report/BrandPages.tsx`. Sửa lỗi nhóm đối chứng
+  khi file shop ngắn hơn tháng (`shopCompareWindow`). Đổi từ ngữ theo bộ từ brand (§5.2). Verify + việc còn mở + quyết định chờ user: lịch sử
+  `## Report Tháng 10 trang (2026-10-24)`. Phiên Dashboard song song (App.tsx, AgencyDashboard, accountOverview) đang sửa cùng lúc — không đụng file của nhau.

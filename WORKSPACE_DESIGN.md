@@ -13,34 +13,12 @@
 
 ## 1. Giai đoạn hiện tại (cập nhật 2026-10-24)
 
-- **25/10: BẢNG VẬN HÀNH THEO AUDIT 24/10 (BUILT, commit riêng, không migration)** — user chốt cả 3 đề xuất, làm như demo
-  https://claude.ai/artifact/HTPVorM52vK9VyYvooyzVW (audit https://claude.ai/artifact/VJXrAH9Mj1iris1LcWgKTu). Khối **Cần xử lý** đầu trang (ca qua giờ chưa có số
-  theo ngày + "Xem & giao ca", trùng người theo ngày, chip lọc hôm nay chưa host/phòng/chưa nhận lịch); nhãn đỏ **"chưa có số"** = `isUnconfirmedPast`, bỏ nhãn
-  vàng theo form Giao ca; khoảng **7 ngày qua**; **kỳ vọng GMV trên dòng ca** (`hooks/useShiftExpectations.ts` → expectedNowById) + mũi tên mở phễu
-  (`OpsSupport.tsx` nay là chi tiết một ca; `OpsSupportTab.tsx` đã xoá); **Việc cần làm** = "Hôm nay phải xong" (≤ 48 giờ, mức theo hạn) + "Việc tháng"
-  gom nhóm thu gọn (`groupTodos`, `Todo.view` mở đúng chỗ trên bảng); khối **lập kế hoạch + cam kết giờ sang "Cả tháng"**; hai chế độ giữ nguyên khi chuyển
-  (Cả tháng lần 2: 66ms, lần đầu ~0,8s); dòng ca là component ngoài hàm vẽ. Verify + số đo: lịch sử `## Bảng Vận Hành theo audit (2026-10-25)`.
-- **24/10: GỘP PHÒNG ĐIỀU HÀNH VÀO BẢNG VẬN HÀNH (đã commit, chưa push, không migration)** — Bảng Vận Hành có 2 chế độ (`opsView` ở App): **Hôm nay &
-  tuần** và **Cả tháng** (`OpsMonthView.tsx`, đổi tên từ `ControlRoom.tsx`); sidebar bỏ mục Phòng Điều Hành, id/link cũ `control_room`/`/phong-dieu-hanh` mở
-  "Cả tháng". Ca nháp (`hooks/useSessionDrafts.ts`) = việc cần làm `session-drafts` + dòng nháp + bộ lọc "Ca nháp · N" + cửa sổ xác nhận. Một bảng tải người
-  (`suggestHosts.weekHours` = `peopleLoad`), một cách xếp host (`hostOrder`; bỏ `hostSkillTable`), một số kỳ vọng mỗi ca (`ChannelRoom.expectedNowById`;
-  benchmark ca sắp live đọc số này, gỡ `trackMonth`). Verify + chỗ cố ý khác: lịch sử `## Gộp Phòng Điều Hành vào Bảng Vận Hành (2026-10-24)`.
-- **24/10: DASHBOARD "TỔNG QUAN ACCOUNT" + CHUẨN HOÁ TỪ NGỮ (đã push 9f31121 24/10, không migration)** — user duyệt demo
-  https://claude.ai/artifact/AQtXSSHpTxFgbNC8tYTFCH ("áp dụng vào code app cùng lúc build"). Tab đầu mới **Tổng quan account** (`period/OverviewTab.tsx`,
-  logic `lib/performance/accountOverview.ts`: `accountRow`/`sortAccounts`/`platformPace`/`accountActions`/`landingText`, test `tests/accountOverview.test.ts`):
-  mọi kênh brand × sàn của MỌI sàn, một dòng, xếp theo rủi ro; tổng riêng từng sàn; không theo thanh Sàn/bộ chọn kỳ. Không công thức mới — đọc thẻ kênh
-  (`useChannelCards` nạp MỘT lần cho mọi sàn, tab theo sàn lọc lại; `AgencyDashboard` nhận `platforms`/`allBrands`/`onPickPlatform`, bỏ `key` theo sàn).
-  Toàn sàn: bỏ hàng ô vận hành (một dòng), bỏ thẻ run-rate từng brand (gỡ `runrate/AccountCard`, `PctBar`, `runRateVerdict`), một số "ca chưa có số liệu",
-  cột "T10 dự báo"; Host/Cặp/Khung giờ/Độ dài ca chuyển sang cuối **Hiệu Suất Host** (`period/TeamBlocks.tsx`, mờ chỉ số host < 8 ca, cặp < 4 ca).
-  Bộ từ ngữ (§5.5): `LANDING_LABEL` = Đạt target / Sát target / Rủi ro / Hụt target, "xác suất đạt", "dự báo" (bỏ dự phóng/dự kiến), Target luỹ kế,
-  "Dữ liệu đầy đủ đến", "ca chưa có số liệu", Phân rã GMV/giờ · ngày Daily (`WAVE_NAME.daily` = "Daily"), Đầu mối xử lý (`LEVER_OWNER`), Lên live trễ,
-  Nhân sự live; bỏ chữ kỹ thuật lộ ra (Engine, monthOutlook.pending, Sa bàn, trần). Chưa đổi: Report Tháng (phiên song song đang sửa), cổng brand/bản tin,
-  các màn khác ngoài Dashboard + Hiệu Suất Host. Verify + số đo: lịch sử `## Dashboard Tổng quan account (2026-10-24)`.
-- **24/10: REPORT THÁNG GỬI BRAND 10 TRANG (BUILT, đã commit, chưa push, không migration)** — user duyệt demo CROCS T9 rồi "triển khai đi". `MonthlyReportTabs`
-  (TikTok) 7 phần → 10 trang (§4 mục 4); trang mới: bảng điểm, bảng nhiệt loại ngày × yếu tố, Quảng cáo riêng, Hủy/hoàn & NMV, Affiliate, lịch creator tháng
-  sau, Key Metrics 5 tab × 3 tháng. Logic `lib/report/brandReport.ts` (test `tests/brandReport.test.ts`), UI `report/BrandPages.tsx`. Sửa lỗi nhóm đối chứng
-  khi file shop ngắn hơn tháng (`shopCompareWindow`). Đổi từ ngữ theo bộ từ brand (§5.2). Verify + việc còn mở + quyết định chờ user: lịch sử
-  `## Report Tháng 10 trang (2026-10-24)`. Phiên Dashboard song song (App.tsx, AgencyDashboard, accountOverview) đang sửa cùng lúc — không đụng file của nhau.
+- **24–25/10: BẢNG VẬN HÀNH (gộp Phòng Điều Hành e5d9364 + làm theo audit 073c231; đã push, không migration)** — 2 chế độ "Hôm nay & tuần" /
+  "Cả tháng" (`OpsMonthView`, khối lập kế hoạch + cam kết giờ ở đây); khối **Cần xử lý** (ca qua giờ chưa có số, trùng người theo ngày, chip lọc); nhãn đỏ
+  "chưa có số" = `isUnconfirmedPast`; kỳ vọng GMV trên dòng ca (`useShiftExpectations`) + phễu (`OpsSupport`); Việc cần làm = hôm nay (≤ 48 giờ) + việc tháng
+  gom nhóm (`groupTodos`); ca nháp sa bàn = việc + dòng + bộ lọc. Audit/demo/verify: lịch sử `## Gộp Phòng Điều Hành…`, `## Audit Bảng Vận Hành…`, `## Bảng Vận Hành theo audit…`.
+- **24/10:** Dashboard tab **Tổng quan account** + chuẩn hoá từ ngữ (đã push 9f31121) và **Report Tháng gửi brand 10 trang** (đã push 3049ecc) — nguyên
+  văn (file, verify, việc còn mở, quyết định chờ user): lịch sử `## §1 mục 24/10 Dashboard + Report Tháng (chuyển khỏi WORKSPACE 25/10)`.
 - **23/10:** audit trùng màn + "mỗi loại số một màn" (đã push 11b2069; user chốt OP vẫn chốt người/mở/huỷ/dời ca như trainer) và **tab Kế Toán K1**
   (`Accounting.tsx`, `lib/accounting/monthClose.ts`, chưa commit) — nguyên văn: lịch sử `## §1 mục 23/10 audit trùng màn + Kế Toán K1 (chuyển khỏi WORKSPACE 24/10)`.
 - **23/10: Dashboard "so cùng kỳ"** (2 tab + chọn kỳ + so cùng kỳ, gộp Chi tiết kênh vào tab Brand, `lib/performance/periodCompare.ts`/`brandLens.ts`,
@@ -444,6 +422,7 @@ target khung camp ở Nhập Ads bỏ 06/10 — tháng không có kế hoạch c
 
 | Mục trong file lịch sử | Tóm tắt |
 |---|---|
+| `## §1 mục 24/10 Dashboard + Report Tháng (chuyển khỏi WORKSPACE 25/10)` | nguyên văn 2 mục §1 ngày 24/10 trước khi rút gọn |
 | `## Bảng Vận Hành theo audit (2026-10-25)` | những gì đã đổi theo 3 quyết định, chỗ khác demo có chủ đích, cách verify trên app thật |
 | `## Audit Bảng Vận Hành (2026-10-24)` | số đo nhãn giả, hàng đợi ẩn, 31 việc, lặp trên một màn, tốc độ Cả tháng, chuẩn ngoài, 3 quyết định chờ |
 | `## Gộp Phòng Điều Hành vào Bảng Vận Hành (2026-10-24)` | 4 chỗ trùng đã gộp, chỗ còn khác nhau có chủ đích, cách verify trên app thật, việc còn mở |
