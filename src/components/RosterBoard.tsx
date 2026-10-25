@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight, ClipboardList, MessageSquareText, Send, Wand2, X } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, ClipboardList, CopyPlus, MessageSquareText, Send, Wand2, X } from "lucide-react";
 import type { Brand, BrandChannel, BrandStudio, LiveSession, ShiftRegistration, ShiftSlot, Studio, Talent, TalentRateHistoryEntry, UserRole } from "../types";
 import { PageHeader } from "./common/PageHeader";
 import { useToast } from "../hooks/useToast";
@@ -9,7 +9,7 @@ import { fmtVndShort } from "../lib/format";
 import { talentShortName } from "../lib/talentName";
 import { addDays, getTodayDate, isoWeekStart } from "../lib/dateUtils";
 import { weekScheduleMessage } from "../lib/talent/agenda";
-import { updateOpenSlotTime } from "../lib/db/shiftSlots";
+import { createOpenSlots, updateOpenSlotTime } from "../lib/db/shiftSlots";
 import {
   fetchRosterChanges,
   fetchRosterDrafts,
@@ -35,6 +35,8 @@ import { AbsencePanel, ChangeLogPanel, ChecksPanel, HoursCostPanel, MatrixPanel,
 import { NextDesk, NowDesk, nextMonthOf, useRosterDesk, type NowChannel } from "./roster/MonthDesk";
 import { MonthStrip, fmtWhen, type MonthAction, type MonthCard } from "./roster/MonthStrip";
 import { monthStatus } from "../lib/roster/monthStatus";
+import { copyPrevWeekFrames } from "../lib/roster/openMonth";
+import { OpenMonthWizard } from "./roster/OpenMonthWizard";
 import { platformOf } from "../lib/reportPlatform";
 import type { EngineParams } from "../lib/scheduling/engineParams";
 import type { ReportPlatform } from "../lib/reportPlatform";
@@ -127,6 +129,8 @@ export const RosterBoard: React.FC<Props> = (p) => {
     if (s) requestAnimationFrame(() => sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
   const [months, setMonths] = useState<RosterMonth[]>([]);
+  // Đợt 2 (25/10): "Mở lịch tháng sau" 3 bước trong module (thay việc phải sang Kế Hoạch Tháng từng kênh).
+  const [wizardOpen, setWizardOpen] = useState(false);
   const [monthsNonce, setMonthsNonce] = useState(0);
   const [mode, setMode] = useState<RankMode>(loadMode);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -256,6 +260,24 @@ export const RosterBoard: React.FC<Props> = (p) => {
   };
   const desk = useRosterDesk({ ...deskProps, registrations: p.shiftRegistrations, drafts, weeks });
   const m0 = desk.month, m1 = desk.next, m2 = nextMonthOf(m1);
+  const wizardChannels = useMemo(
+    () =>
+      desk.nextRows.map((r) => ({
+        brandId: r.brandId,
+        platform: r.platform,
+        brandName: r.brandName,
+        shrink: r.shrink,
+        prevHours: desk.nowRows.find((x) => x.brandId === r.brandId && x.platform === r.platform)?.committed ?? 0
+      })),
+    [desk.nextRows, desk.nowRows]
+  );
+  const openWizard = () => {
+    if (desk.loading) {
+      showToast("Đang tính số các kênh, thử lại sau vài giây.");
+      return;
+    }
+    setWizardOpen(true);
+  };
   const nowIso = new Date().toISOString();
   const statusOf = useCallback(
     (month: string) =>
@@ -529,7 +551,11 @@ export const RosterBoard: React.FC<Props> = (p) => {
     void copyText(text, `Đã chép tin nhắc ${missing.length} người chưa đăng ký — dán vào nhóm Zalo`);
   };
   const onMonthAction = (kind: MonthAction, month: string) => {
-    if (kind === "now" || kind === "next") openSection(kind);
+    if (kind === "now") openSection("now");
+    else if (kind === "next") {
+      if (month === m1) openWizard();
+      else openSection("next");
+    }
     else if (kind === "nudge") nudge(month);
     else if (kind === "staff") {
       const first = p.shiftSlots
@@ -543,14 +569,50 @@ export const RosterBoard: React.FC<Props> = (p) => {
     }
   };
 
+  /** "Chép khung giờ tuần trước": khung giờ (không người) của tuần trước ⇒ ca mở tuần đang xem, chỉ từ hôm nay, không đè ca đã có. */
+  const copyPrevWeek = () =>
+    run(async () => {
+      const known = new Set(channels.map((c) => c.key));
+      const list = copyPrevWeekFrames(p.sessions, p.shiftSlots, weekStart, today).filter((f) => known.has(channelKeyOf(f.brandId, f.platform)));
+      if (list.length === 0) {
+        showToast("Khung giờ tuần trước đều đã có ca ở tuần này (hoặc rơi vào ngày đã qua).");
+        return;
+      }
+      const per = new Map<string, number>();
+      for (const f of list) per.set(`${f.brandName} ${f.platform}`, (per.get(`${f.brandName} ${f.platform}`) ?? 0) + 1);
+      const msg = [
+        `Chép ${list.length} khung giờ từ tuần ${dayLabel(addDays(weekStart, -7))} sang tuần ${dayLabel(weekStart)} thành ca mở?`,
+        [...per].map(([k, n]) => `${k}: ${n} ca`).join("\n"),
+        "Chỉ chép giờ, không chép người. Kênh đã chốt kế hoạch tháng thì đây là ca tăng cường (không cộng target tháng)."
+      ].join("\n\n");
+      if (!(await confirm(msg, { confirmLabel: "Chép" }))) return;
+      const slots: ShiftSlot[] = list.map((f) => {
+        const studioId = p.brandStudios.find((b) => b.brandId === f.brandId && b.platform === f.platform)?.studioId;
+        const studio = p.studios.find((x) => x.id === studioId);
+        return { id: "", date: f.date, startTime: f.startTime, endTime: f.endTime, brandId: f.brandId, brandName: f.brandName, platform: f.platform as ShiftSlot["platform"], studioId: studio?.id, studioName: studio?.name ?? "", notes: "", status: "open" };
+      });
+      let r: Awaited<ReturnType<typeof createOpenSlots>>;
+      try {
+        r = await createOpenSlots(slots);
+      } catch (e) {
+        if (isRosterBackendMissing(e)) {
+          showToast("DB chưa chạy migration 0181 — chưa chép được (nếu mở từng ca, mỗi talent nhận một tin cho mỗi ca).");
+          return;
+        }
+        throw e;
+      }
+      await p.onScheduleChanged();
+      showToast(`Đã mở ${r.created} ca${r.skipped ? `, bỏ ${r.skipped} ca trùng` : ""}${r.notified ? `, báo ${r.notified} host/trợ một tin` : ""}. Bấm "Tự lấp chỗ trống" để xếp người.`);
+    });
+
   const todos: Todo[] = [];
   if (blocks.length > 0)
     todos.push({ key: "blocks", tone: "bad", text: `${blocks.length} lỗi chặn công bố ở tuần đang xem.`, sub: blocks[0].text, action: { label: "Xem ca", run: () => setSelectedKey(blocks[0].shiftKey) } });
   const mNext = `tháng ${Number(m1.slice(5))}`;
   if (st1.phase === "none" && !desk.loading)
-    todos.push({ key: "next", tone: "bad", text: `${mNext[0].toUpperCase()}${mNext.slice(1)} bắt đầu sau ${daysToNext} ngày, chưa mở ca nào.`, sub: `${noCommitNext}/${desk.nextRows.length} kênh chưa có giờ cam kết.`, action: { label: `Mở lịch ${mNext}`, run: () => openSection("next") } });
+    todos.push({ key: "next", tone: "bad", text: `${mNext[0].toUpperCase()}${mNext.slice(1)} bắt đầu sau ${daysToNext} ngày, chưa mở ca nào.`, sub: `${noCommitNext}/${desk.nextRows.length} kênh chưa có giờ cam kết.`, action: { label: `Mở lịch ${mNext}`, run: openWizard } });
   else if (st1.phase === "no_deadline")
-    todos.push({ key: "next", tone: "bad", text: `${st1.openSlots} ca mở ${mNext} chưa có hạn đăng ký.`, sub: "Đặt hạn để talent biết hạn chót và app nhắc từng người.", action: { label: "Đặt hạn đăng ký", run: () => openSection("next") } });
+    todos.push({ key: "next", tone: "bad", text: `${st1.openSlots} ca mở ${mNext} chưa có hạn đăng ký.`, sub: "Đặt hạn để talent biết hạn chót và app nhắc từng người.", action: { label: "Đặt hạn đăng ký", run: openWizard } });
   else if (st1.phase === "signup")
     todos.push({ key: "next", tone: "warn", text: `${mNext[0].toUpperCase()}${mNext.slice(1)} đang nhận đăng ký tới ${fmtWhen(st1.deadline!)}: ${st1.slotsWithSignup}/${st1.openSlots} ca có người báo rảnh.`, action: { label: "Chép tin nhắc người chưa đăng ký", run: () => nudge(m1) } });
   else if (st1.phase === "staff")
@@ -617,6 +679,9 @@ export const RosterBoard: React.FC<Props> = (p) => {
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>
+            <button type="button" disabled={readOnly || busy} onClick={copyPrevWeek} title="Chép khung giờ (không chép người) của tuần trước thành ca mở cho tuần đang xem" className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[var(--border)] text-xs font-bold text-[var(--text)] disabled:opacity-40">
+              <CopyPlus className="w-4 h-4" /> Chép khung giờ tuần trước
+            </button>
             <button type="button" disabled={readOnly || busy || openNoHost === 0} onClick={doAutofill} title={openNoHost === 0 ? "Tuần này không còn ca mở trống người" : undefined} className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[var(--border)] text-xs font-bold text-[var(--text)] disabled:opacity-40">
               <Wand2 className="w-4 h-4" /> Tự lấp chỗ trống
             </button>
@@ -749,6 +814,22 @@ export const RosterBoard: React.FC<Props> = (p) => {
             )}
           </div>
         </div>
+      )}
+
+      {wizardOpen && (
+        <OpenMonthWizard
+          month={m1}
+          today={today}
+          channels={wizardChannels}
+          sessions={p.sessions}
+          shiftSlots={p.shiftSlots}
+          deadline={months.find((m) => m.month === m1)?.signupDeadline}
+          onClose={() => setWizardOpen(false)}
+          onDone={async () => {
+            await Promise.all([p.onScheduleChanged(), reloadRoster()]);
+            setMonthsNonce((n) => n + 1);
+          }}
+        />
       )}
 
       {selected && (

@@ -91,6 +91,31 @@ export async function createShiftSlot(s: ShiftSlot): Promise<ShiftSlot> {
   return fromDb(data as DbShiftSlot);
 }
 
+/**
+ * Mở nhiều ca mở một lần ("Chép khung giờ tuần trước", Điều Phối Lịch Live 25/10) qua RPC create_open_slots (0181): một
+ * transaction, bỏ ca trùng khoá tự nhiên, MỘT tin tóm tắt cho mỗi talent thay vì một tin mỗi ca (34 ca ≈ 900 tin trước 0181).
+ * DB chưa chạy 0181 ⇒ lỗi PGRST202 (isRosterBackendMissing) — nơi gọi chặn, không rơi về insert từng ca.
+ */
+export async function createOpenSlots(list: ShiftSlot[], notify = true): Promise<{ created: number; skipped: number; notified: number }> {
+  const { data, error } = await supabase.rpc("create_open_slots", {
+    p_slots: list.map((s) => ({
+      date: s.date,
+      start_time: s.startTime,
+      end_time: s.endTime,
+      brand_id: s.brandId ?? "",
+      brand_name: s.brandName ?? "",
+      platform: s.platform ?? "TikTok",
+      studio_id: s.studioId ?? "",
+      studio_name: s.studioName ?? "",
+      notes: s.notes ?? ""
+    })),
+    p_notify: notify
+  });
+  if (error) throw error;
+  const d = (data as { created?: number; skipped?: number; notified?: number } | null) ?? {};
+  return { created: Number(d.created ?? 0), skipped: Number(d.skipped ?? 0), notified: Number(d.notified ?? 0) };
+}
+
 // Sinh ca hàng loạt: RPC generate_shift_slots (0088) vẫn tồn tại nhưng app không gọi từ 0090 —
 // Kế Hoạch Tháng chốt qua lock_month_plan (tự sinh shift_slots cùng khoá chống trùng).
 

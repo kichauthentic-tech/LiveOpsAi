@@ -232,6 +232,17 @@ export async function lockMonthPlan(planId: string): Promise<LockPlanResult> {
   return data as LockPlanResult;
 }
 
+/**
+ * Chốt nhiều kế hoạch trong MỘT transaction (0181, "Mở lịch tháng sau" của Điều Phối Lịch Live): trigger báo từng kế hoạch im
+ * lặng, `notify` = một tin tóm tắt/người. Nơi gọi đặt hạn đăng ký ngay sau thì truyền false — set_roster_month_deadline đã báo.
+ */
+export async function lockMonthPlans(planIds: string[], notify: boolean): Promise<{ plans: Record<string, LockPlanResult>; openSlots: number; notified: number }> {
+  const { data, error } = await supabase.rpc("lock_month_plans", { p_plan_ids: planIds, p_notify: notify });
+  if (error) throw error;
+  const d = (data as { plans?: Record<string, LockPlanResult>; open_slots?: number; notified?: number } | null) ?? {};
+  return { plans: d.plans ?? {}, openSlots: Number(d.open_slots ?? 0), notified: Number(d.notified ?? 0) };
+}
+
 export type { LockedPlanTargets };
 
 // Target/ca của mọi kế hoạch ĐÃ CHỐT. Bảng nhỏ, đọc 1 lần + sau mỗi lần chốt.

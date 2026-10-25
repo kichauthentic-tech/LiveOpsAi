@@ -142,6 +142,8 @@ export interface NextChannel {
   platform: ReportPlatform;
   brandName: string;
   committedHours: number | null;
+  /** Hao hụt áp cho kênh (đã kẹp 3–15%). */
+  shrink: number;
   r: NextRow;
 }
 
@@ -188,7 +190,7 @@ export function useRosterDesk(p: DeskProps & { registrations: ShiftRegistration[
         drafts: p.drafts,
         weeks: p.weeks
       });
-      return { brandId: card.brandId, platform: card.platform, brandName: card.brandName, committedHours, r };
+      return { brandId: card.brandId, platform: card.platform, brandName: card.brandName, committedHours, shrink: s.applied, r };
     });
   }, [nx.cards, nx.shrink, nx.reportSessions, cm, next, p.shiftSlots, p.registrations, p.drafts, p.weeks]);
   return { month, next, nowRows, nextRows, loading: now.loading || nx.loading || !cm, commitError: !!cm?.error };

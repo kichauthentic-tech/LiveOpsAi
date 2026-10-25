@@ -6495,3 +6495,26 @@ sau" 3 bước trong module (giờ cam kết → chép khung giờ → ca mở +
 24/10 "trainer lập + chốt Kế Hoạch Tháng"); (3) T11 lập lịch trong app hay Google Sheet; (4) gom 4 tab vào menu Thêm.
 Demo đầy đủ (user "làm demo đi"): https://claude.ai/artifact/6YoM6U3rE89iGcSNESPUyq — màn Lịch tuần + Việc cần làm + thẻ ca (lý do, báo nghỉ) + "Mở lịch tháng 11" 3 bước
 (chép khung tháng 10 khớp giờ cần mở, hoặc dán từ Sheet). Luật trùng như app (2 ca đã lên lịch trùng = vàng). Ca trùng thật: Khanh host JOCKEY 11–13 + Franklin Shopee 10–13 ngày 29/10.
+
+## Điều Phối Lịch Live bản gọn đợt 1–2 (2026-10-25)
+
+User chốt cả 4 điểm theo demo (gồm dải trạng thái tháng); câu 3: tháng 11 trainer lập lịch TRONG APP.
+
+**Đợt 1 (commit b26eed3).** Bỏ 3 chế độ + 6 tab con. `RosterBoard.tsx`: thẻ tháng (`roster/MonthStrip.tsx`, `lib/roster/monthStatus.ts` — pha
+none / no_deadline / signup / staff / publish / done / live / past, test `tests/monthStatus.test.ts`), "Việc cần làm" (lỗi chặn, tháng sau theo pha, kênh
+thiếu giờ ⇒ "Thêm ca" ở ngày ít ca nhất, ca chưa host, trùng giờ ca Sheet, thiếu trợ, ca mở, nháp, GMV không kịp ⇒ chép tin báo quản lý), giờ tháng + một kết
+luận cạnh kênh (`channelVerdict`, `useRosterDesk` trong MonthDesk.tsx), màn phụ dưới lưới từ "Thêm", "Người này báo nghỉ" trong ShiftPanel (lý do ghi sẵn).
+Thử app thật (admin): 3 thẻ tháng, 8 việc, menu, thẻ ca, mở lịch, tuần 2/11; sửa chữ "tab Tuần" + ô bước tháng chưa tới.
+
+**Đợt 2.** `OpenMonthWizard.tsx` + `lib/roster/openMonth.ts` (test `tests/openMonth.test.ts`): bước 1 giờ cam kết (điền theo hợp đồng / như tháng này —
+25/10 chỉ FUJIWA có hợp đồng CRM), bước 2 khung giờ (tuần mẫu = tuần đủ gần nhất đạt ≥ 80% tuần đông nhất trong 5 tuần — lấy tuần đông nhất thì VERA
+TikTok rơi về 14/09; khớp vừa giờ cần mở; hoặc dán Sheet "ngày/tháng giờ-giờ"; hoặc giữ lưới nháp CEO + target), bước 3 hạn. Ghi: `upsertMonthlyCommitment`
+(cùng luật isOverride Kế Hoạch Tháng) → `upsertMonthPlan` + `replacePlanSlots` (target 0) → `lock_month_plans` → `set_roster_month_deadline`.
+Thử DB thật tới bước 3 (KHÔNG bấm tạo): 7 kênh, 525 ca, 1.327 giờ; dán Sheet đọc 2/4 dòng (2 dòng khác tháng/ghi chú bị bỏ); nút chép tuần: 34 khung từ tuần
+19/10 (đã Huỷ); DB kiểm lại 0 ca/plan/hạn T11.
+**Phát hiện:** `trg_notify_slot_opened` (0116) báo MỖI talent cho MỖI ca mở tay ⇒ chép 34 ca ≈ 900 tin; `trg_notify_plan_locked` báo mỗi kế hoạch ⇒ mở
+T11 = 8 tin/người. **0181:** hai trigger im lặng theo cờ transaction `app.quiet_slot_notify`; `create_open_slots(jsonb, notify)` + `lock_month_plans(uuid[],
+notify)` (guard `private.roster_staff_guard`), 1 tin tóm tắt/người (wizard truyền notify = false khi đặt hạn ngay sau — tin hạn là tin duy nhất).
+Replay 0001→0181 sạch; `supabase/tests/0181_quiet_bulk_slots.sql` 12/12 (bỏ 0181 ⇒ đỏ mục 1); 0180 vẫn 21/21. Client: thiếu 0181 ⇒ nút chép tuần chặn,
+wizard chốt từng kênh (ghi rõ "1 tin/kênh").
+
