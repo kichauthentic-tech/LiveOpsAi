@@ -14,7 +14,7 @@
 ## 1. Giai đoạn hiện tại (cập nhật 2026-10-25)
 
 - **25/10: ĐIỀU PHỐI LỊCH LIVE BẢN GỌN (demo duyệt https://claude.ai/artifact/6YoM6U3rE89iGcSNESPUyq)** — Đợt 1 (b26eed3): MỘT màn = thẻ tháng (`MonthStrip`,
-  `monthStatus.ts`) + "Việc cần làm" có nút + lưới tuần có giờ tháng cạnh kênh; màn phụ ở menu "Thêm". Đợt 2 (`0181` CHƯA CHẠY): "Mở lịch tháng sau" 3 bước
+  `monthStatus.ts`) + "Việc cần làm" có nút + lưới tuần có giờ tháng cạnh kênh; màn phụ ở menu "Thêm". Đợt 2 (82ac9cd; `0181` ĐÃ CHẠY 25/10, RPC kiểm trên DB thật): "Mở lịch tháng sau" 3 bước
   (`OpenMonthWizard`, `openMonth.ts`) ghi qua đường Kế Hoạch Tháng (cam kết → plan + ca target 0 → `lock_month_plans` → hạn) + "Chép khung giờ tuần trước"
   (`create_open_slots`). Target T11: CEO/admin "Chia lại target". Chi tiết: lịch sử `## Điều Phối Lịch Live bản gọn đợt 1–2 (2026-10-25)`.
 - **24–25/10: BẢNG VẬN HÀNH (gộp Phòng Điều Hành e5d9364 + làm theo audit 073c231; đã push, không migration)** — 2 chế độ "Hôm nay & tuần" /
@@ -53,8 +53,8 @@
   view chưa có cột ⇒ đọc lại không có `live_evidence`, mỗi lần mở app tốn 2 request 400 tới khi chạy). Sau khi chạy: Bảng Vận Hành / Sổ Ca
   thấy ca quá giờ tự "Đã xong" lại (trước đó `complete_past_sessions` lỗi cả lô vì cặp trùng người). Nên bật pg_cron (Database → Extensions)
   để ca được đóng cả khi không ai mở app. Code đã push `9426932` (19/10, gồm run-rate theo ca 11/10 + bố cục 18–19/10) — Vercel tự deploy từ main.
-- **Điều Phối Lịch Live (25/10):** chạy `0181_quiet_bulk_slots.sql` TRƯỚC deploy (thiếu ⇒ nút chép tuần bị chặn, trình mở tháng chốt từng kênh = 1 tin/kênh/talent);
-  rồi bấm "Mở lịch tháng 11" (đã thử tới bước 3 trên DB thật: 7 kênh, 525 ca, 1.327 giờ — CHƯA bấm tạo). Còn: tài khoản Trainer; rate/giá; GMV hợp đồng FUJIWA (450 → 450M).
+- **Điều Phối Lịch Live (25/10):** `0181` ĐÃ CHẠY + code đã push (b26eed3, 82ac9cd). Việc của user:
+  bấm "Mở lịch tháng 11" (đã thử tới bước 3 trên DB thật: 7 kênh, 525 ca, 1.327 giờ — CHƯA bấm tạo). Còn: tài khoản Trainer; rate/giá; GMV hợp đồng FUJIWA (450 → 450M).
 - **Đối soát / GMV ca (13/10):** 0174 ĐÃ CHẠY. Còn: deploy client; Áp dụng lô CROCS T10 01–13/10, Áp Dụng Lại lô VERA Shopee 08–10/10 (Claude bị chặn bấm — user bấm); ca CROCS 11/10 09–12 (file tải 13:35) nên gõ GMV đúng ở form Giao ca trước khi Áp dụng.
 - **Bảng Vận Hành · Cả tháng (Phòng Điều Hành cũ, 0170 ĐÃ CHẠY):** đặt `ANTHROPIC_API_KEY` trên Vercel nếu muốn hỏi bằng Claude (thiếu thì chỉ Gemini). Role brand chỉ thấy điểm của ngày sổ dự báo đã ghi (Dashboard được mở ngày đó).
 - **0166–0168 ĐÃ CHẠY 11/10.** Còn thử thật: (0168) deploy rồi up Live List giữa phiên ở một ca nối Shopee; (0167) xem lại rồi Áp dụng lô VERA Shopee 01–10/10 đã gộp, TikTok chưa kiểm nhóm restart; (0166) bỏ tick vài phiên → Áp dụng → ca khớp phiên bỏ tick phải giữ nguyên số.
