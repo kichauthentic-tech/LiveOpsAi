@@ -196,27 +196,56 @@ export interface CreatorTotals {
   sessions: number;
   creators: number;
   gmv: number;
+  /** Σ target của các phiên CÓ target; `gmvWithTarget`/`targetSessions` = GMV và số phiên của đúng các phiên đó — % target chỉ
+   *  tính trên tập này (audit 27/10: CROCS T9 lấy GMV cả 4 phiên ÷ target của 1 phiên ⇒ 117,7% thay vì 75%). */
   target: number;
+  gmvWithTarget: number;
+  targetSessions: number;
+  /** Σ giờ / GMV của các phiên có giờ — GMV/giờ chỉ tính trên tập này. */
   hours: number;
+  hoursGmv: number;
+  /** Σ Ads / GMV / số phiên của các phiên có Ads — ROAS chỉ tính trên tập này. */
   ads: number;
+  adsGmv: number;
+  adsSessions: number;
   /** Tên creator lớn nhất + tỷ trọng GMV (%). */
   top: { creator: string; share: number } | null;
 }
 
 export function creatorTotals(rows: CreatorSessionRow[]): CreatorTotals {
   const by = new Map<string, number>();
-  const t: CreatorTotals = { sessions: rows.length, creators: 0, gmv: 0, target: 0, hours: 0, ads: 0, top: null };
+  const t: CreatorTotals = { sessions: rows.length, creators: 0, gmv: 0, target: 0, gmvWithTarget: 0, targetSessions: 0, hours: 0, hoursGmv: 0, ads: 0, adsGmv: 0, adsSessions: 0, top: null };
   for (const r of rows) {
     t.gmv += r.gmv;
-    t.target += r.target ?? 0;
-    t.hours += r.hours ?? 0;
-    t.ads += r.ads ?? 0;
+    if (r.target) {
+      t.target += r.target;
+      t.gmvWithTarget += r.gmv;
+      t.targetSessions++;
+    }
+    if (r.hours) {
+      t.hours += r.hours;
+      t.hoursGmv += r.gmv;
+    }
+    if (r.ads) {
+      t.ads += r.ads;
+      t.adsGmv += r.gmv;
+      t.adsSessions++;
+    }
     by.set(r.creator.trim().toLowerCase(), (by.get(r.creator.trim().toLowerCase()) ?? 0) + r.gmv);
   }
   t.creators = by.size;
   const best = [...by.entries()].sort((a, b) => b[1] - a[1])[0];
   if (best && t.gmv > 0) t.top = { creator: rows.find((r) => r.creator.trim().toLowerCase() === best[0])!.creator, share: (best[1] / t.gmv) * 100 };
   return t;
+}
+
+/** % target, GMV/giờ, ROAS của bảng creator — mỗi tỷ lệ chỉ trên các phiên có đủ tử lẫn mẫu số. */
+export function creatorRates(t: CreatorTotals): { pctTarget: number | null; gmvPerHour: number | null; roas: number | null } {
+  return {
+    pctTarget: t.target > 0 ? (t.gmvWithTarget / t.target) * 100 : null,
+    gmvPerHour: t.hours > 0 ? t.hoursGmv / t.hours : null,
+    roas: t.ads > 0 ? t.adsGmv / t.ads : null
+  };
 }
 
 export interface CreatorPlanRow {

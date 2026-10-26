@@ -139,7 +139,7 @@ test("kết luận trước: kết quả, nguyên nhân quy ra tiền, thị tr�
   expect(next).not.toContain("5,5B");
   expect(autoNextSteps({ ...input, nextPlan: null }).join("\n")).toContain("Chốt target và lịch live tháng 10.");
   // Việc của các phần (đã bỏ trùng) nối sau, không lặp.
-  const sku = "Rà Baya Platform - Winter White: tồn kho, giá và thời lượng giới thiệu trên live (GMV mỗi ngày −32%).";
+  const sku = "Kiểm tra Baya Platform - Winter White: tồn kho, giá và thời lượng giới thiệu trên live (GMV mỗi ngày −32%).";
   const withSteps = autoNextSteps({ ...input, sectionSteps: [sku, sku] });
   expect(withSteps.filter((l) => l === sku)).toHaveLength(1);
 

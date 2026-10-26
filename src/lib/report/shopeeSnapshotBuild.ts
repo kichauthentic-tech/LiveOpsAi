@@ -5,6 +5,8 @@ import { shopeeAdsStats } from "../dataraw/shopeeAds";
 import { fetchDataRawImportStamps } from "../db/brandDataRaw";
 import { fetchMonthlyReportSnapshot } from "../db/monthlyReportSnapshots";
 import { buildShopeeSnapshot, shopeeStampsFor, type ShopeeHeadline, type ShopeeReportSnapshot } from "./shopeeSnapshot";
+import { fetchMonthPlan } from "../db/monthPlans";
+import { effectiveCamp } from "../campaignDays";
 
 // Phần có I/O của bản chụp Report Shopee: đọc 4 loại file Shopee trong kho Dữ Liệu Gốc của tháng + bản chụp Shopee
 // tháng trước (để so cùng kỳ), rồi giao cho hàm thuần buildShopeeSnapshot (lib/report/shopeeSnapshot.ts).
@@ -19,14 +21,16 @@ export async function buildShopeeReportSnapshot(input: { brandId: string; month:
   const { brandId, month, sessions } = input;
   const start = `${month}-01`;
   const end = `${month}-31`;
-  const [live, daily, products, overview, ads, imports, prevStored] = await Promise.all([
+  const [live, daily, products, overview, ads, imports, prevStored, plan] = await Promise.all([
     fetchOverlappingBatchRows(brandId, "shopee_live_list", start, end),
     fetchOverlappingBatchRows(brandId, "shopee_daily", start, end),
     fetchOverlappingBatchRows(brandId, "shopee_product_list", start, end),
     fetchOverlappingBatchRows(brandId, "shopee_overview", start, end),
     fetchOverlappingBatchRows(brandId, "shopee_ads", start, end),
     fetchDataRawImportStamps(brandId),
-    fetchMonthlyReportSnapshot(brandId, prevMonthOf(month), "Shopee").catch(() => null)
+    fetchMonthlyReportSnapshot(brandId, prevMonthOf(month), "Shopee").catch(() => null),
+    // Khung camp của Kế Hoạch Tháng Shopee — cùng nguồn với report TikTok (effectiveCamp), không đọc lịch cố định khi đã có kế hoạch.
+    fetchMonthPlan(brandId, month, "Shopee").catch(() => null)
   ]);
   const prev: ShopeeHeadline | null = (prevStored?.snapshot as unknown as ShopeeReportSnapshot | undefined)?.headline ?? null;
   return buildShopeeSnapshot({
@@ -40,6 +44,7 @@ export async function buildShopeeReportSnapshot(input: { brandId: string; month:
     files: { live: live.hasAnyBatch, daily: daily.hasAnyBatch, products: products.hasAnyBatch, overview: overview.hasAnyBatch },
     prev,
     ads: ads.hasAnyBatch ? shopeeAdsStats(ads.rows) : null,
+    campOverrides: effectiveCamp(plan?.plan.campRanges),
     stamps: shopeeStampsFor(imports, month)
   });
 }

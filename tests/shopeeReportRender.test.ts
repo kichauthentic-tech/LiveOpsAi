@@ -36,7 +36,8 @@ describe("Report Shopee — trạng thái rỗng", () => {
     expect(html).toContain("Chưa có file overview");
     expect(html).toContain("Chưa có file Live List");
     expect(html).toContain("Chưa có file Product List");
-    expect(html).toContain("Cách tính và điểm cần xác nhận");
+    expect(html).toContain("Cách tính");
+    expect(html).toContain("Chỉ ops thấy — cần xác nhận trước khi phát hành");
   });
 });
 
@@ -90,6 +91,11 @@ describe.skipIf(!haveReal)("Report Shopee — 4 file thật VERA T9", () => {
     expect(html).toContain("2.232");
     // brand (canManage=false) không thấy nút Sửa Insight
     expect(render(s, false)).not.toContain("Sửa Insight");
+    // Audit 27/10: bản brand không có chữ nội bộ (ca trong app, số tạm, đối soát, Dữ Liệu Gốc).
+    // Chữ hiển thị (bỏ tooltip title= của từ điển chỉ số, dùng chung toàn app).
+    const brandHtml = render(s, false).replace(/ title="[^"]*"/g, "");
+    for (const w of ["ca trong app", "Lịch ca trong app", "số tạm", "đối soát", "Dữ Liệu Gốc", "Chỉ ops thấy", ">Ca<"]) expect(brandHtml).not.toContain(w);
+    expect(brandHtml).toContain(">Phiên<");
     expect(html).toContain("Sửa Insight");
   });
 });

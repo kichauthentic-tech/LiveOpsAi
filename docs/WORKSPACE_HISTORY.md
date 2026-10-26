@@ -6518,3 +6518,48 @@ notify)` (guard `private.roster_staff_guard`), 1 tin tóm tắt/người (wizard
 Replay 0001→0181 sạch; `supabase/tests/0181_quiet_bulk_slots.sql` 12/12 (bỏ 0181 ⇒ đỏ mục 1); 0180 vẫn 21/21. Client: thiếu 0181 ⇒ nút chép tuần chặn,
 wizard chốt từng kênh (ghi rõ "1 tin/kênh").
 
+
+## Audit Report Tháng trên dữ liệu thật (2026-10-27)
+
+User: "Audit report tháng và tiếp tục tìm phương án tối ưu". Đề xuất (hình, phát hiện 1–6 + phương án A–D): https://claude.ai/artifact/Hh4aiZB3EuFpr7J9HVwith.
+Không sửa code. Đo bằng phiên admin trên app dev nối DB thật (`await import('/src/lib/supabaseClient.ts')` trong `javascript_tool`) + đọc 2 deck PDF T9 trong ~/Downloads.
+
+**Số đo 27/10.**
+- Phát hành: 1/22 kênh-tháng T6–T9 (CROCS T7, 05/10). Bản chụp có: CROCS T7–T10, Franklin T9 (05/10, cũ), VERA Shopee T9. Việc "Report tháng trước chưa phát hành" có ở todoList từ 04/10.
+- Deck tay: CROCS T9 32 trang xong 01/10 09:25 (Total GMV đủ tháng 7,56B), Franklin T9 28 trang xong 04/10 (song ngữ, file Order, whole shop).
+- File trong app: CROCS T9 shop_analytics/product_list/promotion 1–22/09, live_analysis 1–21/09; Franklin T9 chỉ Ads; VERA/JOCKEY TikTok chưa từng có file shop; VERA Shopee T9 đủ 4 file + Ads; T10 chưa kênh nào có file shop.
+- Deck → trang app: CROCS 24 slide nội dung = 20 đủ / 4 một phần (từng creator, action plan có "Căn cứ / Chỉ tiêu theo dõi"); Franklin 20 = 11 / 6 / 3 chưa (KPI theo dịch vụ, hủy theo Order, Direct vs Indirect).
+- CROCS T9 deck vs app: Seller LIVE 5,247B vs 5,22B; Orders 4.298 vs 4.576; giờ 249,8 vs 262,2 (nguồn deck khác, biết từ 26/09). Deck có target T9 5,22B — app không có Kế Hoạch Tháng T9 nên bảng điểm trống.
+
+**7 lỗi đã kiểm trong code (chưa sửa).** (1) `creatorTotals` (brandReport.ts): % target = Σ GMV mọi phiên ÷ Σ target phiên có target, ROAS = Σ GMV ÷ Ads của phiên có Ads ⇒ CROCS T9 117,7% / 35,6x (đúng trên phiên có số: 75% / 22,7x; deck 36% vì 6 phiên, target 1,6B). (2) `sectionInsights.ts:292` câu hành động "thấp hơn trung bình ổn định" cho host mà Insight ghi "sát ngưỡng" (T9 Phú, T10 Trang) + nêu tên host yếu trong bản gửi brand. (3) Trang 1: Total GMV (1–22) cạnh LIVE GMV (1–30). (4) Trang Toàn shop/Sản phẩm không có `canManage` ở chữ "Chưa có file … Dữ Liệu Gốc" (MonthlyReportTabs 1070/1249/1359/1448) và `sectionShown` luôn true. (5) `peopleInsight` nhận `reliability` cả nhóm 4 tháng ⇒ nêu host không live tháng report (T10: Trương Thị Khánh Linh); hai host cùng tên ngắn "Linh". (6) Report Shopee: "ca", "số tạm", "Lịch ca trong app" hiện với brand; khung camp cố định; không so tháng trước, không target. (7) Ba số "Daily" trên một report (−16% đối chứng, −29% GMV/giờ, −8,4% GMV ở Insight trang 7).
+
+**Phương án (chờ user):** A sửa 7 lỗi (không migration) · B màn "Chốt tháng" 7 kênh × đầu vào + chặn phát hành khi file shop thiếu ngày / bản "chỉ livestream" (đã nêu 06/10 Đợt 4 và 23/10 R1) · C xuất deck 16:9 PPTX/PDF (treo từ 23/10) · D report Shopee cùng khung TikTok. Vẫn treo: whole shop, song ngữ, file Order, sổ việc tháng trước → kết quả.
+
+## Report Tháng: sửa 7 lỗi + Chốt tháng (2026-10-27)
+
+User: "Làm A (sửa 7 lỗi) rồi B (màn Chốt tháng) để kịp chốt tháng 10". BUILT, commit + push main 27/10 (user yêu cầu), không migration.
+
+**A — 7 lỗi.** (1) `creatorTotals` thêm `gmvWithTarget/targetSessions`, `hoursGmv`, `adsGmv/adsSessions` + `creatorRates` ⇒ CROCS T9 75,08% target · 1/4 phiên, ROAS 22,7x · 1/4 phiên
+(trước 117,7% / 35,6x). (2) `peopleInsight` bỏ câu "Xem lại … ổn định qua N phiên" khỏi việc gửi brand; `peopleOpsNote` (chỉ ops, dưới Insight trang Host) nói đúng mức:
+"có ý nghĩa" vs "sát ngưỡng, theo dõi thêm một tháng". (3) Trang 1: nhãn "Total GMV · 1–22/09", ô LIVE GMV ghi "1–22/09: 3,68B = 70,60% Total GMV cùng kỳ · cả tháng 96 phiên".
+(4) `sectionShown.shop/products` = ops hoặc có file; chữ "Chưa có file … Dữ Liệu Gốc" chỉ ops, brand thấy "Chưa có số …". (5) `peopleInsight` chỉ nói host có live tháng
+report. (6) Report Shopee `SHOPEE_SNAPSHOT_VERSION` 4: `campOverrides` từ Kế Hoạch Tháng Shopee (`effectiveCamp`) + `campDays`/`campFromPlan`; nhận xét "phiên"; số tạm
+/đối soát ra khỏi nhận xét; `shopeeNotes(s, "brand" | "ops")` — màn tính lại nhận xét + ghi chú từ bản chụp (cả bản chụp cũ), ghi chú ops trong hộp "Chỉ ops thấy";
+bảng Host cột "Phiên". Bản chụp lưu `notes` = brand + ops (cho bản đọc cũ). (7) `contextInsight` câu đầu = khung giờ (bỏ "Daily −x% GMV"); "Rà"/"rà soát" → "Kiểm tra"/"xem lại".
+Tooltip từ điển chỉ số METRIC_HINT Items Sold còn chữ "ca … đối soát" (dùng chung toàn app, không đổi).
+
+**B — Chốt tháng.** `lib/report/monthClose.ts`: `CLOSE_COLUMNS` theo sàn (TikTok: Ca có số · Đối soát · Shop Analytics · Sản phẩm · Khuyến mãi · Ads (tuỳ chọn) · Affiliate
+(phiên kế hoạch quá ngày + độ phủ Live Analysis) · Kế hoạch tháng sau · Report; Shopee: Live List · Theo ngày · Overview · Product List · Ads), `fileCoverage` (hợp
+các khoảng period của dấu file), `closeMonthFor` (tháng đã hết = chính nó; tháng đang chạy tới ngày 10 = tháng trước), `closeDeadline` (ngày 3), tháng chưa hết thiếu file
+⇒ ô xám "tải sau 31/10" (không đỏ), `publishBlocker`. UI `components/MonthClosePanel.tsx` trên đầu Toàn Cảnh Brand (dòng xếp theo số ô thiếu, ô chưa đủ là nút mở
+Dữ Liệu Gốc / Nhập Ads / Affiliate / Sổ Ca / Kế Hoạch Tháng / Report). Chặn phát hành: `useReportPublish.handlePublish` (Toàn Cảnh Brand) và `BrandMonthlyReport.handlePublish`.
+
+**Verify.** vitest 1031/1034 — 3 lỗi: `noCrossPlatformPerf` (do tên trường `targetGmv` mới — đã đổi `gmvWithTarget`, chạy lại xanh) + `layoutConventions`
+(OpenMonthWizard.tsx:238) và `platformProfiles` (shiftSlots.ts:107) đỏ cả trên main sạch (có từ trước, không thuộc đợt này). Test mới: `tests/monthClose.test.ts` (7),
+brandReport/sectionInsights/shopeeSnapshot/shopeeReportRender bổ sung. tsc 0, eslint 0 ở file đợt này, vite build OK, audit:dead 2 mục cũ (roster.setRosterDeadline,
+brandCommitment.liveHoursOf). App thật (dev, DB thật, admin): Chốt tháng 10 TikTok hạn 03/11 còn 7 ngày (JOCKEY 2 ca chưa có số, VERA 1 ca chưa gán host); T9 TikTok
+CROCS 22/30 ngày · Live Analysis 21/30, quá hạn 24 ngày; Shopee T10 Franklin Live List 18/19 ngày (kênh mở 08/10); 375px không tràn. `publishBlocker` trên dấu file thật:
+chỉ CROCS T9 TikTok bị chặn. Bấm thử nút Phát hành bị chặn quyền (thao tác gửi brand) — chưa thử bấm thật. Report CROCS T9 + VERA Shopee T9 đọc lại đúng các sửa ở trên.
+
+**Còn mở:** C xuất deck 16:9 (PPTX/PDF), D Shopee target + trang tháng sau; whole shop, song ngữ, file Order, sổ việc tháng trước. Bản chụp VERA Shopee T9 / CROCS T10 cần
+"Cập nhật số liệu" để lấy bản 4 / số mới.

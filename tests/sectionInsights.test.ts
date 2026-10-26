@@ -7,6 +7,7 @@ import {
   insightToText,
   parseInsightText,
   peopleInsight,
+  peopleOpsNote,
   productsInsight,
   sectionNextSteps,
   shopInsight,
@@ -89,10 +90,20 @@ test("Người — chỉ nêu tên khi so mặt bằng 4 tháng chắc chắn; c
   expect(i.points).toEqual(["3 host còn lại chưa khác biệt rõ so với trung bình (khoảng tin cậy còn cắt qua mức trung bình)."]);
   expect(i.points.join(" ")).not.toContain("Thy");
   expect(i.action).toBeNull(); // Hùng live nhiều giờ nhất ⇒ không gợi ý thêm ca
-  // Host dưới mặt bằng chắc chắn ⇒ nêu tên + việc cần làm.
-  const j = peopleInsight(hosts, [...rel.slice(0, 1), { ...rel[2], lo: 0.8, hi: 0.93, ratio: 0.86, verdict: "below" as const }])!;
+  // Host dưới mặt bằng chắc chắn ⇒ nêu ở Insight (số + khoảng tin cậy); việc "xem lại host" là ghi chú nội bộ, không vào bản gửi brand.
+  const phuBelow = { ...rel[2], lo: 0.8, hi: 0.93, ratio: 0.86, verdict: "below" as const };
+  const j = peopleInsight(hosts, [...rel.slice(0, 1), phuBelow])!;
   expect(j.points[0]).toBe("Phú: thấp hơn trung bình −14% (−20% … −7%) qua 18 phiên.");
-  expect(j.action).toMatch(/^Xem lại khung giờ và nhóm SKU của Phú/);
+  expect(j.action).toBeNull();
+  expect(peopleOpsNote(hosts, [phuBelow])).toBe("Thấp hơn trung bình các host có ý nghĩa: Phú −14% (−20% … −7%) qua 18 phiên — xem lại khung giờ và nhóm SKU được xếp.");
+  // Audit 27/10: sát ngưỡng thì không được gọi là "ổn định".
+  const phuEdge = { ...phuBelow, hi: 0.985 };
+  expect(peopleOpsNote(hosts, [phuEdge])).toMatch(/^Sát ngưỡng, theo dõi thêm một tháng trước khi đổi lịch: Phú/);
+  expect(peopleOpsNote(hosts, [phuEdge])).not.toContain("ổn định");
+  // Host có trong nhóm 4 tháng nhưng không live tháng này ⇒ không nhắc ở Insight lẫn ghi chú.
+  const linh = { key: "l", name: "Linh", sessions: 14, ratio: 0.81, lo: 0.72, hi: 0.91, verdict: "below" as const };
+  expect(peopleInsight(hosts, [...rel, linh])!.points.join(" ")).not.toContain("Linh");
+  expect(peopleOpsNote(hosts, [linh])).toBeNull();
   expect(peopleInsight([mk("Một mình", 100, 5)])).toBeNull();
 });
 
@@ -125,7 +136,7 @@ test("Hàng — SKU dẫn đầu giảm mạnh: nêu ở kết luận, không l�
   expect(down).toContain("Baya Platform - Barely Pink (3 → 6");
   expect(i.points.find((l) => l.startsWith("Lên hạng"))).toContain("Bayaband - White (20 → 5");
   expect(i.points.some((l) => /^Baya - White được bấm nhiều/.test(l))).toBe(true);
-  expect(i.action).toMatch(/^Rà Baya Platform - Winter White/);
+  expect(i.action).toMatch(/^Kiểm tra Baya Platform - Winter White/);
   expect(productsInsight(null, null)).toBeNull();
   expect(shortSku("Classic - Bone - 10001-2Y2")).toBe("Classic - Bone");
   expect(shortSku("Túi vải")).toBe("Túi vải");
@@ -178,9 +189,10 @@ test("Bối cảnh — đếm khung camp tăng/giảm cùng khung tháng trướ
       { label: "Tối (từ 17h)", cur: { n: 22, gmvPerHour: 20_500_000 }, prev: { n: 23, gmvPerHour: 28_100_000 } }
     ]
   )!;
-  expect(i.headline).toBe("Daily −22,5% GMV so với cùng kỳ tháng trước; 0/2 khung Campaign đã chạy tăng GMV so với cùng khung tháng trước.");
-  // Không đọc lại từng dòng bảng Campaign — chỉ còn câu khung giờ.
-  expect(i.points).toEqual(["Khung giờ bắt đầu phiên: tối (từ 17h) bán tốt nhất (20,5M/giờ), sáng (trước 12h) thấp nhất (19,5M/giờ, 18 phiên)."]);
+  // Audit 27/10: trang Host & khung giờ mở bằng câu khung giờ — GMV Daily đã ở trang 1 và 3, không thêm con số Daily thứ ba.
+  expect(i.headline).toBe("Khung giờ bắt đầu phiên: tối (từ 17h) bán tốt nhất (20,5M/giờ), sáng (trước 12h) thấp nhất (19,5M/giờ, 18 phiên).");
+  expect(i.points).toEqual([]);
+  expect(`${i.headline} ${i.points.join(" ")}`).not.toMatch(/Daily −22,5%/);
   expect(i.action).toMatch(/^Xem lại cách chạy Daily: GMV\/giờ −37%/);
 });
 
@@ -196,13 +208,13 @@ test("Việc cần làm của các phần gom về phần 7, bỏ việc autoNex
   const ins = (action: string | null) => ({ headline: "x", points: [], action });
   const all = {
     shop: ins("Ngày thường giảm do vận hành livestream, không phải do thị trường — xem trang Phân tích nguyên nhân để biết yếu tố nào giảm và điều chỉnh lịch tháng sau."),
-    why: ins("Điểm nghẽn ở traffic vào phòng — rà soát khung giờ, thumbnail, tiêu đề phiên và ngân sách Ads cho live."),
-    products: ins("Rà Baya Platform - Winter White: tồn kho, giá và thời lượng giới thiệu trên live (GMV mỗi ngày −32%)."),
+    why: ins("Điểm nghẽn ở traffic vào phòng — xem lại khung giờ, thumbnail, tiêu đề phiên và ngân sách Ads cho live."),
+    products: ins("Kiểm tra Baya Platform - Winter White: tồn kho, giá và thời lượng giới thiệu trên live (GMV mỗi ngày −32%)."),
     people: ins(null),
     context: ins("Xem lại cách chạy Daily: GMV/giờ −38% so với cùng kỳ tháng trước.")
   };
   // CROCS T9: ngày thường hụt do vận hành ⇒ chỉ còn việc về SKU.
-  expect(sectionNextSteps(all, "daily")).toEqual(["Rà Baya Platform - Winter White: tồn kho, giá và thời lượng giới thiệu trên live (GMV mỗi ngày −32%)."]);
+  expect(sectionNextSteps(all, "daily")).toEqual(["Kiểm tra Baya Platform - Winter White: tồn kho, giá và thời lượng giới thiệu trên live (GMV mỗi ngày −32%)."]);
   // Không có nhóm hụt do vận hành ⇒ việc Daily + việc của phần 2 (vd affiliate) là việc mới.
   const noOps = sectionNextSteps({ ...all, shop: ins("Tỷ trọng Affiliate LIVE giảm — rà lịch creator và gói hỗ trợ affiliate cho tháng sau.") }, null);
   expect(noOps).toHaveLength(3);

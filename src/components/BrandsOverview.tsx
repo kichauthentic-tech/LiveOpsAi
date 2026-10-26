@@ -19,6 +19,8 @@ import { BrandLogo } from "./ui/BrandLogo";
 import { PageHeader } from "./common/PageHeader";
 import { MonthPicker } from "./common/MonthPicker";
 import { useReportPublish } from "../hooks/useReportPublish";
+import { MonthClosePanel } from "./MonthClosePanel";
+import { closeMonthFor } from "../lib/report/monthClose";
 
 // Màn toàn cảnh 4 brand cho agency (Đợt C/6, 2026-09-23) — BẢNG trạng thái từng brand cho MỘT
 // tháng đang xem, không phải widget KPI kiểu Dashboard cũ (xoá 2026-09-13 vì số tính live/dự phóng
@@ -254,6 +256,18 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ platform, brands
       {errorMsg && (
         <div className="p-3 bg-red-950/80 border border-red-800/50 rounded-xl text-red-300 text-xs font-semibold">{errorMsg}</div>
       )}
+
+      {/* Chốt tháng (27/10): tháng đang xem nếu đã hết; tháng này thì tới ngày 10 vẫn chốt tháng trước. */}
+      <MonthClosePanel
+        platform={platform}
+        month={closeMonthFor(month, today)}
+        today={today}
+        brands={brands}
+        brandChannels={brandChannels}
+        sessions={sessions}
+        monthlyReports={monthlyReports}
+        onNavigate={onNavigate}
+      />
 
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-xl">
         <div className="overflow-x-auto">

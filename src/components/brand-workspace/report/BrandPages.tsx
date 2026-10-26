@@ -6,6 +6,7 @@ import {
   DAY_TYPE_FACTORS,
   KEY_METRICS_TABS,
   changeTone,
+  creatorRates,
   keyMetricsTable,
   type ChangeTone,
   type CreatorPlanRow,
@@ -259,13 +260,16 @@ export const AffiliatePanel: React.FC<{ rows: CreatorSessionRow[]; totals: Creat
   totals,
   shopAffiliate,
   agencyGmvPerHour
-}) => (
-  <Panel title="Phiên livestream của creator" icon={<Users className="w-4 h-4" />} sub="Tab Affiliate · Direct GMV trong phiên · ROAS = Direct GMV ÷ Ads cost của phiên">
+}) => {
+  const rate = creatorRates(totals);
+  const partOf = (n: number) => (n < totals.sessions ? ` · ${n}/${totals.sessions} phiên` : "");
+  return (
+  <Panel title="Phiên livestream của creator" icon={<Users className="w-4 h-4" />} sub="Tab Affiliate · Direct GMV trong phiên · % Target và ROAS chỉ tính trên các phiên có target / có Ads cost">
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-3 mb-4">
-      <KpiTile frame="plain" label={METRIC.directGmv} value={fmtVndShort(totals.gmv)} note={totals.target > 0 ? `${fmtPct((totals.gmv / totals.target) * 100)} target ${fmtVndShort(totals.target)}` : undefined} />
+      <KpiTile frame="plain" label={METRIC.directGmv} value={fmtVndShort(totals.gmv)} note={rate.pctTarget != null ? `${fmtPct(rate.pctTarget)} target ${fmtVndShort(totals.target)}${partOf(totals.targetSessions)}` : undefined} />
       <KpiTile frame="plain" label="Phiên · giờ" value={`${totals.sessions} · ${fmtHours(totals.hours)}`} note={`${totals.creators} creator`} />
-      <KpiTile frame="plain" label={METRIC.gmvPerHour} value={totals.hours > 0 ? fmtVndShort(totals.gmv / totals.hours) : "—"} note={agencyGmvPerHour != null ? `${METRIC.liveGmv} (YFB) ${fmtVndShort(agencyGmvPerHour)}` : undefined} />
-      <KpiTile frame="plain" label={METRIC.roas} value={totals.ads > 0 ? `${fmtFixed(totals.gmv / totals.ads, 1)}x` : "—"} note={totals.ads > 0 ? `${METRIC.adsCost} ${fmtVndShort(totals.ads)}` : undefined} />
+      <KpiTile frame="plain" label={METRIC.gmvPerHour} value={rate.gmvPerHour != null ? fmtVndShort(rate.gmvPerHour) : "—"} note={agencyGmvPerHour != null ? `${METRIC.liveGmv} (YFB) ${fmtVndShort(agencyGmvPerHour)}` : undefined} />
+      <KpiTile frame="plain" label={METRIC.roas} value={rate.roas != null ? `${fmtFixed(rate.roas, 1)}x` : "—"} note={rate.roas != null ? `${METRIC.adsCost} ${fmtVndShort(totals.ads)}${partOf(totals.adsSessions)}` : undefined} />
     </div>
     <ReportTable head={["Creator", "Phiên", METRIC.directGmv, METRIC.targetGmv, METRIC.pctTarget, METRIC.gmvPerHour, METRIC.roas]}>
       {rows.map((r, idx) => {
@@ -292,7 +296,8 @@ export const AffiliatePanel: React.FC<{ rows: CreatorSessionRow[]; totals: Creat
       Mỗi creator chỉ có vài phiên mỗi tháng nên chênh lệch giữa hai phiên có thể là biến động ngẫu nhiên.
     </p>
   </Panel>
-);
+  );
+};
 
 // ---------- Trang 9: lịch creator tháng sau ----------
 

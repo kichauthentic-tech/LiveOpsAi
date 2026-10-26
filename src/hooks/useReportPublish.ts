@@ -9,6 +9,8 @@ import { brandMonthKey, platformOf, type ReportPlatform } from "../lib/reportPla
 import { dataSourceTier } from "../lib/dataSource";
 import { errorMessage } from "../lib/errorMessage";
 import { useConfirm } from "./useConfirm";
+import { publishBlocker } from "../lib/report/monthClose";
+import { todayVn } from "../lib/performance/brandCommitment";
 
 // Phát hành / thu hồi Report Tháng của một brand × sàn × tháng. Trước 23/10 nằm trong màn "Điều Phối Phát Hành" riêng; audit trùng màn
 // 23/10 gộp màn đó vào Toàn Cảnh Brand (cột Report Tháng) — logic giữ nguyên, chỉ chuyển chỗ.
@@ -62,6 +64,12 @@ export function useReportPublish({ platform, brands, sessions, brandPlatformRate
     let hasStored: boolean;
     try {
       const [stored, stamps] = await Promise.all([fetchMonthlyReportSnapshot(brandId, month, platform), fetchDataRawImportStamps(brandId)]);
+      // Chốt tháng (27/10): file toàn shop phủ thiếu ngày ⇒ không phát hành (lib/report/monthClose.ts).
+      const blocker = publishBlocker(platform, month, stamps, todayVn(), sessions.filter((s) => s.brandId === brandId && platformOf(s) === platform && s.status !== "Cancelled").map((s) => s.date));
+      if (blocker) {
+        setRowError((prev) => ({ ...prev, [key]: blocker }));
+        return;
+      }
       hasStored = !!stored;
       if (stored) {
         const f = engine.freshness(stored.snapshot as AnySnapshot, { sessions, planMonthTotals, brandPlatformRates, stamps, month });

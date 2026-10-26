@@ -17,7 +17,7 @@ import { CreatorLivePerfRow, vnDateOf } from "../../lib/dataraw/creatorLivePerfS
 import { fetchMonthPlan } from "../../lib/db/monthPlans";
 import type { BrandMonthPlan, BrandMonthPlanSlot } from "../../types";
 import { fetchMonthlyReport, saveMonthlyReportNarrative, saveMonthlyReportSectionNote } from "../../lib/db/monthlyReports";
-import { contextInsight, HostInsightRow, hostVsPeer, InsightSection, insightToText, parseInsightText, peopleInsight, productsInsight, sectionNextSteps, SectionInsight, shopInsight, shortSku, whyInsight } from "../../lib/report/sectionInsights";
+import { contextInsight, HostInsightRow, hostVsPeer, InsightSection, insightToText, parseInsightText, peopleInsight, peopleOpsNote, productsInsight, sectionNextSteps, SectionInsight, shopInsight, shortSku, whyInsight } from "../../lib/report/sectionInsights";
 import { CAMP_DAY_BUCKET_LABEL, CAMP_DAY_BUCKET_ORDER, effectiveCamp, resolveCampBucketType, type CampDayBucket, type CampOverrides } from "../../lib/campaignDays";
 import { dailyRhythm, liveFunnel, sessionSpread } from "../../lib/report/rhythm";
 import { adsMonthStats, adsPrevSameCut } from "../../lib/dataraw/adsCampaignOverview";
@@ -611,6 +611,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
       adsCur && { cost: adsCur.cost, roi: adsCur.roi, prevCost: adsPrev?.cost ?? null, prevRoi: adsPrev?.roi ?? null, zeroOrderDays: adsCur.zeroOrderDays.length }
     )
   };
+  const hostOpsNote = peopleOpsNote(hostInsight.rows, reliability);
   // Việc cần làm của từng phần gom về "Việc agency làm tháng sau" — khung Insight tự sinh không nói lại.
   const controlOpsGroup = controlOps ? (controlOps.key as "daily" | "camp") : null;
   const sectionSteps = sectionNextSteps(sectionInsightRaw, controlOpsGroup);
@@ -732,11 +733,12 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   // Nghe `scroll` ở pha capture của document vì vùng cuộn là <main> của App (sự kiện scroll không nổi bọt). Không dùng
   // IntersectionObserver: nhảy thẳng từ phần 3 về đầu trang thì không phần nào cắt qua dải quan sát ⇒ dấu cũ kẹt lại.
   // Trang không có dữ liệu thì ẩn với brand; ops luôn thấy đủ 10 trang (kèm lời nhắc tải file). Số trang đánh theo trang đang hiện.
+  // Toàn shop / Sản phẩm trước 27/10 luôn hiện với brand — tháng chưa tải file thì brand thấy hai trang trống kèm chữ "Dữ Liệu Gốc".
   const sectionShown: Record<ReportSectionId, boolean> = {
     summary: true,
-    shop: true,
+    shop: canManage || !!shopCur,
     why: true,
-    products: true,
+    products: canManage || !!topSku?.hasAnyBatch || !!topPromo?.hasAnyBatch,
     ads: canManage || !!adsCur,
     nmv: canManage || refundRateShop != null || nmvRate != null,
     people: true,
@@ -1057,7 +1059,9 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
           <SectionHead no={secNo("summary")} title={secTitle("summary")} sub={cmp.partial ? `Số tính tới ${cmp.curEnd.slice(8)}/${month.slice(5)} · % là cùng kỳ ${cmp.label}` : `Tháng ${month.slice(5)}/${month.slice(0, 4)} · % là ${cmp.label}`} />
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
             <KpiTile
-              label="Total GMV"
+              // File shop ngắn hơn số phiên (CROCS T9: shop 1–22, phiên 1–30) ⇒ nhãn ghi kỳ của chính ô này, và ô LIVE GMV
+              // nói phần live CÙNG kỳ đó — trước 27/10 hai ô cạnh nhau khác kỳ (5,21B shop < 5,22B live).
+              label={shopCur && shopWin !== cmp ? `Total GMV · 1–${shopWin.curEnd.slice(8)}/${month.slice(5)}` : "Total GMV"}
               value={shopCur ? fmtVndShort(shopCur.gmv) : "—"}
               change={shopCur && shopPrevSame ? pctChange(shopPrevSame.gmv, shopCur.gmv) : null}
               note={
@@ -1067,19 +1071,27 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                     ? shopWin !== cmp
                       ? `Shop Analytics — file tới ${shopWin.curEnd.slice(8)}/${month.slice(5)}, % so ${shopWin.label.split(" so với ")[1] ?? "cùng kỳ"}`
                       : "Shop Analytics — mọi kênh"
-                    : "chưa có file Shop Analytics"
+                    : canManage
+                      ? "chưa có file Shop Analytics"
+                      : "chưa có số toàn shop"
               }
             />
             <KpiTile
               label="LIVE GMV (YFB)"
               value={fmtVndShort(liveCurStats.gmv)}
               change={pctChange(livePrevStats.gmv, liveCurStats.gmv)}
-              note={shopCur && shopCur.gmv > 0 ? `${fmtPct((liveForShare / shopCur.gmv) * 100)} tổng shop${shopWin !== cmp ? ` (tới ${shopWin.curEnd.slice(8)}/${month.slice(5)})` : ""} · ${liveCurStats.sessions} phiên` : `${liveCurStats.sessions} phiên`}
+              note={
+                shopCur && shopCur.gmv > 0
+                  ? shopWin !== cmp
+                    ? `1–${shopWin.curEnd.slice(8)}/${month.slice(5)}: ${fmtVndShort(liveForShare)} = ${fmtPct((liveForShare / shopCur.gmv) * 100)} Total GMV cùng kỳ · cả tháng ${liveCurStats.sessions} phiên`
+                    : `${fmtPct((liveForShare / shopCur.gmv) * 100)} tổng shop · ${liveCurStats.sessions} phiên`
+                  : `${liveCurStats.sessions} phiên`
+              }
             />
             <KpiTile
               label="NMV (ước tính)"
               value={nmvRate != null ? fmtVndShort(liveCurStats.gmv * (1 - nmvRate / 100)) : "—"}
-              note={nmvRate != null ? `trừ ${fmtPct(nmvRate)} — ${nmvSource}` : "chưa có tỷ lệ hoàn hủy (CRM) / Refund rate (Shop Analytics)"}
+              note={nmvRate != null ? `trừ ${fmtPct(nmvRate)} — ${nmvSource}` : canManage ? "chưa có tỷ lệ hoàn hủy (CRM) / Refund rate (Shop Analytics)" : "chưa có Refund rate"}
             />
             <KpiTile label="Giờ live" value={fmtHours(liveCurStats.hours)} change={pctChange(livePrevStats.hours, liveCurStats.hours)} note={`${liveCurStats.sessions} phiên có số`} />
             <KpiTile label="GMV/giờ" value={liveCurStats.gmvPerHour != null ? fmtVndShort(liveCurStats.gmvPerHour) : "—"} change={pctChange(livePrevStats.gmvPerHour, liveCurStats.gmvPerHour)} />
@@ -1156,6 +1168,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
         </section>
 
         {/* ===== 2. Thị trường hay vận hành ===== */}
+        {sectionShown.shop && (
         <section id="mr-shop" className="space-y-4 scroll-mt-16">
           <SectionHead no={secNo("shop")} title={secTitle("shop")} sub="So livestream YFB với các kênh còn lại của shop — cùng thị trường, cùng kỳ" />
           {insightBox("shop")}
@@ -1246,7 +1259,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
               </Panel>
             )}
             {channelMixes.every((c) => !c) ? (
-              <p className="text-sm py-4" style={{ color: PAL.muted }}>Chưa có file Shop Analytics cho các tháng này ở Dữ Liệu Gốc.</p>
+              <p className="text-sm py-4" style={{ color: PAL.muted }}>{canManage ? "Chưa có file Shop Analytics cho các tháng này ở Dữ Liệu Gốc." : "Chưa có số toàn shop cho các tháng này."}</p>
             ) : (
               <Panel
                 title="Cơ cấu Total GMV theo kênh"
@@ -1303,6 +1316,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             )}
           </SectionDetail>
         </section>
+        )}
 
         {/* ===== 3. Vì sao ===== */}
         <section id="mr-why" className="space-y-4 scroll-mt-16">
@@ -1341,6 +1355,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
         </section>
 
         {/* ===== 4. Sản phẩm ===== */}
+        {sectionShown.products && (
         <section id="mr-products" className="space-y-4 scroll-mt-16">
           <SectionHead no={secNo("products")} title={secTitle("products")} sub="Top SKU theo GMV, phần bán qua Seller LIVE, quà tặng kèm, chương trình khuyến mãi" />
           {insightBox("products")}
@@ -1356,7 +1371,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             >
               {!topSku?.hasAnyBatch ? (
                 <p className="text-sm text-center py-6" style={{ color: PAL.muted }}>
-                  Chưa có file "Product List" nào được import trong Dữ Liệu Gốc cho tháng này.
+                  {canManage ? "Chưa có file \"Product List\" nào được import trong Dữ Liệu Gốc cho tháng này." : "Chưa có số sản phẩm tháng này."}
                 </p>
               ) : skuMoveData ? (
                 <ReportTable head={["Hạng", "Sản phẩm", "GMV", skuMoveData.perDay ? "± GMV/ngày" : "± GMV", "Tỷ trọng Seller LIVE", "Orders", "Items sold", "Product CTR", "CTOR"]}>
@@ -1445,7 +1460,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             >
               {!topPromo?.hasAnyBatch ? (
                 <p className="text-sm text-center py-6" style={{ color: PAL.muted }}>
-                  Chưa có file "Shop Promotion List" nào được import trong Dữ Liệu Gốc cho tháng này.
+                  {canManage ? "Chưa có file \"Shop Promotion List\" nào được import trong Dữ Liệu Gốc cho tháng này." : "Chưa có số chương trình khuyến mãi tháng này."}
                 </p>
               ) : topPromo.items.length === 0 ? (
                 <p className="text-sm text-center py-6" style={{ color: PAL.muted }}>
@@ -1500,6 +1515,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             </Panel>
           </SectionDetail>
         </section>
+        )}
 
         {/* ===== Quảng cáo ===== */}
         {sectionShown.ads && (
@@ -1607,6 +1623,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
         <section id="mr-people" className="space-y-4 scroll-mt-16">
           <SectionHead no={secNo("people")} title={secTitle("people")} sub={`So với trung bình các host cùng loại ngày, cùng buổi · gộp ${relMonths} tháng, có khoảng tin cậy · khung giờ bắt đầu phiên`} />
           {insightBox("people")}
+          {canManage && hostOpsNote && warnBox(<>Chỉ ops thấy (không vào bản gửi brand): {hostOpsNote}</>)}
           <SectionDetail open={detailOpen("people")} onOpen={() => openDetail("people")}>
             <HostPerformancePanel rows={hostDayType} team={hostDayTypeTeam} campDaysLabel={campDaysLabel} vsPeer={hostInsight.vsPeer} reliability={reliabilityByKey} relMonths={relMonths}>
               {canManage && hostQuality.reconciled < hostQuality.total && (

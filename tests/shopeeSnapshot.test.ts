@@ -3,7 +3,7 @@ import { describe, expect, test, vi } from "vitest";
 
 vi.mock("../src/lib/supabaseClient", () => ({ supabase: {} }));
 
-const { buildShopeeSnapshot, shopeeHeadline, shopeeSessionsSig, shopeeSnapshotFreshness, shopeeStampsFor, monthDays } = await import("../src/lib/report/shopeeSnapshot");
+const { buildShopeeSnapshot, shopeeHeadline, shopeeSessionsSig, shopeeSnapshotFreshness, shopeeStampsFor, shopeeNotes, monthDays } = await import("../src/lib/report/shopeeSnapshot");
 import type { LiveSession } from "../src/types";
 import type { ShopeeDay, ShopeeOverview, ShopeeProduct, ShopeeStream } from "../src/lib/dataraw/shopeeFiles";
 
@@ -106,7 +106,7 @@ describe("buildShopeeSnapshot", () => {
     const many = build({ streams: [...streams, stream("2026-09-20", "10:00", 3, 30_000_000), stream("2026-09-21", "11:00", 3, 30_000_000)] });
     expect(many.insights.schedule?.headline).toMatch(/Sáng\/Trưa/);
     // Host: mỗi người 1 ca ⇒ chưa xếp hạng.
-    expect(s.insights.people?.headline).toMatch(/Chưa đủ ca/);
+    expect(s.insights.people?.headline).toMatch(/Chưa đủ phiên/);
   });
   test("ghi chú: nêu GMV = doanh số đặt, nêu phần Shopee không có, nêu lệch số ca với file", () => {
     const text = s.notes.join("\n");
@@ -156,7 +156,7 @@ describe("Ads + xu (bản chụp bản 2, 0142)", () => {
   const ads = { shopName: "VERA Official Store", shopId: "13346195", campaigns: [{ name: "LIVESTREAM ADS", id: "1", status: "Ongoing", objective: "", budget: 0, views: 81460, orders: 204, conversionPct: 0.25, gmv: 70_273_048, expense: 2_300_302, roas: 30.55 }], expense: 2_300_302, gmv: 70_273_048, orders: 204, views: 81460, roas: 70_273_048 / 2_300_302, costPerOrder: 2_300_302 / 204 };
   test("có file Ads: bản chụp giữ chi phí/ROAS/chi phí mỗi đơn, nhận xét phần 1 nói Ads", () => {
     const s2 = build({ ads, overview: overview({ coinsClaimed: 499_200, voucherClaimed: 12, specialVoucherClaimed: 7 }) });
-    expect(s2.version).toBe(3);
+    expect(s2.version).toBe(4);
     expect(s2.ads).toMatchObject({ expense: 2_300_302, gmv: 70_273_048, orders: 204, campaigns: 1, shopName: "VERA Official Store" });
     expect(s2.ads!.roas).toBeCloseTo(30.55, 1);
     expect(s2.promo).toEqual({ coins: 499_200, vouchers: 12, liveVouchers: 7 });
@@ -186,5 +186,26 @@ describe("Ads + xu (bản chụp bản 2, 0142)", () => {
       "2026-09"
     );
     expect(st).toEqual(["a@t1"]);
+  });
+});
+
+describe("khung campaign theo Kế Hoạch Tháng (bản 4, audit 27/10)", () => {
+  test("không có kế hoạch ⇒ lịch cố định; có kế hoạch ⇒ đọc khung của kế hoạch", () => {
+    const fixed = build();
+    expect(fixed.campFromPlan).toBe(false);
+    expect(fixed.campDays?.["2026-09-09"]).toBe("dday");
+    expect(fixed.camps.find((c) => c.key === "dday")?.sessions).toBe(2);
+    // Kế hoạch dời D-Day sang 25–26/9: 09/09 thành ngày thường, phiên 26/09 thành D-Day.
+    const planned = build({ campOverrides: { dday: { start: "2026-09-25", end: "2026-09-26" } } });
+    expect(planned.campFromPlan).toBe(true);
+    expect(planned.campDays?.["2026-09-09"]).toBeUndefined();
+    expect(planned.campDays?.["2026-09-26"]).toBe("dday");
+    expect(planned.camps.find((c) => c.key === "dday")?.sessions).toBe(1);
+    expect(shopeeNotes(planned, "brand").join(" ")).toMatch(/khung campaign đã thống nhất trong kế hoạch tháng/);
+    expect(shopeeNotes(fixed, "ops").join(" ")).toMatch(/chưa có khung campaign ở Kế Hoạch Tháng Shopee/);
+  });
+  test("ghi chú gửi brand không có chữ nội bộ", () => {
+    const brand = shopeeNotes(build(), "brand").join(" ");
+    for (const w of ["ca trong app", "số tạm", "đối soát", "Chưa có file", "nạp bù"]) expect(brand).not.toContain(w);
   });
 });

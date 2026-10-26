@@ -14,6 +14,8 @@ import {
   Database
 } from "lucide-react";
 import { getTodayMonth } from "../../lib/dateUtils";
+import { todayVn } from "../../lib/performance/brandCommitment";
+import { publishBlocker } from "../../lib/report/monthClose";
 import { monthlyReportRead, upsertMonthlyReport, publishMonthlyReport, unpublishMonthlyReport } from "../../lib/db/monthlyReports";
 import { BrandWeeklyReport } from "./BrandWeeklyReport";
 import { errorMessage } from "../../lib/errorMessage";
@@ -24,7 +26,7 @@ import { DataRawImportStamp, fetchDataRawImportStamps } from "../../lib/db/brand
 import { type MonthlyReportSnapshot } from "../../lib/report/monthlySnapshot";
 import { type ShopeeReportSnapshot } from "../../lib/report/shopeeSnapshot";
 import { REPORT_ENGINES, type AnySnapshot } from "../../lib/report/reportEngines";
-import { channelTitle, LEGACY_PLATFORM, type ReportPlatform } from "../../lib/reportPlatform";
+import { channelTitle, LEGACY_PLATFORM, platformOf, type ReportPlatform } from "../../lib/reportPlatform";
 import { fmtDateVn, fmtMonth } from "../../lib/format";
 import { profileOf } from "../../lib/platforms/profiles";
 import { prefetchable, type TabPrefetchCtx } from "../../lib/db/prefetch";
@@ -271,6 +273,19 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
   // Phát hành = gửi report cho brand xem ⇒ luôn hỏi lại. Trước đây nút nằm cuối trang (y≈9.200px ở CROCS T9) kèm ô tick
   // "đã biết còn ca chưa đối soát"; nay nút ở thẻ đầu trang, cảnh báo (số cũ / ca chưa đối soát) nằm trong hộp xác nhận.
   const handlePublish = async () => {
+    // Chốt tháng (27/10): file toàn shop phủ thiếu ngày ⇒ không phát hành (số shop và số livestream khác kỳ). Đọc dấu file mới nhất.
+    setErrorMsg(null);
+    try {
+      const dates = sessions.filter((s) => s.brandId === brandId && platformOf(s) === platform && s.status !== "Cancelled").map((s) => s.date);
+      const blocker = publishBlocker(platform, month, await fetchDataRawImportStamps(brandId), todayVn(), dates);
+      if (blocker) {
+        setErrorMsg(blocker);
+        return;
+      }
+    } catch (e) {
+      setErrorMsg(errorMessage(e, "Không kiểm được file đã tải"));
+      return;
+    }
     const warnings = [
       stored && freshness && !upToDate
         ? `• Số liệu chốt lúc ${fmtStamp(stored.computedAt)} và đã có thay đổi sau đó — phát hành bây giờ là gửi số đã chốt. Huỷ rồi bấm "Cập nhật số liệu" nếu muốn gửi số mới nhất.`

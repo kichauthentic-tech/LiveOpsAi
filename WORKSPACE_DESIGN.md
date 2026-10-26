@@ -11,8 +11,12 @@
 
 ---
 
-## 1. Giai đoạn hiện tại (cập nhật 2026-10-25)
+## 1. Giai đoạn hiện tại (cập nhật 2026-10-27)
 
+- **27/10: AUDIT REPORT THÁNG + SỬA A + CHỐT THÁNG B (đã push main 27/10, không migration)** — audit https://claude.ai/artifact/Hh4aiZB3EuFpr7J9HVwith.
+  A: 7 lỗi report (Affiliate % target/ROAS chỉ trên phiên có số `creatorRates`; host yếu → `peopleOpsNote` chỉ ops; ô trang 1 cùng kỳ; ẩn trang Toàn shop/Sản phẩm
+  với brand khi trống; Insight trang 7 mở bằng khung giờ; report Shopee bản 4: khung camp theo Kế Hoạch Tháng, chữ "phiên", ghi chú `shopeeNotes(s,"brand"|"ops")`).
+  B: khối **Chốt tháng** ở Toàn Cảnh Brand (`MonthClosePanel`, `lib/report/monthClose.ts`) + `publishBlocker` ở cả hai nút Phát hành. Chi tiết: lịch sử `## Report Tháng: sửa 7 lỗi + Chốt tháng (2026-10-27)`.
 - **25/10: ĐIỀU PHỐI LỊCH LIVE BẢN GỌN (demo duyệt https://claude.ai/artifact/6YoM6U3rE89iGcSNESPUyq)** — Đợt 1 (b26eed3): MỘT màn = thẻ tháng (`MonthStrip`,
   `monthStatus.ts`) + "Việc cần làm" có nút + lưới tuần có giờ tháng cạnh kênh; màn phụ ở menu "Thêm". Đợt 2 (82ac9cd; `0181` ĐÃ CHẠY 25/10, RPC kiểm trên DB thật): "Mở lịch tháng sau" 3 bước
   (`OpenMonthWizard`, `openMonth.ts`) ghi qua đường Kế Hoạch Tháng (cam kết → plan + ca target 0 → `lock_month_plans` → hạn) + "Chép khung giờ tuần trước"
@@ -21,15 +25,10 @@
   "Cả tháng" (`OpsMonthView`, khối lập kế hoạch + cam kết giờ ở đây); khối **Cần xử lý** (ca qua giờ chưa có số, trùng người theo ngày, chip lọc); nhãn đỏ
   "chưa có số" = `isUnconfirmedPast`; kỳ vọng GMV trên dòng ca (`useShiftExpectations`) + phễu (`OpsSupport`); Việc cần làm = hôm nay (≤ 48 giờ) + việc tháng
   gom nhóm (`groupTodos`); ca nháp sa bàn = việc + dòng + bộ lọc. Audit/demo/verify: lịch sử `## Gộp Phòng Điều Hành…`, `## Audit Bảng Vận Hành…`, `## Bảng Vận Hành theo audit…`.
-- **24/10:** Dashboard tab **Tổng quan account** + chuẩn hoá từ ngữ (đã push 9f31121) và **Report Tháng gửi brand 10 trang** (đã push 3049ecc) — nguyên
-  văn (file, verify, việc còn mở, quyết định chờ user): lịch sử `## §1 mục 24/10 Dashboard + Report Tháng (chuyển khỏi WORKSPACE 25/10)`.
-- **23/10:** audit trùng màn + "mỗi loại số một màn" (đã push 11b2069; user chốt OP vẫn chốt người/mở/huỷ/dời ca như trainer) và **tab Kế Toán K1**
-  (`Accounting.tsx`, `lib/accounting/monthClose.ts`, chưa commit) — nguyên văn: lịch sử `## §1 mục 23/10 audit trùng màn + Kế Toán K1 (chuyển khỏi WORKSPACE 24/10)`.
-- **23/10: Dashboard "so cùng kỳ"** (2 tab + chọn kỳ + so cùng kỳ, gộp Chi tiết kênh vào tab Brand, `lib/performance/periodCompare.ts`/`brandLens.ts`,
-  UI `components/dashboard/period/`) — đã push b7d8315; 24/10 thêm tab Tổng quan account (mục trên). Nguyên văn: lịch sử `## §1 mục 23/10 Dashboard so cùng kỳ (chuyển khỏi WORKSPACE 24/10)`.
-- **16–22/10** (đã thay bởi các mục trên): "một thẻ kênh" + cổng brand (`0179` ĐÃ CHẠY), Run-rate gộp Dashboard, bố cục bớt rối 3 đợt + audit theo
-  sidebar (`0178` CHƯA CHẠY), đề xuất Brand workspace — nguyên văn: lịch sử `## §1 mục 21–22/10 Dashboard (chuyển khỏi WORKSPACE 23/10)`,
-  `## §1 mục 17–19/10 (chuyển khỏi WORKSPACE 24/10)`, `## §1 mục 16–17/10 brand workspace (chuyển khỏi WORKSPACE 21/10)`.
+- **24/10:** Dashboard **Tổng quan account** (9f31121) + **Report Tháng 10 trang** (3049ecc) — lịch sử `## §1 mục 24/10 Dashboard + Report Tháng (chuyển khỏi WORKSPACE 25/10)`.
+- **23/10:** audit trùng màn (11b2069; OP vẫn chốt người/mở/huỷ/dời ca) + **Kế Toán K1** (`Accounting.tsx`, chưa commit) — lịch sử `## §1 mục 23/10 audit trùng màn + Kế Toán K1 (chuyển khỏi WORKSPACE 24/10)`.
+- **23/10: Dashboard "so cùng kỳ"** (đã push b7d8315) — lịch sử `## §1 mục 23/10 Dashboard so cùng kỳ (chuyển khỏi WORKSPACE 24/10)`.
+- **16–22/10** (đã thay): một thẻ kênh + cổng brand (`0179` ĐÃ CHẠY), bố cục bớt rối, audit sidebar (`0178` CHƯA CHẠY) — lịch sử `## §1 mục 21–22/10 …`, `## §1 mục 17–19/10 …`, `## §1 mục 16–17/10 …`.
 - **07–16/10** (nguyên văn: lịch sử `## §1 mục 07–16/10 (chuyển khỏi WORKSPACE 24/10)`, từ đó trỏ tiếp mục chi tiết từng đợt): app talent bản 2
   (0177 ĐÃ CHẠY), Bàn Trainer + role `trainer` (0175 rồi 0176 CHƯA CHẠY), đối soát chia theo mốc (0171–0174 ĐÃ CHẠY, `private.recon_shares` là phép
   chia duy nhất), Phòng Điều Hành 0170 (24/10 gộp vào Bảng Vận Hành), run-rate theo ca, audit đa sàn 0149–0161 (ĐÃ CHẠY). **Còn treo:** brand `JEW`
@@ -366,6 +365,9 @@ live = `sessionHours`. GMV/giờ đem NHÂN với giờ lịch thì chia trên g
   đổi); ca kế hoạch huỷ GIỮ target; ca ngoài kế hoạch target 0; ca thêm vào lưới sau khi chốt nhận target = dự báo. **Ca tăng cường (0165, 10/10):** ca OP mở thêm sau chốt có dòng ở `plan_boost_slots` với target đề xuất của engine, KHÔNG cộng vào target tháng/run-rate — mọi chỗ cộng target tháng chỉ đọc `brand_month_plan_slots`, đừng đưa bảng boost vào đó. **Ngoại lệ do user chủ động "Chia lại theo lịch hiện có" (0164, 10/10):** ca huỷ về 0, ca OP thêm (kể cả đã qua) vào kế hoạch, Σ target = target mới.
 - **Report Tháng là nơi DUY NHẤT nói số một tháng SAU khi hết tháng** (đọc bản chụp; so cùng kỳ cắt 1..N khi tháng chưa hết).
   Dashboard brand là màn TRONG tháng, dùng chung hàm. Phân tích mới thì thêm vào 1 trong 10 trang, không dựng trang riêng.
+- **Chốt tháng (27/10):** hạn chốt = ngày 3 tháng sau (`closeDeadline`); độ phủ file đếm từ ngày có ca đầu tiên của kênh (`firstDueDay`); file toàn shop
+  (`SHOP_FILE`: TikTok Shop Analytics, Shopee theo ngày) đã tải mà thiếu ngày ⇒ `publishBlocker` chặn phát hành — chưa tải gì thì được (bản chỉ livestream,
+  trang toàn shop tự ẩn với brand). Nút Phát hành mới phải gọi `publishBlocker`. Tỷ lệ gộp (% target, ROAS, GMV/giờ) chỉ trên phần tử có đủ tử lẫn mẫu.
 - **Report gửi brand (24/10):** mọi % thay đổi theo loại ngày / khung giờ / Key Metrics chỉ tô màu khi vượt **ngưỡng dao động** `noiseBand`
   (1,96 × 26% × √(1/n₁+1/n₂), `SESSION_CV` ở brandReport.ts) — dưới ngưỡng ghi "trong ngưỡng dao động"; giờ live không đánh giá tốt/xấu. Mọi phép so có
   dùng file shop đi qua `shopCompareWindow` (cắt cả hai tháng tới ngày cuối file shop); Key Metrics chỉ đọc số phiên nên chỉ cắt khi số PHIÊN còn dở.
@@ -439,6 +441,7 @@ target khung camp ở Nhập Ads bỏ 06/10 — tháng không có kế hoạch c
 | `## Dashboard Tổng quan account (2026-10-24)` | tab mới mọi account, nguồn số từ thẻ kênh, bộ từ ngữ cũ → mới, chuyển 4 khối sang Hiệu Suất Host, số đo app thật, cách verify |
 | `## §1 mục 23/10 Dashboard so cùng kỳ (chuyển khỏi WORKSPACE 24/10)` | nguyên văn §1: Dashboard 2 tab so cùng kỳ, gộp Chi tiết kênh, bỏ/thêm khối theo demo |
 | `## Report Tháng 10 trang (2026-10-24)` | cấu trúc 10 trang, lỗi đối chứng (−38%/−51% → −15%/−36%), ngưỡng dao động, bộ từ brand, cách verify, việc còn mở |
+| `## Audit Report Tháng trên dữ liệu thật (2026-10-27)` + `## Report Tháng: sửa 7 lỗi + Chốt tháng (2026-10-27)` | số đo audit (1/22 phát hành, Affiliate 117,7% vs 36%); A sửa lỗi + B Chốt tháng: file, verify, việc còn mở |
 | `## §1 mục 17–19/10 (chuyển khỏi WORKSPACE 24/10)` | nguyên văn §1: bố cục 18–19/10 (3 đợt, số trước/sau) + audit toàn app 17/10 (0178, cách verify) |
 | `## Audit trùng màn (2026-10-23)` | đếm cửa trùng (chốt người 6, mở ca 5, tải người 4, host 6, việc cần làm 5, cam kết 4), quyết định user, 3 sửa đợt 3 + cách verify, việc còn mở |
 | `## Dashboard so cùng kỳ (2026-10-23)` + `## §1 mục 21–22/10 Dashboard (chuyển khỏi WORKSPACE 23/10)` | luật lấy từ audit demo (2 mốc cắt, chỉ số so chính kênh, trễ > 3 tiếng, chia target chưa xếp, host/trợ), số đo app thật 23/10, những gì bỏ so với 3 tab cũ; nguyên văn §1 21–22/10 |

@@ -10,6 +10,7 @@ import {
   campSpanLabels,
   changeTone,
   creatorPlanRows,
+  creatorRates,
   creatorSessionRows,
   creatorTotals,
   dayTypeFactorRows,
@@ -124,6 +125,20 @@ test("affiliate CROCS T9: 6 phiên creator, Khói 64,7% GMV; lịch T10 so GMV/g
   const t = creatorTotals(done);
   expect([t.sessions, t.creators, Math.round(t.gmv / 1e5) / 10, Math.round(t.target / 1e6)]).toEqual([6, 3, 576.6, 1600]);
   expect(t.top!.creator).toBe("Khói");
+
+  // Audit 27/10: % target và ROAS chỉ trên phiên có target / có Ads — trước đây GMV cả 4 phiên ÷ target 1 phiên = 117,7%.
+  const crocsT9 = creatorTotals(creatorSessionRows([
+    entry({ creatorName: "Khói", liveDateLabel: "3/9/2026", targetGmv: 300e6, directGmv: 225_248_394, durationHours: 7.8, adsCost: 9_930_000, status: "done" }),
+    entry({ creatorName: "Mạnh Ka", liveDateLabel: "9/9/2026", directGmv: 49_273_277, durationHours: 4.4, status: "done" }),
+    entry({ creatorName: "Khói", liveDateLabel: "11/9/2026", directGmv: 17_665_514, durationHours: 0.8, status: "done" }),
+    entry({ creatorName: "Linh Ân", liveDateLabel: "20/9/2026", directGmv: 60_937_008, status: "done" })
+  ]));
+  const rate = creatorRates(crocsT9);
+  expect(Math.round(rate.pctTarget!)).toBe(75);
+  expect(Math.round(rate.roas! * 10) / 10).toBe(22.7);
+  expect([crocsT9.targetSessions, crocsT9.adsSessions]).toEqual([1, 1]);
+  expect(Math.round(rate.gmvPerHour! / 1e5) / 10).toBe(22.5); // Linh Ân không có giờ ⇒ không vào GMV/giờ
+  expect(creatorRates(creatorTotals([]))).toEqual({ pctTarget: null, gmvPerHour: null, roas: null });
   expect(Math.round(t.top!.share * 10) / 10).toBe(64.7);
 
   const plan = creatorPlanRows([

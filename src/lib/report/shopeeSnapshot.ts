@@ -1,5 +1,5 @@
 import type { LiveSession } from "../../types";
-import { getCampaignDayInfo } from "../campaignDays";
+import { resolveCampBucketType, type CampOverrides } from "../campaignDays";
 import { byHost, filterSessions, splitUnassignedHost, dataQuality, type DataQuality } from "../performance/hostPerformance";
 import { SHOPEE_FILE_TYPES, type ShopeeDay, type ShopeeOverview, type ShopeeProduct, type ShopeeStream } from "../dataraw/shopeeFiles";
 import type { DataRawImportStamp } from "../db/brandDataRaw";
@@ -21,12 +21,13 @@ import { platformOf } from "../reportPlatform";
 //   - Shopee không có: GMV trực tiếp/gián tiếp, lý do huỷ/hoàn, bảng chấm KPI theo nhóm.
 //   - Ads (bản 2, 06/10): file "Shopee Live Ads Report" (shopee_ads, 0142) — tổng cả tháng theo chiến dịch, không theo ngày.
 //     Khuyến mãi: Xu (Coins Claimed) và voucher đã nhận lấy từ file overview — Shopee chỉ cho SỐ LƯỢNG, coi 1 xu = 1đ.
-//   - Loại ngày camp theo lịch cố định (D-Day, Mid-Month 13–15, Pay Day 23–25) — chưa đọc khung camp ghi đè của Kế Hoạch Tháng TikTok.
+//   - Loại ngày camp theo khung campaign của Kế Hoạch Tháng Shopee (bản 4, 27/10); tháng không có kế hoạch ⇒ lịch cố định.
 
 const SHOPEE = PLATFORM_PROFILES.Shopee.id;
 
 // Bản 3 (07/10): đổi tên chỉ số theo đúng cột file Shopee (Viewers, ABS, Sales (Confirmed Order)…) + thêm GPM/PCU/Avg. Viewing Duration/Engagement.
-export const SHOPEE_SNAPSHOT_VERSION = 3;
+// Bản 4 (27/10): khung camp theo Kế Hoạch Tháng + `campDays`; nhận xét/ghi chú tách bản brand và ghi chú chỉ ops.
+export const SHOPEE_SNAPSHOT_VERSION = 4;
 
 export interface ShopeeHeadline {
   gmv: number; // doanh số đặt
@@ -95,6 +96,10 @@ export interface ShopeeReportSnapshot {
   products: { top: ShopeeProduct[]; count: number; withSales: number; totalSales: number; top3Share: number | null };
   slots: ShopeeSlotRow[];
   camps: ShopeeCampRow[];
+  /** Ngày campaign của tháng → loại (bản 4; ngày Daily không có trong map). Thiếu = bản chụp cũ, đọc lịch cố định. */
+  campDays?: Record<string, "dday" | "midmonth" | "payday">;
+  /** Khung camp lấy từ Kế Hoạch Tháng (true) hay lịch cố định (false). */
+  campFromPlan?: boolean;
   hosts: ShopeeHostRow[];
   unassigned: { sessions: number; gmv: number } | null;
   plan: { sessions: number; hours: number; completed: number };
@@ -155,6 +160,8 @@ export interface ShopeeSnapshotInput {
   stamps: string[];
   /** File Ads Shopee của tháng (0142) — null = chưa tải. */
   ads?: ShopeeAdsStats | null;
+  /** Khung camp của Kế Hoạch Tháng Shopee (effectiveCamp) — thiếu/rỗng = lịch cố định. */
+  campOverrides?: CampOverrides | null;
   computedAt?: string;
 }
 type ShopeeSnapshot_Files = ShopeeReportSnapshot["files"];
@@ -228,8 +235,15 @@ export function buildShopeeSnapshot(input: ShopeeSnapshotInput): ShopeeReportSna
     return { key: sl.key, label: sl.label, sessions: rows.length, hours, gmv, gmvPerHour: ratio(gmv, hours), avgViewers: rows.length ? sum(rows, (s) => s.viewers) / rows.length : null };
   }).filter((r) => r.sessions > 0);
 
-  // ---- loại ngày camp (lịch cố định)
-  const bucketOf = (date: string): ShopeeCampRow["key"] => (getCampaignDayInfo(date)?.type ?? "daily");
+  // ---- loại ngày camp: khung của Kế Hoạch Tháng Shopee, không có thì lịch cố định (cùng hàm với report TikTok)
+  const overrides = input.campOverrides ?? undefined;
+  const bucketOf = (date: string): ShopeeCampRow["key"] => resolveCampBucketType(date, overrides);
+  const campDays: Record<string, "dday" | "midmonth" | "payday"> = {};
+  for (const d of monthDays(month)) {
+    const b = bucketOf(d);
+    if (b !== "daily") campDays[d] = b;
+  }
+  const campFromPlan = !!overrides && Object.values(overrides).some((r) => r?.start && r?.end);
   const campKeys: ShopeeCampRow["key"][] = ["daily", "dday", "midmonth", "payday"];
   const totalGmvForShare = streams.length > 0 ? sum(streams, (s) => s.salesPlaced) : headline.gmv;
   const camps: ShopeeCampRow[] = campKeys
@@ -283,6 +297,8 @@ export function buildShopeeSnapshot(input: ShopeeSnapshotInput): ShopeeReportSna
     products: productInfo,
     slots,
     camps,
+    campDays,
+    campFromPlan,
     hosts,
     unassigned: unassigned ? { sessions: unassigned.sessionCount, gmv: unassigned.gmv } : null,
     plan,
@@ -296,7 +312,8 @@ export function buildShopeeSnapshot(input: ShopeeSnapshotInput): ShopeeReportSna
     notes: []
   };
   snapshot.insights = shopeeInsights(snapshot);
-  snapshot.notes = shopeeNotes(snapshot);
+  // Bản lưu giữ đủ hai phần (cho bản đọc cũ); màn report tách lại brand / chỉ ops bằng shopeeNotes(s, audience).
+  snapshot.notes = [...shopeeNotes(snapshot, "brand"), ...shopeeNotes(snapshot, "ops")];
   return snapshot;
 }
 
@@ -343,17 +360,18 @@ export function shopeeInsights(s: ShopeeReportSnapshot): Record<ShopeeSection, S
     const points: string[] = [];
     if (bestSlot) points.push(`Khung ${bestSlot.label} hiệu quả nhất: ${fmtM(bestSlot.gmvPerHour ?? 0)}/giờ (${bestSlot.sessions} phiên).`);
     if (bestCamp) points.push(`${bestCamp.label}: ${fmtM(bestCamp.gmvPerHour ?? 0)}/giờ, chiếm ${pct((bestCamp.share ?? 0) * 100)} GMV.`);
-    if (s.plan.hours > 0 && h.liveHours > 0) points.push(`Giờ live thực tế ${h.liveHours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h so với ${s.plan.hours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h theo lịch ca trong app.`);
+    if (s.plan.hours > 0 && h.liveHours > 0) points.push(`Giờ live thực tế ${h.liveHours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h so với ${s.plan.hours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h theo lịch đã lên.`);
     out.schedule = { headline: bestSlot ? `Khung giờ ${bestSlot.label} cho GMV/giờ cao nhất.` : "Lịch live theo khung giờ và loại ngày (khung nào cũng dưới 3 phiên nên chưa so được).", points, action: null };
   }
   const rankable = s.hosts.filter((x) => x.sessions >= 2);
   if (s.hosts.length > 0 && rankable.length === 0) {
-    out.people = { headline: "Chưa đủ ca để xếp hạng host (cần từ 2 ca mỗi host).", points: [], action: null };
+    out.people = { headline: "Chưa đủ phiên để xếp hạng host (cần từ 2 phiên mỗi host).", points: [], action: null };
   } else if (rankable.length > 0) {
     const [first] = rankable;
     out.people = {
-      headline: `${first.name} dẫn đầu GMV/giờ: ${fmtM(first.gmvPerHour ?? 0)} (${first.sessions} ca, ${first.hours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h).`,
-      points: s.quality.manual > 0 ? [`${s.quality.manual}/${s.quality.total} ca còn là số tạm chưa đối soát — xếp hạng chỉ để tham khảo tới khi đối soát bằng Live List.`] : [],
+      headline: `${first.name} dẫn đầu GMV/giờ: ${fmtM(first.gmvPerHour ?? 0)} (${first.sessions} phiên, ${first.hours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h).`,
+      // Số tạm / đối soát là việc nội bộ — nằm ở ghi chú chỉ ops (shopeeNotes "ops"), không vào nhận xét gửi brand.
+      points: [],
       action: null
     };
   }
@@ -373,26 +391,37 @@ export function shopeeInsights(s: ShopeeReportSnapshot): Record<ShopeeSection, S
 
 // ---------- cách tính và điểm cần xác nhận ----------
 
-export function shopeeNotes(s: ShopeeReportSnapshot): string[] {
-  const n: string[] = [];
+/** Ghi chú cuối report. "brand" = cách tính (gửi brand được); "ops" = điểm cần xác nhận nội bộ (file thiếu, ca trong app,
+ *  đối soát, ca chưa gán host) — trước 27/10 cả hai nằm chung một danh sách brand đọc được. */
+export function shopeeNotes(s: ShopeeReportSnapshot, audience: "brand" | "ops" = "brand"): string[] {
   const h = s.headline;
+  if (audience === "ops") {
+    const n: string[] = [];
+    const miss = [!s.files.overview && "overview (tổng quan tháng)", !s.files.daily && "theo ngày", !s.files.live && "Live List", !s.files.products && "Product List"].filter(Boolean);
+    if (miss.length) n.push(`Chưa có file: ${miss.join(", ")} — các phần dùng file đó đang trống hoặc lấy từ file khác.`);
+    if (s.files.live && s.files.daily) {
+      const sl = s.streams.reduce((a, x) => a + x.gmv, 0);
+      const sd = s.days.reduce((a, d) => a + d.salesPlaced, 0);
+      if (Math.abs(sl - sd) > Math.max(1000, sd * 0.001)) n.push(`Cộng doanh số từng phiên (${fmtM(sl)}) lệch cộng theo ngày (${fmtM(sd)}) — hai file có thể không cùng kỳ tải.`);
+    }
+    if (s.plan.sessions > 0) {
+      n.push(`Phần Host tính từ ${s.plan.completed} ca Shopee đã diễn ra trong app (${s.quality.reconciled} đã đối soát bằng Live List, ${s.quality.manual} là số tạm). Số của ca là số chia cho từng ca, có thể lệch số phiên của Shopee khi một phiên dài chia cho nhiều ca.`);
+      if (s.appGmv > 0 && h.gmv > 0 && Math.abs(s.appGmv / h.gmv - 1) > 0.02) n.push(`Cộng GMV các ca trong app là ${fmtM(s.appGmv)} so với ${fmtM(h.gmv)} theo file — ${s.appGmv < h.gmv ? "đối soát Live List để số ca khớp file" : "kiểm lại ca nạp bù"}.`);
+    } else {
+      n.push("Chưa có ca Shopee nào trong app cho tháng này nên không có xếp hạng host.");
+    }
+    if (s.unassigned && s.unassigned.sessions > 0) n.push(`${s.unassigned.sessions} ca chưa gán host (${fmtM(s.unassigned.gmv)} GMV) không nằm trong xếp hạng.`);
+    if (!s.campFromPlan) n.push("Tháng này chưa có khung campaign ở Kế Hoạch Tháng Shopee — loại ngày đang theo lịch cố định.");
+    if (s.ads === null) n.push("Chưa có file Ads Shopee của tháng (tải ở Nhập Ads, chọn sàn Shopee) — report chưa có chi phí Ads.");
+    return n;
+  }
+  const n: string[] = [];
   n.push("GMV = Sales(Placed Order) của live; Sales(Confirmed Order) là số thực nhận sau đơn huỷ. Shopee không cho lý do huỷ/hoàn.");
-  const miss = [!s.files.overview && "overview (tổng quan tháng)", !s.files.daily && "theo ngày", !s.files.live && "Live List", !s.files.products && "Product List"].filter(Boolean);
-  if (miss.length) n.push(`Chưa có file: ${miss.join(", ")} — các phần dùng file đó đang trống hoặc lấy từ file khác.`);
-  if (s.files.live && s.files.daily) {
-    const sl = s.streams.reduce((a, x) => a + x.gmv, 0);
-    const sd = s.days.reduce((a, d) => a + d.salesPlaced, 0);
-    if (Math.abs(sl - sd) > Math.max(1000, sd * 0.001)) n.push(`Cộng doanh số từng phiên (${fmtM(sl)}) lệch cộng theo ngày (${fmtM(sd)}) — hai file có thể không cùng kỳ tải.`);
-  }
-  if (s.plan.sessions > 0) {
-    n.push(`Phần Host tính từ ${s.plan.completed} ca Shopee đã diễn ra trong app (${s.quality.reconciled} đã đối soát bằng Live List, ${s.quality.manual} là số tạm). Số của ca là số chia cho từng ca, có thể lệch số phiên của Shopee khi một phiên dài chia cho nhiều ca.`);
-    if (s.appGmv > 0 && h.gmv > 0 && Math.abs(s.appGmv / h.gmv - 1) > 0.02) n.push(`Cộng GMV các ca trong app là ${fmtM(s.appGmv)} so với ${fmtM(h.gmv)} theo file — ${s.appGmv < h.gmv ? "đối soát Live List để số ca khớp file" : "kiểm lại ca nạp bù"}.`);
-  } else {
-    n.push("Chưa có ca Shopee nào trong app cho tháng này nên không có xếp hạng host.");
-  }
-  if (s.unassigned && s.unassigned.sessions > 0) n.push(`${s.unassigned.sessions} ca chưa gán host (${fmtM(s.unassigned.gmv)} GMV) không nằm trong xếp hạng.`);
-  n.push("Loại ngày camp theo lịch cố định (D-Day = ngày trùng tháng và 2 ngày trước, Mid-Month 13–15, Pay Day 23–25); chưa đọc khung camp ghi đè của Kế Hoạch Tháng.");
-  if (s.ads === null) n.push("Chưa có file Ads Shopee của tháng (tải ở Nhập Ads, chọn sàn Shopee) — report chưa có chi phí Ads.");
+  n.push(
+    s.campFromPlan
+      ? "Loại ngày campaign theo khung campaign đã thống nhất trong kế hoạch tháng."
+      : "Loại ngày campaign theo lịch cố định (D-Day = ngày trùng tháng và 2 ngày trước, Mid-Month 13–15, Pay Day 23–25)."
+  );
   if (s.ads) n.push(`Ads lấy từ file "Shopee Live Ads Report"${s.ads.shopName ? ` của shop ${s.ads.shopName}` : ""}: ${s.ads.campaigns} chiến dịch, tổng cả tháng — Shopee không cho số theo ngày nên không tách ROAS theo loại ngày. GMV trong file Ads là một phần của GMV live, không cộng thêm.`);
   if (s.promo) n.push("Coins Claimed và voucher (Shop Voucher Claimed, Special Live Voucher Claimed) lấy từ file overview: Shopee chỉ cho số lượng đã nhận; mỗi xu quy ra 1 đồng, chưa biết xu do shop hay Shopee tài trợ.");
   n.push("Tên chỉ số trong report này lấy đúng tên cột file Shopee (Viewers, Views, ATC, ABS, GPM…). Shopee không có GMV trực tiếp/gián tiếp, LIVE impressions, CTOR hay bảng chấm KPI theo nhóm (video, KOL). Viewers là người xem riêng biệt, không cùng cách đếm với Views của TikTok; GPM của Shopee tính trên Views, không phải Viewers.");

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { BarChart3, Clock, Database, Megaphone, Package, ShoppingBag, Users, Info } from "lucide-react";
 import type { BrandMonthlyReport } from "../../types";
@@ -9,7 +9,7 @@ import { PAL, chartTooltipStyle } from "./report/theme";
 import { chartNum, fmtInt } from "./report/format";
 import { getCampaignDayInfo } from "../../lib/campaignDays";
 import { saveMonthlyReportSectionNote } from "../../lib/db/monthlyReports";
-import type { ShopeeReportSnapshot, ShopeeSection } from "../../lib/report/shopeeSnapshot";
+import { shopeeInsights, shopeeNotes, type ShopeeReportSnapshot, type ShopeeSection } from "../../lib/report/shopeeSnapshot";
 
 // Report Tháng SHOPEE (migration 0139): đọc bản chụp đã chốt (lib/report/shopeeSnapshot.ts), cùng skin đen-vàng và cùng bộ
 // khung với report TikTok. 6 phần theo deck report tháng của Franklin: kết quả → xu hướng ngày → phễu & nguồn traffic →
@@ -26,6 +26,7 @@ const SECTION_LABEL: Record<ShopeeSection, string> = {
   products: "Sản phẩm"
 };
 
+const CAMP_SHORT_LABEL = { dday: "D-Day", midmonth: "Mid-Month", payday: "Pay Day" } as const;
 const dm = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 const pct = (v: number | null | undefined, d = 1) => (v == null ? "—" : `${fmtFixed(v, d)}%`);
 const change = (cur: number | null | undefined, prev: number | null | undefined): number | null =>
@@ -55,9 +56,16 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
   const [showAllProducts, setShowAllProducts] = useState(false);
   const [monthY, monthM] = month.split("-");
 
+  // Nhận xét + ghi chú tính lại từ bản chụp (hàm thuần, chỉ đọc trường có từ bản 1) để bộ từ gửi brand áp cả cho bản chụp chốt
+  // trước 27/10 — chữ đã lưu trong bản chụp cũ còn "ca", "số tạm". Ghi chú nội bộ (file thiếu, ca trong app, đối soát) chỉ ops thấy.
+  const insights = useMemo(() => shopeeInsights(s), [s]);
+  const brandNotes = useMemo(() => shopeeNotes(s, "brand"), [s]);
+  const opsNotes = useMemo(() => (canManage ? shopeeNotes(s, "ops") : []), [canManage, s]);
+  const fileHint = (what: string) => (canManage ? `Chưa có file ${what} của tháng này — up ở Dữ Liệu Gốc.` : "Chưa có số cho phần này trong tháng.");
+
   const insight = (key: ShopeeSection) => (
     <InsightBox
-      auto={s.insights[key]}
+      auto={insights[key]}
       note={report?.sectionNotes?.[`shopee_${key}`]}
       computedAt={s.computedAt}
       canManage={canManage}
@@ -65,7 +73,13 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
     />
   );
 
-  const chartData = s.days.map((d) => ({ date: dm(d.date), gmv: d.salesPlaced, camp: getCampaignDayInfo(d.date)?.shortLabel ?? "" }));
+  // Cột sáng = ngày campaign theo khung của Kế Hoạch Tháng (bản chụp 4); bản chụp cũ đọc lịch cố định.
+  const campLabelOf = (date: string): string => {
+    if (!s.campDays) return getCampaignDayInfo(date)?.shortLabel ?? "";
+    const k = s.campDays[date];
+    return k ? CAMP_SHORT_LABEL[k] : "";
+  };
+  const chartData = s.days.map((d) => ({ date: dm(d.date), gmv: d.salesPlaced, camp: campLabelOf(d.date) }));
   const cancelPct = h.gmv > 0 && h.confirmed > 0 ? (1 - h.confirmed / h.gmv) * 100 : null;
 
   return (
@@ -118,7 +132,7 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
         <SectionHead no="2" title={SECTION_LABEL.daily} sub="Sales(Placed Order) từng ngày (file theo ngày)" />
         {insight("daily")}
         {s.days.length === 0 ? (
-          <EmptyNote text="Chưa có file theo ngày (export-sc…csv) của tháng này — up ở Dữ Liệu Gốc." />
+          <EmptyNote text={fileHint("theo ngày (export-sc…csv)")} />
         ) : (
           <Panel title={`${METRIC.gmv} theo ngày`} icon={<BarChart3 className="w-4 h-4" />} sub="Cột sáng = ngày camp (D-Day, Mid-Month, Pay Day)">
             <div className="h-64">
@@ -153,7 +167,7 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
                   <tr key={d.date} style={{ borderBottom: `1px solid ${PAL.line}`, color: PAL.cream }}>
                     <td className={TD1}>
                       {dm(d.date)}
-                      {getCampaignDayInfo(d.date) ? <span style={{ color: PAL.gold }}> · {getCampaignDayInfo(d.date)!.shortLabel}</span> : null}
+                      {campLabelOf(d.date) ? <span style={{ color: PAL.gold }}> · {campLabelOf(d.date)}</span> : null}
                     </td>
                     <td className={TD}>{fmtVndFull(d.salesPlaced)}</td>
                     <td className={TD}>{fmtVndFull(d.salesConfirmed)}</td>
@@ -172,7 +186,7 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
         <SectionHead no="3" title={SECTION_LABEL.funnel} sub="File overview của Shopee — cả tháng" />
         {insight("funnel")}
         {!o ? (
-          <EmptyNote text="Chưa có file overview (overview-v2…csv) của tháng này — up ở Dữ Liệu Gốc." />
+          <EmptyNote text={fileHint("overview (overview-v2…csv)")} />
         ) : (
           <>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -222,12 +236,12 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
         <SectionHead no="4" title={SECTION_LABEL.schedule} sub="Giờ live thực tế từ Live List; khung giờ theo giờ bắt đầu phiên" />
         {insight("schedule")}
         {s.slots.length === 0 ? (
-          <EmptyNote text="Chưa có file Live List (…live_stream_list…xlsx) của tháng này — up ở Dữ Liệu Gốc." />
+          <EmptyNote text={fileHint("Live List (…live_stream_list…xlsx)")} />
         ) : (
           <>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <KpiTile label={`${METRIC.liveHours} thực tế`} value={hoursLabel(h.liveHours)} note={s.plan.hours > 0 ? `Lịch ca trong app ${hoursLabel(s.plan.hours)}` : "Chưa có ca Shopee trong app"} />
-              <KpiTile label="Số phiên" value={fmtInt(h.liveSessions)} note={`${s.plan.sessions} ca trong app`} />
+              <KpiTile label={`${METRIC.liveHours} thực tế`} value={hoursLabel(h.liveHours)} note={s.plan.hours > 0 ? `Lịch đã lên ${hoursLabel(s.plan.hours)}` : canManage ? "Chưa có ca Shopee trong app" : undefined} />
+              <KpiTile label="Số phiên" value={fmtInt(h.liveSessions)} note={s.plan.sessions > 0 ? `${s.plan.sessions} phiên theo lịch` : undefined} />
               <KpiTile label="GMV/phiên" note="Tự tính: GMV ÷ số phiên" value={h.liveSessions > 0 ? fmtVndShort(h.gmv / h.liveSessions) : "—"} />
               <KpiTile label={METRIC.gmvPerHour} value={h.gmvPerHour != null ? fmtVndShort(h.gmvPerHour) : "—"} />
             </div>
@@ -245,7 +259,7 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
                 ))}
               </ReportTable>
             </Panel>
-            <Panel title="Theo loại ngày" icon={<Clock className="w-4 h-4" />} sub="Lịch camp cố định: D-Day, Mid-Month 13–15, Pay Day 23–25">
+            <Panel title="Theo loại ngày" icon={<Clock className="w-4 h-4" />} sub={s.campFromPlan ? "Khung campaign theo kế hoạch tháng" : "Lịch campaign cố định: D-Day, Mid-Month 13–15, Pay Day 23–25"}>
               <ReportTable head={["Loại ngày", "Ngày", "Phiên", "Giờ live", METRIC.gmv, `% ${METRIC.gmv}`, METRIC.gmvPerHour]}>
                 {s.camps.map((x) => (
                   <tr key={x.key} style={{ borderBottom: `1px solid ${PAL.line}`, color: PAL.cream }}>
@@ -266,17 +280,17 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
 
       {/* 5 · Host */}
       <section className="space-y-4">
-        <SectionHead no="5" title={SECTION_LABEL.people} sub="Từ ca Shopee đã diễn ra trong app" />
+        <SectionHead no="5" title={SECTION_LABEL.people} sub="Các phiên live Shopee do YFB vận hành trong tháng" />
         {insight("people")}
         {s.hosts.length === 0 ? (
-          <EmptyNote text="Chưa có ca Shopee đã diễn ra và đã gán host trong tháng này." />
+          <EmptyNote text={canManage ? "Chưa có ca Shopee đã diễn ra và đã gán host trong tháng này." : "Chưa có phiên đã ghi nhận host trong tháng này."} />
         ) : (
           <Panel
             title={`Xếp hạng ${METRIC.gmvPerHour}`}
             icon={<Users className="w-4 h-4" />}
-            sub={s.quality.manual > 0 ? `${s.quality.manual}/${s.quality.total} ca còn là số tạm (chưa đối soát bằng Live List)` : "Tất cả ca đã đối soát"}
+            sub={canManage ? (s.quality.manual > 0 ? `${s.quality.manual}/${s.quality.total} ca còn là số tạm (chưa đối soát bằng Live List)` : "Tất cả ca đã đối soát") : undefined}
           >
-            <ReportTable head={["Host", "Ca", "Giờ", METRIC.gmv, METRIC.gmvPerHour]}>
+            <ReportTable head={["Host", "Phiên", "Giờ", METRIC.gmv, METRIC.gmvPerHour]}>
               {s.hosts.map((x) => (
                 <tr key={x.key} style={{ borderBottom: `1px solid ${PAL.line}`, color: PAL.cream }}>
                   <td className={TD1}>{x.name}</td>
@@ -289,7 +303,9 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
             </ReportTable>
             {s.unassigned && s.unassigned.sessions > 0 && (
               <p className="text-[11px] mt-2" style={{ color: PAL.muted }}>
-                {s.unassigned.sessions} ca chưa gán host ({fmtVndShort(s.unassigned.gmv)} GMV) không nằm trong xếp hạng.
+                {canManage
+                  ? `${s.unassigned.sessions} ca chưa gán host (${fmtVndShort(s.unassigned.gmv)} GMV) không nằm trong xếp hạng.`
+                  : `${s.unassigned.sessions} phiên (${fmtVndShort(s.unassigned.gmv)}) chưa ghi nhận host nên không nằm trong bảng.`}
               </p>
             )}
           </Panel>
@@ -301,7 +317,7 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
         <SectionHead no="6" title={SECTION_LABEL.products} sub="Product List của Shopee Live — Sales(Placed Order) trong live" />
         {insight("products")}
         {s.products.count === 0 ? (
-          <EmptyNote text="Chưa có file Product List (…live_product_list…xlsx) của tháng này — up ở Dữ Liệu Gốc." />
+          <EmptyNote text={fileHint("Product List (…live_product_list…xlsx)")} />
         ) : (
           <Panel title="Sản phẩm bán chạy" icon={<Package className="w-4 h-4" />} sub={`${s.products.withSales}/${s.products.count} sản phẩm có Sales · ba sản phẩm đầu ${pct(s.products.top3Share != null ? s.products.top3Share * 100 : null)}`}>
             <ReportTable head={["#", "Product(s)", METRIC.gmv, "% live", METRIC.orders, "Product Clicks", METRIC.atc]}>
@@ -328,12 +344,22 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
 
       {/* Cách tính và điểm cần xác nhận */}
       <section className="space-y-3">
-        <SectionHead no="·" title="Cách tính và điểm cần xác nhận" sub="Số nào lấy từ file nào, phần nào còn là số tạm" />
+        <SectionHead no="·" title="Cách tính" sub="Số nào lấy từ file nào của Shopee" />
         <ul className="space-y-1.5 text-[12px] leading-relaxed list-disc pl-5" style={{ color: PAL.muted }}>
-          {s.notes.map((n, i) => (
+          {brandNotes.map((n, i) => (
             <li key={i}>{n}</li>
           ))}
         </ul>
+        {opsNotes.length > 0 && (
+          <div className="rounded-xl p-3 space-y-1" style={{ background: "#2a2410", border: `1px solid ${PAL.gold}55`, color: PAL.gold }}>
+            <p className="text-[11px] font-bold">Chỉ ops thấy — cần xác nhận trước khi phát hành</p>
+            <ul className="space-y-1 text-[11px] leading-relaxed list-disc pl-5">
+              {opsNotes.map((n, i) => (
+                <li key={i}>{n}</li>
+              ))}
+            </ul>
+          </div>
+        )}
         <p className="text-[11px] flex items-center gap-1.5" style={{ color: PAL.muted }}>
           <Info className="w-3.5 h-3.5" /> Số liệu chốt lúc {new Date(s.computedAt).toLocaleString("vi-VN")}.
         </p>

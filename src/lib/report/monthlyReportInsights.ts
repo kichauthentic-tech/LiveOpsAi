@@ -422,7 +422,7 @@ export function factorValueText(key: RateFactor, s: LiveStats): string {
 }
 
 export const FACTOR_ACTION: Record<RateFactor, string> = {
-  viewsPerHour: "Điểm nghẽn ở traffic vào phòng — rà soát khung giờ, thumbnail, tiêu đề phiên và ngân sách Ads cho live.",
+  viewsPerHour: "Điểm nghẽn ở traffic vào phòng — xem lại khung giờ, thumbnail, tiêu đề phiên và ngân sách Ads cho live.",
   liveCtr: "Điểm nghẽn ở tỷ lệ click sản phẩm — ghim sản phẩm và nhắc mở giỏ hàng thường xuyên hơn trong live.",
   ctor: "Điểm nghẽn ở bước chốt đơn — rà giá, voucher và cách chốt của nhóm SKU chủ lực.",
   aov: "Giá trị mỗi đơn giảm — thử combo hoặc ưu đãi theo ngưỡng AOV."
@@ -491,7 +491,7 @@ export function autoNextSteps(i: NarrativeInput): string[] {
   if (worst) out.push(`${DRIVER_LABEL[worst.k]} ${signed(worst.c, 0)} so với cùng kỳ. ${FACTOR_ACTION[worst.k]}`);
   if (i.controlOpsGroup) {
     out.push(
-      `${i.controlOpsGroup === "daily" ? "Daily" : "Campaign"} là chỗ giảm của riêng livestream (giảm mạnh hơn các kênh còn lại của shop) — rà soát khung giờ, host và kịch bản các phiên ${i.controlOpsGroup === "daily" ? "Daily" : "campaign"} trước khi chốt lịch tháng ${i.nextMonth.slice(5)}.`
+      `${i.controlOpsGroup === "daily" ? "Daily" : "Campaign"} là chỗ giảm của riêng livestream (giảm mạnh hơn các kênh còn lại của shop) — xem lại khung giờ, host và kịch bản các phiên ${i.controlOpsGroup === "daily" ? "Daily" : "campaign"} trước khi chốt lịch tháng ${i.nextMonth.slice(5)}.`
     );
   }
   if (i.giftLine && /giảm từ/.test(i.giftLine)) {

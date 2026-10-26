@@ -263,9 +263,13 @@ const borderlineTail = (r: HostReliability) => (isBorderline(r) ? " — sát ng�
 /** Kết luận về host chỉ dựa trên so mặt bằng GỘP 3–4 tháng có khoảng tin cậy (deepAnalysis.hostReliability):
  *  backtest CROCS T6–T9 cho thấy so mặt bằng từng tháng không dự báo được tháng sau (Spearman −0,04), nên
  *  một tháng lệch −24% qua 3 ca không đủ để nêu tên ai. GMV dẫn đầu vẫn nêu (là sự thật, không phải xếp hạng). */
-export function peopleInsight(hosts: HostInsightRow[], rel: HostReliability[] = []): SectionInsight | null {
+export function peopleInsight(hosts: HostInsightRow[], relAll: HostReliability[] = []): SectionInsight | null {
   const live = hosts.filter((h) => h.hours > 0 && h.gmv > 0);
   if (live.length < 2) return null;
+  // Khoảng tin cậy tính trên cả nhóm 4 tháng, nhưng chỉ nói về host CÓ live tháng này (audit 27/10: report T10 nêu một
+  // host không có phiên nào trong tháng). Lọc theo tên vì hàng của tháng và nhóm tin cậy cùng dùng nhãn host.
+  const liveNames = new Set(live.map((h) => h.name));
+  const rel = relAll.filter((r) => liveNames.has(r.name));
   const total = live.reduce((a, h) => a + h.gmv, 0);
   const top = [...live].sort((a, b) => b.gmv - a.gmv)[0];
   const byName = new Map(rel.map((r) => [r.name, r]));
@@ -286,13 +290,28 @@ export function peopleInsight(hosts: HostInsightRow[], rel: HostReliability[] = 
 
   const medHours = median(live.map((h) => h.hours)) ?? 0;
   const underUsed = rel.find((r) => r.verdict === "above" && (live.find((h) => h.name === r.name)?.hours ?? Infinity) <= medHours);
+  // Việc gửi brand chỉ nói phần tích cực (thêm phiên cho host tốt). Host thấp hơn trung bình là việc nội bộ: peopleOpsNote.
   const action = underUsed
     ? `Cân nhắc thêm phiên cho ${underUsed.name} — cao hơn trung bình ${reliabilityText(underUsed)} nhưng tháng này live ít giờ hơn trung vị nhóm.`
-    : below[0]
-      ? `Xem lại khung giờ và nhóm SKU của ${below[0].name} — thấp hơn trung bình ổn định qua ${below[0].sessions} phiên.`
-      : null;
+    : null;
   return { headline, points, action };
 }
+
+/** Ghi chú CHỈ OPS (không vào bản gửi brand): host có live tháng này mà thấp hơn trung bình các host — mức chắc chắn theo
+ *  đúng khoảng tin cậy (sát ngưỡng thì nói là sát ngưỡng; trước 27/10 câu hành động ghi "ổn định" cho cả host sát ngưỡng). */
+export function peopleOpsNote(hosts: HostInsightRow[], rel: HostReliability[] = []): string | null {
+  const liveNames = new Set(hosts.filter((h) => h.hours > 0 && h.gmv > 0).map((h) => h.name));
+  const below = rel.filter((r) => r.verdict === "below" && liveNames.has(r.name));
+  if (below.length === 0) return null;
+  const firm = below.filter((r) => !isBorderline(r));
+  const weak = below.filter((r) => isBorderline(r));
+  const parts: string[] = [];
+  if (firm.length) parts.push(`Thấp hơn trung bình các host có ý nghĩa: ${firm.map((r) => `${r.name} ${reliabilityText(r)} qua ${r.sessions} phiên`).join("; ")} — xem lại khung giờ và nhóm SKU được xếp.`);
+  if (weak.length) parts.push(`Sát ngưỡng, theo dõi thêm một tháng trước khi đổi lịch: ${weak.map((r) => `${r.name} ${reliabilityText(r)} qua ${r.sessions} phiên`).join("; ")}.`);
+  return parts.join(" ");
+}
+
+
 
 // ---------- 6. Hàng ----------
 
@@ -342,7 +361,7 @@ export function productsInsight(
 
   const f = fallersAll[0];
   const action = f
-    ? `Rà ${shortSku(f.name)}: tồn kho, giá và thời lượng giới thiệu trên live${chg(f) ? ` (${chg(f)})` : ""}.`
+    ? `Kiểm tra ${shortSku(f.name)}: tồn kho, giá và thời lượng giới thiệu trên live${chg(f) ? ` (${chg(f)})` : ""}.`
     : leaky
       ? `Kiểm giá và voucher của ${shortSku(leaky.name)} — người xem bấm nhiều nhưng ít chốt.`
       : risers[0]
@@ -386,30 +405,19 @@ export function contextInsight(camps: CampCompareRow[], slots: SlotInsightRow[],
   const ran = camps.filter((r) => r.cur.sessions > 0);
   // Tháng chưa có ca nào có số (vd brand mới nạp file) mà đã có file Ads ⇒ Insight chỉ nói Ads.
   if (ran.length === 0) return hasAds ? { headline: adsLine(ads!), points: [], action: null } : null;
-  const daily = ran.find((r) => r.key === "daily");
-  const campRan = ran.filter((r) => r.key !== "daily");
-  const withPrev = campRan.filter((r) => r.prev.sessions > 0);
-  const up = withPrev.filter((r) => r.cur.gmv > r.prev.gmv).length;
-  const dChg = daily ? pctChange(daily.prev.gmv, daily.cur.gmv) : null;
-  const headline =
-    [
-      dChg != null ? `Daily ${signed(dChg)} GMV so với cùng kỳ tháng trước` : null,
-      withPrev.length ? `${up}/${withPrev.length} khung Campaign đã chạy tăng GMV so với cùng khung tháng trước` : null
-    ]
-      .filter(Boolean)
-      .join("; ") + ".";
-  if (headline === ".") return hasAds ? { headline: adsLine(ads!), points: [], action: null } : null;
-
-  // Không đọc lại từng dòng bảng Campaign ngay bên dưới (GMV, % target, GMV/giờ từng khung) — chỉ câu tổng.
-  const points: string[] = [];
-
+  // Trang này là Host & khung giờ: câu đầu nói khung giờ. GMV từng loại ngày đã ở trang 1 (bảng điểm) và trang 3 (bảng nhiệt) —
+  // trước 27/10 câu đầu ở đây là "Daily −8,4% GMV", con số Daily thứ ba trên cùng một report (trang 1 −16%, trang 3 −29%).
   const usable = slots.filter((s) => s.cur.n >= 3 && s.cur.gmvPerHour != null);
   const sorted = [...usable].sort((a, b) => b.cur.gmvPerHour! - a.cur.gmvPerHour!);
   const bestSlot = sorted[0], worstSlot = sorted[sorted.length - 1];
-  if (bestSlot && worstSlot && bestSlot !== worstSlot) {
-    points.push(`Khung giờ bắt đầu phiên: ${bestSlot.label.toLowerCase()} bán tốt nhất (${money(bestSlot.cur.gmvPerHour!)}/giờ), ${worstSlot.label.toLowerCase()} thấp nhất (${money(worstSlot.cur.gmvPerHour!)}/giờ, ${worstSlot.cur.n} phiên).`);
-  }
+  const slotLine =
+    bestSlot && worstSlot && bestSlot !== worstSlot
+      ? `Khung giờ bắt đầu phiên: ${bestSlot.label.toLowerCase()} bán tốt nhất (${money(bestSlot.cur.gmvPerHour!)}/giờ), ${worstSlot.label.toLowerCase()} thấp nhất (${money(worstSlot.cur.gmvPerHour!)}/giờ, ${worstSlot.cur.n} phiên).`
+      : null;
+  const points: string[] = [];
   if (hasAds) points.push(adsLine(ads!));
+  const headline = slotLine ?? points.shift();
+  if (!headline) return null;
 
   const worstCamp = ran
     .map((r) => ({ r, h: pctChange(r.prev.gmvPerHour, r.cur.gmvPerHour) }))
