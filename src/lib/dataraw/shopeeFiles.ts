@@ -113,6 +113,30 @@ function trimTail(row: unknown[]): unknown[] {
   return out;
 }
 
+// Seller Centre xuất tiêu đề theo ngôn ngữ giao diện của tài khoản (27/10: shop để tiếng Việt ra "Tên buổi livestream", "Doanh thu(Đơn đã đặt)"…).
+// Đổi về tên tiếng Anh ngay lúc đọc ⇒ dữ liệu lưu cùng một khuôn, mọi chỗ đọc sau (snapshot, báo cáo) không phải biết hai thứ tiếng.
+const VI_HEADERS: Record<string, string> = {
+  "Khung Thời Gian": "Data Period",
+  "Streamer ID": "User Id",
+  "Tên buổi livestream": "Livestream Name",
+  "Thời gian bắt đầu": "Start Time",
+  "Thời lượng": "Duration:",
+  "Số người xem tương tác": "Engaged Viewers",
+  "Tổng số Bình luận": "Comments",
+  "Thời lượng xem bình quân": "Avg. Viewing Duration",
+  "Người xem": "Viewers",
+  "Đơn hàng(Đơn đã đặt)": "Orders(Placed Order)",
+  "Đơn hàng(Đơn hàng được xác nhận)": "Orders(Confirmed Order)",
+  "Sản phẩm đã bán(Đơn đã đặt)": "Items Sold(Placed Order)",
+  "Sản phẩm đã bán(Đơn hàng được xác nhận)": "Items Sold(Confirmed Order)",
+  "Doanh thu(Đơn đã đặt)": "Sales(Placed Order)",
+  "Doanh thu(Đơn hàng được xác nhận)": "Sales(Confirmed Order)"
+};
+const viKey = (c: unknown) => (blank(c) ? "" : String(c).trim().replace(/\s*\(\s*/g, "(").replace(/\s*\)/g, ")"));
+// Chỉ dịch dòng trông như dòng tiêu đề (≥2 ô khớp) — tên phiên/sản phẩm trùng chữ ("Người xem") không bị đổi.
+const enHeaders = (rows: unknown[][]) =>
+  rows.map((r) => (Array.isArray(r) && r.filter((c) => VI_HEADERS[viKey(c)]).length >= 2 ? r.map((c) => VI_HEADERS[viKey(c)] ?? c) : r));
+
 function tableAfter(rows: unknown[][], headerIdx: number): { columns: DataRawColumn[]; data: Record<string, unknown>[] } {
   const columns = dedupe(trimTail(rows[headerIdx]));
   const data: Record<string, unknown>[] = [];
@@ -547,7 +571,8 @@ export function shopeeStreamsToSnapshotRows(streams: ShopeeStream[]): SnapshotRo
 
 // ---------- đọc file từ máy ----------
 
-export function parseShopeeRows(rows: unknown[][], reportType: ShopeeFileType): ParsedDataRawImport {
+export function parseShopeeRows(input: unknown[][], reportType: ShopeeFileType): ParsedDataRawImport {
+  const rows = enHeaders(input);
   switch (reportType) {
     case "shopee_live_list": return parseShopeeLiveList(rows);
     case "shopee_product_list": return parseShopeeProductList(rows);
