@@ -13,7 +13,7 @@
 
 ## 1. Giai đoạn hiện tại (cập nhật 2026-10-28)
 
-- **27–28/10: AUDIT + SỬA KẾ HOẠCH THÁNG (chưa commit; `0185` CHƯA CHẠY — chạy TRƯỚC deploy)** — 12 điểm gãy, sửa hết:
+- **27–28/10: AUDIT + SỬA KẾ HOẠCH THÁNG (đã push `ff61f96`; `0185` ĐÃ CHẠY 28/10 — `replace_plan_slots` có, 0/369 ca kế hoạch lệch giờ ca thật)** — 12 điểm gãy, sửa hết:
   P1 — Chốt lại không mở lại ca đã huỷ (`lock_month_plan` giữ huỷ, trả `kept_cancelled`); sau chốt đổi target ca có sẵn chỉ ceo/admin + mọi đổi
   target tháng (sửa/thêm/bỏ ca) ghi `plan_target_audit` (guard 0185; ô target khoá theo `role`); cấm live ngày trên kế hoạch đã chốt phải xác nhận;
   target nhóm ngày báo khi phần còn lại không có ca nào nhận; OP dời giờ ca thật ⇒ shift_slot + ca kế hoạch dời theo (trigger
@@ -71,9 +71,8 @@
 ## 2. Việc còn treo
 
 **Cần user làm:**
-- **Kế Hoạch Tháng (28/10, `0185` CHƯA CHẠY):** dán `0185_month_plan_integrity.sql` vào SQL Editor TRƯỚC khi deploy client (nó tự đồng bộ giờ 4 ca CROCS/Franklin đang lệch).
-  Kiểm đã chạy: gọi `replace_plan_slots` không còn `PGRST202`. Quyết: VERA TikTok T10 có đưa 15 ca 01–07/10 vào kế hoạch không ("Chia lại theo lịch hiện có", ceo/admin).
-  T11 chưa có kế hoạch nào (27/10) — "Mở lịch tháng 11" ở Điều Phối Lịch Live.
+- **Kế Hoạch Tháng (28/10, `0185` ĐÃ CHẠY + push `ff61f96`):** còn thử bằng tài khoản ops: ô target ca đã chốt bị khoá, DB từ chối đổi target. T11 chưa có kế
+  hoạch nào (27/10) — "Mở lịch tháng 11" ở Điều Phối Lịch Live.
 - **Ads theo ngày (28/10, 0184 ĐÃ CHẠY, CROCS T3→T10 đã dán):** cuối mỗi ngày/tháng dán lại khối "Daily Ads Report" để cập nhật actual (ghi đè ngày trùng).
 - **Action plan (27/10, 0182 ĐÃ CHẠY):** commit + deploy; lập plan thật cho CROCS T10 (deck T9 có 9 việc) trước khi chốt T10; đầu T11 ops chấm các việc "Ops tự chấm" ở report T10.
 - **0179 ĐÃ CHẠY 21/10.** Còn: mở Dashboard brand Franklin (ops) → "Gửi bản tin cho brand" → đăng nhập tài khoản brand Franklin xem trang Tổng quan.
