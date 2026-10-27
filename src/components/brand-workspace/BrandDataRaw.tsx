@@ -39,7 +39,8 @@ const REPORT_TABS: { id: DataRawReportType; label: string; hint: string }[] = [
     label: "Creator Live Performance",
     hint: 'Export "Creator-Live-Performance" từ TikTok Creator Center — nguồn chính cho GMV/CTR/CTOR Livestream trong Report Tháng (thay thế Live Analysis).'
   },
-  { id: "live_analysis", label: "Live Analysis", hint: 'Export "Live Analysis" từ TikTok Shop Seller Center ở chế độ xem "linked accounts" (chế độ mặc định chỉ có tài khoản shop, không có creator affiliate nào) — nguồn cho trang Affiliate và cột đối chiếu của Report Tuần.' },
+  { id: "live_analysis", label: "Live Analysis", hint: 'Export "Live Analysis" từ TikTok Shop Seller Center ở chế độ mặc định (chỉ tài khoản shop) — cột đối chiếu của Report Tuần. Phiên của creator affiliate up ở tab "Live Analysis — Affiliate".' },
+  { id: "affiliate_live_analysis", label: "Live Analysis — Affiliate", hint: 'Export "Live Analysis" từ TikTok Shop Seller Center ở chế độ xem creator affiliate (cùng định dạng, mỗi dòng là một phiên live của một creator affiliate) — nguồn cho trang Affiliate và mục Affiliate của Chốt tháng.' },
   { id: "shop_analytics", label: "Shop Analytics", hint: 'Export "Shop Analytics — Key metrics" từ TikTok Shop Seller Center.' },
   { id: "live_performance_core_stats", label: "Live Performance", hint: 'Export "Live Performance Core Stats" từ TikTok Shop Seller Center — GMV LIVE theo ngày. Report Tháng KHÔNG dùng (từ 2026-09-29): file này cộng cả live của creator affiliate nên không phải số agency; chỉ lưu để tra cứu.' }
 ];

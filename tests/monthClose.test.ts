@@ -16,7 +16,7 @@ const crocsStamps = [
   stamp("shop_analytics", "2026-09-01", "2026-09-22"),
   stamp("product_list", "2026-09-01", "2026-09-22"),
   stamp("shop_promotion", "2026-09-01", "2026-09-22"),
-  stamp("live_analysis", "2026-09-01", "2026-09-21"),
+  stamp("affiliate_live_analysis", "2026-09-01", "2026-09-21"),
   stamp("shop_analytics", "2026-08-01", "2026-08-31")
 ];
 
@@ -54,7 +54,7 @@ test("CROCS T9 hôm 27/10: file toàn shop thiếu 8 ngày, Ads tuỳ chọn, af
   expect(by.reconcile).toEqual({ key: "reconcile", state: "partial", text: "2/3 ca" });
   expect(by.shop).toEqual({ key: "shop", state: "partial", text: "22/30 ngày · tới 22/09" });
   expect(by.ads.state).toBe("optional");
-  expect(by.affiliate).toEqual({ key: "affiliate", state: "partial", text: "Live Analysis 21/30 ngày" });
+  expect(by.affiliate).toEqual({ key: "affiliate", state: "partial", text: "Live Analysis Affiliate 21/30 ngày" });
   expect(by.nextPlan.state).toBe("ok");
   expect(by.report).toEqual({ key: "report", state: "partial", text: "nháp" });
   expect(openCount(cells)).toBe(7); // sessions, reconcile, shop, products, promo, affiliate, report — Ads tuỳ chọn không tính

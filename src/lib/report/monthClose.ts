@@ -48,7 +48,7 @@ export const CLOSE_COLUMNS: Record<ReportPlatform, CloseColumn[]> = {
     { key: "products", label: "Sản phẩm", tab: "brand_dataraw", fileType: "product_list" },
     { key: "promo", label: "Khuyến mãi", tab: "brand_dataraw", fileType: "shop_promotion" },
     { key: "ads", label: "Ads", tab: "brand_ads_report", fileType: "ads_campaign_overview", optional: true },
-    { key: "affiliate", label: "Affiliate", tab: "brand_affiliate", fileType: "live_analysis" },
+    { key: "affiliate", label: "Affiliate", tab: "brand_affiliate", fileType: "affiliate_live_analysis" },
     { key: "nextPlan", label: "Kế hoạch tháng sau", tab: "month_plan" },
     { key: "report", label: "Report", tab: "brand_monthly_report" }
   ],
@@ -185,9 +185,9 @@ export function closeRow(i: CloseRowInput): CloseCell[] {
         if (rows.length === 0) return { key: col.key, state: "na", text: "không chạy" };
         // Phiên kế hoạch đã qua ngày mà chưa có số + file Live Analysis (nguồn số affiliate) phủ tới đâu.
         const late = rows.filter((r) => r.status === "planned" && (parseDayLabel(r.liveDateLabel) ?? "9999") < i.today).length;
-        const cov = fileCoverage(i.stamps, "live_analysis", i.month, from);
+        const cov = fileCoverage(i.stamps, "affiliate_live_analysis", i.month, from);
         if (late > 0) return { key: col.key, state: "partial", text: `${late} phiên chưa có số` };
-        if (due > 0 && cov.days < due) return { key: col.key, state: "partial", text: `Live Analysis ${cov.days}/${due} ngày` };
+        if (due > 0 && cov.days < due) return { key: col.key, state: "partial", text: `Live Analysis Affiliate ${cov.days}/${due} ngày` };
         return { key: col.key, state: "ok", text: `${rows.length} phiên` };
       }
       case "nextPlan": {

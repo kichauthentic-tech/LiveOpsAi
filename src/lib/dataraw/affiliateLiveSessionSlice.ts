@@ -34,7 +34,7 @@ export async function fetchAffiliateLiveSessions(
     .from("brand_dataraw_imports")
     .select("id, period_start, period_end, imported_at, columns")
     .eq("brand_id", brandId)
-    .eq("report_type", "live_analysis");
+    .in("report_type", ["live_analysis", "affiliate_live_analysis"]);
   if (error) throw error;
 
   const overlapping = ((imports as DbImportLite[]) ?? [])

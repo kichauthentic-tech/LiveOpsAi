@@ -272,7 +272,8 @@ export async function parseDataRawExcel(file: File, reportType: DataRawReportTyp
     case "shopee_ads": return parseShopeeAdsRows(rows);
     case "shop_promotion": return parseShopPromotion(rows);
     case "product_list": return parseProductList(rows);
-    case "live_analysis": return parseLiveAnalysis(rows);
+    case "live_analysis":
+    case "affiliate_live_analysis": return parseLiveAnalysis(rows);
     case "shop_analytics": return parseShopAnalytics(rows);
     case "live_performance_core_stats": return parseLivePerformanceCoreStats(rows);
     case "creator_live_performance": return parseCreatorLivePerformance(rows);

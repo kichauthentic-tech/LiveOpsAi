@@ -200,7 +200,7 @@ export const PLATFORM_PROFILES: Record<ReportPlatform, PlatformProfile> = {
     liveUnitWord: "room",
     showsTikTokCounters: true,
     reconciliationFile: "Creator-Live-Performance",
-    dataRawTypes: ["creator_live_performance", "shop_promotion", "product_list", "shop_analytics", "live_performance_core_stats", "live_analysis"],
+    dataRawTypes: ["creator_live_performance", "shop_promotion", "product_list", "shop_analytics", "live_performance_core_stats", "live_analysis", "affiliate_live_analysis"],
     dataRawAccept: ".xlsx,.xls",
     dataRawAcceptLabel: "Excel",
     sellerCenterLabel: "TikTok Shop",

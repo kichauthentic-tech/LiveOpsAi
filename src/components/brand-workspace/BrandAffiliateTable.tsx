@@ -196,7 +196,7 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
   const months = useMemo(() => [...new Set([...rangeMonths, planMonth])].sort(), [rangeMonths, planMonth]);
 
   // Nickname tài khoản shop lấy từ chính ca của brand — dùng để đánh dấu dòng KHÔNG phải affiliate
-  // khi nạp (batch Live Analysis xuất ở view mặc định chỉ toàn dòng của shop).
+  // khi nạp (batch live_analysis xuất ở view mặc định chỉ toàn dòng của shop).
   const shopHandle = useMemo(
     () => sessions.find((s) => s.brandId === brandId && s.shopTikTokHandle)?.shopTikTokHandle,
     [sessions, brandId]
@@ -503,7 +503,7 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
       const { end } = monthRange(importMonths[importMonths.length - 1]);
       const slice = await fetchAffiliateLiveSessions(brandId, start, end, shopHandle);
       if (!slice.hasAnyBatch) {
-        setErrorMsg('Chưa có batch "Live Analysis" nào phủ dải tháng này trong Dữ Liệu Gốc. Export ở Seller Center với chế độ xem "linked accounts" rồi import vào tab Live Analysis.');
+        setErrorMsg('Chưa có batch "Live Analysis" nào phủ dải tháng này trong Dữ Liệu Gốc. Export ở Seller Center với chế độ xem creator affiliate rồi import vào tab "Live Analysis — Affiliate".');
         setMissingDataraw(true);
         return;
       }
