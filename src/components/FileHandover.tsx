@@ -50,7 +50,7 @@ export function FileHandover({ session: s, isOps = false, allSessions, onSaved, 
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chạy theo ca + số room, không theo state sự cố đang gõ
   }, [s.id, roomCount]);
 
-  // File cho thấy live ngắn hơn lịch (≥ 10 phút) mà ca chưa giao: hiện sẵn "Off sớm" đúng số phút để trợ chỉ cần chọn lý do (0180 —
+  // File cho thấy live ngắn hơn lịch (≥ 10 phút) mà ca chưa giao: hiện sẵn "Kết thúc sớm" đúng số phút để trợ chỉ cần chọn lý do (0180 —
   // Điều Phối Lịch Live đo giờ mất theo lý do). Gợi ý tính lúc vẽ; trợ đổi bất kỳ ô nào thì giữ đúng thứ trợ chọn.
   const [touched, setTouched] = useState(false);
   const early = durationDeviationInfo(s);

@@ -132,7 +132,7 @@ function outOfRangeFactors(slots: SlotLike[], bucketOf: BucketOf, p90ByBucket: R
 
 /**
  * Bộ dự báo cho tháng `month` từ lịch sử TRƯỚC tháng đó của một kênh. null khi chưa đủ dữ liệu (dưới 15 ca) — nơi gọi rơi về
- * cách cũ. `pastErrors` = dự báo lúc lập của từng tháng trước (chỉ dùng dữ liệu trước tháng đó, lịch = ca đã thực sự chạy).
+ * cách cũ. `pastErrors` = dự báo lúc lập của từng tháng trước (chỉ dùng dữ liệu trước tháng đó, lịch = ca đã thực sự live).
  */
 export function buildMonthForecaster(history: LiveSession[], month: string, params: ForecastParams): MonthForecaster | null {
   // Mức GMV hai sàn khác bản chất (07/10) — một bộ dự báo chỉ cho MỘT kênh.
@@ -290,7 +290,7 @@ export interface CheckpointAdvice {
   checkpoint: Checkpoint;
   /** Target − dự báo (dương = thiếu). */
   gap: number;
-  /** % giờ phần còn lại cần đổi để dự báo chạm target (chưa kẹp). */
+  /** % giờ phần còn lại cần đổi để dự báo đạt target (chưa kẹp). */
   needPct: number;
   /** Sau khi kẹp [0, +cap] — chỉ BÙ thêm, vượt target thì không cắt giờ (vượt là tốt cho agency). */
   pct: number;
@@ -332,7 +332,7 @@ export interface ForecastFold {
   month: string;
   sessions: number;
   actual: number;
-  /** Dự báo lúc lập (dữ liệu tới ngày 20 tháng trước, lịch = ca đã thực sự chạy). */
+  /** Dự báo lúc lập (dữ liệu tới ngày 20 tháng trước, lịch = ca đã thực sự live). */
   plan: number;
   planError: number;
   /** |lệch| ≤ nửa dải 80% lúc lập. */

@@ -140,7 +140,7 @@ export function HostChangeReports({ session: s, canSubmit, onSaved }: Props) {
           <ArrowRightLeft className="w-3.5 h-3.5" /> Report lúc đổi host
         </h4>
         <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${pending === 0 ? "bg-emerald-950 text-emerald-300 border-emerald-800" : "bg-amber-950 text-amber-300 border-amber-800"}`}>
-          {pending === 0 ? "đủ số" : `còn ${pending} chỗ chưa up`}
+          {pending === 0 ? "đủ số" : `còn ${pending} chỗ chưa tải lên`}
         </span>
       </div>
       <p className="text-[11px] text-[var(--text-faint)]">

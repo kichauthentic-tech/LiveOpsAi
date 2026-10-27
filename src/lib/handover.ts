@@ -30,9 +30,9 @@ export function handoverOwnerLabel(s: Pick<LiveSession, "coHostId" | "coHostName
   return s.coHostId ? `Trợ live ${s.coHostName || ""} giao ca`.replace("  ", " ") : "Ca không có trợ — OPS giao ca";
 }
 
-/** Lý do off sớm khai lúc giao ca (0180). "Bán kém" là phần trainer cần đo để quyết giờ phòng hờ (T10: ca tắt sớm bán 0,67× kênh). */
+/** Lý do off sớm khai lúc giao ca (0180). "Doanh số thấp" là phần trainer cần đo để quyết giờ phòng hờ (T10: ca tắt sớm bán 0,67× kênh). */
 export const EARLY_REASON_LABEL: Record<EarlyLeaveReason, string> = {
-  low_sales: "Bán kém",
+  low_sales: "Doanh số thấp",
   technical: "Sự cố kỹ thuật",
   staff: "Host/trợ",
   brand: "Brand yêu cầu",

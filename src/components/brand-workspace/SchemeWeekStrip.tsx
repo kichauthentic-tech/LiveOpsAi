@@ -3,7 +3,7 @@ import { ChevronDown, Plus, Tag, Trash2 } from "lucide-react";
 import { PromoScheme } from "../../types";
 import { schemeCategoryColor } from "../../lib/schemeUtils";
 
-// Bảng Scheme khuyến mãi theo tuần, nhúng thẳng dưới mỗi hàng 7 ô ngày của BrandCalendar —
+// Bảng Chương trình khuyến mãi theo tuần, nhúng thẳng dưới mỗi hàng 7 ô ngày của BrandCalendar —
 // tương đương file Excel vận hành thật (hàng = hạng mục khuyến mãi như "Voucher scheme",
 // "Combo Deal", "Free Gift"; cột = ngày trong tuần; scheme đa-ngày (vd đợt camp D-Day/Mid-Month)
 // tự động gộp thành 1 khối màu trải dài qua các cột đó). Đóng/mở độc lập theo từng tuần (mặc

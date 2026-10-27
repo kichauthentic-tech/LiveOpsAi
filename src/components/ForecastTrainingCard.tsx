@@ -22,7 +22,7 @@ interface Props {
   /** Tham số ĐANG SỬA (chưa lưu). */
   params: ForecastParams;
   today: string;
-  /** Scheme khuyến mãi của brand đang chọn. */
+  /** Chương trình khuyến mãi của brand đang chọn. */
   schemes: { start: string; end: string }[];
 }
 
@@ -149,7 +149,7 @@ export const ForecastTrainingCard: React.FC<Props> = ({ brandId, sessions, param
                     <tr className="text-[var(--text-faint)] text-right">
                       <th className="text-left font-normal py-1">Tháng</th>
                       <th className="font-normal px-1.5">GMV</th>
-                      <th className="font-normal px-1.5" title="Dữ liệu tới ngày 20 tháng trước; lịch = ca đã thực sự chạy">Lúc lập</th>
+                      <th className="font-normal px-1.5" title="Dữ liệu tới ngày 20 tháng trước; lịch = ca đã thực sự live">Lúc lập</th>
                       {BACKTEST_DAYS.map((d) => <th key={d} className="font-normal px-1.5">Ngày {d}</th>)}
                       <th className="font-normal px-1.5" title="Target = dự báo lúc lập; 3 mốc bù giờ; GMV cuối ÷ target − 1">3 mốc</th>
                     </tr>
@@ -167,7 +167,7 @@ export const ForecastTrainingCard: React.FC<Props> = ({ brandId, sessions, param
                   </tbody>
                 </table>
                 <Explain summary="Cách đọc bảng" className="mt-1">
-                  <p>Số = dự báo ÷ GMV cuối tháng − 1 (xanh: trong ±5% với cột ngày, ±10% với lúc lập). ⚠ = rơi ngoài dải ~80%. Backtest dùng lịch đã chạy làm lịch kế hoạch nên lạc quan hơn đời thật — sổ bên dưới là số đã nói thật.</p>
+                  <p>Số = dự báo ÷ GMV cuối tháng − 1 (xanh: trong ±5% với cột ngày, ±10% với lúc lập). ⚠ = rơi ngoài dải ~80%. Backtest dùng lịch đã live làm lịch kế hoạch nên lạc quan hơn thực tế — sổ bên dưới là các dự báo đã ghi nhận thật.</p>
                 </Explain>
               </div>
             )}
@@ -205,7 +205,7 @@ export const ForecastTrainingCard: React.FC<Props> = ({ brandId, sessions, param
                     ))}
                   </tbody>
                 </table>
-                <p className="mt-1 text-[11px] text-[var(--text-faint)] leading-snug">Tháng đang chạy chỉ hiện số đã nói; hết tháng mới chấm lệch so với GMV cuối tháng (lấy từ ca, nên đối soát lại vẫn đúng).</p>
+                <p className="mt-1 text-[11px] text-[var(--text-faint)] leading-snug">Tháng đang chạy chỉ hiện dự báo đã ghi; hết tháng mới chấm lệch so với GMV cuối tháng (lấy từ ca, nên đối soát lại vẫn đúng).</p>
               </div>
             )}
           </div>
@@ -213,7 +213,7 @@ export const ForecastTrainingCard: React.FC<Props> = ({ brandId, sessions, param
           <Explain summary="Chỉ báo sớm (leading indicator) — có giảm sai số lúc lập không">
             {leading.map((c) => (
               <p key={c.signal} className="text-[11px] text-[var(--text-muted)] leading-snug">
-                <b className="text-[var(--text)]">{c.signal === "ads" ? "Ngân sách Ads (Kế Hoạch Tháng)" : "Scheme khuyến mãi"}</b>:{" "}
+                <b className="text-[var(--text)]">{c.signal === "ads" ? "Ngân sách Ads (Kế Hoạch Tháng)" : "Chương trình khuyến mãi"}</b>:{" "}
                 {c.months < LEADING_MIN_MONTHS
                   ? `chưa đủ — ${c.months}/${c.needed} tháng có ${c.signal === "ads" ? "ngân sách Ads" : "chương trình khuyến mãi"} kèm dự báo lúc lập. ${c.signal === "ads" ? "Nhập ô Ngân sách Ads ở Kế Hoạch Tháng mỗi tháng." : "Nhập chương trình khuyến mãi của brand ở CRM / lịch KM."}`
                   : <>sai lúc lập {pct(c.mapeBefore)} → <b className={c.helps ? "text-emerald-400" : "text-[var(--text)]"}>{pct(c.mapeAfter)}</b> nếu dùng (kiểm bỏ-một-tháng). {c.helps ? "Có lợi — đủ điều kiện đưa vào mức dự báo (cần sửa code, ghi vào WORKSPACE)." : "Chưa có lợi rõ (cần giảm ≥ 2 điểm %) — chưa dùng."}</>}

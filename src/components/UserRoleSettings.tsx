@@ -826,7 +826,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                                 aria-label={`Đặt lại mật khẩu cho ${u.name}`}
                               >
                                 <KeyRound className="w-3.5 h-3.5" />
-                                <span className="hidden lg:inline text-[11px] font-bold">Đặt lại MK</span>
+                                <span className="hidden lg:inline text-[11px] font-bold">Đặt lại mật khẩu</span>
                               </button>
                             )}
 

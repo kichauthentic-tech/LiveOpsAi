@@ -35,13 +35,13 @@ export const ShopSection: React.FC<{ files: BrandFiles; platform: ReportPlatform
   ];
   return (
     <>
-      <Sect title="Shop" sub="từ file brand upload ở Dữ Liệu Gốc · số theo tháng" />
+      <Sect title="Shop" sub="từ file brand tải lên ở Dữ Liệu Gốc · số theo tháng" />
       {x && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
-          <StatTile frame="card" size="lg" label="Total GMV" value={money(x.gmv)} hint={y ? <><Chg cur={x.gmv / x.days} prev={y.gmv / y.days} /> mỗi ngày vs file {fileM(prev!)}</> : undefined} />
-          <StatTile frame="card" size="lg" label="% LIVE GMV" value={pct(x.live / x.gmv)} hint={y ? <><Chg cur={x.live / x.gmv} prev={y.live / y.gmv} points /> vs file {fileM(prev!)}</> : "Seller LIVE ÷ Total GMV"} />
+          <StatTile frame="card" size="lg" label="Total GMV" value={money(x.gmv)} hint={y ? <><Chg cur={x.gmv / x.days} prev={y.gmv / y.days} /> mỗi ngày so với file {fileM(prev!)}</> : undefined} />
+          <StatTile frame="card" size="lg" label="% LIVE GMV" value={pct(x.live / x.gmv)} hint={y ? <><Chg cur={x.live / x.gmv} prev={y.live / y.gmv} points /> so với file {fileM(prev!)}</> : "Seller LIVE ÷ Total GMV"} />
           <StatTile frame="card" size="lg" label="Affiliate LIVE" value={money(x.aff)} hint={`${pct(x.aff / x.gmv)} Total GMV`} />
-          <StatTile frame="card" size="lg" label="Refund rate" value={pct(x.refunds / x.gmv, 1)} hint={y ? <><Chg cur={x.refunds / x.gmv} prev={y.refunds / y.gmv} points inv /> vs file {fileM(prev!)}</> : undefined} />
+          <StatTile frame="card" size="lg" label="Refund rate" value={pct(x.refunds / x.gmv, 1)} hint={y ? <><Chg cur={x.refunds / x.gmv} prev={y.refunds / y.gmv} points inv /> so với file {fileM(prev!)}</> : undefined} />
         </div>
       )}
       {files.shop.length > 0 ? (
@@ -114,10 +114,10 @@ const ShopeeShop: React.FC<{ files: BrandFiles }> = ({ files }) => {
     <>
       <Sect title="Shop" sub={`File Shopee theo ngày ${c[0].date.slice(8, 10)}–${c[c.length - 1].date.slice(8, 10)}/${c[0].date.slice(5, 7)} · số trong app theo đơn đặt (Placed Order); Confirmed Order là số brand thực nhận · so với file tháng trước, mỗi ngày`} />
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
-        <StatTile frame="card" size="lg" label="Sales (Placed Order)" value={money(placed)} hint={p.length ? <><Chg cur={per(c, (d) => d.salesPlaced)} prev={per(p, (d) => d.salesPlaced)} /> mỗi ngày vs tháng trước</> : undefined} />
-        <StatTile frame="card" size="lg" label="Sales (Confirmed Order)" value={money(conf)} hint={p.length ? <><Chg cur={per(c, (d) => d.salesConfirmed)} prev={per(p, (d) => d.salesConfirmed)} /> mỗi ngày vs tháng trước</> : undefined} />
-        <StatTile frame="card" size="lg" label="Huỷ sau khi đặt" value={pct(cancel, 1)} hint={cancelB != null ? <><Chg cur={cancel} prev={cancelB} points inv /> vs tháng trước</> : "1 − Confirmed ÷ Placed"} />
-        <StatTile frame="card" size="lg" label="Engaged Viewers" value={s(c, (d) => d.engaged).toLocaleString("vi-VN")} hint={p.length ? <><Chg cur={per(c, (d) => d.engaged)} prev={per(p, (d) => d.engaged)} /> mỗi ngày vs tháng trước</> : undefined} />
+        <StatTile frame="card" size="lg" label="Sales (Placed Order)" value={money(placed)} hint={p.length ? <><Chg cur={per(c, (d) => d.salesPlaced)} prev={per(p, (d) => d.salesPlaced)} /> mỗi ngày so với tháng trước</> : undefined} />
+        <StatTile frame="card" size="lg" label="Sales (Confirmed Order)" value={money(conf)} hint={p.length ? <><Chg cur={per(c, (d) => d.salesConfirmed)} prev={per(p, (d) => d.salesConfirmed)} /> mỗi ngày so với tháng trước</> : undefined} />
+        <StatTile frame="card" size="lg" label="Huỷ sau khi đặt" value={pct(cancel, 1)} hint={cancelB != null ? <><Chg cur={cancel} prev={cancelB} points inv /> so với tháng trước</> : "1 − Confirmed ÷ Placed"} />
+        <StatTile frame="card" size="lg" label="Engaged Viewers" value={s(c, (d) => d.engaged).toLocaleString("vi-VN")} hint={p.length ? <><Chg cur={per(c, (d) => d.engaged)} prev={per(p, (d) => d.engaged)} /> mỗi ngày so với tháng trước</> : undefined} />
       </div>
     </>
   );
@@ -185,7 +185,7 @@ export const TeamSection: React.FC<{ s: Scope; brands: Brand[]; wave?: string }>
   <>
     <Sect title="Nhân sự live" sub={wave ? `chỉ các ca ${wave} · host tính GMV, trợ live tính giờ · so với ${wave} tháng trước` : "host tính GMV, trợ live tính giờ · theo kỳ đang chọn"} />
     <div className="grid gap-4 xl:grid-cols-2 items-start [&>*]:min-w-0">
-      <HostTable s={s} brands={brands} showBrand={false} minSessions={wave ? 1 : 3} title="Host chạy kênh này" />
+      <HostTable s={s} brands={brands} showBrand={false} minSessions={wave ? 1 : 3} title="Host phụ trách kênh này" />
       <CoTable s={s} brands={brands} showBrand={false} />
     </div>
     <SlotTable s={s} within={wave ? "đợt" : "kỳ"} />

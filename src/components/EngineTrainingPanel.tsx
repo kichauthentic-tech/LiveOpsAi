@@ -153,14 +153,14 @@ export const EngineTrainingPanel: React.FC<Props> = ({ brands, sessions, shiftSl
                   <span className="text-[var(--text-muted)]">Đủ dữ liệu để tin</span><b className={`text-right ${history.enough ? "text-emerald-400" : "text-amber-400"}`}>{history.enough ? "có" : `chưa (cần ≥ ${draft.minHistorySessions} ca, ${draft.minHistoryMonths} tháng)`}</b>
                 </div>
                 <div>
-                  <p className="font-bold text-[var(--text-muted)] mb-1">Ngày camp</p>
+                  <p className="font-bold text-[var(--text-muted)] mb-1">Ngày Campaign</p>
                   {(["dday", "midmonth", "payday"] as const).map((b) => (
                     <div key={b} className="flex justify-between gap-2">
                       <span className="text-[var(--text)]">{{ dday: "D-Day", midmonth: "Mid-Month", payday: "Pay Day" }[b]}</span>
                       <span className="text-[var(--text)]">GMV/giờ <b>×{fmtFixed(history.campMultipliers[b], 2)}</b> <span className="text-[11px] text-[var(--text-faint)]">{history.campLearned[b] ? "học" : "mặc định"}</span>{history.campHoursLearned[b] ? <> · <b>{fmtFixed(history.campHoursPerDay[b], 1)}h</b>/ngày</> : ""}</span>
                     </div>
                   ))}
-                  <div className="flex justify-between gap-2"><span className="text-[var(--text)]">Ngày thường</span><span className="text-[var(--text)]">{history.campHoursLearned.daily ? <><b>{fmtFixed(history.campHoursPerDay.daily, 1)}h</b>/ngày</> : "—"}</span></div>
+                  <div className="flex justify-between gap-2"><span className="text-[var(--text)]">Daily</span><span className="text-[var(--text)]">{history.campHoursLearned.daily ? <><b>{fmtFixed(history.campHoursPerDay.daily, 1)}h</b>/ngày</> : "—"}</span></div>
                   <div className="flex justify-between gap-2 mt-1"><span className="text-[var(--text)]">Ca thứ 2/3/4 trong ngày</span><b className="text-[var(--text)]">×{fmtFixed(history.diminishing[1], 2)} / ×{fmtFixed(history.diminishing[2], 2)} / ×{fmtFixed(history.diminishing[3], 2)}</b></div>
                 </div>
                 <div>

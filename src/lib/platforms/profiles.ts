@@ -84,8 +84,8 @@ const SHOPEE_METRICS_SET: PlatformMetricSet = {
     const m = t as ShopeeKeyMetrics;
     const out: { tone: "warn" | "faint"; text: string }[] = [];
     if (m.sessions > 0 && m.atcViewers < m.viewers * 0.5)
-      out.push({ tone: "warn", text: `Mới ${m.atc > 0 || m.atcViewers > 0 ? "một phần" : "chưa ca nào"} có số liệu ${METRIC.atc} (${Math.round((m.atcViewers / (m.viewers || 1)) * 100)}% ${METRIC.viewers}) — ${METRIC.atcRate} và ${METRIC.gmvPerAtc} chỉ phản ánh những ca đó. Đủ số khi ca có file Live List (up lúc giao ca hoặc ở Dữ Liệu Gốc).` });
-    if (m.orders === 0) out.push({ tone: "faint", text: `${METRIC.orders}, ${METRIC.abs} và ${METRIC.itemsSoldShopee} của ca Shopee chỉ có từ file Live List (up lúc giao ca hoặc ở Dữ Liệu Gốc); ca chưa có file chỉ có GMV và ${METRIC.viewers} khai tay.` });
+      out.push({ tone: "warn", text: `Mới ${m.atc > 0 || m.atcViewers > 0 ? "một phần" : "chưa ca nào"} có số liệu ${METRIC.atc} (${Math.round((m.atcViewers / (m.viewers || 1)) * 100)}% ${METRIC.viewers}) — ${METRIC.atcRate} và ${METRIC.gmvPerAtc} chỉ phản ánh những ca đó. Đủ số khi ca có file Live List (tải lên lúc giao ca hoặc ở Dữ Liệu Gốc).` });
+    if (m.orders === 0) out.push({ tone: "faint", text: `${METRIC.orders}, ${METRIC.abs} và ${METRIC.itemsSoldShopee} của ca Shopee chỉ có từ file Live List (tải lên lúc giao ca hoặc ở Dữ Liệu Gốc); ca chưa có file chỉ có GMV và ${METRIC.viewers} khai tay.` });
     return out;
   },
   hostRanking: (sessions) => splitUnassignedShopee(byHostShopee(sessions))
@@ -204,7 +204,7 @@ export const PLATFORM_PROFILES: Record<ReportPlatform, PlatformProfile> = {
     dataRawAccept: ".xlsx,.xls",
     dataRawAcceptLabel: "Excel",
     sellerCenterLabel: "TikTok Shop",
-    dataRawReplaceNote: "(file TikTok luôn cộng dồn từ đầu tháng)",
+    dataRawReplaceNote: "(file TikTok luôn luỹ kế từ đầu tháng)",
     adsFileType: "ads_campaign_overview",
     adsFileLabel: "Campaign overview data (TikTok Ads, theo ngày)",
     hiddenBrandTabs: [],

@@ -115,7 +115,7 @@ const Suggestions: React.FC<{ sessions: LiveSession[]; bucketOf: (d: string) => 
   const pill = (ok: boolean) => <span className={`px-2 py-0.5 rounded-full text-[11px] ${ok ? "bg-emerald-500/15 text-emerald-400" : "bg-[var(--surface-elevated)] text-[var(--text-faint)]"}`}>{ok ? "Đủ tin cậy" : "Chưa đủ tin cậy"}</span>;
   return (
     <Card>
-      <BlockHead title="Đề xuất tối ưu" sub="Chỉ giữ quy tắc đã được thử lại: lấy các tháng trước để đoán tháng sau, quy tắc nào đoán đúng hơn mới được đưa ra. Mức tăng là mức tối đa — giả định giờ dời sang khung khác vẫn bán tốt như trung bình khung đó." />
+      <BlockHead title="Đề xuất tối ưu" sub="Chỉ giữ quy tắc đã được thử lại: lấy các tháng trước để đoán tháng sau, quy tắc nào đoán đúng hơn mới được đưa ra. Mức tăng là mức tối đa — giả định giờ dời sang khung khác vẫn đạt GMV/giờ như trung bình khung đó." />
       <div className="space-y-4 text-xs">
         <div className={`border-l-2 pl-3 space-y-1.5 ${slotOk ? "border-emerald-500" : "border-[var(--border)] opacity-80"}`}>
           <p className="font-bold text-[var(--text)] flex items-center gap-2">{pill(slotOk)}Khung giờ ngày Daily</p>
@@ -152,7 +152,7 @@ const Suggestions: React.FC<{ sessions: LiveSession[]; bucketOf: (d: string) => 
               {(() => {
                 const hF = hoursPerDailyDay(curRange, slotMove.from), hT = hoursPerDailyDay(curRange, slotMove.to), hTp = hoursPerDailyDay(prevRange, slotMove.to);
                 if (hT == null) return null;
-                return <> Kỳ này mỗi ngày Daily live {num(hT, 1)}h ở khung {lbl(slotMove.to)} (cùng kỳ tháng trước {num(hTp, 1)}h) và {num(hF, 1)}h ở khung {lbl(slotMove.from)}.{hTp != null && hT < hTp * 0.85 && <b className="text-rose-300"> Giờ ở khung mạnh nhất đang bị cắt bớt.</b>}</>;
+                return <> Kỳ này mỗi ngày Daily live {num(hT, 1)}h ở khung {lbl(slotMove.to)} (cùng kỳ tháng trước {num(hTp, 1)}h) và {num(hF, 1)}h ở khung {lbl(slotMove.from)}.{hTp != null && hT < hTp * 0.85 && <b className="text-rose-300"> Giờ ở khung hiệu quả nhất đang bị cắt bớt.</b>}</>;
               })()}
             </p>
           )}

@@ -28,7 +28,7 @@ const MODELS: Record<Prefer, { id: string; label: string }[]> = {
 const PREF_KEY = "control-room-ask-provider";
 const NAME: Record<Prefer, string> = { claude: "Claude", gemini: "Gemini" };
 const SUGGEST = [
-  "Kênh nào còn cửa về đích tháng này, kênh nào không, vì sao?",
+  "Kênh nào còn khả năng đạt target tháng này, kênh nào không, vì sao?",
   "Tuần này ca nào làm giảm xác suất đạt nhiều nhất?",
   "Host nào có hiệu suất cao hơn trung bình nhóm, độ tin cậy bao nhiêu?",
   "Tháng trước giảm vì giờ, vì cơ cấu ca hay vì năng suất?",

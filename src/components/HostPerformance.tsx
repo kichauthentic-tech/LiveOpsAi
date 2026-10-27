@@ -231,7 +231,7 @@ export function HostPerformance({ platform, sessions, brands }: HostPerformanceP
               {quality.manual > 0 && (
                 <>
                   ,{" "}
-                  <span className="font-bold text-amber-400">{quality.manual} host tự khai tay</span> — phần tự khai chưa có gì bảo chứng,
+                  <span className="font-bold text-amber-400">{quality.manual} host tự khai tay</span> — phần tự khai chưa được xác thực,
                   cân nhắc khi dùng để ra quyết định
                 </>
               )}
@@ -290,7 +290,7 @@ export function HostPerformance({ platform, sessions, brands }: HostPerformanceP
           </div>
 
           <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-5">
-            <h3 className="text-xs font-black text-[var(--text)]">Host Mạnh Nhất Vào Thứ Mấy</h3>
+            <h3 className="text-xs font-black text-[var(--text)]">Host hiệu quả nhất theo thứ trong tuần</h3>
             <p className="text-[11px] text-[var(--text-faint)] mt-0.5">
               Đậm hơn = GMV/giờ cao hơn. Ô trống nghĩa là host chưa từng live thứ đó trong khoảng đã chọn, không phải hiệu suất bằng 0.
               Hàng cuối "Mọi host" = hiệu suất chung của thứ đó — dùng để quyết định nên mở nhiều ca vào thứ nào, tách khỏi chuyện host nào trực.

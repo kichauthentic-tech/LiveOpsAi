@@ -39,7 +39,7 @@ export function getCampaignDayInfo(dateStr: string): CampaignDayInfo | null {
       type: "payday",
       label: "Pay Day Sale (23-25)",
       shortLabel: "Pay Day",
-      bannerLabel: "PAY-DAY SALE · 23-25",
+      bannerLabel: "PAY DAY SALE · 23-25",
       spanIndex: d - 23,
       spanLength: CAMP_SPAN_DAYS
     };

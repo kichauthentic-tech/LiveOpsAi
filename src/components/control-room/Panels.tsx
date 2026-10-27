@@ -29,10 +29,10 @@ export const SwingList: React.FC<{ channel: RoomChannel }> = ({ channel }) => {
     <div className="space-y-2">
       <p className="text-xs text-[var(--text-muted)]">
         {byPoints
-          ? "Mỗi ca được chấm bằng số điểm xác suất về đích nó làm thay đổi so với việc ca đó chỉ đạt đúng kỳ vọng."
+          ? "Mỗi ca được chấm bằng số điểm % xác suất đạt target mà ca đó làm thay đổi so với việc ca đó chỉ đạt đúng kỳ vọng."
           : r.target == null
             ? "Kênh chưa có target: xếp theo GMV vượt/hụt kỳ vọng của chính ca đó."
-            : `Khả năng đạt đã rõ (${pct(r.now.pHit)}) — một ca không còn đổi được kết quả tháng, nên đo bằng GMV vượt/hụt kỳ vọng.`}
+            : `Xác suất đạt đã rõ (${pct(r.now.pHit)}) — một ca không còn đổi được kết quả tháng, nên đo bằng GMV vượt/hụt kỳ vọng.`}
       </p>
       {rows.map(({ s, v }) => (
         <div key={s.id} className="grid items-center gap-2 text-xs" style={{ gridTemplateColumns: "minmax(0,1fr) minmax(80px,180px) 76px" }}>
@@ -45,7 +45,7 @@ export const SwingList: React.FC<{ channel: RoomChannel }> = ({ channel }) => {
           <span className={`text-right tabular-nums font-bold ${v >= 0 ? "text-emerald-400" : "text-rose-400"}`}>{byPoints ? `${v >= 0 ? "+" : "−"}${Math.abs(v * 100).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} điểm` : `${v >= 0 ? "+" : "−"}${money(Math.abs(v))}`}</span>
         </div>
       ))}
-      {byPoints && <p className="text-[11px] text-[var(--text-faint)]">Điểm = điểm phần trăm của khả năng về đích.</p>}
+      {byPoints && <p className="text-[11px] text-[var(--text-faint)]">Điểm = điểm % của xác suất đạt target.</p>}
     </div>
   );
 };

@@ -117,7 +117,7 @@ const RULE_ORDER: [IssueCode, string][] = [
   ["room", "Nối ca sát giờ nhưng phải đổi phòng"],
   ["day", "Quá giờ trong một ngày"],
   ["streak", "Làm nhiều ngày liền"],
-  ["week_warn", "Gần chạm giờ tối đa/tuần"],
+  ["week_warn", "Gần tới giờ tối đa/tuần"],
   ["new_channel", "Host chưa quen kênh (0 ca trong 90 ngày)"]
 ];
 
@@ -427,7 +427,7 @@ export const HoursCostPanel: React.FC<{
       )}
       <section className="space-y-2">
         <h4 className="text-sm font-black text-[var(--text)]">Giờ từng người tuần này</h4>
-        <p className="text-xs text-[var(--text-muted)]">Giờ theo lịch, cả vai host và trợ (ca đổi người giữa ca chỉ tính phần người đó đứng). Vạch đỏ = {rules.maxWeekHours} giờ (chặn công bố), vạch mờ = {rules.warnWeekHours} giờ.{showCost ? " Tiền công = rate × giờ theo lịch, chưa có OT/off sớm." : ""}</p>
+        <p className="text-xs text-[var(--text-muted)]">Giờ theo lịch, cả vai host và trợ (ca đổi người giữa ca chỉ tính phần người đó đứng). Vạch đỏ = {rules.maxWeekHours} giờ (chặn công bố), vạch mờ = {rules.warnWeekHours} giờ.{showCost ? " Tiền công = rate × giờ theo lịch, chưa tính live quá giờ (OT) / kết thúc sớm." : ""}</p>
         <div className="overflow-x-auto rounded-xl border border-[var(--border)]">
           <table className="w-full text-xs">
             <thead>

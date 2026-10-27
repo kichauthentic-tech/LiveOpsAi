@@ -206,7 +206,7 @@ function ExtraChip({ x }: { x: GridExtra }) {
       : `Ca live ngoài kế hoạch ${x.startTime}–${x.endTime}: target 0, GMV ${fmtVndShort(x.actual ?? 0)} vẫn cộng vào thực đạt ⇒ run-rate cao hơn thực. Đưa vào kế hoạch: "Chia lại theo lịch hiện có…".`;
   return (
     <div title={title} className="w-full min-h-6 flex items-center justify-between gap-1 rounded-md border border-dashed border-sky-700 px-1.5 text-[11px] tabular-nums bg-sky-950/20">
-      <span className="text-sky-300">{hm(x.startTime)}–{hm(x.endTime)} {x.kind === "boost" ? "+" : "ngoài KH"}</span>
+      <span className="text-sky-300">{hm(x.startTime)}–{hm(x.endTime)} {x.kind === "boost" ? "+" : "ngoài kế hoạch"}</span>
       {x.actual !== null ? (
         <b className={x.target === null ? "text-sky-200" : ok ? "text-emerald-400" : "text-rose-400"}>{fmtVndShort(x.actual)}</b>
       ) : (

@@ -18,6 +18,10 @@
   cổng brand + bản tin, Sổ Ca, giao ca, đối soát, Finance, engine). Bảng từ ở §5.2 "Thuật ngữ chuẩn"; `tests/uiWording.test.ts` chặn từ cũ quay lại.
   Kiểm: tsc sạch, vitest chỉ còn 3 lỗi có sẵn từ trước (layoutConventions h2, platformProfiles, uiReadability 11px — không do đợt này);
   Browser pane: Sổ Ca ("Chưa tải lên file số liệu", "ca có số liệu"), Finance ("P&L từng ca"), Dashboard ("target luỹ kế", "ca chưa có số liệu"), 0 lỗi console.
+  Vòng 2 cùng ngày: ĐỌC HẾT 4.411 câu chữ hiển thị (trích chuỗi + text JSX, gộp trùng, bỏ className/import) — sửa thêm ~70 chỗ
+  (về đích→xác suất đạt target, Đã chạy→Đã live ở Cam Kết brand, Nhịp bán→GMV theo ngày, Off sớm→Kết thúc sớm, bảo chứng→được xác thực,
+  PAY-DAY→PAY DAY, Đặt lại MK, % commission→% hoa hồng…), mẫu mới thêm vào `tests/uiWording.test.ts`. **Còn treo:** ~10 câu `raise exception`
+  trong SQL vẫn nói "up file"/"off sớm" (hiện ra khi DB từ chối) — cần một migration định nghĩa lại các hàm đó; chưa làm.
 - **27/10: TARGET CA TĂNG CƯỜNG HIỆN KHẮP APP + DB TỰ ĐIỀN TARGET TẠM (đã push `aea3acd`; `0186` ĐÃ CHẠY 27/10 — JOCKEY TikTok 11/10 20–23 = 4.918.033 = 100M ÷ 61h × 3h, đúng)** — check engine target trên DB thật:
   ca OP mở sau chốt có target đề xuất ở `plan_boost_slots` nhưng `applyAllocatedTargets` gán 0 cho mọi ca ngoài kế hoạch ⇒ Lịch/Sổ Ca/Bảng
   Vận Hành/app talent hiện 0 (CROCS 24/10 15–18 52,8M; 27, 30, 31/10 18–21 66,5M); target chỉ được điền khi có người mở Kế Hoạch Tháng

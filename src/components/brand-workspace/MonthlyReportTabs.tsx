@@ -877,12 +877,12 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             "Livestream YFB kỳ trước": n(r.livePrev),
             "Livestream YFB kỳ này": n(r.liveCur),
             "± Livestream YFB (%)": n(r.liveChg),
-            "Live tài khoản shop (Shop Analytics) kỳ trước": n(r.shopLivePrev),
-            "Live tài khoản shop (Shop Analytics) kỳ này": n(r.shopLiveCur),
+            "Seller LIVE (Shop Analytics) kỳ trước": n(r.shopLivePrev),
+            "Seller LIVE (Shop Analytics) kỳ này": n(r.shopLiveCur),
             "Các kênh còn lại kỳ trước": n(r.restPrev),
             "Các kênh còn lại kỳ này": n(r.restCur),
             "± Các kênh còn lại (%)": n(r.restChg),
-            "± Lượt vào shop (%)": n(r.visitorsChg),
+            "± Lượt truy cập shop (%)": n(r.visitorsChg),
             "CVR shop kỳ trước (%)": n(r.cvrPrev),
             "CVR shop kỳ này (%)": n(r.cvrCur),
             "Đánh giá": controlVerdict(r) ? VERDICT_TEXT[controlVerdict(r)!] : ""
@@ -1228,7 +1228,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                 icon={<Scale className="w-4 h-4" />}
                 sub={`${shopWin.label} · các kênh còn lại = Affiliate LIVE, Video, Product card (cùng thị trường, YFB không vận hành) · chênh lệch ≥ 10 điểm % mới xem là khác xu hướng thị trường`}
               >
-                <ReportTable head={["Loại ngày", "Livestream YFB", "Các kênh còn lại", "Lượt vào shop", "CVR shop", "Đánh giá"]}>
+                <ReportTable head={["Loại ngày", "Livestream YFB", "Các kênh còn lại", "Lượt truy cập shop", "CVR shop", "Đánh giá"]}>
                   {control.map((r, idx) => {
                     const v = controlVerdict(r);
                     return (
@@ -1266,7 +1266,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             )}
             {rhythm && (
               <Panel
-                title="Nhịp bán theo ngày"
+                title="GMV theo ngày"
                 icon={<Activity className="w-4 h-4" />}
                 sub={`${METRIC.totalGmv} cả shop mỗi ngày (Shop Analytics) · đường vàng = trung bình 7 ngày · đường xanh = ${METRIC.liveGmv} YFB · ${rhythm.points.length} ngày có số liệu`}
               >
@@ -1656,7 +1656,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
         {/* ===== Hủy, hoàn & NMV ===== */}
         {sectionShown.nmv && (
         <section id="mr-nmv" className="space-y-4 scroll-mt-16">
-          <SectionHead no={secNo("nmv")} title={secTitle("nmv")} sub="Bao nhiêu GMV thành doanh thu thật" />
+          <SectionHead no={secNo("nmv")} title={secTitle("nmv")} sub="Từ GMV đến doanh thu thực nhận (NMV)" />
           <NmvPanel
             gmv={liveCurStats.gmv}
             refundRate={refundRateShop}
@@ -1682,7 +1682,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                     <>
                       {hostQuality.total} phiên: {hostQuality.reconciled} đã đối soát
                       {hostQuality.snapshot > 0 ? `, ${hostQuality.snapshot} số lúc giao ca (chờ đối soát cuối kỳ)` : ""}
-                      {hostQuality.manual > 0 ? `, ${hostQuality.manual} talent tự khai (chưa có gì bảo chứng)` : ""}. Đối soát ở "Vận Hành Live → Đối Soát Số Liệu" trước khi phát hành report.
+                      {hostQuality.manual > 0 ? `, ${hostQuality.manual} talent tự khai (chưa được xác thực)` : ""}. Đối soát ở "Vận Hành Live → Đối Soát Số Liệu" trước khi phát hành report.
                     </>
                   )}
                 </div>

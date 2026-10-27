@@ -298,7 +298,7 @@ export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSes
               </p>
               {isOps && (
                 <button onClick={() => void doEstimate(prev.id, s.id, `${prev.startTime}–${prev.endTime}`)} disabled={busy || !snapshot} className={btnGhost}>
-                  Ca trước quên up — chia ước lượng theo thời gian
+                  Ca trước chưa tải file lên — chia ước lượng theo thời gian
                 </button>
               )}
               {isOps && !snapshot && <p className="text-[11px] text-[var(--text-faint)]">Cần tải lên file của ca này trước thì mới chia ước lượng được.</p>}

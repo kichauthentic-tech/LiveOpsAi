@@ -155,7 +155,7 @@ export const CumulativeLegend: React.FC<{ color: string; showPace?: boolean }> =
     <span className="inline-flex items-center gap-1.5"><i className="w-4 h-[3px] rounded inline-block" style={{ background: color }} />Đã đạt (luỹ kế)</span>
     {showPace && <span className="inline-flex items-center gap-1.5"><i className="w-4 h-[3px] rounded inline-block" style={{ background: `repeating-linear-gradient(90deg,${color} 0 5px,transparent 5px 8px)` }} />Nếu giữ tiến độ hiện tại</span>}
     <span className="inline-flex items-center gap-1.5"><i className="w-4 h-[3px] rounded inline-block" style={{ background: "repeating-linear-gradient(90deg,var(--text-faint) 0 3px,transparent 3px 6px)" }} />Target luỹ kế</span>
-    <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: "var(--accent)", opacity: 0.35 }} />Ngày camp</span>
+    <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: "var(--accent)", opacity: 0.35 }} />Ngày Campaign</span>
   </div>
 );
 

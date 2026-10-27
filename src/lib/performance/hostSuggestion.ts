@@ -111,7 +111,7 @@ export function suggestHosts(
     // Mệt mỏi / công bằng: đếm cả vai trò trợ, cả ca sắp tới, trừ ca huỷ.
     if (s.status !== "Cancelled") {
       // Đổi người giữa ca (0138): chỉ tính phần giờ người đó đứng ca. Giờ = phút theo LỊCH của đoạn đứng ca — đúng luật bảng
-      // "Tải người" (channelHealth.peopleLoad) để cảnh báo mệt lúc chốt ca và bảng tải người nói cùng một số (24/10; trước đó
+      // "Tải người" (channelHealth.peopleLoad) để cảnh báo quá tải lúc chốt ca và bảng tải người nói cùng một số (24/10; trước đó
       // nhân theo giờ live thật của file nên lệch bảng).
       for (const pid of new Set([s.hostId, s.coHostId, ...(s.staffSegments ?? []).map((g) => g.talentId)])) {
         if (!pid || !ids.has(pid)) continue;

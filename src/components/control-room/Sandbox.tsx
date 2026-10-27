@@ -43,7 +43,7 @@ export const Sandbox: React.FC<{
           <b className="text-[var(--text)] tabular-nums w-6">{budget}</b>
         </label>
         <div className="flex gap-1 rounded-xl border border-[var(--border)] p-1" role="group" aria-label="Mục tiêu tự xếp">
-          {([["probability", "Tối đa xác suất về đích"], ["gmv", "Tối đa GMV"]] as const).map(([k, l]) => (
+          {([["probability", "Tối đa xác suất đạt target"], ["gmv", "Tối đa GMV"]] as const).map(([k, l]) => (
             <button key={k} type="button" aria-pressed={objective === k} onClick={() => onObjective(k)} className={`px-2.5 py-1 rounded-lg text-xs font-bold min-h-[28px] ${objective === k ? "seg-on" : "text-[var(--text-muted)]"}`}>{l}</button>
           ))}
         </div>
@@ -84,12 +84,12 @@ export const Sandbox: React.FC<{
           ))}
         </div>
       </div>
-      <p className="text-[11px] text-[var(--text-faint)]">Mỗi ngày 3 ô: 10h · 14h · 20h (ca 3 giờ). Ô trống: phòng đã có ca, hoặc không còn host/trợ quen kênh rảnh. Ca thêm tính 0,8 lần kỳ vọng vì giờ thêm thường kém giờ sẵn có; khung 14h ít lịch sử nên cân nhắc trước khi tin.</p>
+      <p className="text-[11px] text-[var(--text-faint)]">Mỗi ngày 3 ô: 10h · 14h · 20h (ca 3 giờ). Ô trống: phòng đã có ca, hoặc không còn host/trợ quen kênh rảnh. Ca thêm tính 0,8 lần kỳ vọng vì giờ thêm thường có hiệu suất thấp hơn giờ sẵn có; khung 14h ít lịch sử nên cân nhắc trước khi tin.</p>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead><tr className="text-[11px] text-[var(--text-faint)] text-left"><th className="py-1.5 pr-2">Kênh</th><th className="py-1.5 pr-2 text-right">Ca thêm</th><th className="py-1.5 pr-2 text-right">GMV thêm</th><th className="py-1.5 text-right">Khả năng về đích</th></tr></thead>
+            <thead><tr className="text-[11px] text-[var(--text-faint)] text-left"><th className="py-1.5 pr-2">Kênh</th><th className="py-1.5 pr-2 text-right">Ca thêm</th><th className="py-1.5 pr-2 text-right">GMV thêm</th><th className="py-1.5 text-right">Xác suất đạt target</th></tr></thead>
             <tbody>
               {channels.map((c) => {
                 const mine = plan.filter((p) => p.candidate.channelKey === c.key).map((p) => p.candidate);
@@ -109,7 +109,7 @@ export const Sandbox: React.FC<{
         </div>
         <div className="space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="text-xs text-[var(--text-faint)]">Ca đề xuất · host tay nghề cao nhất đang rảnh, trợ ít giờ nhất tháng</span>
+            <span className="text-xs text-[var(--text-faint)]">Ca đề xuất · host hiệu suất cao nhất đang rảnh, trợ ít giờ nhất tháng</span>
             <button type="button" onClick={onCreateDrafts} disabled={plan.length === 0 || creating} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-bold bg-[var(--accent)] text-[var(--accent-contrast)] disabled:opacity-40 min-h-[34px]">
               {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}Tạo {plan.length} ca nháp cho OP
             </button>

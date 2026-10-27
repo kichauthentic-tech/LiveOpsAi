@@ -78,12 +78,12 @@ export const LateCard: React.FC<{ s: Scope }> = ({ s }) => {
       <p className="text-xs text-[var(--text-faint)] mt-3 leading-snug">
         <Chg cur={c.lateRate} prev={b?.lateRate} points inv /> · các ca trễ, trung bình trễ <b className="text-[var(--text-muted)]">{c.lateAvgMin == null ? "—" : `${Math.round(c.lateAvgMin)} phút`}</b>
         {b?.lateAvgMin != null && ` (kỳ trước ${Math.round(b.lateAvgMin)} phút)`}.
-        {c.lateOdd > 0 && ` Bỏ ra ${c.lateOdd} ca lệch giờ trên 3 tiếng: gần như chắc là giờ xếp ghi sai, cần sửa ở Sổ Ca.`}
+        {c.lateOdd > 0 && ` Bỏ ra ${c.lateOdd} ca lệch giờ trên 3 tiếng: nhiều khả năng giờ xếp lịch bị ghi sai, cần sửa ở Sổ Ca.`}
       </p>
       {worst.length > 0 && (
         <div className="mt-3">
           <p className="text-xs font-bold text-[var(--text)] mb-1">Trễ nhiều nhất {s.label}</p>
-          <Table head={["Host", "Sessions", "Trễ >5p", "Trễ trung bình", "Kỳ trước"]}>
+          <Table head={["Host", "Sessions", "Trễ > 5 phút", "Trễ trung bình", "Kỳ trước"]}>
             {worst.map(([k, p]) => {
               const q = mb.get(k);
               return (
@@ -228,8 +228,8 @@ export const PairTable: React.FC<{ s: Scope; brands: Brand[]; weakBelow?: number
   const prev = new Map((s.prev ? pairRows(s.prev) : []).map((r) => [r.id, r]));
   return (
     <Card>
-      <BlockHead title="Cặp host + trợ live" sub={`${s.label} · cặp chạy chung từ 2 ca, dưới ${weakBelow} ca hiển thị mờ · chỉ số 100 = GMV/giờ trung bình của kênh · so với ${s.prevLabel} · chỉ để xem cách ghép, trợ live không chịu trách nhiệm GMV`} />
-      <Table head={["Cặp", "Brand", "Sessions", "Giờ live", "GMV", "Chỉ số", "vs kỳ trước"]} empty={rows.length ? undefined : "Chưa cặp nào có từ 2 ca chạy chung trong kỳ này."}>
+      <BlockHead title="Cặp host + trợ live" sub={`${s.label} · cặp live chung từ 2 ca, dưới ${weakBelow} ca hiển thị mờ · chỉ số 100 = GMV/giờ trung bình của kênh · so với ${s.prevLabel} · chỉ để xem cách ghép, trợ live không chịu trách nhiệm GMV`} />
+      <Table head={["Cặp", "Brand", "Sessions", "Giờ live", "GMV", "Chỉ số", "vs kỳ trước"]} empty={rows.length ? undefined : "Chưa cặp nào có từ 2 ca live chung trong kỳ này."}>
         {rows.map((r) => (
           <tr key={r.id}>
             <td className={`${TD} font-semibold text-[var(--text)]`}>{r.name}</td>

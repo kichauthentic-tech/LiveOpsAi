@@ -123,8 +123,8 @@ export type PnlMissingInput =
 export const PNL_MISSING_LABEL: Record<PnlMissingInput, string> = {
   host_rate: "Host chưa có rate",
   cohost_rate: "Trợ live chưa có rate",
-  brand_rate: "Brand chưa set rate/giờ",
-  commission_default: `Chưa đặt % commission (đang dùng mặc định ${DEFAULT_FINANCE.agencyCommissionRate}%)`
+  brand_rate: "Brand chưa có đơn giá/giờ",
+  commission_default: `Chưa đặt % hoa hồng (đang dùng mặc định ${DEFAULT_FINANCE.agencyCommissionRate}%)`
 };
 
 // Giờ tính lương của 1 phiên = giờ ca theo lịch + OT − off sớm (host tự khai trong report sau

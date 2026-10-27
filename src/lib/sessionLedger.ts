@@ -235,6 +235,6 @@ export function sessionIncidents(s: LiveSession): SessionIncident[] {
   if (r.crossLive) out.push({ key: "crossLive", label: "Cross-live", internal: false });
   if (r.hostLate) out.push({ key: "hostLate", label: "Host trễ", internal: true });
   if (r.otMinutes > 0) out.push({ key: "ot", label: `OT ${r.otMinutes}'`, internal: true });
-  if (r.earlyLeaveMinutes > 0) out.push({ key: "earlyLeave", label: `Off sớm ${r.earlyLeaveMinutes}'${r.earlyLeaveReason ? ` · ${EARLY_REASON_LABEL[r.earlyLeaveReason]}` : ""}`, internal: true });
+  if (r.earlyLeaveMinutes > 0) out.push({ key: "earlyLeave", label: `Kết thúc sớm ${r.earlyLeaveMinutes}'${r.earlyLeaveReason ? ` · ${EARLY_REASON_LABEL[r.earlyLeaveReason]}` : ""}`, internal: true });
   return out;
 }

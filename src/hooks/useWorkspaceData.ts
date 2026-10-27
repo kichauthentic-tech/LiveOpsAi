@@ -228,7 +228,7 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
   // tự filter theo brandId.
   const [brandSkus, setBrandSkus] = useState<BrandSku[]>([]);
   const [phaseB1Error, setPhaseB1Error] = useState<string | null>(null);
-  // Giai đoạn C3 — Scheme khuyến mãi tích hợp Calendar. Áp dụng theo khoảng ngày, agency-wide.
+  // Giai đoạn C3 — Chương trình khuyến mãi tích hợp Calendar. Áp dụng theo khoảng ngày, agency-wide.
   const [promoSchemes, setPromoSchemes] = useState<PromoScheme[]>([]);
   const [phaseC3Error, setPhaseC3Error] = useState<string | null>(null);
 
@@ -572,7 +572,7 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
       })
       .catch((err) => {
         if (cancelled) return;
-        setPhaseC3Error(err.message ?? "Không tải được Scheme khuyến mãi — thử tải lại trang.");
+        setPhaseC3Error(err.message ?? "Không tải được Chương trình khuyến mãi — thử tải lại trang.");
       });
     return () => {
       cancelled = true;

@@ -272,7 +272,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
         description={
           isBrandView
             ? "Từng ca live đã diễn ra cho brand: giờ live thật, GMV, đơn, lượt xem. Số “Tạm tính” còn chờ sàn cập nhật, “Đã chốt” là số đối soát cuối kỳ."
-            : "Từng ca đã/đang chạy: số liệu thực tế của ca, số đó tin được tới đâu, và còn thiếu bước nào (TikTok: tải lên file → giao ca; Shopee: giao ca; rồi đối soát) để chốt tháng."
+            : "Từng ca đã/đang live: số liệu thực tế của ca, số đó tin được tới đâu, và còn thiếu bước nào (TikTok: tải lên file → giao ca; Shopee: giao ca; rồi đối soát) để chốt tháng."
         }
         actions={
           <>

@@ -25,7 +25,7 @@ export type SlotLike = { date: string; startTime: string; endTime: string };
 export type AllocParams = Pick<EngineParams, "allocEnsembleShare" | "allocRidge" | "allocMinMonths" | "allocUseBand" | "allocUseCampPos">;
 
 /** Khung theo GIỜ BẮT ĐẦU ca. Ranh giới không ảnh hưởng độ chính xác (21,9–22,5% với mọi cách cắt đã thử) — chọn theo vận hành. */
-export const ALLOC_BAND_LABEL = ["Sáng (đến 11h)", "Trưa 11–14h", "Chiều 14–18h", "Tối vàng 18–21h", "Đêm từ 21h"] as const;
+export const ALLOC_BAND_LABEL = ["Sáng (đến 11h)", "Trưa 11–14h", "Chiều 14–18h", "Giờ vàng 18–21h", "Đêm từ 21h"] as const;
 const BAND_CUTS = [11, 14, 18, 21];
 const BANDS = ALLOC_BAND_LABEL.length;
 export const allocBand = (startTime: string): number => {

@@ -139,7 +139,7 @@ export default function OpsMonthView(props: OpsMonthViewProps) {
   const runAuto = () => {
     const p = autoPlan(rooms, candidates, budget, objective);
     setPlan(p);
-    if (p.length === 0) showToast(objective === "probability" ? "Không ca nào làm tăng khả năng đạt target — kênh còn lại thêm ca cũng không đổi được kết quả tháng." : "Không còn khung trống có đủ người.");
+    if (p.length === 0) showToast(objective === "probability" ? "Không ca nào làm tăng xác suất đạt target — kênh còn lại thêm ca cũng không đổi được kết quả tháng." : "Không còn khung trống có đủ người.");
   };
   const createDrafts = async () => {
     setCreating(true);
@@ -159,7 +159,7 @@ export default function OpsMonthView(props: OpsMonthViewProps) {
           coHostId: p.assistant.id,
           studioId: ch.studioId || null,
           expectedGmv: p.candidate.expected,
-          reason: before != null && after != null && after - before > 0.0005 ? `+${((after - before) * 100).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} điểm khả năng về đích` : "Thêm GMV"
+          reason: before != null && after != null && after - before > 0.0005 ? `+${((after - before) * 100).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} điểm % xác suất đạt target` : "Thêm GMV"
         };
       });
       await createSessionDrafts(items);
@@ -228,7 +228,7 @@ export default function OpsMonthView(props: OpsMonthViewProps) {
           {withRoom.find((c) => c.key === swingKey) && <SwingList channel={withRoom.find((c) => c.key === swingKey)!} />}
         </Card>
         <Card className="space-y-3">
-          <SectionTitle title={`Tải người tháng ${Number(month.slice(5))}`} note="Host + trợ, mọi kênh, gồm ca sắp tới — cùng số giờ tuần với cảnh báo mệt lúc chốt ca" />
+          <SectionTitle title={`Tải người tháng ${Number(month.slice(5))}`} note="Host + trợ, mọi kênh, gồm ca sắp tới — cùng số giờ tuần với cảnh báo quá tải lúc chốt ca" />
           <PeopleLoadTable people={people} weekLimit={params.fatigueWeekHours} />
         </Card>
       </div>

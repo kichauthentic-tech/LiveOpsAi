@@ -12,7 +12,7 @@ import { StatTile } from "../common/StatTile";
 
 // CỔNG BRAND (21/10/2026, đề xuất "một thẻ kênh" — user chốt cả 4 điểm): role brand mở Dashboard thấy 4 khối — số tháng này (bản tin
 // ops gửi), giờ live đã thực hiện so với cam kết, lịch 7 ngày tới, báo cáo tháng đã phát hành. Brand đã xem GMV từng phiên trong Seller Center,
-// nên cổng chỉ mang thứ agency có. KHÔNG có nhãn "khó đạt/sẽ hụt" hay xác suất (luật 4); KHÔNG tự tính số tháng chưa phát hành từ ca
+// nên cổng chỉ mang thứ agency có. KHÔNG có nhãn "Rủi ro/Hụt target" hay xác suất (luật 4); KHÔNG tự tính số tháng chưa phát hành từ ca
 // (bị che ở live_sessions_secure — 0107) — số trong tháng chỉ tới qua bản tin (0179).
 
 const WD = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
@@ -76,7 +76,7 @@ export const BrandPortal: React.FC<{
               <StatTile frame="card" size="lg" label="Dự báo cuối tháng" value={p.forecast != null ? `~${fmtVndShort(p.forecast)}` : "—"} hint={p.forecast != null ? "theo lịch live còn lại và GMV/giờ gần đây" : "kênh mới, chưa đủ lịch sử để ước tính"} />
               <StatTile frame="card" size="lg" label="Giờ live đã thực hiện" value={p.hours ? `${hrs(p.hours.delivered)} / ${hrs(p.hours.committed)}` : "—"} hint={p.hours ? `cam kết hợp đồng · còn ${hrs(p.hours.scheduled)} trong lịch` : "chưa có cam kết giờ cho tháng này"}>
                 {p.hours && p.hours.committed > 0 && (
-                  <div className="relative h-2 mt-1.5 rounded bg-[var(--surface-base)]" role="img" aria-label={`Đã chạy ${hrs(p.hours.delivered)} trên ${hrs(p.hours.committed)} cam kết`}>
+                  <div className="relative h-2 mt-1.5 rounded bg-[var(--surface-base)]" role="img" aria-label={`Đã live ${hrs(p.hours.delivered)} trên ${hrs(p.hours.committed)} cam kết`}>
                     <div className="absolute inset-y-0 left-0 rounded bg-[var(--success)]" style={{ width: `${Math.min(100, (p.hours.delivered / p.hours.committed) * 100)}%` }} />
                   </div>
                 )}

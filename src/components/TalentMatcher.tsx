@@ -358,7 +358,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
             {/* Vai trò gõ tay một lần, không đối chiếu ca thật (audit người mới 2026-10-04: "Host" mà 86 ca đều
                 là trợ live). Lệch thì nói ra để ops sửa hồ sơ — không tự đổi. */}
             {roleMismatch(t.role, real) && (
-              <span className="text-amber-300 shrink-0" title={`Vai trò trên hồ sơ khác với vai người này thật sự chạy trong ca (chỉ chạy ${t.role === "Assistant" ? "host" : "trợ live"}) — mở hồ sơ để sửa`}>
+              <span className="text-amber-300 shrink-0" title={`Vai trò trên hồ sơ khác với vai người này thật sự đảm nhận trong ca (chỉ làm ${t.role === "Assistant" ? "host" : "trợ live"}) — mở hồ sơ để sửa`}>
                 <AlertTriangle className="w-3.5 h-3.5" />
               </span>
             )}
@@ -368,7 +368,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
             <span className="truncate">{parts.length ? parts.join(" · ") : "Chưa gắn với ca nào"}</span>
           </span>
         </span>
-        <span className="hidden sm:block h-1.5 rounded-full bg-[var(--surface-elevated)] overflow-hidden" title="Tổng ca so với người chạy nhiều nhất">
+        <span className="hidden sm:block h-1.5 rounded-full bg-[var(--surface-elevated)] overflow-hidden" title="Tổng ca so với người live nhiều nhất">
           <span className="block h-full rounded-full bg-[var(--accent-text)]/70" style={{ width: `${Math.round((n / maxCa) * 100)}%` }} />
         </span>
         <span className="text-right font-mono text-[13px] font-bold text-[var(--text)]">{n || <Dash />}</span>
@@ -402,7 +402,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           { label: "Talent", value: String(overview.all) },
-          { label: "Đã chạy ca", value: String(overview.active) },
+          { label: "Đã live", value: String(overview.active) },
           { label: "Giờ host + trợ", value: `${fmtFixed(overview.hours, 0)}h` },
           { label: "Chưa gắn ca", value: String(overview.all - overview.active) }
         ].map((k) => (
@@ -599,7 +599,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                   {METRIC.gmvPerHour} theo kênh (brand × sàn)
                 </p>
                 {selectedBrandPerf.every((b) => b.sessions === 0) ? (
-                  <p className="text-[11px] text-[var(--text-faint)]">Chưa chạy ca nào có số liệu cho kênh nào.</p>
+                  <p className="text-[11px] text-[var(--text-faint)]">Chưa live ca nào có số liệu ở kênh nào.</p>
                 ) : (
                   <ul className="space-y-1">
                     {selectedBrandPerf.filter((b) => b.sessions > 0).map((b) => {

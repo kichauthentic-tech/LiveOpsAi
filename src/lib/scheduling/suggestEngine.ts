@@ -141,7 +141,7 @@ export interface SuggestResult {
   totalHours: number;
   forecastGmv: number;
   marginal: MarginalPoint[];
-  // Khả thi target: cần bao nhiêu giờ để dự báo chạm target (theo cùng thuật toán), null nếu không tới.
+  // Khả thi target: cần bao nhiêu giờ để dự báo đạt target (theo cùng thuật toán), null nếu không tới.
   hoursToHitTarget: number | null;
   targetGapGmv: number; // target − dự báo (dương = thiếu)
   confidence: "none" | "low" | "medium" | "high";
@@ -545,7 +545,7 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
   const dayLabelOf = (date: string) => {
     const e = eventByDate.get(date);
     const sch = schemeOf(date);
-    return [e?.label, sch ? `KM: ${sch.label ?? "scheme"}` : ""].filter(Boolean).join(" · ") || undefined;
+    return [e?.label, sch ? `Khuyến mãi: ${sch.label ?? "scheme"}` : ""].filter(Boolean).join(" · ") || undefined;
   };
   const get = cellLookup(history);
   const brandGph = history.brandGmvPerHour;
@@ -727,7 +727,7 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
     const raised = (["dday", "midmonth", "payday"] as CampDayBucket[]).filter((b) => dayCapOf(b) > maxPerDay);
     if (raised.length > 0) {
       const label: Record<CampDayBucket, string> = { daily: "Daily", dday: "D-Day", midmonth: "Mid-Month", payday: "Pay Day" };
-      notes.push(`Khuôn ngày Campaign học từ lịch sử: ${raised.map((b) => `${label[b]} ~${fmtFixed(history.campHoursPerDay[b], 0)}h/ngày`).join(", ")} → xếp đủ giờ ngày Campaign trước (tới ${raised.map((b) => `${dayCapOf(b)} ca`).join("/")}), phần còn lại mới chia cho ngày thường (tối đa ${maxPerDay} ca); tối đa ca/ngày của kế hoạch được nâng theo khi áp gợi ý.`);
+      notes.push(`Khuôn ngày Campaign học từ lịch sử: ${raised.map((b) => `${label[b]} ~${fmtFixed(history.campHoursPerDay[b], 0)}h/ngày`).join(", ")} → xếp đủ giờ ngày Campaign trước (tới ${raised.map((b) => `${dayCapOf(b)} ca`).join("/")}), phần còn lại mới chia cho ngày Daily (tối đa ${maxPerDay} ca); tối đa ca/ngày của kế hoạch được nâng theo khi áp gợi ý.`);
     }
   }
   if (c.calibration && c.calibration.size > 0) notes.push(`Đã hiệu chỉnh GMV/giờ theo kế hoạch vs thực tế các tháng trước (${c.calibration.size} ô thứ × giờ có dữ liệu).`);
@@ -789,12 +789,12 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
 
   const totalHours = all.reduce((a, s) => a + s.hours, 0);
   if (stopAtTarget) {
-    if (forecastGmv >= c.targetGmv) notes.push(`Xếp theo target: cần ${totalHours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h để dự báo chạm ${fmtM(c.targetGmv)}${committed > 0 ? ` (cam kết ${committed}h → ${totalHours > committed ? "thiếu" : "dư"} ${Math.abs(totalHours - committed).toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h)` : ""}.`);
-    else notes.push(`Xếp theo target: xếp kín chỗ (${totalHours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h trong khung giờ / tối đa ca/ngày) vẫn chỉ dự báo ${fmtM(forecastGmv)} / ${fmtM(c.targetGmv)} — target vượt sức lịch sử; nới khung giờ, tăng CVR/AOV hoặc hạ target.`);
+    if (forecastGmv >= c.targetGmv) notes.push(`Xếp theo target: cần ${totalHours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h để dự báo đạt ${fmtM(c.targetGmv)}${committed > 0 ? ` (cam kết ${committed}h → ${totalHours > committed ? "thiếu" : "dư"} ${Math.abs(totalHours - committed).toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h)` : ""}.`);
+    else notes.push(`Xếp theo target: xếp kín chỗ (${totalHours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h trong khung giờ / tối đa ca/ngày) vẫn chỉ dự báo ${fmtM(forecastGmv)} / ${fmtM(c.targetGmv)} — target vượt năng lực theo lịch sử; nới khung giờ, tăng CVR/AOV hoặc hạ target.`);
   } else if (committed > 0 && totalHours + 0.01 < committed) notes.push(`Chỉ xếp được ${totalHours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h / ${committed}h — hết chỗ trong khung giờ hoặc chạm tối đa ca/ngày; nới khung hoặc số ca/ngày.`);
   if (c.targetGmv > 0 && !stopAtTarget) {
     const gap = c.targetGmv - forecastGmv;
-    if (gap > 0) notes.push(hoursToHitTarget ? `Dự báo thiếu ${fmtM(gap)} so với target — cần ~${Math.ceil(hoursToHitTarget)}h (thay vì ${committed}h) theo cùng cách xếp.` : `Dự báo thiếu ${fmtM(gap)} so với target — thêm giờ trong khung cũng không chạm được; cần tăng CVR/AOV hoặc hạ target.`);
+    if (gap > 0) notes.push(hoursToHitTarget ? `Dự báo thiếu ${fmtM(gap)} so với target — cần ~${Math.ceil(hoursToHitTarget)}h (thay vì ${committed}h) theo cùng cách xếp.` : `Dự báo thiếu ${fmtM(gap)} so với target — thêm giờ trong khung giờ hiện có cũng không đạt được; cần tăng CVR/AOV hoặc hạ target.`);
     else notes.push(`Dự báo vượt target ${fmtM(-gap)} — có dư địa giảm giờ hoặc nâng target.`);
   }
   // Lịch sử mượn luôn kẹp ở "low" bất kể agency có bao nhiêu ca: `enough` đã là false nên nhánh đầu

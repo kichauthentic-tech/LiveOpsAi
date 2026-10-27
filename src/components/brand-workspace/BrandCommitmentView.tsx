@@ -84,7 +84,7 @@ const Bar: React.FC<{ done: number; scheduled: number; committed: number }> = ({
   const pctScheduled = Math.min(100 - pctDone, (scheduled / committed) * 100);
   return (
     <div className="h-2 w-full rounded-full bg-[var(--surface-elevated)] overflow-hidden flex">
-      <div className="h-full bg-[var(--success)]" style={{ width: `${pctDone}%` }} title={`Đã chạy ${fmtHours(done)}`} />
+      <div className="h-full bg-[var(--success)]" style={{ width: `${pctDone}%` }} title={`Đã live ${fmtHours(done)}`} />
       {/* Ca đã xếp nhưng chưa chạy: cùng dải, nhạt hơn — khách thấy được phần đã chắc chắn có lịch. */}
       <div className="h-full bg-[var(--success)]/35" style={{ width: `${pctScheduled}%` }} title={`Đã xếp lịch ${fmtHours(scheduled)}`} />
     </div>
@@ -189,7 +189,7 @@ export const BrandCommitmentView: React.FC<BrandCommitmentViewProps> = ({
         return {
           "Tháng": fmtMonth(p.periodMonth),
           "Cam Kết (giờ)": Math.round(p.committedHours * 10) / 10,
-          "Đã Chạy (giờ)": Math.round(p.deliveredHours * 10) / 10,
+          "Đã Live (giờ)": Math.round(p.deliveredHours * 10) / 10,
           "Đã Xếp (giờ)": Math.round(p.scheduledHours * 10) / 10,
           "Chênh Lệch (giờ)": Math.round((p.gapHours > 0 ? -p.gapHours : Math.abs(p.gapHours)) * 10) / 10,
           "GMV": gmvHidden ? "Chưa phát hành" : p.deliveredGmv || 0,
@@ -260,7 +260,7 @@ export const BrandCommitmentView: React.FC<BrandCommitmentViewProps> = ({
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <KV label="Cam kết" value={fmtHours(current.committedHours)} strong />
-            <KV label="Đã chạy" value={`${fmtHours(current.deliveredHours)} · ${current.deliveredSessions} ca`} strong />
+            <KV label="Đã live" value={`${fmtHours(current.deliveredHours)} · ${current.deliveredSessions} ca`} strong />
             <KV label="Đã xếp lịch" value={`${fmtHours(current.scheduledHours)} · ${current.scheduledSessions} ca`} />
             <KV
               label={current.gapHours > 0 ? "Còn thiếu" : "Vượt cam kết"}
@@ -294,7 +294,7 @@ export const BrandCommitmentView: React.FC<BrandCommitmentViewProps> = ({
                 <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)] text-[11px] font-semibold">
                   <th className="py-2.5 px-4">Tháng</th>
                   <th className="py-2.5 px-2 text-right">Cam kết</th>
-                  <th className="py-2.5 px-2 text-right">Đã chạy</th>
+                  <th className="py-2.5 px-2 text-right">Đã live</th>
                   <th className="py-2.5 px-2 text-right">Đã xếp</th>
                   <th className="py-2.5 px-2 text-right">Chênh lệch</th>
                   <th className="py-2.5 px-2 text-right">GMV</th>

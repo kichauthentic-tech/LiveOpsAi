@@ -823,7 +823,7 @@ export default function MonthPlan({
     const gap = planHours - totals.hours;
     const warn = planHours > 0 && Math.abs(gap) > 0.01 ? `\n\nGiờ kế hoạch ${fmtH(totals.hours)}h ${gap > 0 ? "THIẾU" : "VƯỢT"} ${fmtH(Math.abs(gap))}h so với ${fmtH(planHours)}h cam kết tháng này.` : "";
     const relockNote = locked ? "\n\nChốt lại sẽ mở thêm ca mới và HUỶ ca đang mở đã bị bỏ khỏi kế hoạch (trừ ca đã có người đăng ký)." : "";
-    const targetWarn = targetGap && targetGap.pct > engineParams.targetGapWarnPct ? `\n\nDự báo lưới ${fmtVndShort(targetGap.forecast)} THIẾU ${fmtVndShort(targetGap.gap)} (${Math.round(targetGap.pct * 100)}%) so với target ${fmtVndShort(targetTotal)}${targetGap.fill ? ` — cần bù ~${fmtH(targetGap.extraHours)}h.` : " — thêm giờ trong khung cũng không chạm."} Sau khi chốt, target/ca KHÔNG chia lại nữa.` : "";
+    const targetWarn = targetGap && targetGap.pct > engineParams.targetGapWarnPct ? `\n\nDự báo lưới ${fmtVndShort(targetGap.forecast)} THIẾU ${fmtVndShort(targetGap.gap)} (${Math.round(targetGap.pct * 100)}%) so với target ${fmtVndShort(targetTotal)}${targetGap.fill ? ` — cần bù ~${fmtH(targetGap.extraHours)}h.` : " — thêm giờ trong khung giờ hiện có cũng không đạt."} Sau khi chốt, target/ca KHÔNG chia lại nữa.` : "";
     const sumDelta = Math.round(totals.target) - targetTotal;
     const sumNote = Math.abs(sumDelta) >= 1
       ? `\n\nTarget các ca cộng lại ${fmtVndShort(totals.target)} ${sumDelta > 0 ? "VƯỢT" : "THIẾU"} ${fmtVndShort(Math.abs(sumDelta))} so với ô Target GMV tháng ${fmtVndShort(targetTotal)}. Sau khi chốt, target tháng = tổng các ca (${fmtVndShort(totals.target)}) ở mọi màn.`
@@ -1077,7 +1077,7 @@ export default function MonthPlan({
       {/* Hàng 5 số. Giải thích dài của từng ô nằm trong ⓘ. */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
         <div className={TILE}>
-          <span className={TILE_LABEL}>Target GMV tháng <Info text={locked ? "Kế hoạch đã chốt: target tháng = tổng target các ca. Đổi cả tháng: \"Chia lại theo lịch hiện có…\" (ceo/admin)." : "Số GMV live agency phải đạt; chia xuống từng ca, run-rate và % Target tính từ đây."} /></span>
+          <span className={TILE_LABEL}>Target GMV tháng <Info text={locked ? "Kế hoạch đã chốt: target tháng = tổng target các ca. Đổi cả tháng: \"Chia lại theo lịch hiện có…\" (ceo/admin)." : "LIVE GMV cần đạt; chia xuống từng ca, run-rate và % Target tính từ đây."} /></span>
           {locked ? (
             <b className={`text-xl font-black tabular-nums ${needsTarget ? "text-amber-400" : "text-[var(--text)]"}`}>{needsTarget ? "chưa đặt" : fmtVndShort(totals.target)}</b>
           ) : (
@@ -1533,7 +1533,7 @@ export default function MonthPlan({
         labelOf={(day) => {
           const ev = eventByDate.get(day);
           const sch = brandSchemes.find((r) => day >= r.start && day <= r.end);
-          return ev || sch ? [ev?.label, sch ? `KM: ${sch.label}` : ""].filter(Boolean).join(" · ") : undefined;
+          return ev || sch ? [ev?.label, sch ? `Khuyến mãi: ${sch.label}` : ""].filter(Boolean).join(" · ") : undefined;
         }}
         isStaffed={isStaffed}
         timeLocked={(d) => !editable || timeLocked(d)}
@@ -1631,7 +1631,7 @@ function SuggestionPanel({ history: h, result: r, committedHours, targetTotal, c
           ))}
           <p className="mt-1 text-[11px] text-[var(--text-faint)]">
             {committedHours > 0 ? `Cam kết ${fmtH(committedHours)}h → dự báo ${fmtVndShort(r.forecastGmv)}` : ""}
-            {targetTotal > 0 ? ` · target ${fmtVndShort(targetTotal)}${r.hoursToHitTarget !== null ? ` cần ~${Math.ceil(r.hoursToHitTarget)}h` : " (không chạm được trong khung)"}` : ""}
+            {targetTotal > 0 ? ` · target ${fmtVndShort(targetTotal)}${r.hoursToHitTarget !== null ? ` cần ~${Math.ceil(r.hoursToHitTarget)}h` : " (không đạt được trong khung giờ hiện có)"}` : ""}
           </p>
         </div>
       </div>

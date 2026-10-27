@@ -365,7 +365,7 @@ export function channelVerdict(x: {
   if (f && f.trailing == null && o.target)
     causes.push({ key: "new_channel", tone: "info", text: "Kênh mới, chưa đủ 28 ngày lịch sử để kiểm target" });
   if (t && t.gmvPerHour.change != null && t.gmvPerHour.change <= -PRODUCTIVITY_SHIFT)
-    causes.push({ key: "productivity_down", tone: hurting ? "bad" : "warn", text: `GMV/giờ ngày Daily ${signedPct(t.gmvPerHour.change)} so cùng loại ngày tháng trước${t.worst ? `; giảm mạnh nhất ${t.worst.label} ${signedPct(t.worst.change)} (${LEVER_OWNER[t.worst.label] ?? "xem cây GMV"})` : ""}` });
+    causes.push({ key: "productivity_down", tone: hurting ? "bad" : "warn", text: `GMV/giờ ngày Daily ${signedPct(t.gmvPerHour.change)} so cùng loại ngày tháng trước${t.worst ? `; giảm mạnh nhất ${t.worst.label} ${signedPct(t.worst.change)} (${LEVER_OWNER[t.worst.label] ?? "xem phân rã GMV"})` : ""}` });
   if (w && w.ratio != null && w.ratio < THIN_WAVE_RATIO)
     causes.push({ key: "thin_wave", tone: "warn", text: `${WAVE_NAME[w.bucket]} ${dm(w.days[0])}–${dm(w.days[w.days.length - 1])} mới xếp ${Math.round(w.scheduledHours)} giờ, mức thông thường ~${Math.round(w.usualHours!)} giờ` });
   if (o.remainingDays > 0 && o.actual > 0 && !o.pending.some((p) => p.date >= x.today))

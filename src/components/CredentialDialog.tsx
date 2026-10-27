@@ -61,7 +61,7 @@ export function CredentialDialog({ cred, onClose }: { cred: IssuedCredential; on
 }
 
 /** Bảng kết quả "Cấp cho tất cả": mỗi người một dòng tên đăng nhập + mật khẩu tạm + nút copy lời nhắn; dòng lỗi hiện lý do.
- *  Đóng khi còn người chưa copy ⇒ hỏi lại (đóng là mất mật khẩu, phải "Đặt lại MK"). */
+ *  Đóng khi còn người chưa copy ⇒ hỏi lại (đóng là mất mật khẩu, phải "Đặt lại mật khẩu"). */
 export function BulkCredentialsDialog({ results, onClose }: { results: GrantResult[]; onClose: () => void }) {
   const confirm = useConfirm();
   const ok = results.filter((r) => r.password);
@@ -78,7 +78,7 @@ export function BulkCredentialsDialog({ results, onClose }: { results: GrantResu
   };
   const close = async () => {
     const left = ok.filter((r) => !copied.has(r.talentId)).length;
-    if (left > 0 && !(await confirm(`Còn ${left} người chưa copy lời nhắn. Đóng là mất mật khẩu của họ (phải Đặt lại MK). Vẫn đóng?`, { danger: true }))) return;
+    if (left > 0 && !(await confirm(`Còn ${left} người chưa copy lời nhắn. Đóng là mất mật khẩu của họ (phải Đặt lại mật khẩu). Vẫn đóng?`, { danger: true }))) return;
     onClose();
   };
   return (

@@ -478,7 +478,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
             {unreconciledSessions.length} Phiên Live Completed Trong Tháng Chưa Đối Soát Với {platform}
           </div>
           <p className="text-[11px] text-amber-300">
-            {manualOnly.length > 0 && `${manualOnly.length} phiên là số talent tự khai, chưa có gì bảo chứng. `}
+            {manualOnly.length > 0 && `${manualOnly.length} phiên là số talent tự khai, chưa được xác thực. `}
             {snapshotOnly > 0 && `${snapshotOnly} phiên đã có số liệu lúc giao ca nhưng ${platform} còn cập nhật đơn/hoàn/huỷ sau đó. `}
             Đối soát trước khi phát hành report cho khách — vào Dữ Liệu Gốc → file {profileOf(platform).reconciliationFile}, tải lên file rồi bấm Áp dụng ở mục Đối soát số liệu.
           </p>

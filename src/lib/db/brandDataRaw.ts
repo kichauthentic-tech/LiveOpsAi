@@ -167,7 +167,7 @@ export async function createOrReplaceDataRawImport(
     // upload cùng brand+loại+tháng chạy gần như đồng thời (double-click, hoặc người khác vừa upload
     // xong). Không phải lỗi hệ thống, chỉ cần tải lại danh sách import để thấy bản mới nhất.
     if (batchError.code === "23505") {
-      throw new Error("Đã có báo cáo cùng loại cho tháng này (có thể do bấm xác nhận 2 lần, hoặc người khác vừa upload xong) — tải lại trang rồi chọn ghi đè bản đó nếu cần.");
+      throw new Error("Đã có báo cáo cùng loại cho tháng này (có thể do bấm xác nhận 2 lần, hoặc người khác vừa tải lên xong) — tải lại trang rồi chọn ghi đè bản đó nếu cần.");
     }
     // check_violation trên report_type: loại file mới (vd ads_campaign_overview, 0137) mà DB chưa chạy migration mở loại đó.
     if (batchError.code === "23514" && /report_type/.test(batchError.message ?? "")) {

@@ -151,17 +151,17 @@ export const ENGINE_PARAM_META: EngineParamMeta[] = [
   { key: "campDefaultDday", group: "history", label: "Hệ số D-Day mặc định", help: "Dùng khi brand chưa đủ ca D-Day để học.", kind: "number", min: 0.5, max: 3, step: 0.05 },
   { key: "campDefaultMidmonth", group: "history", label: "Hệ số Mid-Month mặc định", help: "", kind: "number", min: 0.5, max: 3, step: 0.05 },
   { key: "campDefaultPayday", group: "history", label: "Hệ số Pay Day mặc định", help: "", kind: "number", min: 0.5, max: 3, step: 0.05 },
-  { key: "campMultMin", group: "history", label: "Hệ số camp học được — sàn", help: "Kẹp hệ số học từ lịch sử trong [sàn, trần].", kind: "number", min: 0.1, max: 2, step: 0.05 },
-  { key: "campMultMax", group: "history", label: "Hệ số camp học được — trần", help: "", kind: "number", min: 1, max: 10, step: 0.1 },
+  { key: "campMultMin", group: "history", label: "Hệ số Campaign học được — sàn", help: "Kẹp hệ số học từ lịch sử trong [sàn, trần].", kind: "number", min: 0.1, max: 2, step: 0.05 },
+  { key: "campMultMax", group: "history", label: "Hệ số Campaign học được — trần", help: "", kind: "number", min: 1, max: 10, step: 0.1 },
   { key: "minEventSessions", group: "history", label: "Ca tối thiểu để học lễ/sự kiện & khuyến mãi", help: "Không đủ → ×1.0 và chỉ ghi nhãn trên lưới.", kind: "number", min: 1, max: 50, step: 1 },
   { key: "eventMultMin", group: "history", label: "Hệ số lễ/sự kiện — sàn", help: "", kind: "number", min: 0.1, max: 2, step: 0.05 },
   { key: "eventMultMax", group: "history", label: "Hệ số lễ/sự kiện — trần", help: "", kind: "number", min: 1, max: 10, step: 0.1 },
   { key: "schemeMultMin", group: "history", label: "Hệ số ngày trùng khuyến mãi — sàn", help: "", kind: "number", min: 0.1, max: 2, step: 0.05 },
   { key: "schemeMultMax", group: "history", label: "Hệ số ngày trùng khuyến mãi — trần", help: "", kind: "number", min: 1, max: 10, step: 0.1 },
-  { key: "diminishingMinHours", group: "history", label: "Giờ tối thiểu để học lợi suất giảm dần", help: "Ca thứ 2/3/4 trong ngày bán kém hơn ca đầu bao nhiêu — cần đủ giờ quan sát ở vị trí đó.", kind: "number", min: 1, max: 100, step: 1 },
+  { key: "diminishingMinHours", group: "history", label: "Giờ tối thiểu để học lợi suất giảm dần", help: "Ca thứ 2/3/4 trong ngày có GMV/giờ thấp hơn ca đầu bao nhiêu — cần đủ giờ quan sát ở vị trí đó.", kind: "number", min: 1, max: 100, step: 1 },
   { key: "diminishingMin", group: "history", label: "Lợi suất giảm dần — sàn", help: "GMV ước tính của ca thứ k không thấp hơn X× ca đầu.", kind: "number", min: 0.1, max: 1, step: 0.05 },
-  { key: "campPatternEnabled", group: "camp", label: "Ưu tiên xếp đủ giờ ngày Campaign theo lịch sử", help: "Học giờ live/ngày theo loại ngày Campaign, xếp ngày Campaign thành khối ca liên tục đủ giờ đó trước khi chia cho ngày thường; nới trần ca/ngày của ngày Campaign theo. Tắt → ngày Campaign xếp như ngày thường (chỉ khác hệ số GMV/giờ).", kind: "boolean" },
-  { key: "minCampDays", group: "camp", label: "Ngày camp tối thiểu để học giờ/ngày", help: "", kind: "number", min: 1, max: 30, step: 1 },
+  { key: "campPatternEnabled", group: "camp", label: "Ưu tiên xếp đủ giờ ngày Campaign theo lịch sử", help: "Học giờ live/ngày theo loại ngày Campaign, xếp ngày Campaign thành khối ca liên tục đủ giờ đó trước khi chia cho ngày Daily; nới trần ca/ngày của ngày Campaign theo. Tắt → ngày Campaign xếp như ngày Daily (chỉ khác hệ số GMV/giờ).", kind: "boolean" },
+  { key: "minCampDays", group: "camp", label: "Ngày Campaign tối thiểu để học giờ/ngày", help: "", kind: "number", min: 1, max: 30, step: 1 },
   { key: "weekEvenCap", group: "schedule", label: "Tuần vượt X× trung bình thì phạt", help: "Rải đều giữa các tuần trong tháng (phương án Tối đa/Tiết kiệm).", kind: "number", min: 1, max: 3, step: 0.05 },
   { key: "weekEvenPenalty", group: "schedule", label: "Mức phạt tuần lệch", help: "Điểm ca nhân với hệ số này khi tuần đã quá tải.", kind: "number", min: 0.1, max: 1, step: 0.05 },
   { key: "balancedWeekCap", group: "schedule", label: "Cân bằng: tuần vượt X× thì phạt", help: "", kind: "number", min: 1, max: 3, step: 0.05 },
@@ -169,7 +169,7 @@ export const ENGINE_PARAM_META: EngineParamMeta[] = [
   { key: "anchorMinDays", group: "schedule", label: "Giờ neo: cùng giờ bắt đầu ≥ N ngày", help: "Ưu tiên lặp cùng giờ mở live nhiều ngày — khán giả nhớ giờ, host dễ xếp.", kind: "number", min: 1, max: 15, step: 1 },
   { key: "anchorBonus", group: "schedule", label: "Thưởng giờ neo", help: "", kind: "number", min: 1, max: 2, step: 0.01 },
   { key: "balancedAnchorBonus", group: "schedule", label: "Cân bằng: thưởng giờ neo", help: "", kind: "number", min: 1, max: 2, step: 0.01 },
-  { key: "balancedMaxPerDay", group: "schedule", label: "Cân bằng: tối đa ca/ngày Daily", help: "Ngày camp vẫn theo khuôn Campaign.", kind: "number", min: 1, max: 8, step: 1 },
+  { key: "balancedMaxPerDay", group: "schedule", label: "Cân bằng: tối đa ca/ngày Daily", help: "Ngày Campaign vẫn theo khuôn Campaign.", kind: "number", min: 1, max: 8, step: 1 },
   { key: "balancedSecondSlotPenalty", group: "schedule", label: "Cân bằng: phạt ca thứ 2 trong ngày", help: "", kind: "number", min: 0.1, max: 1, step: 0.05 },
   { key: "leanExtraHours", group: "schedule", label: "Tiết kiệm: ca dài thêm (giờ)", help: "Ca = mặc định + X giờ, ít ca hơn, ít ngày hơn.", kind: "number", min: 0, max: 6, step: 0.5 },
   { key: "leanNewDayPenalty", group: "schedule", label: "Tiết kiệm: phạt mở ngày mới", help: "", kind: "number", min: 0.1, max: 1, step: 0.01 },
@@ -191,7 +191,7 @@ export const ENGINE_PARAM_META: EngineParamMeta[] = [
   { key: "calibrationK", group: "calibration", label: "Kéo hệ số hiệu chỉnh về 1", help: "Ô có ít ca kế hoạch đã có thực tế bị kéo về 1 (không hiệu chỉnh). k lớn = thận trọng hơn.", kind: "number", min: 0, max: 20, step: 1 },
   { key: "calibrationMin", group: "calibration", label: "Hệ số hiệu chỉnh — sàn", help: "", kind: "number", min: 0.1, max: 1, step: 0.05 },
   { key: "calibrationMax", group: "calibration", label: "Hệ số hiệu chỉnh — trần", help: "", kind: "number", min: 1, max: 5, step: 0.1 },
-  { key: "fatigueWeekHours", group: "host", label: "Ngưỡng mệt (giờ/tuần)", help: "Host/trợ đã xếp quá X giờ trong tuần (T2–CN, tính cả ca sắp tới và ca vừa gán trong lô) bị cảnh báo và đẩy xuống cuối hàng khi chốt hàng loạt.", kind: "number", min: 1, max: 80, step: 1 }
+  { key: "fatigueWeekHours", group: "host", label: "Ngưỡng quá tải (giờ/tuần)", help: "Host/trợ đã xếp quá X giờ trong tuần (T2–CN, tính cả ca sắp tới và ca vừa gán trong lô) bị cảnh báo và đẩy xuống cuối hàng khi chốt hàng loạt.", kind: "number", min: 1, max: 80, step: 1 }
 ];
 
 // Trộn phần admin đã đổi với mặc định; bỏ khoá lạ, bỏ giá trị không hợp kiểu.

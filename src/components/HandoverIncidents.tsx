@@ -5,7 +5,7 @@ import { EARLY_REASON_LABEL, MINUTE_PRESETS, parseCount } from "../lib/handover"
 // "Đúng giờ, không sự cố" (Working File T8–T9: ô sự cố trống 76–100%, không phân biệt được "không có" với "quên ghi").
 
 export type Incident = "ot" | "early" | "restart" | "late";
-const INCIDENT_LABEL: Record<Incident, string> = { ot: "OT", early: "Off sớm", restart: "Restart", late: "Host trễ" };
+const INCIDENT_LABEL: Record<Incident, string> = { ot: "OT", early: "Kết thúc sớm", restart: "Restart", late: "Host trễ" };
 
 export interface IncidentState {
   on: Incident[];
@@ -83,7 +83,7 @@ export function HandoverIncidents({ value, onChange, label }: { value: IncidentS
         );
       })}
       {value.on.includes("early") && (
-        <div className="flex flex-wrap items-center gap-1.5 text-xs" role="group" aria-label="Lý do off sớm">
+        <div className="flex flex-wrap items-center gap-1.5 text-xs" role="group" aria-label="Lý do kết thúc sớm">
           <span className="font-bold text-[var(--text-muted)] w-14">Vì sao</span>
           {(Object.keys(EARLY_REASON_LABEL) as EarlyLeaveReason[]).map((k) => (
             <button

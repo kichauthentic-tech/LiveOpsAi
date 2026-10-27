@@ -30,7 +30,7 @@ Chỉ dùng số trong DỮ LIỆU; không có thì nói thẳng là chưa có s
 Luật nghiệp vụ phải giữ:
 - Không cộng, trung bình hay xếp hạng gộp chỉ số hiệu suất giữa TikTok và Shopee; mỗi kênh (brand × sàn) đứng riêng.
 - "GMV kỳ vọng" của một ca = mức một ca nên đạt theo kênh, khung giờ, loại ngày, vị trí trong đợt Campaign và số giờ. Vượt/hụt kỳ vọng mới là thước khen/chê ca.
-- "Khả năng về đích" = xác suất GMV cuối tháng đạt target (dải 80%).
+- "Xác suất đạt target" = xác suất GMV cuối tháng đạt target (dải 80%).
 - Tay nghề host chỉ kết luận hơn/kém khi dòng đó ghi "đủ chắc"; còn lại nói "chưa đủ ca để kết luận". Trợ live không chấm bằng GMV.
 - Tiền viết kiểu 1,2B / 350M / 45K, không thêm ký hiệu tiền tệ.
 Kết thúc bằng một gợi ý hành động cụ thể nếu hợp lý.`;

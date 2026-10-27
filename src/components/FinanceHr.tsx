@@ -52,7 +52,7 @@ const MISSING_SHORT: Record<PnlMissingInput, string> = {
   host_rate: "rate host",
   cohost_rate: "rate trợ live",
   brand_rate: "rate brand",
-  commission_default: "% commission"
+  commission_default: "% hoa hồng"
 };
 
 export const FinanceHr: React.FC<FinanceHrProps> = ({
@@ -262,7 +262,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
             mỗi lý do một dòng có chấm màu — trước đó 3 hộp màu chồng nhau đẩy bảng xuống ~230px. */}
         {(missingSummary.rowsAffected > 0 || unconfirmed.length > 0 || (rows.length > 0 && quality.reconciled < quality.total)) && (
           <div className="text-[11px] rounded-xl border border-[var(--border)] bg-[var(--surface-base)] divide-y divide-[var(--border-muted)]">
-            <p className="px-3 py-1.5 font-semibold text-[var(--text-muted)]">Số trên trang này chưa chắc chắn vì</p>
+            <p className="px-3 py-1.5 font-semibold text-[var(--text-muted)]">Số liệu trên trang này chưa chốt vì</p>
             {missingSummary.rowsAffected > 0 && (
               <div className="px-3 py-2 flex gap-2">
                 <span className="mt-1 w-2 h-2 rounded-full bg-rose-500 shrink-0" aria-hidden />
@@ -304,7 +304,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                 <p className="text-amber-200 min-w-0">
                   Nguồn GMV của {quality.total} phiên: <b>{quality.reconciled}</b> đã đối soát
                   {quality.snapshot > 0 && <>, <b>{quality.snapshot}</b> số lúc giao ca (sàn còn cập nhật đơn/hoàn/huỷ sau đó)</>}
-                  {quality.manual > 0 && <>, <b>{quality.manual}</b> talent tự khai (chưa có gì bảo chứng)</>}.
+                  {quality.manual > 0 && <>, <b>{quality.manual}</b> talent tự khai (chưa được xác thực)</>}.
                   <span className="text-[var(--text-muted)]"> Số tiền của các phiên chưa đối soát là tạm tính — duyệt sau khi đối soát ở Dữ Liệu Gốc của brand (mục Đối soát số liệu).</span>
                 </p>
               </div>
@@ -424,7 +424,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                       <div className="font-bold text-[var(--text-muted)]">{money(sessionAdsCost(s))}</div>
                     </td>
                     {/* Giai đoạn 3 — nói rõ con số ra từ đâu: talent ăn theo giờ thì hiện giờ
-                        công thực tế + phần OT/off sớm host đã khai, để ops đối chiếu khi duyệt. */}
+                        công thực tế + phần OT/kết thúc sớm host đã khai, để ops đối chiếu khi duyệt. */}
                     <td className="py-2 pr-3">
                       <div className="text-amber-400 font-bold">{money(hostPayout)}</div>
                       {/* Đổi người giữa ca (0138): mỗi người một dòng — công theo giờ của chính họ. */}
@@ -441,7 +441,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                         <div className="text-[11px] text-[var(--text-muted)] mt-0.5">
                           {fmtFixed(billableHours, 2)}h × rate/giờ
                           {otMinutes > 0 && <span className="text-emerald-400 font-bold"> · OT +{otMinutes}p</span>}
-                          {earlyLeaveMinutes > 0 && <span className="text-amber-400 font-bold"> · off sớm −{earlyLeaveMinutes}p</span>}
+                          {earlyLeaveMinutes > 0 && <span className="text-amber-400 font-bold"> · kết thúc sớm −{earlyLeaveMinutes} phút</span>}
                         </div>
                       )}
                       {/* Trợ live có công (user chốt 2026-09-18) — hiện tách dòng để ops thấy Net

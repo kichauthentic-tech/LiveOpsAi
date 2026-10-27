@@ -211,7 +211,7 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
                 <KpiTile label={METRIC.liveNewFollowers} value={fmtInt(o.newFollowers)} />
               </div>
             </Panel>
-            <Panel title="Nguồn traffic của live" icon={<Database className="w-4 h-4" />} sub="Sales và lượt xem theo Traffic Source dẫn vào phòng live">
+            <Panel title="Nguồn traffic của live" icon={<Database className="w-4 h-4" />} sub="Sales và lượt xem theo Traffic Source dẫn vào phiên live">
               <ReportTable head={["Traffic Source", METRIC.salesRatio, "Sales (Placed Order)", METRIC.liveViews, METRIC.liveViewers, METRIC.engagedViewers]}>
                 {[...o.sources]
                   .sort((a, b) => b.salesPlaced - a.salesPlaced)

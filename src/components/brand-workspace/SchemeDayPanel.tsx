@@ -84,7 +84,7 @@ export const SchemeDayPanel: React.FC<SchemeDayPanelProps> = ({ brandId, date, s
   return (
     <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 shadow-sm space-y-2">
       <h3 className="flex items-center gap-2 text-sm font-bold text-[var(--text)]">
-        <Tag className="w-4 h-4 text-[var(--warning)]" /> Scheme khuyến mãi ngày {date}
+        <Tag className="w-4 h-4 text-[var(--warning)]" /> Chương trình khuyến mãi ngày {date}
       </h3>
 
       <datalist id="scheme-categories-day">

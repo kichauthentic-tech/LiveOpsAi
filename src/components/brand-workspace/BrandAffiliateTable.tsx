@@ -832,7 +832,7 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
                   {sessionInfo(r)}
                   {r.isShopAccount && <span className="px-1.5 rounded bg-slate-200 text-slate-700">tài khoản shop</span>}
                   {r.noBrandActivity && (
-                    <span className="px-1.5 rounded bg-slate-200 text-slate-700" title="Không có click lẫn đơn cho brand — thường là buổi live riêng của creator, chỉ lọt vào báo cáo vì còn sót sản phẩm trong giỏ. Tick lại nếu bạn vẫn muốn đưa vào bảng.">
+                    <span className="px-1.5 rounded bg-slate-200 text-slate-700" title="Không có click lẫn đơn cho brand — thường là buổi live riêng của creator, chỉ lọt vào báo cáo vì còn sót sản phẩm trong giỏ. Chọn lại nếu bạn vẫn muốn đưa vào bảng.">
                       0 click / 0 đơn
                     </span>
                   )}

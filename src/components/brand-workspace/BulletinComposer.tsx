@@ -76,7 +76,7 @@ export const BulletinComposer: React.FC<{ card: ChannelCard }> = ({ card }) => {
               <button type="button" onClick={send} disabled={sending} className="min-h-[32px] px-3.5 rounded-lg bg-[var(--accent)] text-sm font-bold text-white disabled:opacity-50">{sending ? "Đang gửi…" : "Gửi"}</button>
               <button type="button" onClick={() => copy(text)} className="min-h-[32px] px-3.5 rounded-lg border border-[var(--border)] text-sm font-bold text-[var(--text)] hover:border-[var(--accent)]">Chép tin Zalo</button>
             </div>
-            <p className="text-[11px] text-[var(--text-faint)] leading-snug">Brand thấy đúng các số bên cạnh — không có nhãn "khó đạt/sẽ hụt" hay xác suất. Số trong tháng chỉ tới brand qua bản tin; tháng phát hành Report thì brand xem đủ ở Report Tháng.</p>
+            <p className="text-[11px] text-[var(--text-faint)] leading-snug">Brand thấy đúng các số bên cạnh — không có nhãn "Rủi ro/Hụt target" hay xác suất. Số trong tháng chỉ tới brand qua bản tin; tháng phát hành Report thì brand xem đủ ở Report Tháng.</p>
           </div>
           <pre className="min-w-0 whitespace-pre-wrap rounded-lg bg-[var(--surface-base)] border border-[var(--border)] p-3 text-xs leading-relaxed text-[var(--text)] font-sans">{text}</pre>
         </div>

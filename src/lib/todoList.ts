@@ -212,7 +212,7 @@ export function buildTodos(input: TodoInput): Todo[] {
     for (const p of platforms) {
       if (!brandPriceSet(b, input.rates, p)) {
         const name = platforms.length > 1 ? `${b.name} ${p}` : b.name;
-        out.push({ id: `rate-${b.id}${platformIdSuffix(p)}`, level: "low", title: `${name} chưa có giá`, detail: "Chưa có giá thì Finance & P&L và Dashboard không tính được doanh thu, lãi.", tab: "crm", rememberBrandId: b.id, rememberPlatform: p, action: "Nhập ở CRM" });
+        out.push({ id: `rate-${b.id}${platformIdSuffix(p)}`, level: "low", title: `${name} chưa có giá`, detail: "Chưa có giá thì Finance & P&L và Dashboard không tính được doanh thu, lợi nhuận.", tab: "crm", rememberBrandId: b.id, rememberPlatform: p, action: "Nhập ở CRM" });
       }
     }
 
