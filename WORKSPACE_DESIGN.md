@@ -11,8 +11,11 @@
 
 ---
 
-## 1. Giai đoạn hiện tại (cập nhật 2026-10-27)
+## 1. Giai đoạn hiện tại (cập nhật 2026-10-28)
 
+- **28/10: ADS THEO NGÀY DÁN TỪ FILE TRACKING (đã push, `0184` ĐÃ CHẠY 28/10; CROCS T3→T10 đã dán, 245 ngày)** — CROCS theo dõi Ads bằng file "Performance Tracking" (sheet "Daily Ads
+  Report": target + actual × Live/Product/Creator mỗi ngày). Nhập Ads có khung dán (`AdsTrackingPanel`, bộ đọc `lib/ads/adsTracking.ts`, bảng `brand_ads_daily`
+  qua `lib/db/adsDaily.ts`); Report Tháng trang Quảng cáo có khối "Ngân sách Ads theo kế hoạch" (`report/AdsPlanPanel.tsx`). Chi tiết: lịch sử `## Ads theo ngày dán từ file tracking (2026-10-28)`.
 - **27/10: tab up riêng "Live Analysis — Affiliate" (loại `affiliate_live_analysis`, `0183` ĐÃ CHẠY 27/10)** — view "linked accounts" không ra phiên của tài khoản affiliate nên thêm loại file mới (cùng 28 cột, dùng chung `parseLiveAnalysis`). Trang Affiliate (`affiliateLiveSessionSlice`) chỉ đọc `affiliate_live_analysis` (file shop `live_analysis` chứa phiên inhouse nên không đưa vào); mục Affiliate của Chốt tháng (`monthClose.ts`) chỉ tính `affiliate_live_analysis`; Report Tuần vẫn chỉ đọc `live_analysis` nên số affiliate không lọt vào cột đối chiếu. Chạy `0183` trước khi up file (không thì DB báo check_violation). Chưa up thử file mẫu thật `Live Analysis20261027035737.xlsx` (T10, 6 phiên, 3 creator) vào app.
 - **27/10 tối: ACTION PLAN REPORT THÁNG (chưa commit, `0182` ĐÃ CHẠY 27/10 — đọc được cột qua REST)** — học deck CROCS T9 slide "Plans for OCT": trang "Tháng sau" có bảng
   Hành động · Căn cứ · Chỉ tiêu theo dõi (`ActionPlanPanel`, report/ActionPlan.tsx); plan lưu ở report tháng VIẾT ra nó (`brand_monthly_reports.action_plan`,
@@ -54,6 +57,7 @@
 ## 2. Việc còn treo
 
 **Cần user làm:**
+- **Ads theo ngày (28/10, 0184 ĐÃ CHẠY, CROCS T3→T10 đã dán):** cuối mỗi ngày/tháng dán lại khối "Daily Ads Report" để cập nhật actual (ghi đè ngày trùng).
 - **Action plan (27/10, 0182 ĐÃ CHẠY):** commit + deploy; lập plan thật cho CROCS T10 (deck T9 có 9 việc) trước khi chốt T10; đầu T11 ops chấm các việc "Ops tự chấm" ở report T10.
 - **0179 ĐÃ CHẠY 21/10.** Còn: mở Dashboard brand Franklin (ops) → "Gửi bản tin cho brand" → đăng nhập tài khoản brand Franklin xem trang Tổng quan.
 - **0178 (17/10):** chạy `0178_ops_flow_integrity.sql` — trước hay sau deploy đều được (client chưa có hàm ⇒ quay về `update_session_with_children`;
@@ -367,8 +371,9 @@ live = `sessionHours`. GMV/giờ đem NHÂN với giờ lịch thì chia trên g
   giữa hai sàn**; màn xem nhiều kênh đặt khối TikTok | Shopee cạnh nhau. Cộng được: số vận hành (ca, giờ, người, phòng) và tiền agency.
 - **Ads (05/10):** nguồn duy nhất = file TikTok Ads theo ngày (`ads_campaign_overview`). ROI = doanh thu gộp ÷ chi phí
   (cùng cách TikTok). Doanh thu gộp tính trước huỷ/hoàn (Franklin T9: 798tr > GMV shop 771tr) ⇒ KHÔNG trình bày như %
-  GMV, không cộng vào GMV. Chưa có ngân sách Ads dự kiến trong app (deck Franklin có "95,3% ngân sách" — user chưa chốt
-  nhập ở đâu, chỉ số đó chưa có).
+  GMV, không cộng vào GMV. **Kế hoạch Ads theo ngày (28/10, 0184):** dán từ file tracking của brand vào `brand_ads_daily` (target +
+  thực tế × Live/Product/Creator; actual null = chưa có số). Không lưu cột MTD/runrate của sheet — so target luỹ kế cắt ở ngày
+  cuối có số thực (`adsTrackingMonth`). Hai nguồn không cộng nhau: file TikTok Ads = chi phí cả cửa hàng do TikTok xuất; bảng dán = kế hoạch brand.
 - **Run-rate chỉ tính bằng `planRunRate`** (28/09): target = Σ target ca của Kế Hoạch Tháng đã chốt (không chia lại khi lịch
   đổi); ca kế hoạch huỷ GIỮ target; ca ngoài kế hoạch target 0; ca thêm vào lưới sau khi chốt nhận target = dự báo. **Ca tăng cường (0165, 10/10):** ca OP mở thêm sau chốt có dòng ở `plan_boost_slots` với target đề xuất của engine, KHÔNG cộng vào target tháng/run-rate — mọi chỗ cộng target tháng chỉ đọc `brand_month_plan_slots`, đừng đưa bảng boost vào đó. **Ngoại lệ do user chủ động "Chia lại theo lịch hiện có" (0164, 10/10):** ca huỷ về 0, ca OP thêm (kể cả đã qua) vào kế hoạch, Σ target = target mới.
 - **Report Tháng là nơi DUY NHẤT nói số một tháng SAU khi hết tháng** (đọc bản chụp; so cùng kỳ cắt 1..N khi tháng chưa hết).

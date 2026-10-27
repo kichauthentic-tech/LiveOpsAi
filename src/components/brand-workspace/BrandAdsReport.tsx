@@ -16,6 +16,7 @@ import { fmtDateVn, fmtMonth, fmtFixed, fmtVndFull, fmtVndShort } from "../../li
 import { MonthPicker } from "../common/MonthPicker";
 import { PageHeader } from "../common/PageHeader";
 import { ShopeeAdsPanel } from "./ShopeeAdsPanel";
+import { AdsTrackingPanel } from "./AdsTrackingPanel";
 import { fetchMonthlyReport } from "../../lib/db/monthlyReports";
 import { channelTitle, LEGACY_PLATFORM, type ReportPlatform } from "../../lib/reportPlatform";
 // Nhập Ads (tab ops-only, tách khỏi Report Tháng 2026-09-21). Từ 2026-10-05 (migration 0137): Ads lấy từ FILE
@@ -401,6 +402,9 @@ export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandNa
 
       {/* Mỗi sàn một khung nhập file Ads (ADS_PANELS) — TikTok: "Campaign overview data" theo ngày (0137), Shopee: Live Ads Report (0142). */}
       <AdsPanel brandId={brandId} brandName={brandName} month={month} canManage={canManage} isPublished={isPublished} onMonthChange={setMonth} />
+
+      {/* Target + thực tế Ads theo ngày dán từ file tracking của brand (0184) — kế hoạch brand giao, tách Live / Product / Creator. */}
+      <AdsTrackingPanel brandId={brandId} brandName={brandName} platform={platform} month={month} canManage={canManage} onMonthChange={setMonth} />
 
 
       {/* Khung camp của tháng chỉ nhập ở Kế Hoạch Tháng (gộp cấu hình 06/10 — trước đó tháng không có kế hoạch nhập ở đây). */}

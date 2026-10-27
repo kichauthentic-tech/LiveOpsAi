@@ -39,6 +39,9 @@ import { fetchAffiliateActuals } from "../../lib/db/affiliateActuals";
 import { fetchAffiliatePlanMonth } from "../../lib/db/affiliatePlanMonths";
 import { DEFAULT_FX_RATE } from "../../lib/affiliate/plan";
 import { bucketStats, campSpanLabels, changeTone, creatorPlanRows, creatorSessionRows, creatorTotals, dayTypeFactorRows, noiseBand, scoreRows, type KeyMetricsMonth, type KeyMetricsTab } from "../../lib/report/brandReport";
+import { AdsPlanPanel } from "./report/AdsPlanPanel";
+import { adsTrackingMonth, type AdsDayRow } from "../../lib/ads/adsTracking";
+import { fetchAdsDaily } from "../../lib/db/adsDaily";
 import { AffiliatePanel, CreatorPlanPanel, DayTypeHeatPanel, KeyMetricsPanel, NmvPanel, ScoreboardPanel, ToneLegend } from "./report/BrandPages";
 
 // Report Tháng này là report của sàn TikTok (Shopee: ShopeeMonthlyReportTabs) — chỉ đọc ca TikTok.
@@ -184,6 +187,18 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
       cancelled = true;
     };
   }, [brandId, month, nextMonth]);
+  // Ads theo ngày dán từ file tracking của brand (0184): target + thực tế tách Live / Product / Creator. Bảng nhỏ, đọc thẳng như
+  // Affiliate, không vào bản chụp; brand đọc được khi tháng đã phát hành (RLS). DB chưa chạy 0184 ⇒ coi như chưa có.
+  const [adsPlanRows, setAdsPlanRows] = useState<{ key: string; rows: AdsDayRow[] } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetchAdsDaily(brandId, month, REPORT_PLATFORM)
+      .catch(() => [])
+      .then((rows) => !cancelled && setAdsPlanRows({ key: `${brandId}|${month}`, rows }));
+    return () => {
+      cancelled = true;
+    };
+  }, [brandId, month]);
   const planCur = plans[month] ?? null;
   const nextPlanFull = plans[nextMonth] ?? null;
 
@@ -415,6 +430,10 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   // Cột live = ca agency (cùng số ô KPI phần 1 và bảng Campaign phần 6); phần còn lại vẫn từ Shop Analytics.
   // Cửa sổ = shopWin (cắt theo ngày cuối file shop cho CẢ hai tháng) — không phải cmp.
   const agencyLiveByDate = useMemo(() => ({ prev: liveGmvByDate(livePrev?.rows ?? []), cur: liveGmvByDate(liveCurrent?.rows ?? []) }), [livePrev, liveCurrent]);
+  const adsPlan = useMemo(() => {
+    const rows = adsPlanRows?.key === `${brandId}|${month}` ? adsPlanRows.rows : [];
+    return rows.length ? adsTrackingMonth(rows, month, bucketCur, agencyLiveByDate.cur) : null;
+  }, [adsPlanRows, brandId, month, bucketCur, agencyLiveByDate]);
   const control = useMemo(
     () => controlGroup(shopDaysOf(prevMonth)?.days, view.shopDays[month]?.days, shopWin, bucketPrev, bucketCur, agencyLiveByDate),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -765,7 +784,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     shop: canManage || !!shopCur,
     why: true,
     products: canManage || !!topSku?.hasAnyBatch || !!topPromo?.hasAnyBatch,
-    ads: canManage || !!adsCur,
+    ads: canManage || !!adsCur || !!adsPlan,
     nmv: canManage || refundRateShop != null || nmvRate != null,
     people: true,
     affiliate: canManage || creatorRows.length > 0,
@@ -1545,6 +1564,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
         {sectionShown.ads && (
         <section id="mr-ads" className="space-y-4 scroll-mt-16">
           <SectionHead no={secNo("ads")} title={secTitle("ads")} sub="Ads cost toàn cửa hàng (LIVE GMV Max + Product GMV Max) · ROI theo loại ngày · ngày có chi phí nhưng 0 đơn" />
+            {adsPlan && <AdsPlanPanel s={adsPlan} month={month} />}
             {adsCur ? (() => {
               const prevLabel = adsCur.lastDate && adsCur.lastDate < end ? `1–${Number(adsCur.lastDate.slice(8))}/${prevMonth.slice(5)}` : `Tháng ${prevMonth.slice(5)}`;
               const vsPrev = (cur: number | null, prev: number | null | undefined, fmt: (v: number) => string) => {

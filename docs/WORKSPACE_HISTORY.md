@@ -6563,3 +6563,36 @@ chỉ CROCS T9 TikTok bị chặn. Bấm thử nút Phát hành bị chặn quy�
 
 **Còn mở:** C xuất deck 16:9 (PPTX/PDF), D Shopee target + trang tháng sau; whole shop, song ngữ, file Order, sổ việc tháng trước. Bản chụp VERA Shopee T9 / CROCS T10 cần
 "Cập nhật số liệu" để lấy bản 4 / số mới.
+
+## Ads theo ngày dán từ file tracking (2026-10-28)
+
+User gửi `~/Downloads/CROCS x YFB _ Peformance Tracking.xlsx` + dán khối sheet "Daily Ads Report": "Ads của Crocs có file tracking riêng, có luôn target
+và actual … muốn copy vào paste vào cho dễ". Chưa commit, `0184` CHƯA CHẠY.
+
+**File.** 5 sheet: `2026 TG` (JBP target GMV + Total Ads Budget theo tháng, bản "Target by cut-off" và "Monthly Operation"), `Daily Ads Report` (T3→T10, mỗi
+ngày: Month · Date · Target by TTS · target Total/Live/Product/Creator · actual ×4 · Daily Runrate · MTD target ×4 · MTD actual ×4 · MTD Runrate · NOTE),
+`Video ads`, `Product Ads` (danh sách SKU chạy GMV Max), `Daily GMV Report` (toàn 0, chưa dùng).
+
+**Đã làm.**
+- `0184_brand_ads_daily.sql`: bảng `(brand_id, platform, date)` + target/actual ×4 (actual null = chưa có số) + `tts_target` + note; RLS ops ghi, brand đọc khi
+  `private.brand_month_published(brand_id, date, platform)`; anon không quyền. Kiểm `supabase/tests/0184_brand_ads_daily.sql` 10 mục trên replay 0001→0184 (ghi đè cùng ngày,
+  số âm/sàn lạ bị chặn, brand chỉ thấy T9 đã phát hành của mình, không ghi được, role NULL 0 dòng, thu hồi ⇒ hết thấy, anon bị chặn); chạy lại lần hai sạch.
+- `lib/ads/adsTracking.ts`: `parseVnNumber` (VN "7.464.852", Excel "7464852.387", "7,464,852"), `parseDayCell` ("01/03" + năm), `parseAdsTrackingPaste` (lấy 11 cột
+  đầu + ô chữ đầu tiên từ cột NOTE; bỏ tiêu đề/dòng tổng; cảnh báo Total ≠ Live+Product+Creator), `defaultPasteYear`, `adsTrackingMonth` (target cả tháng, luỹ kế cắt ở
+  ngày cuối có số, % so target, % target cả tháng đã chi, theo phần, theo loại ngày + Ads Live/LIVE GMV YFB/ROAS Live, ngày lệch ≥ 30% kèm ghi chú), `pasteMonths`.
+  Test `tests/adsTracking.test.ts` (5, gồm vẽ `AdsPlanPanel`).
+- UI: `AdsTrackingPanel` ở Nhập Ads (dán ⇒ tự đọc khi có tab ⇒ xem trước theo tháng ⇒ "Lưu N ngày"; xoá tháng; ô số + bảng phần/loại ngày + ngày lệch + bảng từng ngày);
+  Report Tháng trang Quảng cáo: `AdsPlanPanel` trên khối file TikTok Ads, trang Ads hiện với brand khi có kế hoạch dù không có file Ads.
+
+**Số đo trên file thật (cả sheet xuất ra dạng dán, `parseAdsTrackingPaste` + `adsTrackingMonth`).** 245 ngày, 0 cảnh báo; target và actual cả tháng khớp đúng từng
+đồng với cột MTD của sheet 8/8 tháng. Sheet cộng cả target ngày chưa tới vào MTD target ⇒ runrate cuối tháng tụt giả: T10 sheet −9,5% (31/10), đúng −4,8% tới
+25/10 (đã chi 90,5% target tháng 378,3M). Actual các tháng dừng giữa tháng: T3 24/03, T4 19/04, T5 20/05, T7 26/07, T8 17/08 ⇒ "−38,6%" T8 của sheet là thiếu
+số, không phải chi thiếu. Cột "Target by TTS" T9–T10 vẫn công thức `='2026 TG'!$L$12/31` (L = AUG) ⇒ 7.624.285/ngày; theo đúng tháng là SEP 308,8M/30 ≈ 10,3M,
+OCT 337,7M/31 ≈ 10,9M.
+
+**Verify.** tsc 0; eslint 0 lỗi ở file đợt này; vitest 1045 — 2 lỗi có từ trước trên main (layoutConventions `OpenMonthWizard.tsx:238`, platformProfiles
+`shiftSlots.ts:107`); test từ điển chỉ số bắt nhãn "Runrate" ⇒ đổi "So target luỹ kế"; vite build OK. **Chưa thử trên app thật**: dev mới ở cổng 3101 chưa
+đăng nhập, và DB chưa có 0184 nên chưa lưu được.
+**Cập nhật 28/10 (sau khi user chạy 0184):** kiểm trên app (cổng 3100, phiên admin, DB thật): dán khối sheet T3→T10 ⇒ xem trước 245 ngày, 8 tháng khớp sheet ⇒ Lưu
+⇒ CROCS có 245 dòng `brand_ads_daily`. Nhập Ads T9: +0,1%, D-Day 112%, 9 ngày lệch ≥ 30%. Report Tháng T10 trang Quảng cáo: target 378,3M, đã chi 342,5M tới 25/10
+(90,5%), so target −4,8%, Creator 53,3% target, ROAS Live 14,7x (Daily 21,7x, Pay Day 8,9x). Commit + push cùng ngày.
