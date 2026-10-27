@@ -625,24 +625,6 @@ export interface ShiftSlot {
   planId?: string;
 }
 
-// Quy tắc lặp theo thứ trong tuần — sinh hàng loạt ShiftSlot cho 1 tháng
-// thay vì ops tạo tay từng ca (xem migration 0015).
-export interface RecurringShiftTemplate {
-  id: string;
-  weekday: number; // 0=CN...6=Thứ 7, khớp Date.getDay() — bỏ qua khi isDaily=true
-  isDaily?: boolean; // true = áp dụng mọi ngày trong tháng, không chỉ 1 thứ cố định
-  brandId?: string;
-  brandName: string;
-  platform: "TikTok" | "Shopee";
-  startTime: string;
-  endTime: string;
-  studioId?: string;
-  studioName: string;
-  notes: string;
-  active: boolean;
-  createdBy?: string;
-}
-
 export interface ShiftRegistration {
   id: string;
   slotId: string;

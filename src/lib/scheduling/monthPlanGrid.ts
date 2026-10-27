@@ -1,9 +1,8 @@
 // Kế Hoạch Tháng — phần thuần cho lưới ngày × ca (giai đoạn A, 0090). Không gọi DB.
-import { BrandMonthPlan, BrandMonthPlanSlot, LiveSession, PlanGroupTargets, RecurringShiftTemplate, ShiftSlot } from "../../types";
+import { BrandMonthPlan, BrandMonthPlanSlot, LiveSession, PlanGroupTargets, ShiftSlot } from "../../types";
 import type { CampDayBucket } from "../campaignDays";
 import { sessionDurationHours } from "../pnl";
 import { dateTimeRangesOverlap } from "../dateUtils";
-import { planMonthSlots } from "./planMonthSlots";
 import { platformOf, type ReportPlatform } from "../reportPlatform";
 
 export interface PlanDraftSlot {
@@ -70,26 +69,6 @@ export function nextSlotForDay(day: string, drafts: PlanDraftSlot[], plan: Pick<
   const end = full(after) > plan.liveWindowEnd ? plan.liveWindowEnd : full(after);
   if (end <= after) return null;
   return make(after, end);
-}
-
-// Nạp từ quy tắc lặp của brand: thêm ca chưa có (theo khoá ngày|giờ), giữ nguyên ca đang có.
-export function mergeFromTemplates(
-  drafts: PlanDraftSlot[],
-  templates: RecurringShiftTemplate[],
-  month: string,
-  brandId: string,
-  today: string
-): { next: PlanDraftSlot[]; added: number } {
-  const have = new Set(drafts.map(draftKeyOf));
-  const plan = planMonthSlots(templates, [], month, today, brandId);
-  const added: PlanDraftSlot[] = [];
-  for (const s of plan.toCreate) {
-    const k = draftKeyOf(s);
-    if (have.has(k)) continue;
-    have.add(k);
-    added.push({ key: newKey(), date: s.date, startTime: s.startTime, endTime: s.endTime, targetGmv: 0, note: s.notes });
-  }
-  return { next: [...drafts, ...added], added: added.length };
 }
 
 // Dựng lưới từ CA ĐÃ NHẬP (live_sessions nạp từ file/tạo tay trước khi có kế hoạch — 07/10: lịch T10 của 6 kênh). Mỗi ca chưa huỷ

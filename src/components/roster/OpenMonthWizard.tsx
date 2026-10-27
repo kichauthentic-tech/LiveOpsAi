@@ -412,7 +412,7 @@ export const OpenMonthWizard: React.FC<{
               <ul className="text-xs text-[var(--text-muted)] space-y-1 list-disc pl-4">
                 <li>Mỗi kênh: lưu giờ cam kết, lưu lưới ca vào Kế Hoạch Tháng rồi chốt — ca mở hiện ở app talent (Đăng ký ca).</li>
                 <li>Đặt hạn xong mỗi host/trợ nhận một tin. Qua hạn talent không đăng ký thêm được; bạn vẫn xếp hộ.</li>
-                <li>Target GMV: CEO/admin vào Kế Hoạch Tháng đặt target rồi bấm "Chia lại target" (ca mới có target 0 tới lúc đó).</li>
+                <li>Target GMV: CEO/admin vào Kế Hoạch Tháng — thẻ "Bước tiếp: đặt target tháng" chia target xuống từng ca (ca mới có target 0 tới lúc đó).</li>
               </ul>
               {results && (
                 <ul className="rounded-xl border border-[var(--border)] divide-y divide-[var(--border)] text-sm">

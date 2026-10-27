@@ -14,14 +14,13 @@ import {
   draftsFromSessions,
   draftsFromSuggestion,
   endsAfterMidnight,
-  mergeFromTemplates,
   nextSlotForDay,
   slotHours,
   totalsOf,
   validateDrafts,
   type PlanDraftSlot
 } from "../src/lib/scheduling/monthPlanGrid";
-import { BrandMonthPlan, BrandMonthPlanSlot, RecurringShiftTemplate } from "../src/types";
+import { BrandMonthPlan, BrandMonthPlanSlot } from "../src/types";
 
 const PLAN: Pick<BrandMonthPlan, "defaultSlotHours" | "liveWindowStart" | "liveWindowEnd" | "maxSlotsPerDay"> = {
   defaultSlotHours: 2,
@@ -190,7 +189,7 @@ test("lưới hợp lệ không sinh lỗi nào, và ca khác NGÀY không bị 
   expect(validateDrafts(ok, PLAN)).toEqual([]);
 });
 
-// ── draftsFromSaved / draftsFromSuggestion / mergeFromTemplates ───────────────────────────────────
+// ── draftsFromSaved / draftsFromSuggestion ───────────────────────────────────
 
 test("draftsFromSaved giữ id làm key và bỏ expectedGmv = 0", () => {
   const saved: BrandMonthPlanSlot[] = [
@@ -220,31 +219,6 @@ test("draftKeyOf không gồm target/note — ca chỉ khác target vẫn là c�
   expect(draftKeyOf(d("2026-10-06", "08:00", "10:00", { targetGmv: 1 }))).toBe(
     draftKeyOf(d("2026-10-06", "08:00", "10:00", { targetGmv: 999, note: "x" }))
   );
-});
-
-test("mergeFromTemplates thêm ca còn thiếu và GIỮ NGUYÊN ca ops đã vẽ", () => {
-  const templates: RecurringShiftTemplate[] = [
-    {
-      id: "t1",
-      weekday: 4, // thứ Năm
-      brandId: "brand-crocs",
-      brandName: "CROCS",
-      platform: "TikTok",
-      studioName: "",
-      notes: "từ quy tắc",
-      startTime: "09:00",
-      endTime: "11:00",
-      active: true
-    } as RecurringShiftTemplate
-  ];
-  // 08/10/2026 là thứ Năm — ops đã vẽ tay đúng khung đó, kèm target đã nhập.
-  const existing = [d("2026-10-08", "09:00", "11:00", { key: "mine", targetGmv: 777 })];
-  const { next, added } = mergeFromTemplates(existing, templates, "2026-10", "brand-crocs", "2026-10-01");
-
-  expect(added).toBe(4); // 01, 15, 22, 29 (08 đã có)
-  expect(next[0]).toMatchObject({ key: "mine", targetGmv: 777 }); // không bị ghi đè
-  expect(next.filter((x) => x.date === "2026-10-08")).toHaveLength(1); // không nhân đôi
-  expect(next.find((x) => x.date === "2026-10-15")?.note).toBe("từ quy tắc");
 });
 
 // ── dựng lưới từ ca đã nhập (07/10: lịch T10 nạp bằng file, 0 shift_slots) ──────────────────────────────

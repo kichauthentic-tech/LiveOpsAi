@@ -2,7 +2,7 @@ import React, { useState, useEffect, useLayoutEffect, useMemo, useRef, Suspense 
 import { rememberBrandId } from "./lib/defaultBrand";
 import { requestCrmFocus } from "./lib/crmFocus";
 import { todayVn } from "./lib/performance/brandCommitment";
-import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, Talent, Studio, Equipment, Brand, SessionFinance, ShiftSlot, RecurringShiftTemplate, BrandSku, PromoScheme, AppNotification, BrandChannel } from "./types";
+import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, Talent, Studio, Equipment, Brand, SessionFinance, ShiftSlot, BrandSku, PromoScheme, AppNotification, BrandChannel } from "./types";
 import { ChannelBar } from "./components/common/ChannelBar";
 import { PageHeader, PlatformBlockContext } from "./components/common/PageHeader";
 import { TabErrorFallback } from "./components/common/TabErrorFallback";
@@ -23,7 +23,6 @@ import { upsertBrandPlatformCommissionRate, upsertBrandPlatformRate, upsertBrand
 import { setBrandStudio } from "./lib/db/brandStudios";
 import { fetchShiftSlots, createShiftSlot, deleteShiftSlot } from "./lib/db/shiftSlots";
 import { fetchShiftRegistrations, registerForSlot, unregisterFromSlot } from "./lib/db/shiftRegistrations";
-import { createRecurringShiftTemplate, updateRecurringShiftTemplate, deleteRecurringShiftTemplate } from "./lib/db/recurringShiftTemplates";
 import { fetchTalentRateHistory } from "./lib/db/talentRateHistory";
 import { fetchBrandPlatformRateHistory } from "./lib/db/brandPlatformRateHistory";
 import { createBrandSku, updateBrandSku, deleteBrandSku } from "./lib/db/brandSkus";
@@ -381,8 +380,6 @@ export default function App() {
     setBrandChannels,
     shiftRegistrations,
     setShiftRegistrations,
-    recurringShiftTemplates,
-    setRecurringShiftTemplates,
     phase14Error,
     talentRateHistory,
     setTalentRateHistory,
@@ -1243,37 +1240,6 @@ export default function App() {
       setShiftRegistrations((prev) => prev.filter((r) => r.slotId !== id));
     } catch (e) {
       showToast(`Không thể xoá ca: ${errorMessage(e)}`);
-    }
-  };
-
-  const handleCreateRecurringTemplate = async (t: RecurringShiftTemplate): Promise<boolean> => {
-    try {
-      const created = await createRecurringShiftTemplate(t);
-      setRecurringShiftTemplates((prev) => [...prev, created]);
-      return true;
-    } catch (e) {
-      showToast(`Không thể tạo quy tắc lặp: ${errorMessage(e)}`);
-      return false;
-    }
-  };
-
-  const handleToggleRecurringTemplate = async (t: RecurringShiftTemplate): Promise<boolean> => {
-    try {
-      const updated = await updateRecurringShiftTemplate({ ...t, active: !t.active });
-      setRecurringShiftTemplates((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
-      return true;
-    } catch (e) {
-      showToast(`Không thể cập nhật quy tắc lặp: ${errorMessage(e)}`);
-      return false;
-    }
-  };
-
-  const handleDeleteRecurringTemplate = async (id: string) => {
-    try {
-      await deleteRecurringShiftTemplate(id);
-      setRecurringShiftTemplates((prev) => prev.filter((t) => t.id !== id));
-    } catch (e) {
-      showToast(`Không thể xoá quy tắc lặp: ${errorMessage(e)}`);
     }
   };
 
@@ -2152,16 +2118,12 @@ export default function App() {
                     sessions={activeSessions}
                     shiftSlots={shiftSlots}
                     promoSchemes={promoSchemes}
-                    currentUserId={activeUser.id}
-                    recurringShiftTemplates={recurringShiftTemplates}
-                    onCreateTemplate={handleCreateRecurringTemplate}
-                    onToggleTemplate={handleToggleRecurringTemplate}
-                    onDeleteTemplate={handleDeleteRecurringTemplate}
                     onPlanLocked={reloadShiftSlots}
                     engineParams={engineParams}
                     brandStudios={brandStudios}
                     onOpenCrm={(brandId, platform) => { requestCrmFocus(brandId, platform); navigateTo("crm"); }}
                     talents={talents}
+                    onOpenRoster={checkPermission("manage_roster") ? () => navigateTo("roster") : undefined}
                     role={currentRole}
                   />
                 )}

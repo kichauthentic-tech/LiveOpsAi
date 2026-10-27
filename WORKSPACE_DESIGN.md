@@ -11,8 +11,20 @@
 
 ---
 
-## 1. Giai đoạn hiện tại (cập nhật 2026-10-28)
+## 1. Giai đoạn hiện tại (cập nhật 2026-10-28; mục KH Tháng bản gọn 27/10)
 
+- **27/10: KẾ HOẠCH THÁNG BẢN GỌN (chưa commit, không migration; đề xuất + demo https://claude.ai/artifact/WCc9XbDXLCf4n7BAQAdAYY, user duyệt cả 4 quyết định)** —
+  đầu trang = dải 4 bước (Giờ & target · Lưới · Chốt · Theo dõi/Target tháng) + hàng 5 số (ⓘ thay dòng giải thích) + MỘT dòng tham số ("sửa" mở khung;
+  kế hoạch mới mở sẵn) thay 3 thẻ 704px; lưới tách sang `components/monthplan/PlanMonthGrid.tsx`: ca = một nút rút gọn, sửa trong khung nổi; đã chốt ⇒ ca
+  tới hạn hiện thực đạt xanh/đỏ, đầu ô ngày + cột **Tuần** = % target tới nay (`lib/scheduling/planWeeks.ts` `summarizePlanSpan`, cùng luật run-rate,
+  nguồn `planRunRate(...).slots`); ca tăng cường + ca ngoài kế hoạch thành dòng viền đứt trong ô ngày (bỏ 2 khối + cảnh báo riêng + khối "Kế hoạch vs thực tế").
+  Kế hoạch đã chốt mà Σ target = 0 (lối "Mở lịch tháng sau" của Điều Phối) ⇒ thẻ **"Bước tiếp: đặt target tháng"** mở thẳng khung chia lại (RPC 0164, ceo/admin;
+  role khác thấy "báo ceo/admin"); banner tháng sau trỏ "Mở lịch tháng N ở Điều Phối" (`onOpenRoster`). Bỏ hẳn: Quy tắc lặp + Nạp từ quy tắc (0 quy tắc
+  trong DB; xoá `RecurringRulesPanel`, `lib/db/recurringShiftTemplates.ts`, `planMonthSlots.ts`, `mergeFromTemplates`, kiểu `RecurringShiftTemplate`;
+  bảng `recurring_shift_templates` ở DB vẫn còn), ô Ghi chú (cột `notes` giữ), ô chọn phương án (chọn ở bảng so 3 phương án). Đo trên dev nối DB thật,
+  CROCS TikTok T10, 1440×900: lưới bắt đầu 539px (trước 1.385), lưới cao 839px (trước 2.420), ô nhập luôn mở 2 (trước 281), chữ trên lưới 142 từ (trước 461);
+  tuần 122/111/89/73%, "95% target tới nay" khớp Dashboard; khung sửa ca: ca đã qua khoá target + giờ, ca tương lai đã chốt người khoá giờ; 375px không
+  tràn. Chưa thử được trên dữ liệu thật: thẻ "đặt target" (T11 chưa có kế hoạch nào). Test: `tests/planWeeks.test.ts`; sửa test bố cục M5/layoutCalm.
 - **27–28/10: AUDIT + SỬA KẾ HOẠCH THÁNG (đã push `ff61f96`; `0185` ĐÃ CHẠY 28/10 — `replace_plan_slots` có, 0/369 ca kế hoạch lệch giờ ca thật)** — 12 điểm gãy, sửa hết:
   P1 — Chốt lại không mở lại ca đã huỷ (`lock_month_plan` giữ huỷ, trả `kept_cancelled`); sau chốt đổi target ca có sẵn chỉ ceo/admin + mọi đổi
   target tháng (sửa/thêm/bỏ ca) ghi `plan_target_audit` (guard 0185; ô target khoá theo `role`); cấm live ngày trên kế hoạch đã chốt phải xác nhận;
@@ -71,6 +83,7 @@
 ## 2. Việc còn treo
 
 **Cần user làm:**
+- **Kế Hoạch Tháng bản gọn (27/10, chưa commit):** commit + deploy; sau khi "Mở lịch tháng 11" ở Điều Phối, vào Kế Hoạch Tháng từng kênh bấm "Đặt target…" (ceo/admin).
 - **Kế Hoạch Tháng (28/10, `0185` ĐÃ CHẠY + push `ff61f96`):** còn thử bằng tài khoản ops: ô target ca đã chốt bị khoá, DB từ chối đổi target. T11 chưa có kế
   hoạch nào (27/10) — "Mở lịch tháng 11" ở Điều Phối Lịch Live.
 - **Ads theo ngày (28/10, 0184 ĐÃ CHẠY, CROCS T3→T10 đã dán):** cuối mỗi ngày/tháng dán lại khối "Daily Ads Report" để cập nhật actual (ghi đè ngày trùng).

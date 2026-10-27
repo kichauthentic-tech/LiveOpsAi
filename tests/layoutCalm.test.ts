@@ -76,7 +76,8 @@ test("sidebar: không nhóm có tiêu đề nào chỉ một mục (9 nhóm/19 m
 test("lịch tháng của brand và lưới Kế Hoạch Tháng bắt đầu Thứ 2 như Lịch & Studio / Điều Phối Lịch Live", () => {
   expect(read("components/brand-workspace/BrandCalendar.tsx")).toMatch(/const WEEKDAY_LABELS = \["T2", "T3", "T4", "T5", "T6", "T7", "CN"\];/);
   expect(read("components/brand-workspace/BrandCalendar.tsx")).toMatch(/const leadingBlanks = \(firstDay\.getDay\(\) \+ 6\) % 7;/);
-  expect(read("components/MonthPlan.tsx")).toMatch(/const WEEKDAY_LABELS = \["T2", "T3", "T4", "T5", "T6", "T7", "CN"\];/);
+  // 27/10: lưới tách sang components/monthplan/PlanMonthGrid.tsx (thêm cột "Tuần" sau CN).
+  expect(read("components/monthplan/PlanMonthGrid.tsx")).toMatch(/const WEEKDAY_LABELS = \["T2", "T3", "T4", "T5", "T6", "T7", "CN"\];/);
   expect(read("components/MonthPlan.tsx")).toMatch(/const leading = \(new Date\(`\$\{days\[0\]\}T00:00:00`\)\.getDay\(\) \+ 6\) % 7;/);
 });
 

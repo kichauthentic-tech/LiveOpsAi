@@ -196,20 +196,22 @@ test("Lịch brand mở thẳng màn Ngày ở điện thoại (lưới tháng c
 // ---- M5 Kế Hoạch Tháng (2026-09-29) ----
 
 test("Kế Hoạch Tháng: ô/nút trong lưới ca đạt sàn 24px và hàng vừa bề ngang ô ngày", () => {
-  const src = readFileSync(join(SRC, "components/MonthPlan.tsx"), "utf8");
-  // input[type=time] của Chrome cần tối thiểu 63px (đo bằng width:auto) — hẹp hơn là cắt mất phút.
-  expect(src).not.toMatch(/type="time"[^>]*w-\[(?:[0-5]?\d|6[0-2])px\]/);
-  // Hai ô giờ 63px + gap là đã kín hàng: không được nhét thêm gì vào hàng đó nữa.
-  expect(src).toMatch(/w-\[63px\] min-h-6 shrink-0/);
-  // Nút xoá ca và ô target phải cao ≥ 24px (p-1.5 quanh icon 12px / min-h-6).
-  expect(src).toMatch(/p-1\.5 text-rose-400[^"]*" title="Bỏ ca"/);
-  expect(src).toMatch(/aria-label="Target GMV của ca"/);
-  // Margin âm từng làm nút tràn sang ô ngày bên cạnh rồi bị ô đó phủ lên — không quay lại.
+  const page = readFileSync(join(SRC, "components/MonthPlan.tsx"), "utf8");
+  const src = readFileSync(join(SRC, "components/monthplan/PlanMonthGrid.tsx"), "utf8");
+  // 27/10 (đề xuất duyệt): ca trong lưới là MỘT nút rút gọn "20–23 · 62,6M", sửa trong khung nổi — không còn 3 ô nhập luôn mở mỗi ca
+  // (CROCS T10: 281 ô). Hai ô giờ 63px từng không vừa thẻ ca 125px (M5 29/09); nay ô giờ chỉ nằm trong khung nổi rộng 260px.
+  expect(page).not.toMatch(/aria-label="Target GMV của ca"/);
+  expect(src).toMatch(/data-plan-chip/);
+  expect(src).toMatch(/w-full min-h-6 flex items-center justify-between/);
+  expect(src).toMatch(/w-\[260px\]/);
+  // Nút "+ ca" và nút cấm live vẫn đạt 24px (min-h-6 / p-1.5 quanh icon 12px), margin âm không đẩy cao dòng ngày.
+  expect(src).toMatch(/mt-auto min-h-6/);
+  expect(src).toMatch(/-m-1\.5 p-1\.5/);
   expect(src).not.toMatch(/ml-auto p-1\.5 -mr-1/);
-  // Lưới phải đủ rộng để ô ngày chứa nổi hàng 128px, nếu không lại tràn ở màn hẹp.
-  const grid = src.match(/grid grid-cols-7 gap-1\.5 min-w-\[(\d+)px\]/);
+  // 7 cột ngày + cột "Tuần"; đủ rộng cho ô ngày ~115px ở màn hẹp (cuộn ngang trong khung, không tràn trang).
+  const grid = src.match(/grid grid-cols-\[repeat\(7,minmax\(0,1fr\)\)_minmax\(\d+px,[\d.]+fr\)\] gap-1\.5 min-w-\[(\d+)px\]/);
   expect(grid).not.toBeNull();
-  expect(Number(grid![1])).toBeGreaterThanOrEqual(1100);
+  expect(Number(grid![1])).toBeGreaterThanOrEqual(1000);
 });
 
 // ---- M6 Talent Pool (2026-09-30) ----

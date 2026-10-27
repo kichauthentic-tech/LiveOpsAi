@@ -13,7 +13,6 @@ import {
   Equipment,
   LiveSession,
   PromoScheme,
-  RecurringShiftTemplate,
   RolePermissionsMap,
   SessionFinance,
   ShiftRegistration,
@@ -42,7 +41,6 @@ import { fetchBrandStudios } from "../lib/db/brandStudios";
 import { fetchBrandChannels } from "../lib/db/brandChannels";
 import { fetchShiftSlots } from "../lib/db/shiftSlots";
 import { fetchShiftRegistrations } from "../lib/db/shiftRegistrations";
-import { fetchRecurringShiftTemplates } from "../lib/db/recurringShiftTemplates";
 import { fetchTalentRateHistory } from "../lib/db/talentRateHistory";
 import { fetchBrandPlatformRateHistory } from "../lib/db/brandPlatformRateHistory";
 import { fetchBrandSkus } from "../lib/db/brandSkus";
@@ -202,7 +200,6 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
   // Kênh brand × sàn (0149). null = DB chưa có bảng (0149 chưa chạy) ⇒ App tự suy kênh như cũ.
   const [brandChannels, setBrandChannels] = useState<BrandChannel[] | null>(null);
   const [shiftRegistrations, setShiftRegistrations] = useState<ShiftRegistration[]>([]);
-  const [recurringShiftTemplates, setRecurringShiftTemplates] = useState<RecurringShiftTemplate[]>([]);
   const [phase14Error, setPhase14Error] = useState<string | null>(null);
 
 
@@ -446,14 +443,13 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
   useEffect(() => {
     if (!authUserId) return;
     let cancelled = false;
-    Promise.all([fetchBrandPlatformRates(), fetchShiftSlots(), fetchShiftRegistrations(), fetchRecurringShiftTemplates(), fetchLockedPlanTargets().catch(() => ({ bySlotId: new Map<string, number>(), monthTotals: new Map<string, number>(), slotTargets: new Map<string, { date: string; target: number }[]>() })), fetchBrandStudios().catch(() => [] as BrandStudio[])])
-      .then(([rates, slots, regs, templates, planTargets, bStudios]) => {
+    Promise.all([fetchBrandPlatformRates(), fetchShiftSlots(), fetchShiftRegistrations(), fetchLockedPlanTargets().catch(() => ({ bySlotId: new Map<string, number>(), monthTotals: new Map<string, number>(), slotTargets: new Map<string, { date: string; target: number }[]>() })), fetchBrandStudios().catch(() => [] as BrandStudio[])])
+      .then(([rates, slots, regs, planTargets, bStudios]) => {
         if (cancelled) return;
         setBrandPlatformRates(rates);
         setBrandStudios(bStudios);
         setShiftSlots(slots);
         setShiftRegistrations(regs);
-        setRecurringShiftTemplates(templates);
         setPlanTargetsBySlotId(planTargets.bySlotId);
         setPlanMonthTotals(planTargets.monthTotals);
         setPlanSlotTargets(planTargets.slotTargets);
@@ -698,8 +694,6 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
     setBrandChannels,
     shiftRegistrations,
     setShiftRegistrations,
-    recurringShiftTemplates,
-    setRecurringShiftTemplates,
     phase14Error,
     setPhase14Error,
     talentRateHistory,
