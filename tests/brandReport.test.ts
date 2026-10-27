@@ -109,6 +109,20 @@ test("bảng điểm: % Target từng loại ngày + KPI cả shop; thiếu targ
   expect(rows[3].pct).toBeNull();
 });
 
+test("bảng điểm tháng còn dở: % theo target tới nay (khớp Dashboard T10 CROCS: Daily 103%, cả tháng 95%); khung chưa tới ⇒ null", () => {
+  const rows = scoreRows(5.15e9, 4.43e9, [
+    { key: "daily", target: 2.33e9, actual: 1.89e9 },
+    { key: "dday", target: 1.08e9, actual: 1.16e9 },
+    { key: "payday", target: 925.4e6, actual: 0 }
+  ], null, { all: 4.66e9, daily: 1.83e9, dday: 1.08e9, payday: 0 });
+  const by = (k: string) => rows.find((r) => r.key === k)!;
+  expect(Math.round(by("all").pct!)).toBe(95);
+  expect(Math.round(by("daily").pct!)).toBe(103);
+  expect(Math.round(by("dday").pct!)).toBe(107);
+  expect(by("payday").pct).toBeNull();
+  expect(by("all").target).toBe(5.15e9); // cột "cả tháng" vẫn giữ
+});
+
 const entry = (e: Partial<AffiliateActualEntry>): AffiliateActualEntry => ({ brandId: "b", periodMonth: "2026-09-01", creatorName: "?", ...e });
 
 test("affiliate CROCS T9: 6 phiên creator, Khói 64,7% GMV; lịch T10 so GMV/giờ mục tiêu với phiên tốt nhất của creator", () => {

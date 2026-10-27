@@ -13,6 +13,7 @@
 
 ## 1. Giai đoạn hiện tại (cập nhật 2026-10-28)
 
+- **28/10: Bảng điểm Report Tháng khớp Dashboard (chưa commit, chưa kiểm trên app thật)** — tháng còn dở (`cmp.partial`) + plan đã chốt: % Target tính trên **target tới nay** (`planRunRate.buckets[].targetToDate`, cùng số run-rate Dashboard; Daily 103% thay vì 81%, cả tháng 95% thay vì 86%), ô Target hiện "tới nay · cả tháng". Tháng đủ: không đổi. Dòng Total GMV (file shop) giữ nguyên. Code: `scoreRows(..., toDate)` ở `lib/report/brandReport.ts`, `planRR` memo ở `MonthlyReportTabs.tsx`, test trong `tests/brandReport.test.ts`.
 - **28/10: ADS THEO NGÀY DÁN TỪ FILE TRACKING (đã push, `0184` ĐÃ CHẠY 28/10; CROCS T3→T10 đã dán, 245 ngày)** — CROCS theo dõi Ads bằng file "Performance Tracking" (sheet "Daily Ads
   Report": target + actual × Live/Product/Creator mỗi ngày). Nhập Ads có khung dán (`AdsTrackingPanel`, bộ đọc `lib/ads/adsTracking.ts`, bảng `brand_ads_daily`
   qua `lib/db/adsDaily.ts`); Report Tháng trang Quảng cáo có khối "Ngân sách Ads theo kế hoạch" (`report/AdsPlanPanel.tsx`). Chi tiết: lịch sử `## Ads theo ngày dán từ file tracking (2026-10-28)`.

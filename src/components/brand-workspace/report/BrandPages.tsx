@@ -58,7 +58,7 @@ export const ToneLegend: React.FC<{ extra?: string }> = ({ extra }) => (
 const SCORE_LABEL: Record<ScoreRow["key"], string> = { all: `${METRIC.liveGmv} (YFB vận hành)`, shop: METRIC.totalGmv, ...DAY_TYPE_SHORT };
 
 export const ScoreboardPanel: React.FC<{ rows: ScoreRow[]; campSpans: Partial<Record<CampDayBucket, string>>; footnote?: string }> = ({ rows, campSpans, footnote }) => (
-  <Panel title="Bảng điểm tháng" icon={<Gauge className="w-4 h-4" />} sub="Target theo Kế Hoạch Tháng đã chốt · KPI toàn shop do brand giao · vạch = 100%">
+  <Panel title="Bảng điểm tháng" icon={<Gauge className="w-4 h-4" />} sub="Target theo Kế Hoạch Tháng đã chốt · tháng còn dở thì % tính trên target tới nay (cùng số run-rate Dashboard) · KPI toàn shop do brand giao · vạch = 100%">
     <ReportTable head={["", "Target", "Thực tế", METRIC.pctTarget, ""]}>
       {rows.map((r, idx) => {
         const tone = r.pct == null ? PAL.muted : r.pct >= 100 ? PAL.green : r.pct >= 95 ? PAL.gold : PAL.red;
@@ -71,7 +71,14 @@ export const ScoreboardPanel: React.FC<{ rows: ScoreRow[]; campSpans: Partial<Re
               {sub && campSpans[r.key as CampDayBucket] && <span className="text-[11px] font-normal" style={{ color: PAL.muted }}> · {campSpans[r.key as CampDayBucket]}</span>}
               {r.key === "shop" && <span className="text-[11px] font-normal" style={{ color: PAL.muted }}> · KPI toàn shop, gồm các kênh ngoài livestream</span>}
             </td>
-            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{r.target ? fmtVndShort(r.target) : "—"}</td>
+            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
+              {r.targetToDate != null && r.target && Math.round(r.targetToDate) !== Math.round(r.target) ? (
+                <>
+                  {fmtVndShort(r.targetToDate)}
+                  <span className="block text-[10px] font-normal">tới nay · cả tháng {fmtVndShort(r.target)}</span>
+                </>
+              ) : r.target ? fmtVndShort(r.target) : "—"}
+            </td>
             <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>{fmtVndShort(r.actual)}</td>
             <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: tone }}>{r.pct == null ? "—" : `${fmtFixed(r.pct, 1)}%`}</td>
             <td className="py-2 px-3 w-[28%] min-w-[110px]">

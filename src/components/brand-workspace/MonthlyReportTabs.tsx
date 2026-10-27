@@ -145,19 +145,22 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   const [plans, setPlans] = useState<Record<string, { plan: BrandMonthPlan; slots: BrandMonthPlanSlot[] } | null>>({});
   const nextMonth = useMemo(() => nextMonthStrLocal(month), [month]);
   // Run-rate: tháng có Kế Hoạch Tháng đã chốt ⇒ theo plan ban đầu (planRunRate — cùng số với Dashboard brand).
-  const runRate = useMemo(() => {
+  const planRR = useMemo(() => {
     const p = plans[month];
-    if (p?.plan.status === "locked") {
-      const bs = sessions.filter((s) => s.brandId === brandId);
-      // Cùng khung camp hiệu lực với phần còn lại của report (effectiveCamp — audit workflow #8); trước đây
-      // run-rate đọc khung Kế Hoạch Tháng còn bảng khung camp đọc khung đã ghi đè ⇒ hai khung trong một trang.
-      const camp = effectiveCamp(p.plan.campRanges);
-      const rr = planRunRate(month, p.slots, shiftSlots, bs, todayVn(), camp);
+    if (p?.plan.status !== "locked") return null;
+    const bs = sessions.filter((s) => s.brandId === brandId);
+    // Cùng khung camp hiệu lực với phần còn lại của report (effectiveCamp — audit workflow #8); trước đây
+    // run-rate đọc khung Kế Hoạch Tháng còn bảng khung camp đọc khung đã ghi đè ⇒ hai khung trong một trang.
+    const camp = effectiveCamp(p.plan.campRanges);
+    return { rr: planRunRate(month, p.slots, shiftSlots, bs, todayVn(), camp), bs, camp };
+  }, [plans, month, sessions, brandId, shiftSlots]);
+  const runRate = useMemo(() => {
+    if (planRR) {
       const open = shiftSlots.filter((sl) => sl.brandId === brandId && sl.status === "open" && !sl.sessionId);
-      return monthRunRateFromPlan(rr, projectMonthEnd(rr, monthOutlook(month, todayVn(), bs, open, null, camp)));
+      return monthRunRateFromPlan(planRR.rr, projectMonthEnd(planRR.rr, monthOutlook(month, todayVn(), planRR.bs, open, null, planRR.camp)));
     }
     return monthRunRate(sessions, brandId, start, end);
-  }, [plans, month, sessions, brandId, start, end, shiftSlots]);
+  }, [planRR, month, sessions, brandId, start, end, shiftSlots]);
   // Tháng T−2 chỉ để lấy khung camp + target cho trang Key Metrics 3 tháng.
   const prev2Month = useMemo(() => prevMonthStrLocal(prevMonth), [prevMonth]);
   useEffect(() => {
@@ -531,9 +534,11 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
         kpiTargetGmvCur,
         liveCurStats.gmv,
         campDetailRows.map((r) => ({ key: r.key, target: r.target, actual: r.cur.gmv })),
-        shopKpi ? { target: shopKpi.target, actual: shopKpi.actual } : null
+        shopKpi ? { target: shopKpi.target, actual: shopKpi.actual } : null,
+        // Tháng còn dở ⇒ % theo target TỚI NAY (cùng số run-rate Dashboard); tháng đủ thì hai target trùng nhau.
+        cmp.partial && planRR ? { all: planRR.rr.total.targetToDate, ...Object.fromEntries(planRR.rr.buckets.map((b) => [b.bucket, b.targetToDate])) } : null
       ),
-    [kpiTargetGmvCur, liveCurStats, campDetailRows, shopKpi]
+    [kpiTargetGmvCur, liveCurStats, campDetailRows, shopKpi, cmp.partial, planRR]
   );
   // Trang 3 — bảng nhiệt loại ngày × yếu tố (cùng các khối của bảng Campaign: mỗi tháng dùng khung camp của chính tháng đó).
   const dayTypeRows = useMemo(() => dayTypeFactorRows(campDetailRows), [campDetailRows]);

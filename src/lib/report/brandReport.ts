@@ -135,20 +135,32 @@ export interface ScoreRow {
   key: KeyMetricsTab | "shop";
   target: number | null;
   actual: number;
-  /** % Target; null khi chưa có target. */
+  /** Target tới nay (tháng còn dở): các ca/ngày đã qua. null = không dùng, % tính trên `target`. */
+  targetToDate: number | null;
+  /** % Target — theo `targetToDate` nếu có, không thì theo `target`; null khi chưa có target. */
   pct: number | null;
 }
 
-export function scoreRows(liveTarget: number | null, liveActual: number, camp: { key: CampDayBucket; target: number | null; actual: number }[], shop: { target: number; actual: number } | null): ScoreRow[] {
-  const pct = (t: number | null, a: number) => (t && t > 0 ? (a / t) * 100 : null);
+export function scoreRows(
+  liveTarget: number | null,
+  liveActual: number,
+  camp: { key: CampDayBucket; target: number | null; actual: number }[],
+  shop: { target: number; actual: number } | null,
+  toDate: Partial<Record<KeyMetricsTab, number>> | null = null
+): ScoreRow[] {
+  const row = <K extends ScoreRow["key"]>(key: K, target: number | null, actual: number, td?: number): ScoreRow => {
+    // Khung chưa tới (target tới nay = 0) ⇒ chưa có gì để chấm.
+    const base = td != null && target != null ? td : target;
+    return { key, target, actual, targetToDate: td != null && target != null ? td : null, pct: base && base > 0 ? (actual / base) * 100 : null };
+  };
   const order: CampDayBucket[] = ["daily", "dday", "midmonth", "payday"];
   return [
-    { key: "all", target: liveTarget, actual: liveActual, pct: pct(liveTarget, liveActual) },
+    row("all", liveTarget, liveActual, toDate?.all),
     ...order.flatMap((k) => {
       const c = camp.find((x) => x.key === k);
-      return c ? [{ key: k, target: c.target, actual: c.actual, pct: pct(c.target, c.actual) }] : [];
+      return c ? [row(k, c.target, c.actual, toDate?.[k])] : [];
     }),
-    ...(shop ? [{ key: "shop" as const, target: shop.target, actual: shop.actual, pct: pct(shop.target, shop.actual) }] : [])
+    ...(shop ? [row("shop", shop.target, shop.actual)] : [])
   ];
 }
 
