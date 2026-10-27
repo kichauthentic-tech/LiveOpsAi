@@ -724,7 +724,7 @@ export interface BrandMonthPlan {
   notes: string;
   blackoutDates: string[]; // ngày brand cấm live (0091)
   targetGmv: number; // target GMV tháng của kế hoạch (0094) — riêng, không đọc Report Tháng
-  campRanges: PlanCampRanges; // khoảng ngày camp riêng (0094); thiếu khoá = lịch camp cố định
+  campRanges: PlanCampRanges; // khoảng ngày Campaign riêng (0094); thiếu khoá = lịch Campaign cố định
   /** Target chốt trước theo nhóm ngày (0161) — chỉ là nháp lập kế hoạch; thiếu khoá = nhóm đó tự chia phần còn lại. */
   groupTargets: PlanGroupTargets;
   /** KPI GMV CẢ SHOP brand giao (0122) — mọi kênh, khác targetGmv (phần live); 0 = chưa giao. Không dùng để xếp ca. */

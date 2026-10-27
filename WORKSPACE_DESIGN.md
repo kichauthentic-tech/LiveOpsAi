@@ -13,7 +13,12 @@
 
 ## 1. Giai đoạn hiện tại (cập nhật 2026-10-28; mục KH Tháng bản gọn 27/10)
 
-- **27/10: TARGET CA TĂNG CƯỜNG HIỆN KHẮP APP + DB TỰ ĐIỀN TARGET TẠM (đã push `aea3acd`; `0186` CHƯA CHẠY)** — check engine target trên DB thật:
+- **27/10: AUDIT THUẬT NGỮ CHUYÊN NGÀNH TOÀN APP (chưa commit, không migration)** — quét ~5.000 dòng chữ hiển thị, thay khẩu ngữ bằng
+  thuật ngữ ecommerce/livestream/digital marketing ở ~110 file (Report Tháng TikTok/Shopee, câu Insight tự sinh, Dashboard, kế hoạch xử lý,
+  cổng brand + bản tin, Sổ Ca, giao ca, đối soát, Finance, engine). Bảng từ ở §5.2 "Thuật ngữ chuẩn"; `tests/uiWording.test.ts` chặn từ cũ quay lại.
+  Kiểm: tsc sạch, vitest chỉ còn 3 lỗi có sẵn từ trước (layoutConventions h2, platformProfiles, uiReadability 11px — không do đợt này);
+  Browser pane: Sổ Ca ("Chưa tải lên file số liệu", "ca có số liệu"), Finance ("P&L từng ca"), Dashboard ("target luỹ kế", "ca chưa có số liệu"), 0 lỗi console.
+- **27/10: TARGET CA TĂNG CƯỜNG HIỆN KHẮP APP + DB TỰ ĐIỀN TARGET TẠM (đã push `aea3acd`; `0186` ĐÃ CHẠY 27/10 — JOCKEY TikTok 11/10 20–23 = 4.918.033 = 100M ÷ 61h × 3h, đúng)** — check engine target trên DB thật:
   ca OP mở sau chốt có target đề xuất ở `plan_boost_slots` nhưng `applyAllocatedTargets` gán 0 cho mọi ca ngoài kế hoạch ⇒ Lịch/Sổ Ca/Bảng
   Vận Hành/app talent hiện 0 (CROCS 24/10 15–18 52,8M; 27, 30, 31/10 18–21 66,5M); target chỉ được điền khi có người mở Kế Hoạch Tháng
   (JOCKEY TikTok 11/10 chờ 16 ngày). Sửa: (1) `fetchBoostTargets` + effect theo chữ ký `shiftSlots` ở `useWorkspaceData` ⇒ ca mang target
@@ -93,7 +98,6 @@
 ## 2. Việc còn treo
 
 **Cần user làm:**
-- **0186 (27/10):** chạy `0186_boost_provisional_target.sql` (trước hay sau deploy đều được) — xong thì ca JOCKEY TikTok 11/10 20–23 có target tạm; client đã push `aea3acd` (Vercel tự deploy).
 - **Kế Hoạch Tháng bản gọn (27/10, đã push `db5311c`):** deploy; sau khi "Mở lịch tháng 11" ở Điều Phối, vào Kế Hoạch Tháng từng kênh bấm "Đặt target…" (ceo/admin).
 - **Kế Hoạch Tháng (28/10, `0185` ĐÃ CHẠY + push `ff61f96`):** còn thử bằng tài khoản ops: ô target ca đã chốt bị khoá, DB từ chối đổi target. T11 chưa có kế
   hoạch nào (27/10) — "Mở lịch tháng 11" ở Điều Phối Lịch Live.
@@ -237,6 +241,13 @@
 - Nhãn vai trò talent qua `talentRoleLabel` (lib/talentName.ts) — DB lưu "Assistant", màn hình nói "Trợ live".
 - **App talent (11/10, bản 2 16/10):** màn talent đổi bố cục theo bề rộng (`useMediaQuery(TALENT_WIDE_QUERY)` / class `lg:`), KHÔNG theo user-agent (user-agent chỉ dùng để chọn nút Lịch iPhone hay Google Calendar). "ca của tôi / trùng giờ của tôi / giờ tháng" chỉ qua `lib/talent/myShifts.ts` (đi qua staffSegments); danh sách theo tuần, chấm đỏ, câu hiệu suất, tin Zalo chỉ qua `lib/talent/agenda.ts`. App talent KHÔNG nhắc giao ca (admin giao). Chấm đỏ chỉ đếm việc host làm được trên điện thoại. Mỗi ca hiện MỘT lần trên một màn (không lặp ở khối khác). File lịch .ics: luật đổi người giữa ca chép trong `server/calendarFeed.ts` (`personWindows`) — đổi `effectiveSegments` thì sửa cả hai; hiệu suất của talent chỉ `myChannelStanding` (so mặt bằng cùng kênh, không tên người khác). Thẻ ca của talent = `SessionEventCard` + `buildSessionMeta(..., meId)` (chip "Bạn"), không dựng thẻ riêng. Màn dùng chung với ops thì mở theo `currentRole === "talent"` + quyền ghi (`canEdit = canManageSlots && !!onUpdateSession`), không truyền callback ghi cho talent. "Đã nhận lịch" (0169) chỉ qua `lib/talent/acks.ts` (`ackState` so ngày/giờ đã nhận với giờ hiện tại của ca — không thêm cờ "đã nhận" vào `live_sessions`).
 - `strict` + `noUnusedLocals` bật; `@types/react*` phải có trong devDependencies (thiếu là JSX thành `any`, CI xanh giả).
+- **Thuật ngữ chuẩn (audit 27/10, `tests/uiWording.test.ts` canh):** tải lên / tải lại file (không "up"); chọn / bỏ chọn (không "tick");
+  số liệu (không "có số / chưa có số" trơn); Campaign / Daily (không "ngày camp", "ngày thường"); trung bình nhóm (không "mặt bằng", "TB");
+  dự báo, xác suất đạt, đạt target (không dự phóng/dự kiến cuối tháng/chạm target); Target luỹ kế (không "cộng dồn"); đúng tiến độ, theo tốc độ
+  cùng kỳ (không "nhịp"); chương trình khuyến mãi (không "scheme KM"); P&L (không "lãi/lỗ"); giờ live đã thực hiện, ca đã live (không "đã chạy");
+  tăng traffic / tăng ATC / tăng New followers (không đẩy traffic, kéo giỏ, kéo follow); hiệu quả nhất, hiệu suất cao (không bán tốt, giỏi);
+  mức thông thường (không "mọi khi"); có chi phí Ads nhưng không phát sinh đơn (không "tiêu tiền mà 0 đơn"); Product CTR cao nhưng CTOR thấp
+  (không "bấm nhiều nhưng ít chốt"). Prompt gửi model AI (`server/askData.ts`, `askContext.ts`) không bị canh.
 - **Chữ gửi brand (Report Tháng + câu Insight tự sinh, 24/10):** "phiên" (không "ca"), "YFB"/"livestream YFB" (không "agency"), "trung bình các host"
   (không "mặt bằng"), "yếu tố" (không "thừa số"), "campaign" (không "camp"), "các kênh còn lại" (không "phần còn lại"), "Daily" (không "ngày thường"),
   "có ý nghĩa / trong ngưỡng dao động" — KHÔNG BAO GIỜ "vượt biên" (nghĩa khác trong tiếng Việt). Tên kênh/loại ngày theo `CHANNEL`/`DAY_TYPE` (Product card,

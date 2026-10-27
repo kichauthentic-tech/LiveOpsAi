@@ -89,7 +89,7 @@ test("cơ cấu lịch vs hiệu suất: mix + rate = ΔGMV/giờ; giữ nguyên
     ["camp", 31.2, 26.5]
   ]);
   expect(dailyGapLine(groups[0])).toBe(
-    "Nếu Daily giữ GMV/giờ kỳ trước (28,8M/giờ, nay 17,9M/giờ) với 100 giờ live đã chạy, LIVE GMV có thêm ~1,09B."
+    "Nếu Daily giữ GMV/giờ kỳ trước (28,8M/giờ, nay 17,9M/giờ) với 100 giờ live đã thực hiện, LIVE GMV có thêm ~1,09B."
   );
 });
 
@@ -109,7 +109,7 @@ test("nhóm đối chứng CROCS 1–22/09: ngày thường hụt do vận hành
   expect(controlVerdict(by.camp)).toBe("agency_better");
   expect(controlVerdict(by.all)).toBe("agency_better");
   expect(controlLine(rows)).toBe(
-    "So với các kênh còn lại của shop (Daily): livestream YFB −19%, các kênh còn lại +1%, lượt vào shop −4% ⇒ phần giảm nằm ở vận hành livestream."
+    "So với các kênh còn lại của shop (Daily): livestream YFB −19%, các kênh còn lại +1%, lượt truy cập shop −4% ⇒ phần giảm nằm ở vận hành livestream."
   );
   // Cùng chiều, lệch < 10 điểm ⇒ đi cùng thị trường; không có ngày nào ⇒ không có dòng.
   expect(controlVerdict({ ...by.all, liveChg: -12, restChg: -8 })).toBe("market");

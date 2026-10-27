@@ -70,8 +70,8 @@ test("ca chưa có số, affiliate phiên kế hoạch đã qua ngày, brand kh�
     affiliate: [{ brandId: "crocs", periodMonth: "2026-10-01", status: "planned", liveDateLabel: "9/10/2026" }]
   });
   const by = Object.fromEntries(t10.map((c) => [c.key, c]));
-  expect(by.sessions.text).toBe("1 ca chưa có số");
-  expect(by.affiliate).toEqual({ key: "affiliate", state: "partial", text: "1 phiên chưa có số" });
+  expect(by.sessions.text).toBe("1 ca chưa có số liệu");
+  expect(by.affiliate).toEqual({ key: "affiliate", state: "partial", text: "1 phiên chưa có số liệu" });
   expect(by.shop).toEqual({ key: "shop", state: "optional", text: "tải sau 31/10" }); // tháng chưa hết: không tô đỏ
   expect(by.nextPlan.state).toBe("missing");
   expect(by.report.state).toBe("na");

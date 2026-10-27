@@ -18,7 +18,7 @@ export const ChannelChips: React.FC<{ channels: RoomChannel[]; value: string; on
 export const SwingList: React.FC<{ channel: RoomChannel }> = ({ channel }) => {
   const r = channel.room;
   if (!r) return <p className="text-sm text-[var(--text-faint)]">Kênh chưa đủ lịch sử để chiếu.</p>;
-  if (r.swings.length === 0) return <p className="text-sm text-[var(--text-faint)]">Tháng này chưa có ca nào có số.</p>;
+  if (r.swings.length === 0) return <p className="text-sm text-[var(--text-faint)]">Tháng này chưa có ca nào có số liệu.</p>;
   const byPoints = r.target != null && !r.decided;
   const rows = [...r.swings]
     .map((s) => ({ s, v: byPoints ? s.deltaP ?? 0 : s.actual - s.expectedNow }))

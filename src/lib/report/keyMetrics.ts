@@ -157,8 +157,8 @@ type Kind = "money" | "int" | "dec2" | "pct1" | "pct2" | "sec" | "hours";
 export type KeyMetricGroup = "result" | "traffic" | "conversion" | "basket";
 
 export const KEY_METRIC_GROUPS: { group: KeyMetricGroup; label: string; hint: string }[] = [
-  { group: "result", label: "Kết quả", hint: "Tiền và sản lượng thu được trên số giờ đã chạy." },
-  { group: "traffic", label: "Lưu lượng", hint: "TikTok đẩy phiên ra bao nhiêu người và giữ họ ở lại bao lâu." },
+  { group: "result", label: "Kết quả", hint: "GMV và sản lượng trên số giờ live." },
+  { group: "traffic", label: "Lưu lượng", hint: "TikTok phân phối phiên tới bao nhiêu người và giữ họ ở lại bao lâu." },
   { group: "conversion", label: "Chuyển đổi", hint: "Người xem thấy giỏ hàng, bấm vào, rồi chốt đơn." },
   { group: "basket", label: "Giỏ hàng", hint: "Một đơn gồm mấy sản phẩm, giá bao nhiêu." }
 ];

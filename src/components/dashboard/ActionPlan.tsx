@@ -77,7 +77,7 @@ const CheckpointStrip: React.FC<{ o: MonthOutlook; p: HandlingPlan; today: strin
             : <>Thiếu <b className="text-[var(--text)]">{money(c.gap)}</b> ⇒ cần <b className="text-[var(--text)]">+{Math.round(c.needPct * 100)}%</b> giờ của phần còn lại{c.capped ? <> (vượt giới hạn, đề xuất <b className="text-[var(--text)]">+{Math.round(c.pct * 100)}%</b> ≈ {hrs(c.extraHours)} và báo brand sớm)</> : <> ≈ <b className="text-[var(--text)]">{hrs(c.extraHours)}</b></>}; thêm đủ thì dự báo ≈ {money(c.projectedAfter)}.</>}
         </p>
       )}
-      <p className="text-[11px] text-[var(--text-faint)] leading-snug">Mô phỏng T7–T9 trên số thật: làm đủ 3 mốc (bù tối đa +30% giờ còn lại) thì 9/9 tháng CROCS + VERA đạt ≥ 95% target; không điều chỉnh chỉ 3/9.</p>
+      <p className="text-[11px] text-[var(--text-faint)] leading-snug">Mô phỏng T7–T9 trên số liệu thực tế: làm đủ 3 mốc (bù tối đa +30% giờ còn lại) thì 9/9 tháng CROCS + VERA đạt ≥ 95% target; không điều chỉnh chỉ 3/9.</p>
     </div>
   );
 };

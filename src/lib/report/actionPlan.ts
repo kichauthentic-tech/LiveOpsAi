@@ -172,7 +172,7 @@ export const ACTION_STATUS_LABEL: Record<ActionGradeStatus, string> = {
   met: "Đạt",
   missed: "Chưa đạt",
   tracking: "Đang theo dõi",
-  nodata: "Không có số",
+  nodata: "Không có số liệu",
   awaiting: "Chờ chấm"
 };
 

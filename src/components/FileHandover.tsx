@@ -78,7 +78,7 @@ export function FileHandover({ session: s, isOps = false, allSessions, onSaved, 
   return (
     <div className="space-y-4">
       <ol>
-        <Step no={1} state={stepState(fileDone, !fileDone)} title={`Up file ${prof.reconciliationFile}`}>
+        <Step no={1} state={stepState(fileDone, !fileDone)} title={`Tải lên file ${prof.reconciliationFile}`}>
           <SessionLiveSnapshotUpload session={s} onApplied={(u) => onSaved([u])} />
         </Step>
         <Step no={2} state={stepState(false, fileDone)} title="Lượt live & ca nối" hint="chỉ khi có restart / chạy sang ca sau">
@@ -104,7 +104,7 @@ export function FileHandover({ session: s, isOps = false, allSessions, onSaved, 
             fileDone ? "bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white" : "bg-[var(--surface-elevated)] text-[var(--text-faint)] font-bold cursor-not-allowed"
           }`}
         >
-          {!fileDone ? "Up file ở bước 1 trước để giao ca" : saving ? "Đang giao ca..." : s.report?.handoverAt ? "Cập nhật giao ca" : "Giao ca"}
+          {!fileDone ? "Tải lên file ở bước 1 trước để giao ca" : saving ? "Đang giao ca..." : s.report?.handoverAt ? "Cập nhật giao ca" : "Giao ca"}
         </button>
       </div>
     </div>

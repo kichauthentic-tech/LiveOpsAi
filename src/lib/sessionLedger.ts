@@ -116,7 +116,7 @@ export function groupByDate(rows: LiveSession[]): LedgerDay[] {
 
 export interface LedgerSummary {
   total: number;
-  happened: number; // ca đã diễn ra (Đ11) — dùng cho bảng tự nhận "chỉ số thật"
+  happened: number; // ca đã diễn ra (Đ11) — dùng cho bảng tự nhận "chỉ số liệu thực tế"
   upcoming: number; // total − happened − ca huỷ
   countable: number;
   hours: number;

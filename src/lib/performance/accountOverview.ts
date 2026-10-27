@@ -224,7 +224,7 @@ export function accountActions(r: AccountRow, today: string, fmtMoney: (v: numbe
   } else if (x.kind === "save" && x.extraHours != null && x.projectedAfter != null) {
     out.push(`Thêm ~${vnNum(x.extraHours)} giờ live (≈ ${Math.ceil(x.extraHours / slotHours)} ca ${slotHours}h) trước cuối tháng là dự báo đạt ${fmtMoney(x.projectedAfter)}.`);
   } else if (x.kind === "no_hours") {
-    out.push("Không còn ca nào trong lịch tháng này để bù: báo brand sớm khả năng hụt.");
+    out.push("Không còn ca nào trong lịch tháng này để bù: báo brand sớm rủi ro hụt target.");
   } else if (x.kind === "no_forecast" && r.target) {
     out.push(`Kênh chưa đủ lịch sử để dự báo: đạt ${fmtMoney(r.actual)} / ${fmtMoney(r.target)} (${vnNum((r.actual / r.target) * 100)}%)${x.needRate != null && x.nowRate ? `; để đạt target cần ${fmtMoney(x.needRate)}/giờ, hiện đạt ${fmtMoney(x.nowRate)}/giờ` : ""}.`);
   }

@@ -145,7 +145,7 @@ const SLOTS: { key: string; label: string; from: number; to: number }[] = [
   { key: "early", label: "Khuya/Sáng sớm (0h–10h)", from: 0, to: 10 }
 ];
 
-const CAMP_LABEL: Record<ShopeeCampRow["key"], string> = { daily: "Ngày thường", dday: "D-Day", midmonth: "Mid-Month", payday: "Pay Day" };
+const CAMP_LABEL: Record<ShopeeCampRow["key"], string> = { daily: "Daily", dday: "D-Day", midmonth: "Mid-Month", payday: "Pay Day" };
 
 export interface ShopeeSnapshotInput {
   brandId: string;
@@ -343,7 +343,7 @@ export function shopeeInsights(s: ShopeeReportSnapshot): Record<ShopeeSection, S
     const topSum = top.reduce((a, d) => a + d.salesPlaced, 0);
     const points = [`Ba ngày cao nhất: ${top.map((d) => `${dm(d.date)} (${fmtM(d.salesPlaced)})`).join(", ")} — chiếm ${pct(h.gmv > 0 ? (topSum / h.gmv) * 100 : 0)} GMV tháng.`];
     if (s.noLiveDays.length) points.push(`${s.noLiveDays.length} ngày không có phiên live: ${s.noLiveDays.slice(0, 6).map(dm).join(", ")}${s.noLiveDays.length > 6 ? "…" : ""}.`);
-    out.daily = { headline: `Doanh số dồn vào vài ngày camp: ${dm(top[0].date)} là ngày cao nhất với ${fmtM(top[0].salesPlaced)}.`, points, action: null };
+    out.daily = { headline: `Doanh số tập trung vào vài ngày Campaign: ${dm(top[0].date)} là ngày cao nhất với ${fmtM(top[0].salesPlaced)}.`, points, action: null };
   }
   const o = s.overview;
   if (o && o.views > 0) {
@@ -402,10 +402,10 @@ export function shopeeNotes(s: ShopeeReportSnapshot, audience: "brand" | "ops" =
     if (s.files.live && s.files.daily) {
       const sl = s.streams.reduce((a, x) => a + x.gmv, 0);
       const sd = s.days.reduce((a, d) => a + d.salesPlaced, 0);
-      if (Math.abs(sl - sd) > Math.max(1000, sd * 0.001)) n.push(`Cộng doanh số từng phiên (${fmtM(sl)}) lệch cộng theo ngày (${fmtM(sd)}) — hai file có thể không cùng kỳ tải.`);
+      if (Math.abs(sl - sd) > Math.max(1000, sd * 0.001)) n.push(`Tổng doanh số theo phiên (${fmtM(sl)}) chênh lệch với tổng theo ngày (${fmtM(sd)}) — hai file có thể không cùng kỳ tải.`);
     }
     if (s.plan.sessions > 0) {
-      n.push(`Phần Host tính từ ${s.plan.completed} ca Shopee đã diễn ra trong app (${s.quality.reconciled} đã đối soát bằng Live List, ${s.quality.manual} là số tạm). Số của ca là số chia cho từng ca, có thể lệch số phiên của Shopee khi một phiên dài chia cho nhiều ca.`);
+      n.push(`Phần Host tính từ ${s.plan.completed} ca Shopee đã diễn ra trong app (${s.quality.reconciled} đã đối soát bằng Live List, ${s.quality.manual} là số tạm tính). Số của ca là số chia cho từng ca, có thể lệch số phiên của Shopee khi một phiên dài chia cho nhiều ca.`);
       if (s.appGmv > 0 && h.gmv > 0 && Math.abs(s.appGmv / h.gmv - 1) > 0.02) n.push(`Cộng GMV các ca trong app là ${fmtM(s.appGmv)} so với ${fmtM(h.gmv)} theo file — ${s.appGmv < h.gmv ? "đối soát Live List để số ca khớp file" : "kiểm lại ca nạp bù"}.`);
     } else {
       n.push("Chưa có ca Shopee nào trong app cho tháng này nên không có xếp hạng host.");
@@ -416,7 +416,7 @@ export function shopeeNotes(s: ShopeeReportSnapshot, audience: "brand" | "ops" =
     return n;
   }
   const n: string[] = [];
-  n.push("GMV = Sales(Placed Order) của live; Sales(Confirmed Order) là số thực nhận sau đơn huỷ. Shopee không cho lý do huỷ/hoàn.");
+  n.push("GMV = Sales(Placed Order) của live; Sales(Confirmed Order) là số liệu thực tế nhận sau đơn huỷ. Shopee không cho lý do huỷ/hoàn.");
   n.push(
     s.campFromPlan
       ? "Loại ngày campaign theo khung campaign đã thống nhất trong kế hoạch tháng."

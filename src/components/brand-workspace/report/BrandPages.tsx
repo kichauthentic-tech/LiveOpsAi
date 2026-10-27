@@ -58,7 +58,7 @@ export const ToneLegend: React.FC<{ extra?: string }> = ({ extra }) => (
 const SCORE_LABEL: Record<ScoreRow["key"], string> = { all: `${METRIC.liveGmv} (YFB vận hành)`, shop: METRIC.totalGmv, ...DAY_TYPE_SHORT };
 
 export const ScoreboardPanel: React.FC<{ rows: ScoreRow[]; campSpans: Partial<Record<CampDayBucket, string>>; footnote?: string }> = ({ rows, campSpans, footnote }) => (
-  <Panel title="Bảng điểm tháng" icon={<Gauge className="w-4 h-4" />} sub="Target theo Kế Hoạch Tháng đã chốt · tháng còn dở thì % tính trên target tới nay (cùng số run-rate Dashboard) · KPI toàn shop do brand giao · vạch = 100%">
+  <Panel title="Bảng điểm tháng" icon={<Gauge className="w-4 h-4" />} sub="Target theo Kế Hoạch Tháng đã chốt · tháng chưa kết thúc thì % tính trên target tới nay (cùng số run-rate Dashboard) · KPI toàn shop do brand giao · vạch = 100%">
     <ReportTable head={["", "Target", "Thực tế", METRIC.pctTarget, ""]}>
       {rows.map((r, idx) => {
         const tone = r.pct == null ? PAL.muted : r.pct >= 100 ? PAL.green : r.pct >= 95 ? PAL.gold : PAL.red;
@@ -405,7 +405,7 @@ export const NmvPanel: React.FC<{
         {shopRefundOnly
           ? `${METRIC.refundRate} chỉ gồm giá trị hoàn tiền, chưa gồm đơn hủy — ${METRIC.nmv} thật sẽ thấp hơn. `
           : ""}
-        {bars.length > 1 ? `Hai cách tính cho ${METRIC.nmv} khác nhau khi chưa có số đơn hủy; ` : ""}Công thức {METRIC.nmv} nên thống nhất trong hợp đồng.
+        {bars.length > 1 ? `Hai cách tính cho ${METRIC.nmv} khác nhau khi chưa có số liệu đơn hủy; ` : ""}Công thức {METRIC.nmv} nên thống nhất trong hợp đồng.
       </p>
     </Panel>
   );

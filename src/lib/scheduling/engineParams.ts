@@ -10,16 +10,16 @@ export interface EngineParams {
   // --- Học lịch sử ---
   recencyLambda: number; // trọng số ca cũ = e^(−λ·tháng)
   winsorizePct: number; // chặn GMV/giờ ở phân vị này (0.95 = p95)
-  shrinkK: number; // số quan sát "ảo" kéo ô về TB brand
+  shrinkK: number; // số quan sát "ảo" kéo ô về trung bình brand
   minHistorySessions: number; // dưới mức này → "lịch sử mỏng"
   minHistoryMonths: number;
-  minCampSessions: number; // ca tối thiểu để học hệ số camp
+  minCampSessions: number; // ca tối thiểu để học hệ số Campaign
   campMultMin: number;
   campMultMax: number;
-  campDefaultDday: number; // hệ số camp khi chưa học được
+  campDefaultDday: number; // hệ số Campaign khi chưa học được
   campDefaultMidmonth: number;
   campDefaultPayday: number;
-  minEventSessions: number; // ca tối thiểu để học hệ số lễ/sự kiện & scheme
+  minEventSessions: number; // ca tối thiểu để học hệ số lễ/sự kiện & khuyến mãi
   eventMultMin: number;
   eventMultMax: number;
   schemeMultMin: number;
@@ -27,8 +27,8 @@ export interface EngineParams {
   diminishingMinHours: number; // giờ quan sát tối thiểu để học lợi suất giảm dần ca thứ k
   diminishingMin: number;
   // --- Khuôn ngày camp ---
-  campPatternEnabled: boolean; // lấp ngày camp đủ giờ/ngày lịch sử trước, bằng khối liên tục
-  minCampDays: number; // số ngày camp tối thiểu để học giờ/ngày
+  campPatternEnabled: boolean; // lấp ngày Campaign đủ giờ/ngày lịch sử trước, bằng khối liên tục
+  minCampDays: number; // số ngày Campaign tối thiểu để học giờ/ngày
   // --- Xếp lịch ---
   weekEvenCap: number; // tuần vượt X× TB thì phạt
   weekEvenPenalty: number;
@@ -37,7 +37,7 @@ export interface EngineParams {
   anchorMinDays: number; // cùng giờ bắt đầu đã có ≥ N ngày → thưởng đều đặn
   anchorBonus: number;
   balancedAnchorBonus: number;
-  balancedMaxPerDay: number; // phương án cân bằng: tối đa ca/ngày thường
+  balancedMaxPerDay: number; // phương án cân bằng: tối đa ca/ngày Daily
   balancedSecondSlotPenalty: number;
   leanExtraHours: number; // phương án tiết kiệm: ca dài hơn mặc định bao nhiêu giờ
   leanNewDayPenalty: number;
@@ -123,7 +123,7 @@ export const DEFAULT_ENGINE_PARAMS: EngineParams = {
 export type EngineParamGroup = "history" | "camp" | "schedule" | "target" | "calibration" | "host";
 export const ENGINE_GROUP_LABEL: Record<EngineParamGroup, string> = {
   history: "Học từ lịch sử",
-  camp: "Khuôn ngày camp",
+  camp: "Khuôn ngày Campaign",
   schedule: "Xếp lịch",
   target: "Target",
   calibration: "Hiệu chỉnh kế hoạch vs thực tế",
@@ -143,24 +143,24 @@ export interface EngineParamMeta {
 
 export const ENGINE_PARAM_META: EngineParamMeta[] = [
   { key: "recencyLambda", group: "history", label: "Quên dần ca cũ", help: "Ca cách đây N tháng nặng e^(−λ·N). 0.35 ≈ tháng trước còn 70%, 2 tháng còn 50%. Tăng để chạy theo xu hướng mới, giảm nếu dữ liệu ít.", kind: "number", min: 0, max: 2, step: 0.05 },
-  { key: "winsorizePct", group: "history", label: "Chặn ca viral", help: "GMV/giờ vượt phân vị này bị cắt xuống — 1 ca bùng nổ không kéo cả ô. 0.95 = p95.", kind: "number", min: 0.5, max: 1, step: 0.01 },
-  { key: "shrinkK", group: "history", label: "Kéo ô ít dữ liệu về TB brand", help: "Ô thứ×giờ có n ca được trộn với k ca 'ảo' ở mức TB brand. k lớn = thận trọng hơn với ô ít ca.", kind: "number", min: 0, max: 20, step: 1 },
+  { key: "winsorizePct", group: "history", label: "Giới hạn ca đột biến (outlier)", help: "GMV/giờ vượt phân vị này bị cắt xuống — 1 ca đột biến không làm lệch cả ô. 0.95 = p95.", kind: "number", min: 0.5, max: 1, step: 0.01 },
+  { key: "shrinkK", group: "history", label: "Co ô ít dữ liệu về trung bình brand (shrinkage)", help: "Ô thứ×giờ có n ca được trộn với k ca 'ảo' ở mức trung bình brand. k lớn = thận trọng hơn với ô ít ca.", kind: "number", min: 0, max: 20, step: 1 },
   { key: "minHistorySessions", group: "history", label: "Ca tối thiểu để tin gợi ý", help: "Dưới mức này panel ghi 'lịch sử mỏng' và độ tin cậy thấp.", kind: "number", min: 0, max: 200, step: 1 },
   { key: "minHistoryMonths", group: "history", label: "Tháng tối thiểu để tin gợi ý", help: "", kind: "number", min: 0, max: 12, step: 1 },
-  { key: "minCampSessions", group: "history", label: "Ca tối thiểu để học hệ số camp", help: "Không đủ thì dùng hệ số mặc định bên dưới.", kind: "number", min: 1, max: 50, step: 1 },
+  { key: "minCampSessions", group: "history", label: "Ca tối thiểu để học hệ số Campaign", help: "Không đủ thì dùng hệ số mặc định bên dưới.", kind: "number", min: 1, max: 50, step: 1 },
   { key: "campDefaultDday", group: "history", label: "Hệ số D-Day mặc định", help: "Dùng khi brand chưa đủ ca D-Day để học.", kind: "number", min: 0.5, max: 3, step: 0.05 },
   { key: "campDefaultMidmonth", group: "history", label: "Hệ số Mid-Month mặc định", help: "", kind: "number", min: 0.5, max: 3, step: 0.05 },
   { key: "campDefaultPayday", group: "history", label: "Hệ số Pay Day mặc định", help: "", kind: "number", min: 0.5, max: 3, step: 0.05 },
   { key: "campMultMin", group: "history", label: "Hệ số camp học được — sàn", help: "Kẹp hệ số học từ lịch sử trong [sàn, trần].", kind: "number", min: 0.1, max: 2, step: 0.05 },
   { key: "campMultMax", group: "history", label: "Hệ số camp học được — trần", help: "", kind: "number", min: 1, max: 10, step: 0.1 },
-  { key: "minEventSessions", group: "history", label: "Ca tối thiểu để học lễ/sự kiện & scheme", help: "Không đủ → ×1.0 và chỉ ghi nhãn trên lưới.", kind: "number", min: 1, max: 50, step: 1 },
+  { key: "minEventSessions", group: "history", label: "Ca tối thiểu để học lễ/sự kiện & khuyến mãi", help: "Không đủ → ×1.0 và chỉ ghi nhãn trên lưới.", kind: "number", min: 1, max: 50, step: 1 },
   { key: "eventMultMin", group: "history", label: "Hệ số lễ/sự kiện — sàn", help: "", kind: "number", min: 0.1, max: 2, step: 0.05 },
   { key: "eventMultMax", group: "history", label: "Hệ số lễ/sự kiện — trần", help: "", kind: "number", min: 1, max: 10, step: 0.1 },
-  { key: "schemeMultMin", group: "history", label: "Hệ số ngày trùng KM — sàn", help: "", kind: "number", min: 0.1, max: 2, step: 0.05 },
-  { key: "schemeMultMax", group: "history", label: "Hệ số ngày trùng KM — trần", help: "", kind: "number", min: 1, max: 10, step: 0.1 },
+  { key: "schemeMultMin", group: "history", label: "Hệ số ngày trùng khuyến mãi — sàn", help: "", kind: "number", min: 0.1, max: 2, step: 0.05 },
+  { key: "schemeMultMax", group: "history", label: "Hệ số ngày trùng khuyến mãi — trần", help: "", kind: "number", min: 1, max: 10, step: 0.1 },
   { key: "diminishingMinHours", group: "history", label: "Giờ tối thiểu để học lợi suất giảm dần", help: "Ca thứ 2/3/4 trong ngày bán kém hơn ca đầu bao nhiêu — cần đủ giờ quan sát ở vị trí đó.", kind: "number", min: 1, max: 100, step: 1 },
-  { key: "diminishingMin", group: "history", label: "Lợi suất giảm dần — sàn", help: "Ca thứ k không bao giờ bị coi bán dưới X× ca đầu.", kind: "number", min: 0.1, max: 1, step: 0.05 },
-  { key: "campPatternEnabled", group: "camp", label: "Lấp ngày camp đủ giờ lịch sử trước", help: "Học giờ live/ngày theo loại ngày camp, xếp ngày camp thành khối ca liên tục đủ giờ đó trước khi chia cho ngày thường; nới trần ca/ngày của ngày camp theo. Tắt → ngày camp xếp như ngày thường (chỉ khác hệ số GMV/giờ).", kind: "boolean" },
+  { key: "diminishingMin", group: "history", label: "Lợi suất giảm dần — sàn", help: "GMV ước tính của ca thứ k không thấp hơn X× ca đầu.", kind: "number", min: 0.1, max: 1, step: 0.05 },
+  { key: "campPatternEnabled", group: "camp", label: "Ưu tiên xếp đủ giờ ngày Campaign theo lịch sử", help: "Học giờ live/ngày theo loại ngày Campaign, xếp ngày Campaign thành khối ca liên tục đủ giờ đó trước khi chia cho ngày thường; nới trần ca/ngày của ngày Campaign theo. Tắt → ngày Campaign xếp như ngày thường (chỉ khác hệ số GMV/giờ).", kind: "boolean" },
   { key: "minCampDays", group: "camp", label: "Ngày camp tối thiểu để học giờ/ngày", help: "", kind: "number", min: 1, max: 30, step: 1 },
   { key: "weekEvenCap", group: "schedule", label: "Tuần vượt X× trung bình thì phạt", help: "Rải đều giữa các tuần trong tháng (phương án Tối đa/Tiết kiệm).", kind: "number", min: 1, max: 3, step: 0.05 },
   { key: "weekEvenPenalty", group: "schedule", label: "Mức phạt tuần lệch", help: "Điểm ca nhân với hệ số này khi tuần đã quá tải.", kind: "number", min: 0.1, max: 1, step: 0.05 },
@@ -169,7 +169,7 @@ export const ENGINE_PARAM_META: EngineParamMeta[] = [
   { key: "anchorMinDays", group: "schedule", label: "Giờ neo: cùng giờ bắt đầu ≥ N ngày", help: "Ưu tiên lặp cùng giờ mở live nhiều ngày — khán giả nhớ giờ, host dễ xếp.", kind: "number", min: 1, max: 15, step: 1 },
   { key: "anchorBonus", group: "schedule", label: "Thưởng giờ neo", help: "", kind: "number", min: 1, max: 2, step: 0.01 },
   { key: "balancedAnchorBonus", group: "schedule", label: "Cân bằng: thưởng giờ neo", help: "", kind: "number", min: 1, max: 2, step: 0.01 },
-  { key: "balancedMaxPerDay", group: "schedule", label: "Cân bằng: tối đa ca/ngày thường", help: "Ngày camp vẫn theo khuôn camp.", kind: "number", min: 1, max: 8, step: 1 },
+  { key: "balancedMaxPerDay", group: "schedule", label: "Cân bằng: tối đa ca/ngày Daily", help: "Ngày camp vẫn theo khuôn Campaign.", kind: "number", min: 1, max: 8, step: 1 },
   { key: "balancedSecondSlotPenalty", group: "schedule", label: "Cân bằng: phạt ca thứ 2 trong ngày", help: "", kind: "number", min: 0.1, max: 1, step: 0.05 },
   { key: "leanExtraHours", group: "schedule", label: "Tiết kiệm: ca dài thêm (giờ)", help: "Ca = mặc định + X giờ, ít ca hơn, ít ngày hơn.", kind: "number", min: 0, max: 6, step: 0.5 },
   { key: "leanNewDayPenalty", group: "schedule", label: "Tiết kiệm: phạt mở ngày mới", help: "", kind: "number", min: 0.1, max: 1, step: 0.01 },
@@ -179,7 +179,7 @@ export const ENGINE_PARAM_META: EngineParamMeta[] = [
   { key: "allocEnsembleShare", group: "target", label: "Chia target ca: tỷ trọng mô hình v2", help: "Target ca = v2 × X + cách cũ × (1−X). 0.5 là mức backtest cho sai số thấp nhất và ổn định nhất qua các brand; 1 = chỉ v2; 0 = chỉ cách cũ. Bảng backtest ngay bên dưới cho thấy đổi số này tác động sai số ra sao.", kind: "number", min: 0, max: 1, step: 0.05 },
   { key: "allocRidge", group: "target", label: "Chia target ca: độ co hệ số về 1", help: "Hệ số loại ngày/khung giờ/vị trí ngày bị kéo về 1 như có thêm X ca ảo. Brand ít ca hoặc nhiễu thì tăng; backtest CROCS gần như không nhạy trong 0.5–8.", kind: "number", min: 0, max: 50, step: 0.5 },
   { key: "allocMinMonths", group: "target", label: "Chia target ca: tháng lịch sử tối thiểu cho v2", help: "Dưới mức này chỉ dùng cách cũ (hoặc chia theo dự báo engine nếu cách cũ cũng chưa đủ).", kind: "number", min: 1, max: 6, step: 1 },
-  { key: "allocUseBand", group: "target", label: "Chia target ca: dùng hệ số khung giờ", help: "Ca bắt đầu 11–14h lịch sử CROCS chỉ ~0,8× mặt bằng, 18–21h ~1,07×; áp cho cả D-Day, Mid-Month, Pay Day. Tắt để thấy khung giờ đóng góp bao nhiêu điểm sai số.", kind: "boolean" },
+  { key: "allocUseBand", group: "target", label: "Chia target ca: dùng hệ số khung giờ", help: "Ca bắt đầu 11–14h lịch sử CROCS chỉ ~0,8× trung bình nhóm, 18–21h ~1,07×; áp cho cả D-Day, Mid-Month, Pay Day. Tắt để thấy khung giờ đóng góp bao nhiêu điểm sai số.", kind: "boolean" },
   { key: "allocUseCampPos", group: "target", label: "Chia target ca: dùng hệ số vị trí ngày trong đợt", help: "Ngày 1 của Mid-Month/Pay Day mạnh hơn ngày 3 (CROCS ~1,3× so với ~0,8×). Brand có mẫu hình khác thì hệ số tự học theo brand; tắt nếu thấy bảng backtest không cải thiện.", kind: "boolean" },
   { key: "fcRecentDays", group: "target", label: "Dự báo tháng: số ngày của mức gần đây", help: "Mức GMV tháng tới = trung bình nhân của (mức N ngày gần nhất) và (mức 3 tháng gần nhất), mỗi mức đã chia theo hình dạng tháng (loại ngày, khung giờ). Backtest 10/10: 28 ngày; 14–56 chênh ≤1,5 điểm %.", kind: "number", min: 7, max: 90, step: 1 },
   { key: "fcCredibility", group: "target", label: "Dự báo trong tháng: kéo về mức lập kế hoạch", help: "Số đã có của tháng được tin bao nhiêu so với mức lúc lập. 0 = tin hẳn số đã có; 0.1 là mức backtest tốt nhất (sai số tổng tháng CROCS+VERA ngày 8: 8%, ngày 15: 5%, ngày 18: 3%; Dashboard cũ 12% / 8% / 6%). Tăng khi đầu tháng hay có ngày đột biến.", kind: "number", min: 0, max: 1, step: 0.05 },
@@ -187,7 +187,7 @@ export const ENGINE_PARAM_META: EngineParamMeta[] = [
   { key: "fcBandSmall", group: "target", label: "Dải 80% lúc lập — kênh ít lịch sử", help: "Như trên cho kênh còn lại. Backtest: 80% tháng lệch ≤ 30%.", kind: "number", min: 0.05, max: 1, step: 0.01 },
   { key: "fcOutOfRangeFactor", group: "target", label: "Giờ vượt vùng lịch sử ra bao nhiêu", help: "Ngày có tổng giờ live vượt p90 giờ/ngày cùng loại ngày trong lịch sử: phần giờ vượt chỉ tính X lần GMV/giờ (chưa có bằng chứng thêm giờ ra thêm GMV — VERA T10 tuần đầu giờ gấp đôi, GMV gần như đứng yên). 1 = nhân tuyến tính như cũ.", kind: "number", min: 0, max: 1, step: 0.05 },
   { key: "fcBiasCorrect", group: "target", label: "Tự hiệu chỉnh khi dự báo lệch cùng chiều", help: "Khi ≥ 2 tháng gần nhất dự báo lúc lập lệch cùng chiều và trung bình > 5%, nhân dự báo với hệ số bù nửa phần lệch. Mặc định tắt: 3 tháng dữ liệu chưa đủ để chứng minh có lợi (backtest ở thẻ Dự báo tháng); lệch luôn được hiện ra dù tắt.", kind: "boolean" },
-  { key: "fcCheckpointCap", group: "target", label: "Mốc điều chỉnh: bù tối đa bao nhiêu giờ", help: "Ở 3 mốc (sau đợt D-Day, sau Mid-Month, ngày 20) engine tính số giờ cần thêm cho phần tháng còn lại để dự báo chạm target, kẹp ở +X. Mô phỏng 10/10: +30% ⇒ 9/9 tháng CROCS+VERA đạt ≥ 95% target.", kind: "number", min: 0, max: 1, step: 0.05 },
+  { key: "fcCheckpointCap", group: "target", label: "Mốc điều chỉnh: bù tối đa bao nhiêu giờ", help: "Ở 3 mốc (sau đợt D-Day, sau Mid-Month, ngày 20) engine tính số giờ cần thêm cho phần tháng còn lại để dự báo đạt target, kẹp ở +X. Mô phỏng 10/10: +30% ⇒ 9/9 tháng CROCS+VERA đạt ≥ 95% target.", kind: "number", min: 0, max: 1, step: 0.05 },
   { key: "calibrationK", group: "calibration", label: "Kéo hệ số hiệu chỉnh về 1", help: "Ô có ít ca kế hoạch đã có thực tế bị kéo về 1 (không hiệu chỉnh). k lớn = thận trọng hơn.", kind: "number", min: 0, max: 20, step: 1 },
   { key: "calibrationMin", group: "calibration", label: "Hệ số hiệu chỉnh — sàn", help: "", kind: "number", min: 0.1, max: 1, step: 0.05 },
   { key: "calibrationMax", group: "calibration", label: "Hệ số hiệu chỉnh — trần", help: "", kind: "number", min: 1, max: 5, step: 0.1 },

@@ -143,13 +143,13 @@ export const EngineTrainingPanel: React.FC<Props> = ({ brands, sessions, shiftSl
               </div>
             </div>
             {!history || history.sessions === 0 ? (
-              <p className="text-xs text-[var(--text-muted)]">Brand chưa có ca đối soát nào — không có gì để học. Up file ở Dữ Liệu Gốc của brand rồi Áp dụng đối soát, hoặc nạp bù từ file.</p>
+              <p className="text-xs text-[var(--text-muted)]">Brand chưa có ca đối soát nào — không có gì để học. Tải lên file ở Dữ Liệu Gốc của brand rồi Áp dụng đối soát, hoặc nạp bù từ file.</p>
             ) : (
               <div className="text-xs space-y-3">
                 <div className="grid grid-cols-2 gap-x-3 gap-y-1">
                   <span className="text-[var(--text-muted)]" title="Ca đã đối soát, có GMV > 0 và có giờ — ca GMV 0 không dạy được engine">Ca đối soát có GMV</span><b className="text-[var(--text)] text-right">{history.sessions} · {history.months} tháng</b>
                   <span className="text-[var(--text-muted)]">Khoảng</span><b className="text-[var(--text)] text-right">{history.firstDate ? fmtDateVn(history.firstDate) : "—"} → {history.lastDate ? fmtDateVn(history.lastDate) : "—"}</b>
-                  <span className="text-[var(--text-muted)]">GMV/giờ TB brand</span><b className="text-[var(--text)] text-right">{fmtM(history.brandGmvPerHour)}</b>
+                  <span className="text-[var(--text-muted)]">GMV/giờ trung bình brand</span><b className="text-[var(--text)] text-right">{fmtM(history.brandGmvPerHour)}</b>
                   <span className="text-[var(--text-muted)]">Đủ dữ liệu để tin</span><b className={`text-right ${history.enough ? "text-emerald-400" : "text-amber-400"}`}>{history.enough ? "có" : `chưa (cần ≥ ${draft.minHistorySessions} ca, ${draft.minHistoryMonths} tháng)`}</b>
                 </div>
                 <div>
@@ -168,7 +168,7 @@ export const EngineTrainingPanel: React.FC<Props> = ({ brands, sessions, shiftSl
                   {(["holiday", "mega_sale", "event"] as const).map((k) => (
                     <div key={k} className="flex justify-between gap-2"><span className="text-[var(--text)]">{{ holiday: "Ngày lễ", mega_sale: "Mega sale", event: "Sự kiện" }[k]}</span><b className="text-[var(--text)]">×{fmtFixed(history.eventMultipliers[k], 2)} <span className="text-[11px] font-normal text-[var(--text-faint)]">{history.eventLearned[k] ? "học" : "chưa đủ ca"}</span></b></div>
                   ))}
-                  <div className="flex justify-between gap-2"><span className="text-[var(--text)]">Ngày trùng scheme KM</span><b className="text-[var(--text)]">×{fmtFixed(history.schemeMultiplier, 2)} <span className="text-[11px] font-normal text-[var(--text-faint)]">{history.schemeLearned ? "học" : "chưa đủ ca"}</span></b></div>
+                  <div className="flex justify-between gap-2"><span className="text-[var(--text)]">Ngày có khuyến mãi</span><b className="text-[var(--text)]">×{fmtFixed(history.schemeMultiplier, 2)} <span className="text-[11px] font-normal text-[var(--text-faint)]">{history.schemeLearned ? "học" : "chưa đủ ca"}</span></b></div>
                 </div>
                 <div>
                   <p className="font-bold text-[var(--text-muted)] mb-1">Khung giờ mạnh (thứ × khối 2h)</p>
@@ -193,7 +193,7 @@ export const EngineTrainingPanel: React.FC<Props> = ({ brands, sessions, shiftSl
                     <span className="text-[var(--text)]">{month}</span>
                     {/* Mũi tên "dự báo → thực tế" phải so CÙNG tập ca có dự báo (`actualForecast`),
                         không phải tổng mọi ca đã xong — ca ops đặt tay không có dự báo nào để sai. */}
-                    <span className="text-[var(--text-muted)]">{ev.doneCount}/{ev.rows.length} ca có số{ev.forecastCount > 0 ? <> · dự báo {fmtM(ev.expectedDone)} → thực tế <b className="text-[var(--text)]">{fmtM(ev.actualForecast)}</b>{ev.forecastCount < ev.doneCount ? ` (${ev.forecastCount}/${ev.doneCount} ca có dự báo)` : ""}{ev.mape !== null ? ` · sai số ${Math.round(ev.mape * 100)}%` : ""}</> : ev.doneCount > 0 ? " · chưa ca nào có dự báo engine để so" : ""}</span>
+                    <span className="text-[var(--text-muted)]">{ev.doneCount}/{ev.rows.length} ca có số liệu{ev.forecastCount > 0 ? <> · dự báo {fmtM(ev.expectedDone)} → thực tế <b className="text-[var(--text)]">{fmtM(ev.actualForecast)}</b>{ev.forecastCount < ev.doneCount ? ` (${ev.forecastCount}/${ev.doneCount} ca có dự báo)` : ""}{ev.mape !== null ? ` · sai số ${Math.round(ev.mape * 100)}%` : ""}</> : ev.doneCount > 0 ? " · chưa ca nào có dự báo engine để so" : ""}</span>
                   </div>
                 ))}
                 <div className="flex justify-between gap-2 pt-1 border-t border-[var(--border)]">

@@ -82,13 +82,13 @@ export default function OpsSupport({ win, expected, sessions, promoSchemes, engi
         {funnel.hasOrderFunnel && b && cell("AOV", b.aov > 0 ? fmtVndShort(b.aov) : "—")}
         {funnel.hasOrderFunnel && b && cell("Ads / giờ", b.adsPerHour === null ? "chưa có report" : fmtVndShort(b.adsPerHour))}
       </div>
-      {expected === undefined && <p className="text-[11px] text-[var(--text-faint)]">Kênh chưa đủ lịch sử để chiếu kỳ vọng (dưới 15 ca có số).</p>}
+      {expected === undefined && <p className="text-[11px] text-[var(--text-faint)]">Kênh chưa đủ lịch sử để chiếu kỳ vọng (dưới 15 ca có số liệu).</p>}
       {high && <p className="text-[11px] text-amber-300">Target ca cao hơn {engineParams.highExpectationRatio.toLocaleString("vi-VN")} lần kỳ vọng.</p>}
       {b && (b.thin || b.cellTags.includes("weak") || b.cellTags.includes("traffic_low_cvr")) && (
         <p className="text-[11px] text-amber-300">
           {b.thin ? "Ít dữ liệu ở khung này — phễu chỉ tham khảo. " : ""}
           {b.cellTags.includes("traffic_low_cvr") ? funnel.lowConversionTip : ""}
-          {b.cellTags.includes("weak") ? "Khung yếu trong lịch sử." : ""}
+          {b.cellTags.includes("weak") ? "Khung giờ hiệu suất thấp trong lịch sử." : ""}
         </p>
       )}
       <p className="text-[11px] text-[var(--text-faint)]">GMV kỳ vọng cùng số với sa bàn ở "Cả tháng". Phễu theo thứ × giờ trong lịch sử brand. {funnel.inSessionTip}</p>

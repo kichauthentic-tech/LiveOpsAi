@@ -437,14 +437,14 @@ export const RosterBoard: React.FC<Props> = (p) => {
     run(async () => {
       const res = autofillWeek(ctx);
       if (res.assignments.length === 0) {
-        showToast(res.missed ? `Không lấp được ${res.missed} chỗ: không ai rảnh, quen kênh và không phạm luật` : "Tuần này không còn ca mở trống người");
+        showToast(res.missed ? `Không xếp được ${res.missed} chỗ: không ai rảnh, quen kênh và không phạm luật` : "Tuần này không còn ca mở trống người");
         return;
       }
       const bySlot = new Map<string, RosterDraft>();
       for (const s of res.shifts) if (s.kind === "open" && s.slotId && res.assignments.some((a) => a.slotId === s.slotId)) bySlot.set(s.slotId, { slotId: s.slotId, hostId: s.hostId, coHostId: s.coHostId });
       await saveRosterDrafts([...bySlot.values()], p.currentUserId);
       setDrafts((prev) => [...prev.filter((d) => !bySlot.has(d.slotId)), ...bySlot.values()]);
-      showToast(`Đã lấp ${res.assignments.length} chỗ vào nháp${res.missed ? `, còn ${res.missed} chỗ không ai đủ điều kiện` : ""}`);
+      showToast(`Đã xếp ${res.assignments.length} chỗ vào nháp${res.missed ? `, còn ${res.missed} chỗ không ai đủ điều kiện` : ""}`);
     });
 
   const applyCost = () =>
@@ -602,7 +602,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
         throw e;
       }
       await p.onScheduleChanged();
-      showToast(`Đã mở ${r.created} ca${r.skipped ? `, bỏ ${r.skipped} ca trùng` : ""}${r.notified ? `, báo ${r.notified} host/trợ một tin` : ""}. Bấm "Tự lấp chỗ trống" để xếp người.`);
+      showToast(`Đã mở ${r.created} ca${r.skipped ? `, bỏ ${r.skipped} ca trùng` : ""}${r.notified ? `, báo ${r.notified} host/trợ một tin` : ""}. Bấm "Tự xếp người vào chỗ trống" để xếp người.`);
     });
 
   const todos: Todo[] = [];
@@ -616,7 +616,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
   else if (st1.phase === "signup")
     todos.push({ key: "next", tone: "warn", text: `${mNext[0].toUpperCase()}${mNext.slice(1)} đang nhận đăng ký tới ${fmtWhen(st1.deadline!)}: ${st1.slotsWithSignup}/${st1.openSlots} ca có người báo rảnh.`, action: { label: "Chép tin nhắc người chưa đăng ký", run: () => nudge(m1) } });
   else if (st1.phase === "staff")
-    todos.push({ key: "next", tone: "bad", text: `${mNext[0].toUpperCase()}${mNext.slice(1)}: còn ${st1.noHost} ca mở chưa có host.`, sub: `${st1.noHostWithSignup} ca có người báo rảnh. Mỗi tuần bấm Tự lấp rồi Công bố.`, action: { label: "Tới tuần còn trống", run: () => onMonthAction("staff", m1) } });
+    todos.push({ key: "next", tone: "bad", text: `${mNext[0].toUpperCase()}${mNext.slice(1)}: còn ${st1.noHost} ca mở chưa có host.`, sub: `${st1.noHostWithSignup} ca có người báo rảnh. Mỗi tuần bấm Tự xếp người rồi Công bố.`, action: { label: "Tới tuần còn trống", run: () => onMonthAction("staff", m1) } });
   else if (st1.phase === "publish")
     todos.push({ key: "next", tone: "warn", text: `${mNext[0].toUpperCase()}${mNext.slice(1)}: ${st1.weeksToPublish.length} tuần có ca nháp chưa công bố.`, action: { label: "Tới tuần chưa công bố", run: () => onMonthAction("publish", m1) } });
   for (const r of short.slice(0, 3))
@@ -643,7 +643,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
     todos.push({ key: "noco", tone: "warn", text: `${noCoShifts.length} ca tuần này chưa có trợ live.`, sub: "Ca không có trợ thì OP giao ca. Bấm để xếp lần lượt.", action: { label: "Xếp ca đầu tiên", run: () => setSelectedKey(noCoShifts[0].key) } });
   const openNoHost = openShifts.filter((s) => !s.hostId).length;
   if (openNoHost > 0 && !(viewMonth === m1 && st1.phase === "signup"))
-    todos.push({ key: "open", tone: "warn", text: `${openNoHost} ca mở tuần này chưa có người.`, sub: "Tự lấp ưu tiên người đã báo rảnh, rồi người quen kênh, giờ tuần thấp.", action: readOnly ? undefined : { label: "Tự lấp chỗ trống", run: doAutofill } });
+    todos.push({ key: "open", tone: "warn", text: `${openNoHost} ca mở tuần này chưa có người.`, sub: "Tự xếp ưu tiên người đã báo rảnh, rồi người quen kênh, giờ tuần thấp.", action: readOnly ? undefined : { label: "Tự xếp người vào chỗ trống", run: doAutofill } });
   if (draftedCount > 0 && blocks.length === 0)
     todos.push({ key: "pub", tone: "warn", text: `${draftedCount} ca nháp tuần này chưa công bố.`, sub: "Công bố xong mỗi host/trợ nhận một tin.", action: readOnly ? undefined : { label: "Công bố", run: publish } });
   const cannot = desk.nowRows.filter((r) => r.row.rescue.kind === "cannot" && r.row.rescue.needRate != null && r.row.rescue.nowRate != null);
@@ -683,7 +683,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
               <CopyPlus className="w-4 h-4" /> Chép khung giờ tuần trước
             </button>
             <button type="button" disabled={readOnly || busy || openNoHost === 0} onClick={doAutofill} title={openNoHost === 0 ? "Tuần này không còn ca mở trống người" : undefined} className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[var(--border)] text-xs font-bold text-[var(--text)] disabled:opacity-40">
-              <Wand2 className="w-4 h-4" /> Tự lấp chỗ trống
+              <Wand2 className="w-4 h-4" /> Tự xếp người vào chỗ trống
             </button>
             <button type="button" onClick={copyZalo} title="Chép lịch đã chốt của tuần này theo từng người, kèm link vào app" className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[var(--border)] text-xs font-bold text-[var(--text)]">
               <MessageSquareText className="w-4 h-4" /> Chép tin Zalo

@@ -17,7 +17,7 @@ export interface PlanEvalRow {
   endTime: string;
   expectedGmv: number;
   targetGmv: number;
-  actualGmv: number | null; // null = ca chưa diễn ra / chưa có số
+  actualGmv: number | null; // null = ca chưa diễn ra / chưa có số liệu
   status: "done" | "pending" | "cancelled" | "unlinked";
   errorPct: number | null; // (thực tế − dự báo) / dự báo
 }
@@ -31,7 +31,7 @@ export interface PlanEvaluation {
   // chênh phần lớn là ca ops đặt tay (expectedGmv = 0), vốn không có dự báo nào để mà sai. Nặng nhất
   // là brand chưa có lịch sử (Đ12 cold start): không ca nào có dự báo ⇒ "dự báo 0 → thực tế 3,5 tỷ".
   actualForecast: number;
-  forecastCount: number; // số ca vừa đã có thực tế vừa có dự báo — mẫu số thật của `mape`/`bias`
+  forecastCount: number; // số ca vừa đã có thực tế vừa có dự báo — mẫu số liệu thực tế của `mape`/`bias`
   targetDone: number;
   actualDone: number;
   mape: number | null; // sai số tuyệt đối trung bình theo ca (chỉ ca có dự báo > 0)

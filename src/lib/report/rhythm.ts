@@ -19,7 +19,7 @@ export interface RhythmPoint {
   label: string; // "07/09"
   gmv: number; // Total GMV cả shop trong ngày (Shop Analytics)
   ma7: number | null; // trung bình trượt 7 ngày của gmv
-  live: number; // LIVE GMV agency trong ngày (ca có số)
+  live: number; // LIVE GMV agency trong ngày (ca có số liệu)
 }
 
 export interface WeekdayIndex {

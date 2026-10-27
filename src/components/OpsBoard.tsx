@@ -170,7 +170,7 @@ const SessionRow: React.FC<{
       </span>
       <span className="order-5 md:order-none ml-auto md:ml-0 flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-[11px] font-bold">
         {clashWith && <span className="px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-300" title="Người này có ca khác cùng giờ">trùng người: {clashWith.join(", ")}</span>}
-        {noNumbers && <span className="px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-300">chưa có số</span>}
+        {noNumbers && <span className="px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-300">chưa có số liệu</span>}
         {noRoom && <span className="text-amber-300">chưa có phòng</span>}
         {unackNames && <span className="text-amber-300" title={unackNames}>chưa nhận lịch: {unackNames}</span>}
       </span>
@@ -179,7 +179,7 @@ const SessionRow: React.FC<{
       ) : (
         <span className="order-5 md:order-none text-right text-xs font-bold tabular-nums">
           {s.actualGmv ? <span className="text-emerald-300">{fmtVndShort(s.actualGmv)}</span> : null}
-          {!noNumbers && s.status === "Completed" && !s.actualGmv && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 inline" aria-label="Đã có số" />}
+          {!noNumbers && s.status === "Completed" && !s.actualGmv && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 inline" aria-label="Đã có số liệu" />}
         </span>
       )}
       {/* Điện thoại: trạng thái lên cùng hàng giờ + brand (order), người + nhãn xuống hàng dưới. */}
@@ -240,7 +240,7 @@ const NeedsQueue: React.FC<{
 }> = ({ backlogByDay, backlogTotal, clashByDay, counts, today, range, filter, onBacklog, onDay, onFilter }) => {
   const nothing = backlogTotal === 0 && clashByDay.length === 0 && counts.nohost + counts.noroom + counts.unack === 0;
   if (nothing) {
-    return <p className="text-sm text-emerald-300 flex items-center gap-2"><CheckCircle2 className="w-4 h-4" /> Không có gì cần xử lý: ca đã qua đều có số, lịch không trùng người.</p>;
+    return <p className="text-sm text-emerald-300 flex items-center gap-2"><CheckCircle2 className="w-4 h-4" /> Không có gì cần xử lý: ca đã qua đều có số liệu, lịch không trùng người.</p>;
   }
   const first = clashByDay[0];
   const rest = clashByDay.slice(1);
@@ -258,7 +258,7 @@ const NeedsQueue: React.FC<{
         <div className="grid grid-cols-[36px_minmax(0,1fr)_auto] gap-3 items-center">
           <span className="text-xl font-black tabular-nums text-rose-300 text-right">{backlogTotal}</span>
           <span className="min-w-0 text-xs text-[var(--text-muted)]">
-            <b className="block text-sm text-[var(--text)]">ca đã qua giờ chưa có số</b>
+            <b className="block text-sm text-[var(--text)]">ca đã qua giờ chưa có số liệu</b>
             {backlogByDay.map(([d, n]) => `${fmtDay(d)}: ${n}`).join(" · ")}
           </span>
           <button type="button" onClick={onBacklog} aria-pressed={range === "backlog"} className={`px-3 py-1.5 rounded-lg text-xs font-bold min-h-[32px] ${range === "backlog" ? "border border-[var(--border)] text-[var(--text)]" : "bg-[var(--accent)] text-[var(--accent-contrast)]"}`}>
@@ -508,7 +508,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
   const toggle = (id: string) => (renderExpectDetail ? () => setExpandId((x) => (x === id ? null : id)) : undefined);
   const pastRange = range === "past" || range === "backlog";
   const emptyText =
-    range === "backlog" ? "Không còn ca nào đã qua giờ mà chưa có số." :
+    range === "backlog" ? "Không còn ca nào đã qua giờ mà chưa có số liệu." :
     filter ? "Không có ca hôm nay khớp bộ lọc." :
     `Không có ca nào ${range === "today" ? "hôm nay" : range === "tomorrow" ? "ngày mai" : "trong khoảng này"}. Ca được mở từ Kế Hoạch Tháng hoặc nút "Mở ca chờ đăng ký" ở Lịch & Studio.`;
 
@@ -517,7 +517,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
       <PageHeader
         icon={Radio}
         title="Bảng Vận Hành"
-        description={view === "month" ? `Tháng ${Number(today.slice(5, 7))}: lập kế hoạch, cam kết giờ, thêm ca để kịp target, ai đang gánh nhiều giờ.` : "Việc cần xử lý trước, rồi lịch. Bấm vào ca để mở cửa sổ ca, mũi tên bên phải để xem kỳ vọng."}
+        description={view === "month" ? `Tháng ${Number(today.slice(5, 7))}: lập kế hoạch, cam kết giờ, thêm ca để kịp target, ai đang nhận nhiều giờ nhất.` : "Việc cần xử lý trước, rồi lịch. Bấm vào ca để mở cửa sổ ca, mũi tên bên phải để xem kỳ vọng."}
         actions={
           <>
             {monthView && onViewChange && (
@@ -583,11 +583,11 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
                   và nhãn trên dòng ca). Không có ca thì không bày ô 0. */}
               {summary.total > 0 && range !== "drafts" && (
                 <div className="flex flex-wrap gap-x-8 gap-y-2 px-2 sm:px-3 pt-1">
-                  <StatTile frame="plain" size="sm" label={range === "backlog" ? "Ca chưa có số" : range === "today" ? "Ca hôm nay" : "Ca"} value={String(summary.total)} />
+                  <StatTile frame="plain" size="sm" label={range === "backlog" ? "Ca chưa có số liệu" : range === "today" ? "Ca hôm nay" : "Ca"} value={String(summary.total)} />
                   {pastRange
                     ? REPORT_PLATFORMS.filter((p) => summary.gmv[p] > 0).map((p) => <StatTile key={p} frame="plain" size="sm" label={`GMV đã ghi nhận ${p}`} value={fmtVndShort(summary.gmv[p])} />)
                     : summary.expKnown > 0 && REPORT_PLATFORMS.filter((p) => summary.exp[p] > 0).map((p) => <StatTile key={p} frame="plain" size="sm" label={`Kỳ vọng ${p}`} value={fmtVndShort(summary.exp[p])} />)}
-                  {range === "past" && <StatTile frame="plain" size="sm" label="Chưa có số" value={String(summary.noNumbers)} tone={summary.noNumbers > 0 ? "text-rose-300" : "text-emerald-300"} />}
+                  {range === "past" && <StatTile frame="plain" size="sm" label="Chưa có số liệu" value={String(summary.noNumbers)} tone={summary.noNumbers > 0 ? "text-rose-300" : "text-emerald-300"} />}
                 </div>
               )}
               {rows.length === 0 && <p className="text-sm text-[var(--text-faint)] italic py-6 text-center">{emptyText}</p>}

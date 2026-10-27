@@ -6,7 +6,7 @@ import type { HostSuggestion } from "./hostSuggestion";
 // Bản tóm tắt số liệu gửi kèm câu hỏi ở "Hỏi số liệu" (Phòng Điều Hành 11/10/2026; từ 24/10 là Bảng Vận Hành · Cả tháng). Thuần — chỉ định dạng lại ĐÚNG các số màn
 // đang hiện (một nguồn số), không tính gì mới. Không có tiền lương, rate, SĐT. Mỗi kênh brand × sàn đứng riêng.
 
-const BUCKET: Record<CampDayBucket, string> = { daily: "ngày thường", dday: "D-Day", midmonth: "Mid-Month", payday: "Pay Day" };
+const BUCKET: Record<CampDayBucket, string> = { daily: "Daily", dday: "D-Day", midmonth: "Mid-Month", payday: "Pay Day" };
 const m = (v: number | null | undefined) => {
   if (v == null || !Number.isFinite(v)) return "—";
   const a = Math.abs(v), s = v < 0 ? "-" : "";
@@ -30,14 +30,14 @@ export interface AskChannel {
 
 export function buildAskContext(x: { today: string; month: string; channels: AskChannel[]; people: PersonLoad[]; plan: PlannedSession[]; channelNameOf: (key: string) => string }): string {
   const L: string[] = [];
-  L.push(`Hôm nay ${d(x.today)}/${x.today.slice(0, 4)}. Tháng đang xem ${x.month.slice(5, 7)}/${x.month.slice(0, 4)}. Ca hôm nay chưa chắc đã có số.`);
+  L.push(`Hôm nay ${d(x.today)}/${x.today.slice(0, 4)}. Tháng đang xem ${x.month.slice(5, 7)}/${x.month.slice(0, 4)}. Ca hôm nay chưa chắc đã có số liệu.`);
   L.push("");
   L.push("## KÊNH (brand × sàn) — tháng này");
-  L.push("kênh | target | đã có | dự kiến cuối tháng | dải 80% | khả năng đạt hiện tại | khả năng lúc đầu tháng | mức target 50/50 lúc đầu tháng | mức 80% chắc | ca đã live đạt so kỳ vọng");
+  L.push("kênh | target | đã có | dự báo cuối tháng | dải 80% | khả năng đạt hiện tại | khả năng lúc đầu tháng | mức target 50/50 lúc đầu tháng | mức 80% chắc | ca đã live đạt so kỳ vọng");
   for (const c of x.channels) {
     const r = c.room;
     if (!r) {
-      L.push(`${c.name} | chưa đủ lịch sử để chiếu (dưới 15 ca có số)`);
+      L.push(`${c.name} | chưa đủ lịch sử để chiếu (dưới 15 ca có số liệu)`);
       continue;
     }
     L.push(`${c.name} | ${m(r.target)} | ${m(r.now.actual)} | ${m(r.now.projected)} | ${m(r.now.lo)}–${m(r.now.hi)} | ${p(r.now.pHit)} | ${p(r.start.pHit)} | ${m(r.start.p50)} | ${m(r.start.p80)} | ${p(r.ratio)}`);
@@ -74,7 +74,7 @@ export function buildAskContext(x: { today: string; month: string; channels: Ask
     if (b) L.push(`${c.name} | ${b.monthA.slice(5)}→${b.monthB.slice(5)} | ${m(b.gmvA)} | ${m(b.hours)} | ${m(b.mix)} | ${m(b.level)} | ${m(b.gmvB)} | ${Math.round(b.hoursA)}h→${Math.round(b.hoursB)}h`);
   }
   L.push("");
-  L.push("## LỊCH SỬ THEO THÁNG (ca có số) — kênh | tháng | số ca | giờ | GMV | GMV/giờ");
+  L.push("## LỊCH SỬ THEO THÁNG (ca có số liệu) — kênh | tháng | số ca | giờ | GMV | GMV/giờ");
   for (const c of x.channels) for (const h of c.history) L.push(`${c.name} | ${h.month} | ${h.sessions} | ${Math.round(h.hours)} | ${m(h.gmv)} | ${m(h.hours > 0 ? h.gmv / h.hours : null)}`);
   L.push("");
   L.push("## TẢI NGƯỜI THÁNG NÀY (cả ca sắp tới) — người | giờ host | giờ trợ | tuần nặng nhất | số ngày quá 6 giờ | kênh");

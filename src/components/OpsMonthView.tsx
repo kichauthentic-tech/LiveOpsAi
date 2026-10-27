@@ -222,7 +222,7 @@ export default function OpsMonthView(props: OpsMonthViewProps) {
       <div className="grid gap-4 xl:grid-cols-2">
         <Card className="space-y-3">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <SectionTitle title="Ca xoay chuyển cục diện" />
+            <SectionTitle title="Ca tác động lớn nhất" />
             <ChannelChips channels={withRoom} value={swingKey} onChange={setSwingPick} />
           </div>
           {withRoom.find((c) => c.key === swingKey) && <SwingList channel={withRoom.find((c) => c.key === swingKey)!} />}

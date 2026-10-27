@@ -220,7 +220,7 @@ export const LEVER_OWNER: Record<string, string> = {
   [METRIC.liveCtr]: "host — thứ tự ghim sản phẩm, kịch bản mở đầu",
   [METRIC.ctor]: "host và brand — giá, voucher, tồn kho SKU ghim",
   [METRIC.aov]: "brand — combo, quà tặng kèm",
-  [METRIC.atcRate]: "host và brand — xu/voucher live, deal giờ vàng",
+  [METRIC.atcRate]: "host và brand — xu/voucher live, flash deal giờ vàng",
   [METRIC.gmvPerAtc]: "brand — combo, giá trị giỏ hàng"
 };
 
@@ -367,7 +367,7 @@ export function channelVerdict(x: {
   if (t && t.gmvPerHour.change != null && t.gmvPerHour.change <= -PRODUCTIVITY_SHIFT)
     causes.push({ key: "productivity_down", tone: hurting ? "bad" : "warn", text: `GMV/giờ ngày Daily ${signedPct(t.gmvPerHour.change)} so cùng loại ngày tháng trước${t.worst ? `; giảm mạnh nhất ${t.worst.label} ${signedPct(t.worst.change)} (${LEVER_OWNER[t.worst.label] ?? "xem cây GMV"})` : ""}` });
   if (w && w.ratio != null && w.ratio < THIN_WAVE_RATIO)
-    causes.push({ key: "thin_wave", tone: "warn", text: `${WAVE_NAME[w.bucket]} ${dm(w.days[0])}–${dm(w.days[w.days.length - 1])} mới xếp ${Math.round(w.scheduledHours)} giờ, mọi khi ~${Math.round(w.usualHours!)} giờ` });
+    causes.push({ key: "thin_wave", tone: "warn", text: `${WAVE_NAME[w.bucket]} ${dm(w.days[0])}–${dm(w.days[w.days.length - 1])} mới xếp ${Math.round(w.scheduledHours)} giờ, mức thông thường ~${Math.round(w.usualHours!)} giờ` });
   if (o.remainingDays > 0 && o.actual > 0 && !o.pending.some((p) => p.date >= x.today))
     causes.push({ key: "no_schedule", tone: "bad", text: `Chưa có ca nào trong lịch cho ${o.remainingDays} ngày còn lại` });
   if (t && t.gmvPerHour.change != null && t.gmvPerHour.change >= PRODUCTIVITY_SHIFT)

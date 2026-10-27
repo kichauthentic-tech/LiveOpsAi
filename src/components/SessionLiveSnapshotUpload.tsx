@@ -129,7 +129,7 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
   }
 
   async function handleDelete() {
-    if (!(await confirm("Xoá file số liệu của ca này? Ca sẽ quay về số liệu trước khi up (kể cả bản host tự khai tay).", { danger: true }))) return;
+    if (!(await confirm("Xoá file số liệu của ca này? Ca sẽ quay về số liệu trước khi tải lên (kể cả bản host tự khai tay).", { danger: true }))) return;
     setBusy(true);
     setError(null);
     try {
@@ -189,7 +189,7 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
             <button
               onClick={handleDelete}
               disabled={busy}
-              title="Xoá nếu up nhầm ca"
+              title="Xoá nếu tải nhầm ca"
               className="p-1.5 -m-1.5 rounded shrink-0 text-[var(--text-faint)] hover:text-rose-400 disabled:opacity-40 transition-colors"
             >
               <Trash2 className="w-3.5 h-3.5" />
@@ -256,7 +256,7 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
           {(session.liveRoomIds?.length ?? 0) === 0 && (
             <p className="text-[11px] text-amber-400 flex items-start gap-1.5">
               <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
-              File không có {prof.liveFileRowNoun} nào thuộc ca này. Có thể up nhầm ca, hoặc chưa phát sinh số liệu.
+              File không có {prof.liveFileRowNoun} nào thuộc ca này. Có thể tải nhầm ca, hoặc chưa phát sinh số liệu.
             </p>
           )}
         </div>
@@ -292,27 +292,27 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
       {dataSourceTier(session) === "reconciled" && (
         <p className="text-[11px] text-sky-300 flex items-start gap-1.5">
           <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-px" />
-          Ca đã đối soát bằng file sàn: up hay xoá file ở đây không đổi số của ca, chỉ dùng làm mốc khi bấm Áp dụng lại ở Đối soát.
+          Ca đã đối soát bằng file sàn: tải lên hay xoá file ở đây không đổi số của ca, chỉ dùng làm mốc khi bấm Áp dụng lại ở Đối soát.
         </p>
       )}
 
       {links.prev && !links.prev.hasSnapshot && (
         <p className="text-[11px] text-amber-300 flex items-start gap-1.5">
           <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
-          Ca này nối từ ca {links.prev.startTime}–{links.prev.endTime} nhưng ca đó chưa up file lúc giao ca — số của ca này sẽ chưa hiện cho tới khi ca đó up.
+          Ca này nối từ ca {links.prev.startTime}–{links.prev.endTime} nhưng ca đó chưa tải lên file lúc giao ca — số của ca này sẽ chưa hiện cho tới khi ca đó tải lên.
         </p>
       )}
 
       {snapshot && (
         <button
           onClick={async () => {
-            if (partCount > 0 && !(await confirm("Ca này đang có các mảnh room bị ngắt. Up lại file khác sẽ XOÁ hết mảnh (số + lý do ngắt) và tính lại từ file mới. Tiếp tục?", { danger: true }))) return;
+            if (partCount > 0 && !(await confirm("Ca này đang có các mảnh room bị ngắt. Tải lại file khác sẽ XOÁ hết mảnh (số + lý do ngắt) và tính lại từ file mới. Tiếp tục?", { danger: true }))) return;
             fileRef.current?.click();
           }}
           disabled={busy}
           className="text-[11px] text-[var(--text-muted)] hover:text-[var(--text)] underline disabled:opacity-40"
         >
-          {busy ? "Đang xử lý..." : "Up lại file khác cho ca này"}
+          {busy ? "Đang xử lý..." : "Tải lại file khác cho ca này"}
         </button>
       )}
 

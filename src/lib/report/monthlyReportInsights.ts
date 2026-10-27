@@ -422,7 +422,7 @@ export function factorValueText(key: RateFactor, s: LiveStats): string {
 }
 
 export const FACTOR_ACTION: Record<RateFactor, string> = {
-  viewsPerHour: "Điểm nghẽn ở traffic vào phòng — xem lại khung giờ, thumbnail, tiêu đề phiên và ngân sách Ads cho live.",
+  viewsPerHour: "Điểm nghẽn ở traffic vào phiên live — xem lại khung giờ, thumbnail, tiêu đề phiên và ngân sách Ads cho live.",
   liveCtr: "Điểm nghẽn ở tỷ lệ click sản phẩm — ghim sản phẩm và nhắc mở giỏ hàng thường xuyên hơn trong live.",
   ctor: "Điểm nghẽn ở bước chốt đơn — rà giá, voucher và cách chốt của nhóm SKU chủ lực.",
   aov: "Giá trị mỗi đơn giảm — thử combo hoặc ưu đãi theo ngưỡng AOV."
@@ -444,7 +444,7 @@ export function autoSummary(i: NarrativeInput): string[] {
   const k = i.shopKpi;
   const kpi = k
     ? k.partial
-      ? ` Total GMV đạt ${pctTxt(k.pct, 0)} KPI ${money(k.target)}; ${k.method === "prev" ? "theo nhịp cùng kỳ tháng trước" : "chia đều theo ngày"}, dự kiến cuối tháng ~${money(k.projected)} (${pctTxt(k.projectedPct, 0)} KPI).`
+      ? ` Total GMV đạt ${pctTxt(k.pct, 0)} KPI ${money(k.target)}; ${k.method === "prev" ? "theo tốc độ cùng kỳ tháng trước" : "chia đều theo ngày"}, dự báo cuối tháng ~${money(k.projected)} (${pctTxt(k.projectedPct, 0)} KPI).`
       : ` Total GMV đạt ${pctTxt(k.pct, 0)} KPI ${money(k.target)}${k.pct >= 100 ? ` (vượt ${money(k.actual - k.target)})` : ` (thiếu ${money(k.target - k.actual)})`}.`
     : "";
   out.push(head + target + kpi);
@@ -495,11 +495,11 @@ export function autoNextSteps(i: NarrativeInput): string[] {
     );
   }
   if (i.giftLine && /giảm từ/.test(i.giftLine)) {
-    out.push("Hỏi brand về chương trình quà tặng kèm đã giảm — nếu quà từng kéo tỷ lệ chốt đơn, đề xuất chạy lại cho các ngày campaign.");
+    out.push("Hỏi brand về chương trình quà tặng kèm đã giảm — nếu quà tặng từng giúp tăng CVR, đề xuất chạy lại cho các ngày campaign.");
   }
   const hChg = pctChange(i.livePrev.hours, i.liveCur.hours);
   const ghChg = pctChange(i.livePrev.gmvPerHour, i.liveCur.gmvPerHour);
-  if (hChg != null && ghChg != null && hChg > 5 && ghChg <= -10) out.push(`Tăng giờ live nhưng GMV/giờ giảm — ưu tiên dồn giờ vào khung giờ và ngày Campaign có GMV/giờ cao nhất thay vì kéo dài phiên.`);
+  if (hChg != null && ghChg != null && hChg > 5 && ghChg <= -10) out.push(`Tăng giờ live nhưng GMV/giờ giảm — ưu tiên phân bổ giờ vào khung giờ và ngày Campaign có GMV/giờ cao nhất thay vì kéo dài phiên.`);
   for (const t of i.sectionSteps ?? []) if (!out.includes(t)) out.push(t);
   // Có kế hoạch thì target + số ca đã ở 2 ô ngay dưới danh sách — không viết lại thành 1 việc.
   if (!i.nextPlan) out.push(`Chốt target và lịch live tháng ${i.nextMonth.slice(5)}.`);

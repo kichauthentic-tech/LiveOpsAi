@@ -141,7 +141,7 @@ export const AdsSection: React.FC<{ files: BrandFiles }> = ({ files }) => {
       )}
       {aff.length > 0 && (
         <Card>
-          <BlockHead title="Affiliate (creator ngoài)" sub={`Tab Affiliate · ${aff.length} phiên · dòng chưa có số là kế hoạch · không cộng vào GMV live của agency`} />
+          <BlockHead title="Affiliate (creator ngoài)" sub={`Tab Affiliate · ${aff.length} phiên · dòng chưa có số liệu là kế hoạch · không cộng vào GMV live của agency`} />
           <Table head={["Creator", "Ngày", "Giờ", "GMV", "Target", "Orders", "Ads cost"]}>
             {aff.map((e, i) => {
               const planned = e.status === "planned";
@@ -163,7 +163,7 @@ export const AdsSection: React.FC<{ files: BrandFiles }> = ({ files }) => {
       )}
       {promo && promo.items.length > 0 && (
         <Card>
-          <BlockHead title="Khuyến mãi" sub={`Chương trình chạy trọn trong tháng · top ${promo.items.length} theo GMV${promo.excludedMultiMonth ? ` · bỏ ${promo.excludedMultiMonth} chương trình vắt qua tháng khác (file chỉ có số luỹ kế)` : ""}`} />
+          <BlockHead title="Khuyến mãi" sub={`Chương trình chạy trọn trong tháng · top ${promo.items.length} theo GMV${promo.excludedMultiMonth ? ` · bỏ ${promo.excludedMultiMonth} chương trình vắt qua tháng khác (file chỉ có số liệu luỹ kế)` : ""}`} />
           <Table head={["Chương trình", "GMV", "Orders", "Avg. discount", "ROI"]}>
             {promo.items.map((r) => (
               <tr key={r.name}>

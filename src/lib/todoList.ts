@@ -160,7 +160,7 @@ export function buildTodos(input: TodoInput): Todo[] {
           detail: profileOf(p).staleDataHint,
           tab: "brand_dataraw",
           brandId: b.id,
-          action: "Up file"
+          action: "Tải lên file"
         });
       }
       // 2–3. Kế hoạch tháng này.
@@ -233,8 +233,8 @@ export function buildTodos(input: TodoInput): Todo[] {
         out.push({
           id: `aff-late-${b.id}`,
           level: daysBetween(oldest, today) > 3 ? "high" : "medium",
-          title: `${late.length} phiên Affiliate của ${b.name} đã qua ngày chưa có số`,
-          detail: "Up file Live Analysis (xem \"linked accounts\") ở Dữ Liệu Gốc, rồi Nạp Từ Dữ Liệu Gốc ở tab Affiliate. Phiên không diễn ra thì đánh dấu Huỷ / dời.",
+          title: `${late.length} phiên Affiliate của ${b.name} đã qua ngày chưa có số liệu`,
+          detail: "Tải lên file Live Analysis (xem \"linked accounts\") ở Dữ Liệu Gốc, rồi Nạp Từ Dữ Liệu Gốc ở tab Affiliate. Phiên không diễn ra thì đánh dấu Huỷ / dời.",
           tab: "brand_affiliate",
           brandId: b.id,
           action: "Nạp số Affiliate"
@@ -275,7 +275,7 @@ export function buildTodos(input: TodoInput): Todo[] {
     out.push({
       id: "no-host",
       level: "medium",
-      title: `${noHost.length} ca đã chạy chưa gán host`,
+      title: `${noHost.length} ca đã live chưa gán host`,
       detail: allBackfill ? "Ca nhập từ file — vào Dữ Liệu Gốc, chọn loại Creator Live Performance, gán host ở lưới nạp bù." : "Mở Sổ Ca, bấm vào ca để gán host.",
       tab: allBackfill && oneBrand ? "brand_dataraw" : "sessions",
       brandId: allBackfill && oneBrand ? brandOf : undefined,
@@ -287,7 +287,7 @@ export function buildTodos(input: TodoInput): Todo[] {
   const unconfirmed = sessions.filter(isUnconfirmedPast);
   if (unconfirmed.length > 0) {
     // 25/10 (audit Bảng Vận Hành): "chưa có số" — cùng định nghĩa với khối Cần xử lý và nhãn đỏ trên dòng ca; mở thẳng danh sách đó.
-    out.push({ id: "unconfirmed", level: "high", title: `${unconfirmed.length} ca đã qua giờ chưa có số`, detail: "Ca có diễn ra: mở ca → Giao ca (up file số liệu của sàn: TikTok Creator-Live-Performance, Shopee Live List; trợ live giao, ca không trợ thì OPS). Không diễn ra: huỷ ca.", tab: "calendar", view: "backlog", action: "Xem & giao ca" });
+    out.push({ id: "unconfirmed", level: "high", title: `${unconfirmed.length} ca đã qua giờ chưa có số liệu`, detail: "Ca có diễn ra: mở ca → Giao ca (tải lên file số liệu của sàn: TikTok Creator-Live-Performance, Shopee Live List; trợ live giao, ca không trợ thì OPS). Không diễn ra: huỷ ca.", tab: "calendar", view: "backlog", action: "Xem & giao ca" });
   }
 
   // 9b. Trùng người từ hôm nay (user chốt 06/10: một người chỉ đứng MỘT ca tại một thời điểm). Lịch nạp hàng loạt
@@ -372,7 +372,7 @@ export function buildTodos(input: TodoInput): Todo[] {
     for (const s of sessions) if (s.status !== "Cancelled" && s.date <= today) { if (s.hostId) worked.add(s.hostId); if (s.coHostId) worked.add(s.coHostId); for (const g of s.staffSegments ?? []) worked.add(g.talentId); }
     const missing = input.talents.filter((t) => worked.has(t.id) && !t.rateHidden && !(t.ratePerHour > 0) && !(t.ratePerSession > 0) && !(t.assistantRatePerHour && t.assistantRatePerHour > 0));
     if (missing.length > 0) {
-      out.push({ id: "talent-rate", level: "low", title: `${missing.length} talent đã chạy ca nhưng chưa có rate`, detail: "Chưa có rate thì lương và lãi/lỗ từng ca chưa tính được.", tab: "talents", action: "Mở Talent Pool" });
+      out.push({ id: "talent-rate", level: "low", title: `${missing.length} talent đã live nhưng chưa có rate`, detail: "Chưa có rate thì lương và P&L từng ca chưa tính được.", tab: "talents", action: "Mở Talent Pool" });
     }
   }
 
@@ -420,7 +420,7 @@ export function groupTodos(todos: Todo[]): { today: TodoRow[]; month: TodoGroup[
   for (const t of todos) {
     if (t.id.startsWith("stale-")) continue;
     if (DAY_IDS.has(t.id)) {
-      today.push(t.id === "unconfirmed" && stale.length ? { ...t, children: stale, detail: `Số liệu cũ ở ${stale.length} kênh — mở dòng để up file từng kênh. ${t.detail ?? ""}`.trim() } : t);
+      today.push(t.id === "unconfirmed" && stale.length ? { ...t, children: stale, detail: `Số liệu cũ ở ${stale.length} kênh — mở dòng để tải lên file từng kênh. ${t.detail ?? ""}`.trim() } : t);
       continue;
     }
     const g = MONTH_GROUPS.find((x) => x.match(t.id));

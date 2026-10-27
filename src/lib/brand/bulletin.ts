@@ -66,8 +66,8 @@ const hrs = (v: number) => `${v.toLocaleString("vi-VN", { maximumFractionDigits:
 export function bulletinText(p: BulletinPayload, note: string, link?: string): string {
   const lines = [`${p.name} · tháng ${Number(p.month.slice(5))}/${p.month.slice(0, 4)}${p.asOf ? ` · số tới ${p.lastShift ? `ca ${p.lastShift.startTime}–${p.lastShift.endTime} ` : ""}${ddmm(p.lastShift?.date ?? p.asOf)}` : ""}`];
   lines.push(`• Đã đạt ${money(p.actual)}${p.target ? ` / target ${money(p.target)}` : ""}${p.runRate != null ? ` — ${pct(p.runRate)} so kế hoạch tới nay` : ""}`);
-  if (p.forecast != null) lines.push(`• Dự kiến cuối tháng ~${money(p.forecast)}`);
-  if (p.hours) lines.push(`• Giờ live đã chạy ${hrs(p.hours.delivered)} / cam kết ${hrs(p.hours.committed)} (còn ${hrs(p.hours.scheduled)} trong lịch)`);
+  if (p.forecast != null) lines.push(`• Dự báo cuối tháng ~${money(p.forecast)}`);
+  if (p.hours) lines.push(`• Giờ live đã thực hiện ${hrs(p.hours.delivered)} / cam kết ${hrs(p.hours.committed)} (còn ${hrs(p.hours.scheduled)} trong lịch)`);
   if (note.trim()) lines.push("", note.trim());
   if (link) lines.push("", `Xem chi tiết: ${link}`);
   return lines.join("\n");

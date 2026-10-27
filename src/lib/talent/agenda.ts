@@ -61,7 +61,7 @@ export function splitStanding(rows: ChannelStanding[]): { clear: ChannelStanding
 /** "cao hơn mặt bằng khoảng 16%" — nói bằng chữ, không in khoảng tin cậy. */
 export function standingSentence(r: Pick<ChannelStanding, "ratio" | "verdict">): string {
   const pct = Math.round(Math.abs(r.ratio - 1) * 100);
-  return r.verdict === "above" ? `cao hơn mặt bằng khoảng ${pct}%` : r.verdict === "below" ? `thấp hơn mặt bằng khoảng ${pct}%` : "ngang mặt bằng";
+  return r.verdict === "above" ? `cao hơn trung bình nhóm khoảng ${pct}%` : r.verdict === "below" ? `thấp hơn trung bình nhóm khoảng ${pct}%` : "ngang trung bình nhóm";
 }
 
 // ---------- Tin Zalo lúc công bố lịch tuần ----------

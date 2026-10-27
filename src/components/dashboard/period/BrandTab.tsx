@@ -109,7 +109,7 @@ export const BrandTab: React.FC<{
           </div>
           {lens === "month" && (
             <Card>
-              <BlockHead title="Đã đạt so với target, cộng dồn theo ngày" sub={`Nét liền dừng ở ngày có dữ liệu cuối (${ddmm(r.asOf!)})`} />
+              <BlockHead title="Đã đạt so với target, luỹ kế theo ngày" sub={`Nét liền dừng ở ngày có dữ liệu cuối (${ddmm(r.asOf!)})`} />
               <CumulativeChart r={r} color={chartColor(brand.name)} showPace={false} />
               <CumulativeLegend color={chartColor(brand.name)} showPace={false} />
               <RowsTable kind="Tuần" rows={weeks.rows} total={weeks.total} selected={pick.week ?? ""} onPick={(id) => set({ week: id && id !== pick.week ? id : null })} card={card} lastHead="Target cả kỳ"
@@ -118,7 +118,7 @@ export const BrandTab: React.FC<{
           )}
           {lens === "wave" && (
             <Card>
-              <BlockHead title="Theo loại ngày camp" sub={`Tính đến ngày có dữ liệu cuối (${ddmm(r.asOf!)}) · bấm một dòng: Key Metrics và nhân sự live bên dưới đổi theo loại ngày đó`} />
+              <BlockHead title="Theo loại ngày Campaign" sub={`Tính đến ngày có dữ liệu cuối (${ddmm(r.asOf!)}) · bấm một dòng: Key Metrics và nhân sự live bên dưới đổi theo loại ngày đó`} />
               <RowsTable kind="Loại ngày" rows={waves.rows} total={waves.total} selected={scope.wave ?? ""} onPick={(id) => id && set({ wave: id as CampDayBucket })} card={card} lastHead="Target còn lại" remaining totalClickable={false} />
             </Card>
           )}
@@ -230,7 +230,7 @@ const RunRateHead: React.FC<{ vm: AccountVM; onNavigate: (tab: string) => void }
               <AlertTriangle className="w-4 h-4 shrink-0 mt-px text-amber-300" />
               <div className="flex-1 min-w-0 space-y-0.5">
                 {tentative && <p>Run-rate gồm {r.tail.shifts} ca sau ngày đủ số{vm.completeThrough ? ` (${ddmm(vm.completeThrough)})` : ""}{r.tail.lastShift ? `, tới ca ${r.tail.lastShift.startTime}–${r.tail.lastShift.endTime} ${ddmm(r.tail.lastShift.date)}` : ""}, mỗi ca so với target đúng ca đó{r.tail.unreconciled > 0 ? `; ${r.tail.unreconciled} ca chưa đối soát nên còn đổi` : ""}.</p>}
-                {vm.missingSessions > 0 && <p>{vm.missingSessions} ca đã live chưa có số liệu{vm.oldestMissing ? `, cũ nhất ${ddmm(vm.oldestMissing)}` : ""}{r.noDataCount - r.noDataWaiting > 0 ? ": run-rate có thể thấp hơn thực tế." : ": chưa vào run-rate, có số là tự cập nhật."}</p>}
+                {vm.missingSessions > 0 && <p>{vm.missingSessions} ca đã live chưa có số liệu{vm.oldestMissing ? `, cũ nhất ${ddmm(vm.oldestMissing)}` : ""}{r.noDataCount - r.noDataWaiting > 0 ? ": run-rate có thể thấp hơn thực tế." : ": chưa vào run-rate, có số liệu là tự cập nhật."}</p>}
               </div>
               {vm.missingSessions > 0 && <button type="button" onClick={() => onNavigate("sessions")} className="font-bold underline underline-offset-2 hover:text-amber-100 min-h-[24px]">Mở Sổ Ca</button>}
             </div>
@@ -316,7 +316,7 @@ const ShiftPicker: React.FC<{ r: NonNullable<AccountVM["report"]>; day: string; 
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-3 text-sm">
             <b className="text-[var(--text)]">Ngày {ddmm(d.date)} · {WEEKDAY[weekdayIdx(d.date)]}</b>
             <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--surface-base)] text-[var(--text-muted)]">{d.bucket === "daily" ? "Daily" : WAVE_NAME[d.bucket]}</span>
-            <span className="text-xs text-[var(--text-faint)]">{d.withData}/{d.shifts} ca có số</span>
+            <span className="text-xs text-[var(--text-faint)]">{d.withData}/{d.shifts} ca có số liệu</span>
             <span className="sm:ml-auto text-[var(--text-muted)]">Đạt <b className="text-[var(--text)] tabular-nums">{d.withData ? money(d.actual) : "—"}</b> / target <b className="text-[var(--text)] tabular-nums">{money(d.target)}</b>{d.withData && d.target ? <> · <b className="tabular-nums">{pct(d.actual / d.target)}</b></> : null}</span>
           </div>
           <div className="mt-2 divide-y divide-[var(--border-muted)]">
@@ -366,7 +366,7 @@ const KeyMetrics: React.FC<{ platform: ReportPlatform; scope: LensScope }> = ({ 
       <div key={d.key} className={`min-w-0 ${big ? "h-full rounded-xl border border-[var(--border)] bg-[var(--surface-base)] p-3" : "py-1.5"}`}>
         <p className="text-xs text-[var(--text-muted)] truncate">{d.label}</p>
         <p className={`${big ? "text-lg" : "text-sm"} font-black tabular-nums text-[var(--text)] leading-tight`}>{prof.metrics.fmt(d, cv)}</p>
-        <p className="text-[11px] truncate">{ch == null ? <span className="text-[var(--text-faint)]">{baseGot.length ? "—" : "kỳ so sánh chưa có số"}</span> : <><span className={`font-bold ${cls}`}>{ch >= 0 ? "+" : "−"}{(Math.abs(ch) * 100).toLocaleString("vi-VN", { maximumFractionDigits: Math.abs(ch) < 0.1 ? 1 : 0 })}%</span> <span className="text-[var(--text-faint)]">({prof.metrics.fmt(d, bn)}{vol && norm ? `/${scope.unit}` : ""})</span></>}</p>
+        <p className="text-[11px] truncate">{ch == null ? <span className="text-[var(--text-faint)]">{baseGot.length ? "—" : "kỳ so sánh chưa có số liệu"}</span> : <><span className={`font-bold ${cls}`}>{ch >= 0 ? "+" : "−"}{(Math.abs(ch) * 100).toLocaleString("vi-VN", { maximumFractionDigits: Math.abs(ch) < 0.1 ? 1 : 0 })}%</span> <span className="text-[var(--text-faint)]">({prof.metrics.fmt(d, bn)}{vol && norm ? `/${scope.unit}` : ""})</span></>}</p>
       </div>
     );
   };
@@ -374,7 +374,7 @@ const KeyMetrics: React.FC<{ platform: ReportPlatform; scope: LensScope }> = ({ 
     <Card>
       <BlockHead title={`Key Metrics · ${scope.label}`} sub={<><span className="inline-block px-2 py-0.5 rounded-full bg-[var(--surface-base)] text-[var(--text-muted)] mr-1.5">theo: {scope.by}</span>% thay đổi so với {scope.baseLabel}, số trong ngoặc là giá trị kỳ so sánh{norm ? ` (chỉ số tổng quy về bình quân mỗi ${scope.unit})` : ""} · {curGot.length} ca có số liệu</>} />
       {curGot.length === 0 ? (
-        <p className="text-sm text-[var(--text-muted)]">Không có ca có số trong {scope.label}. Chọn ngày, đợt hoặc ca khác.</p>
+        <p className="text-sm text-[var(--text-muted)]">Không có ca có số liệu trong {scope.label}. Chọn ngày, đợt hoặc ca khác.</p>
       ) : (
         <div className="space-y-3">
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-2">{prof.metrics.defs.filter((d) => d.group === "result").map((d) => cell(d, true))}</div>
@@ -401,10 +401,10 @@ const BelowNote: React.FC<{ lens: Lens; wave?: CampDayBucket; day: string | null
   const w = wave ? (wave === "daily" ? "những ngày đó" : `các ngày ${WAVE_NAME[wave]}`) : "các ngày của đợt";
   const note =
     lens === "wave"
-      ? ["Shop, SKU, quảng cáo và khuyến mãi không tách được theo đợt", `File brand gửi chỉ có số cả tháng. Muốn xem theo đợt cần brand xuất thêm file SKU riêng cho ${w}.`, back]
+      ? ["Shop, SKU, quảng cáo và khuyến mãi không tách được theo đợt", `File brand gửi chỉ có số liệu cả tháng. Muốn xem theo đợt cần brand xuất thêm file SKU riêng cho ${w}.`, back]
       : lens === "day"
         ? [`Ngày ${day ? ddmm(day) : ""}: chỉ xem số của ngày ở trên và Key Metrics`, "Một ngày chỉ 2–3 ca, quá ít để xếp hạng host hay so khung giờ. Host và trợ live từng ca ở nút Ca; shop, SKU, quảng cáo ở nút Tháng.", <><button type="button" onClick={() => onGo("shift")} className="text-xs font-bold px-3 py-1.5 rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] min-h-[30px]">Xem các ca ngày này</button>{back}</>]
-        : ["Ca đang chọn: host, trợ live và số của ca ở bảng trên", "Nhân sự live, khung giờ, shop và quảng cáo cần nhiều ca hoặc chỉ có số cả tháng: xem ở nút Tháng hoặc Đợt campaign.", back];
+        : ["Ca đang chọn: host, trợ live và số của ca ở bảng trên", "Nhân sự live, khung giờ, shop và quảng cáo cần nhiều ca hoặc chỉ có số liệu cả tháng: xem ở nút Tháng hoặc Đợt campaign.", back];
   return (
     <Card className="!py-3">
       <div className="flex flex-wrap items-center gap-3">

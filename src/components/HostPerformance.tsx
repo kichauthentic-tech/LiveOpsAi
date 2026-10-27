@@ -198,7 +198,7 @@ export function HostPerformance({ platform, sessions, brands }: HostPerformanceP
               </div>
             )}
             <select value={brandId} onChange={(e) => setBrandId(e.target.value)} className={inputCls} aria-label="Brand">
-              {platformBrands.length === 0 && <option value="">Chưa brand nào có số</option>}
+              {platformBrands.length === 0 && <option value="">Chưa brand nào có số liệu</option>}
               {platformBrands.map((b) => (
                 <option key={b.id} value={b.id}>{b.name}</option>
               ))}

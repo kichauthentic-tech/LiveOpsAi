@@ -291,7 +291,7 @@ export function controlLine(rows: ControlRow[]): string | null {
   const r = ordered[0];
   const v = controlVerdict(r);
   if (!r || !v) return null;
-  const vis = r.visitorsChg != null ? `, lượt vào shop ${signed(r.visitorsChg, 0)}` : "";
+  const vis = r.visitorsChg != null ? `, lượt truy cập shop ${signed(r.visitorsChg, 0)}` : "";
   return `So với các kênh còn lại của shop (${GROUP_LABEL[r.key]}): livestream YFB ${signed(r.liveChg!, 0)}, các kênh còn lại ${signed(r.restChg!, 0)}${vis} ⇒ ${VERDICT_TEXT[v]}.`;
 }
 
@@ -400,5 +400,5 @@ export function dailyGap(g: DayGroupStats | undefined): number | null {
 export function dailyGapLine(g: DayGroupStats | undefined): string | null {
   const gap = dailyGap(g);
   if (gap == null || !g) return null;
-  return `Nếu Daily giữ GMV/giờ kỳ trước (${money(g.prev.gmvPerHour!)}/giờ, nay ${money(g.cur.gmvPerHour!)}/giờ) với ${g.cur.hours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })} giờ live đã chạy, LIVE GMV có thêm ~${money(gap)}.`;
+  return `Nếu Daily giữ GMV/giờ kỳ trước (${money(g.prev.gmvPerHour!)}/giờ, nay ${money(g.cur.gmvPerHour!)}/giờ) với ${g.cur.hours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })} giờ live đã thực hiện, LIVE GMV có thêm ~${money(gap)}.`;
 }

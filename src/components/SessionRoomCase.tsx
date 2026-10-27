@@ -175,7 +175,7 @@ export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSes
   const confirmLink = async () => {
     const cand = chooser?.find((c) => c.sessionId === pickedNext);
     if (!cand) return;
-    if (!(await confirm(`Xác nhận: ${unit} của ca này chạy tiếp sang ca ${linkedLabel(cand)}? Số của ca sau = ${unit} cộng dồn trừ file ca này up lúc giao ca.`))) return;
+    if (!(await confirm(`Xác nhận: ${unit} của ca này chạy tiếp sang ca ${linkedLabel(cand)}? Số của ca sau = ${unit} cộng dồn trừ file ca này tải lên lúc giao ca.`))) return;
     if (await run(() => linkSessionRoom(s.id, cand.sessionId))) setChooser(null);
   };
 
@@ -187,7 +187,7 @@ export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSes
   };
 
   const doEstimate = async (prevId: string, nextId: string, label: string) => {
-    if (!(await confirm(`Chia ƯỚC LƯỢNG theo thời gian cho ca ${label} (vì không có file lúc giao ca)? Số của cả hai ca sẽ gắn nhãn ước lượng, tới khi trợ up file thật.`, { danger: true }))) return;
+    if (!(await confirm(`Chia ƯỚC LƯỢNG theo thời gian cho ca ${label} (vì không có file lúc giao ca)? Số của cả hai ca sẽ gắn nhãn ước lượng, tới khi trợ tải lên file thật.`, { danger: true }))) return;
     await run(() => estimateHandoverSplit(prevId, nextId));
   };
 
@@ -288,25 +288,25 @@ export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSes
         <div className={`rounded-xl border p-2.5 text-xs space-y-1.5 ${waiting ? "border-amber-800 bg-amber-950/40" : "border-sky-900 bg-sky-950/30"}`}>
           <p className="text-[var(--text)]">
             <Link2 className="w-3.5 h-3.5 inline mr-1 -mt-0.5" />
-            Ca này nối từ ca <b>{linkedLabel(prev)}</b>: số = {unit} cộng dồn <b>trừ</b> mốc ca đó đã up lúc giao ca.
+            Ca này nối từ ca <b>{linkedLabel(prev)}</b>: số = {unit} cộng dồn <b>trừ</b> mốc ca đó đã tải lên lúc giao ca.
           </p>
           {waiting ? (
             <>
               <p className="text-amber-300 flex items-start gap-1.5">
                 <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
-                Ca trước chưa up file lúc giao ca ⇒ số của ca này đang KHOÁ (chưa ghi). Nhờ trợ ca trước up file.
+                Ca trước chưa tải lên file lúc giao ca ⇒ số của ca này đang KHOÁ (chưa ghi). Nhờ trợ ca trước tải lên file.
               </p>
               {isOps && (
                 <button onClick={() => void doEstimate(prev.id, s.id, `${prev.startTime}–${prev.endTime}`)} disabled={busy || !snapshot} className={btnGhost}>
                   Ca trước quên up — chia ước lượng theo thời gian
                 </button>
               )}
-              {isOps && !snapshot && <p className="text-[11px] text-[var(--text-faint)]">Cần up file của ca này trước thì mới chia ước lượng được.</p>}
+              {isOps && !snapshot && <p className="text-[11px] text-[var(--text-faint)]">Cần tải lên file của ca này trước thì mới chia ước lượng được.</p>}
             </>
           ) : prev.isEstimated ? (
             <p className="text-amber-300 flex items-start gap-1.5">
               <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
-              Mốc của ca trước là ƯỚC LƯỢNG (chia theo thời gian). Khi trợ ca trước up file thật, số của ca này tự cập nhật.
+              Mốc của ca trước là ƯỚC LƯỢNG (chia theo thời gian). Khi trợ ca trước tải lên file thật, số của ca này tự cập nhật.
             </p>
           ) : (
             <p className="text-sky-200/80">Ca trước đã có mốc — số của ca này đã trừ chính xác.</p>
@@ -324,7 +324,7 @@ export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSes
           {!snapshot ? (
             <p className="text-amber-300 flex items-start gap-1.5">
               <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
-              Chưa up file lúc giao ca — ca sau sẽ bị khoá số cho tới khi ca này up file (đây chính là mốc để tách số hai ca).
+              Chưa tải lên file lúc giao ca — ca sau sẽ bị khoá số cho tới khi ca này tải lên file (đây chính là mốc để tách số hai ca).
             </p>
           ) : (
             <p className="text-sky-200/80">Đã có mốc giao ca — ca sau trừ đúng file này.</p>
@@ -337,7 +337,7 @@ export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSes
             )}
             {isOps && !snapshot && next.hasSnapshot && (
               <button onClick={() => void doEstimate(s.id, next.id, `${s.startTime}–${s.endTime}`)} disabled={busy} className={btnGhost}>
-                Quên up file — chia ước lượng theo thời gian
+                Quên tải lên file — chia ước lượng theo thời gian
               </button>
             )}
           </div>
@@ -435,7 +435,7 @@ export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSes
           {isOps && prevShift && (
             <button
               onClick={async () => {
-                if (!(await confirm(`Xác nhận: ${unit} của ca ${linkedLabel(prevShift)} chạy tiếp sang ca này? Số ca này = ${unit} cộng dồn trừ file ca đó up lúc giao ca.`))) return;
+                if (!(await confirm(`Xác nhận: ${unit} của ca ${linkedLabel(prevShift)} chạy tiếp sang ca này? Số ca này = ${unit} cộng dồn trừ file ca đó tải lên lúc giao ca.`))) return;
                 await run(() => linkSessionRoom(prevShift.id, s.id));
               }}
               disabled={busy}
@@ -459,7 +459,7 @@ export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSes
                 <React.Fragment key={c.id}>
                   {bd && (
                     <span
-                      title={bd.kind === "linked" ? `${Unit} chạy tiếp: ca sau trừ mốc ca trước${bd.locked ? " — ca trước CHƯA up file ⇒ ca sau đang khoá số" : ""}` : `Chưa xác nhận nối — ${unit} mới ở ca sau`}
+                      title={bd.kind === "linked" ? `${Unit} chạy tiếp: ca sau trừ mốc ca trước${bd.locked ? " — ca trước CHƯA tải lên file ⇒ ca sau đang khoá số" : ""}` : `Chưa xác nhận nối — ${unit} mới ở ca sau`}
                       className={`font-bold px-1 ${bd.kind === "linked" ? (bd.locked ? "text-amber-300" : "text-sky-300") : "text-[var(--text-faint)]"}`}
                     >
                       {bd.kind === "linked" ? (bd.locked ? "⛓🔒" : "⛓") : "○"}
@@ -497,10 +497,10 @@ export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSes
           <div className="flex flex-wrap gap-2">
             <button onClick={() => { setPartForm(null); setError(null); }} disabled={busy} className="min-h-10 px-4 rounded-xl bg-[var(--surface-elevated)] text-[var(--text-muted)] font-bold text-xs">Thôi</button>
             <button onClick={() => fileRef.current?.click()} disabled={busy} className="min-h-10 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black text-xs">
-              {busy ? "Đang xử lý..." : `Up file riêng của lượt ${nextTurnNo}`}
+              {busy ? "Đang xử lý..." : `Tải lên file riêng của lượt ${nextTurnNo}`}
             </button>
             {rooms.length > 1 && (
-              <button onClick={() => void savePart([], null)} disabled={busy} className="min-h-10 px-4 rounded-xl bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-[var(--text)] font-bold text-xs" title={`Các ${unit} đã nằm sẵn trong file đã up — chỉ ghi lý do`}>
+              <button onClick={() => void savePart([], null)} disabled={busy} className="min-h-10 px-4 rounded-xl bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-[var(--text)] font-bold text-xs" title={`Các ${unit} đã nằm sẵn trong file đã tải lên — chỉ ghi lý do`}>
                 Chỉ ghi nhận lý do ({unit} đã có trong file)
               </button>
             )}
@@ -521,10 +521,10 @@ export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSes
             <button
               onClick={() => setPartForm({ reason: "network", note: "" })}
               disabled={busy || !snapshot}
-              title={snapshot ? "Mỗi lượt restart có một lần up file riêng" : "Up file của lượt đầu trước, rồi mới thêm lượt restart"}
+              title={snapshot ? "Mỗi lượt restart có một lần tải lên file riêng" : "Tải lên file của lượt đầu trước, rồi mới thêm lượt restart"}
               className={btnGhost}
             >
-              <Plus className="w-3.5 h-3.5" /> Thêm lượt restart (up file riêng)
+              <Plus className="w-3.5 h-3.5" /> Thêm lượt restart (tải lên file riêng)
             </button>
           )}
         </div>
@@ -532,11 +532,11 @@ export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSes
       {canEdit && embedded && restartFlagged && !chooser && !partForm && (
         <p className="text-[11px] text-amber-300/90">
           {snapshot
-            ? `Lượt restart chưa có trong file vừa up thì bấm "Thêm lượt restart" — mỗi lượt một file riêng.`
-            : `Có restart: file ở bước 1 thường có đủ các lượt — tick hết ${prof.liveFileRowNoun} của ca ở đó, app hỏi lý do từng lượt. Lượt nào không có trong file thì up file riêng bằng "Thêm lượt restart" sau khi xong bước 1.`}
+            ? `Lượt restart chưa có trong file vừa tải lên thì bấm "Thêm lượt restart" — mỗi lượt một file riêng.`
+            : `Có restart: file ở bước 1 thường có đủ các lượt — chọn hết ${prof.liveFileRowNoun} của ca ở đó, app hỏi lý do từng lượt. Lượt nào không có trong file thì tải lên file riêng bằng "Thêm lượt restart" sau khi xong bước 1.`}
         </p>
       )}
-      {canEdit && !embedded && !snapshot && !chooser && !partForm && <p className="text-[11px] text-[var(--text-faint)]">Restart giữa ca: up file lượt đầu trước, rồi bấm "Thêm lượt restart" — mỗi lượt có một lần up file riêng.</p>}
+      {canEdit && !embedded && !snapshot && !chooser && !partForm && <p className="text-[11px] text-[var(--text-faint)]">Restart giữa ca: tải lên file lượt đầu trước, rồi bấm "Thêm lượt restart" — mỗi lượt có một lần tải lên file riêng.</p>}
 
       {error && <ErrorLine text={error} />}
       <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleFile(f); }} />

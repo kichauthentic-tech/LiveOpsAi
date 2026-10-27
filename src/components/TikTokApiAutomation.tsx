@@ -73,7 +73,7 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
       {!tiktokStatus?.connected && (
         <div className="bg-amber-500/10 border border-amber-500/40 text-[var(--text)] text-xs p-3 rounded-xl">
           <b>Chưa dùng được.</b> Agency đang chờ TikTok cấp quyền cho ứng dụng. Trong lúc chờ, số liệu vào app bằng
-          cách tải file từ TikTok Shop rồi up ở <b>Dữ Liệu Gốc</b> (trong từng brand) — một lần up là tự đối soát ca.
+          cách tải file từ TikTok Shop rồi tải lên ở <b>Dữ Liệu Gốc</b> (trong từng brand) — một lần tải lên là tự đối soát ca.
         </div>
       )}
 

@@ -50,7 +50,7 @@ describe("việc Affiliate", () => {
   test("phiên kế hoạch đã qua ngày ≥ 2 ngày chưa có số ⇒ nhắc, đỏ khi trễ quá 3 ngày", () => {
     const rows = [aff("2026-10-01", "planned", "5/10/2026"), aff("2026-10-01", "planned", "7/10/2026"), aff("2026-10-01", "planned", "20/10/2026")];
     const t = buildTodos(withAff(rows, ["crocs|2026-10"])).find((x) => x.id === "aff-late-crocs")!;
-    expect(t.title).toBe("1 phiên Affiliate của CROCS đã qua ngày chưa có số");
+    expect(t.title).toBe("1 phiên Affiliate của CROCS đã qua ngày chưa có số liệu");
     expect(t.level).toBe("medium");
     expect(t.tab).toBe("brand_affiliate");
     expect(t.brandId).toBe("crocs");

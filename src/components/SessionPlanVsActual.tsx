@@ -146,7 +146,7 @@ export function SessionPlanVsActual({ session: s, planHours, liveHours, hideMetr
             </label>
           </div>
           <p className="text-[11px] text-[var(--text-faint)]">
-            Số gõ tay là tạm tính. Khi up file số liệu (Creator-Live-Performance / Live List) hoặc giao ca, số trong file tự thay các ô này. Giờ live để trống nếu chưa biết.
+            Số gõ tay là tạm tính. Khi tải lên file số liệu (Creator-Live-Performance / Live List) hoặc giao ca, số trong file tự thay các ô này. Giờ live để trống nếu chưa biết.
           </p>
           {error && <p className="text-[11px] text-rose-300">{error}</p>}
           <div className="flex justify-end gap-2">
@@ -161,7 +161,7 @@ export function SessionPlanVsActual({ session: s, planHours, liveHours, hideMetr
       ) : (
         !isBrandView && !editing && (
           <p className="mt-2 text-[11px] text-[var(--text-faint)]">
-            {canEnter ? "Cột Thực tế tự cập nhật khi up file số liệu; chưa có file thì nhập tay." : "Cột Thực tế lấy từ file số liệu / giao ca / đối soát."}
+            {canEnter ? "Cột Thực tế tự cập nhật khi tải lên file số liệu; chưa có file thì nhập tay." : "Cột Thực tế lấy từ file số liệu / giao ca / đối soát."}
           </p>
         )
       )}

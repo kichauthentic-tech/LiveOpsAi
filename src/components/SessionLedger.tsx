@@ -60,7 +60,7 @@ const STATUS_CLS = SESSION_STATUS_CLS;
 const SUB_COL = "hidden sm:table-cell py-2.5 px-2";
 
 const MISSING_LABEL: Record<MissingStep, string> = {
-  snapshot: "Chưa up file số liệu",
+  snapshot: "Chưa tải lên file số liệu",
   report: "Chưa giao ca",
   reconcile: "Chưa đối soát"
 };
@@ -271,8 +271,8 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
         title="Sổ Ca"
         description={
           isBrandView
-            ? "Từng ca live đã chạy cho brand: giờ live thật, GMV, đơn, lượt xem. Số “Tạm tính” còn chờ sàn cập nhật, “Đã chốt” là số đối soát cuối kỳ."
-            : "Từng ca đã/đang chạy: số thật của ca, số đó tin được tới đâu, và còn thiếu bước nào (TikTok: up file → giao ca; Shopee: giao ca; rồi đối soát) để chốt tháng."
+            ? "Từng ca live đã diễn ra cho brand: giờ live thật, GMV, đơn, lượt xem. Số “Tạm tính” còn chờ sàn cập nhật, “Đã chốt” là số đối soát cuối kỳ."
+            : "Từng ca đã/đang chạy: số liệu thực tế của ca, số đó tin được tới đâu, và còn thiếu bước nào (TikTok: tải lên file → giao ca; Shopee: giao ca; rồi đối soát) để chốt tháng."
         }
         actions={
           <>
@@ -337,7 +337,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
             hơn 3 nút xám mà người đọc phải quét từng cái mới biết là (0). */}
         {!isBrandView && noMissing && (
           <p className="text-[11px] text-[var(--text-faint)]">
-            Không còn ca nào chưa up file, chưa giao ca hay chưa đối soát trong phạm vi đang lọc (ca nhập từ file, ca chưa diễn ra và ca huỷ không cần).
+            Không còn ca nào chưa tải lên file, chưa giao ca hay chưa đối soát trong phạm vi đang lọc (ca nhập từ file, ca chưa diễn ra và ca huỷ không cần).
           </p>
         )}
         {!isBrandView && !noMissing && (
@@ -366,7 +366,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
 
         {/* Dải tổng hợp theo bộ lọc */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-          <StatTile frame="card" label="Số ca" value={String(summary.total)} hint={summary.countable < summary.total ? `${summary.countable} ca có số` : undefined} />
+          <StatTile frame="card" label="Số ca" value={String(summary.total)} hint={summary.countable < summary.total ? `${summary.countable} ca có số liệu` : undefined} />
           <StatTile frame="card" label="Giờ live" value={fmtHours(summary.hours)} hint="giờ thật, thiếu thì lấy giờ kế hoạch" />
           <StatTile frame="card" label="GMV" value={allHidden ? lockedValue : perfValue((x) => fmtVndShort(x.gmv))} tone={allHidden ? undefined : "text-[var(--success)]"} valueTitle={allHidden ? LOCKED_TITLE : undefined} />
           <StatTile frame="card" label="Orders" value={allHidden ? lockedValue : perfValue((x) => fmtInt(x.orders))} valueTitle={allHidden ? LOCKED_TITLE : undefined} />
@@ -417,7 +417,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
             </thead>
             <tbody>
               {/* Ca của những ngày SAU hôm nay gập thành một dòng (bố cục 18/10): sổ xếp ngày mới nhất lên đầu nên trước đây
-                  màn mở ra là 31/10, 30/10… toàn ca "Sắp tới" chưa có số (đo CROCS T10: 3 màn đầu không một ô số nào). */}
+                  màn mở ra là 31/10, 30/10… toàn ca "Sắp tới" chưa có số liệu (đo CROCS T10: 3 màn đầu không một ô số nào). */}
               {upcomingDays.length > 0 && (
                 <tr className="border-b border-[var(--border-muted)]">
                   <td colSpan={colCount} className="p-0">

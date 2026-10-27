@@ -223,7 +223,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
       <PageHeader
         icon={DollarSign}
         title="Finance & P&L"
-        description="Lãi/lỗ theo từng ca đã chạy xong trong tháng: GMV, hoa hồng agency, chi phí host, studio và ads."
+        description="P&L theo từng ca đã kết thúc trong tháng: GMV, hoa hồng agency, chi phí host, studio và ads."
         actions={<MonthPicker value={month} onChange={setMonth} size="sm" />}
       />
 
@@ -232,7 +232,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
         <div className="border-b border-[var(--border)] pb-3 flex items-center justify-between flex-wrap gap-2">
           <div>
             <h3 className="font-bold text-[var(--text)] text-base flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-[var(--accent-text)]" /> Lãi/lỗ từng ca
+              <TrendingUp className="w-5 h-5 text-[var(--accent-text)]" /> P&amp;L từng ca
             </h3>
             <PageIntro>
               GMV lấy từ số của ca, tiền trả host/trợ live tính theo rate ở Talent Pool, doanh thu agency theo giá của brand (CRM → Hợp đồng & giá). Chi phí studio nhập ở đây, Ads theo ca lấy từ report ca. Chỉ CEO duyệt.
@@ -240,7 +240,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
           </div>
           <div className="text-right text-xs bg-[var(--surface-elevated)]/50 border border-[var(--border)] rounded-xl px-4 py-2">
             <div className="text-[var(--text-muted)]">
-              Tổng {rows.length} ca{backfillCount > 0 && rows.length > 0 ? ` (không tính ${backfillCount} ca nạp bù)` : ""} · Lãi/lỗ
+              Tổng {rows.length} ca{backfillCount > 0 && rows.length > 0 ? ` (không tính ${backfillCount} ca nạp bù)` : ""} · P&amp;L
               {missingSummary.rowsAffected > 0 && (
                 <span className="text-amber-300 font-bold"> · {rows.length - missingSummary.rowsAffected}/{rows.length} ca đủ rate</span>
               )}
@@ -269,7 +269,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                 <div className="space-y-0.5 min-w-0">
                   <p className="text-rose-200">
                     <b>{missingSummary.rowsAffected}/{rows.length} ca thiếu rate/giá</b> — không cộng vào tổng ở trên. Số từng ca bên dưới
-                    đang coi phần chưa nhập là 0 (hoặc dùng % mặc định trong code) nên chỉ để tham khảo.
+                    đang tính phần chưa nhập là 0 (hoặc dùng % mặc định trong code) nên chỉ để tham khảo.
                   </p>
                   <p className="text-[var(--text-muted)]">
                     {missingSummary.byKind.map(([kind, n], i) => (
@@ -321,7 +321,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                   <th className="py-2 pr-3 text-right">Ca</th>
                   <th className="py-2 pr-3 text-right">Doanh thu agency</th>
                   <th className="py-2 pr-3 text-right">Trả host / trợ live</th>
-                  <th className="py-2 pr-3 text-right">Lãi/lỗ</th>
+                  <th className="py-2 pr-3 text-right">P&amp;L</th>
                   <th className="py-2 pr-3 text-right">Biên</th>
                 </tr>
               </thead>
@@ -366,7 +366,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                   <th className="py-2 pr-3">Chi phí studio</th>
                   <th className="py-2 pr-3">Chi phí ads (report ca)</th>
                   <th className="py-2 pr-3">Trả host / trợ live</th>
-                  <th className="py-2 pr-3">Lãi/lỗ</th>
+                  <th className="py-2 pr-3">P&amp;L</th>
                   <th className="py-2 pr-3">Duyệt</th>
                 </tr>
               </thead>

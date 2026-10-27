@@ -42,7 +42,7 @@ export interface CloseColumn {
 /** Cột theo sàn — cùng thứ tự với trang report đọc chúng. */
 export const CLOSE_COLUMNS: Record<ReportPlatform, CloseColumn[]> = {
   TikTok: [
-    { key: "sessions", label: "Ca có số", tab: "brand_sessions" },
+    { key: "sessions", label: "Ca có số liệu", tab: "brand_sessions" },
     { key: "reconcile", label: "Đối soát", tab: "brand_dataraw" },
     { key: "shop", label: "Shop Analytics", tab: "brand_dataraw", fileType: "shop_analytics" },
     { key: "products", label: "Sản phẩm", tab: "brand_dataraw", fileType: "product_list" },
@@ -53,7 +53,7 @@ export const CLOSE_COLUMNS: Record<ReportPlatform, CloseColumn[]> = {
     { key: "report", label: "Report", tab: "brand_monthly_report" }
   ],
   Shopee: [
-    { key: "sessions", label: "Ca có số", tab: "brand_sessions" },
+    { key: "sessions", label: "Ca có số liệu", tab: "brand_sessions" },
     { key: "reconcile", label: "Đối soát", tab: "brand_dataraw" },
     { key: "shopeeLive", label: "Live List", tab: "brand_dataraw", fileType: "shopee_live_list" },
     { key: "shopeeDaily", label: "Theo ngày", tab: "brand_dataraw", fileType: "shopee_daily" },
@@ -172,7 +172,7 @@ export function closeRow(i: CloseRowInput): CloseCell[] {
         if (done.length === 0) return { key: col.key, state: "na", text: mine.length ? "chưa có ca đã live" : "không có ca" };
         const noData = done.filter(isUnconfirmedPast).length;
         const noHost = done.filter((s) => !s.hostId && !s.hostName).length;
-        const parts = [noData ? `${noData} ca chưa có số` : null, noHost ? `${noHost} ca chưa gán host` : null].filter(Boolean);
+        const parts = [noData ? `${noData} ca chưa có số liệu` : null, noHost ? `${noHost} ca chưa gán host` : null].filter(Boolean);
         return parts.length ? { key: col.key, state: "partial", text: parts.join(" · ") } : { key: col.key, state: "ok", text: `${done.length} ca đủ số` };
       }
       case "reconcile": {
@@ -186,7 +186,7 @@ export function closeRow(i: CloseRowInput): CloseCell[] {
         // Phiên kế hoạch đã qua ngày mà chưa có số + file Live Analysis (nguồn số affiliate) phủ tới đâu.
         const late = rows.filter((r) => r.status === "planned" && (parseDayLabel(r.liveDateLabel) ?? "9999") < i.today).length;
         const cov = fileCoverage(i.stamps, "affiliate_live_analysis", i.month, from);
-        if (late > 0) return { key: col.key, state: "partial", text: `${late} phiên chưa có số` };
+        if (late > 0) return { key: col.key, state: "partial", text: `${late} phiên chưa có số liệu` };
         if (due > 0 && cov.days < due) return { key: col.key, state: "partial", text: `Live Analysis Affiliate ${cov.days}/${due} ngày` };
         return { key: col.key, state: "ok", text: `${rows.length} phiên` };
       }

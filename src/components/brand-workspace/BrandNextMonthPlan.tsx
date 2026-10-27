@@ -125,7 +125,7 @@ export const BrandNextMonthPlan: React.FC<BrandNextMonthPlanProps> = ({ brandId,
       <PageHeader
         icon={CalendarCheck2}
         title={`Kế Hoạch ${fmtMonthLabel(nextMonth)} · ${channelTitle(brandName, platform, multiPlatform)}`}
-        description="Lịch lên sóng agency dự kiến xếp cho tháng sau. Xem qua rồi bấm xác nhận — nếu agency đổi gì sau đó, mục xác nhận sẽ tự mất để bạn biết lịch đã khác."
+        description="Lịch livestream YFB dự kiến cho tháng sau. Xem qua rồi bấm xác nhận — nếu agency đổi gì sau đó, mục xác nhận sẽ tự mất để bạn biết lịch đã khác."
       />
 
       {errorMsg && (

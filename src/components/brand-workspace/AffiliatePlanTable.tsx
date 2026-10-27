@@ -154,7 +154,7 @@ export function AffiliatePlanTable({ rows, month, fxRate, readOnly, campOverride
               <th className={headL}>Ngày</th>
               <th className={headL}>Creator</th>
               <th className={headL}>Camp</th>
-              <th className={headL} title="Quy mô camp (Big/Medium…), khác với tên camp D-Day / Mid-Month / Pay Day">Quy mô</th>
+              <th className={headL} title="Quy mô Campaign (Big/Medium…), khác với tên Campaign D-Day / Mid-Month / Pay Day">Quy mô</th>
               <th className={headR}>Timeline</th>
               <th className={headR} title="Tự tính từ Timeline; gõ số vào để đè">Duration</th>
               <th className={headR}>Target GMV</th>

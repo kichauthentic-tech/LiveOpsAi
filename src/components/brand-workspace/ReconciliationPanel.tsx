@@ -46,8 +46,8 @@ const BUCKET_LABEL: Record<ReconciliationBucket, string> = {
 };
 
 const BUCKET_HINT: Record<ReconciliationBucket, string> = {
-  agency: "Chia đúng theo snapshot trợ live up lúc giao ca; ca cuối không up thì nhận phần sau mốc cuối.",
-  review: "Có ca chưa up snapshot hoặc up trễ — phần không có mốc chia theo giờ (ô ≈), phần có mốc vẫn chia đúng. Nên nhắc trợ up đúng lúc giao ca.",
+  agency: "Chia đúng theo snapshot trợ live tải lên lúc giao ca; ca cuối không tải lên thì nhận phần sau mốc cuối.",
+  review: "Có ca chưa tải snapshot lên hoặc tải lên trễ — phần không có mốc chia theo giờ (ô ≈), phần có mốc vẫn chia đúng. Nên nhắc trợ live tải lên đúng lúc giao ca.",
   unassigned: "Không nằm trong khung giờ ca nào của agency. Không ảnh hưởng số liệu ca, chỉ cần gán nhãn để còn so hiệu suất agency với inhouse.",
   inhouse: "Đã xác nhận là brand tự live, không tính vào ca nào của agency."
 };
@@ -67,7 +67,7 @@ const ORDER: ReconciliationBucket[] = ["agency", "review", "unassigned", "inhous
 const METHOD_TITLE: Record<ReconShare["method"], string> = {
   whole: "Cả phiên thuộc ca này",
   snapshot: "Theo snapshot lúc giao ca",
-  time: "Có phần ước lượng theo giờ — thiếu snapshot hoặc up trễ",
+  time: "Có phần ước lượng theo giờ — thiếu snapshot hoặc tải lên trễ",
   manual: "GMV gõ tay — phần còn lại của phiên chia cho các ca kia"
 };
 
@@ -220,8 +220,8 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">
         <h4 className="font-bold text-[var(--text)] text-xs">Đối soát số liệu — {brandName}</h4>
         <p className="text-[11px] text-[var(--text-muted)] mt-1 max-w-3xl">
-          Mỗi lần up file ở dưới tự tạo một lần đối soát: app khớp từng phiên live với ca CÓ SẴN của brand theo giờ, bạn xem rổ rồi bấm Áp dụng để thay số tạm bằng số cuối của sàn.
-          Phiên chạy xuyên nhiều ca: chia theo các mốc snapshot (tính theo giờ up thật), chỉ phần không có mốc mới chia theo giờ (≈) — tổng luôn đúng bằng file. Biết số đúng của một ca thì bấm vào ô ca để gõ (✎): phần còn lại tự chia cho các ca kia, đơn/lượt xem theo % GMV.
+          Mỗi lần tải lên file ở dưới tự tạo một lần đối soát: app khớp từng phiên live với ca CÓ SẴN của brand theo giờ, bạn xem rổ rồi bấm Áp dụng để thay số tạm bằng số cuối của sàn.
+          Phiên chạy xuyên nhiều ca: chia theo các mốc snapshot (tính theo giờ tải lên thực tế), chỉ phần không có mốc mới chia theo giờ (≈) — tổng luôn đúng bằng file. Biết số đúng của một ca thì bấm vào ô ca để gõ (✎): phần còn lại tự chia cho các ca kia, đơn/lượt xem theo % GMV.
         </p>
 
         {batches.length > 0 && (
@@ -263,7 +263,7 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
       {!active && !busy && (
         <div className="bg-[var(--surface)] border border-dashed border-[var(--border)] rounded-2xl p-8 text-center">
           <FileSpreadsheet className="w-6 h-6 text-[var(--text-faint)] mx-auto mb-2" />
-          <p className="text-xs text-[var(--text-muted)]">Chưa có lần đối soát nào của brand này. Up file ở trên (hoặc bấm "Đối soát" ở một lần tải trong Lịch Sử Import) để bắt đầu.</p>
+          <p className="text-xs text-[var(--text-muted)]">Chưa có lần đối soát nào của brand này. Tải lên file ở trên (hoặc bấm "Đối soát" ở một lần tải trong Lịch Sử Import) để bắt đầu.</p>
         </div>
       )}
 
@@ -482,7 +482,7 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
                 <>
                   File {active.platform} của <span className="font-bold">{brandName}</span> — chỉ khớp với ca {active.platform} của brand này. Áp dụng sẽ ghi đè số
                   liệu của các ca thuộc rổ "khớp ca agency" và "cần xem lại", đổi nguồn dữ liệu thành <span className="font-bold">đã đối soát</span>.
-                  Chỉ các phiên được tick mới được ghi; phiên bỏ tick không đụng tới số của ca. Bỏ tick sau khi đã áp dụng thì số đã ghi KHÔNG tự hoàn lại.
+                  Chỉ các phiên được chọn mới được ghi; phiên bỏ chọn không đụng tới số của ca. Bỏ chọn sau khi đã áp dụng thì số đã ghi KHÔNG tự hoàn lại.
                   Chạy lại nhiều lần được — mỗi lần tính lại từ đầu theo file này.
                 </>
               ) : (
@@ -496,7 +496,7 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
               <button
                 onClick={() => void run(async () => {
                   const skipped = applicable.length - selectedCount;
-                  if (selectedCount === 0) throw new Error("Chưa chọn phiên nào để đối soát — tick ít nhất một phiên.");
+                  if (selectedCount === 0) throw new Error("Chưa chọn phiên nào để đối soát — chọn ít nhất một phiên.");
                   const ask = skipped > 0
                     ? `Áp dụng đối soát ${selectedCount} phiên đã chọn (bỏ qua ${skipped} phiên) và ghi đè số liệu các ca khớp?`
                     : "Áp dụng đối soát và ghi đè số liệu các ca trong kỳ này?";

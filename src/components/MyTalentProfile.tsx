@@ -221,7 +221,7 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
           )}
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div className="rounded-xl bg-[var(--surface-base)]/40 border border-[var(--border)] p-3">
-              <div className="text-[var(--text-muted)]">Ca đã chạy</div>
+              <div className="text-[var(--text-muted)]">Ca đã live</div>
               <div className="font-bold text-[var(--text)] text-base">{month.done.count > 0 ? `${month.done.count} ca` : <Empty>chưa có</Empty>}</div>
               {month.done.count > 0 && <div className="text-[11px] text-[var(--text-faint)]">{h1(month.done.hostHours)} host · {h1(month.done.coHours)} trợ</div>}
             </div>
@@ -293,13 +293,13 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
 
       <div className="space-y-3 min-w-0 lg:col-start-1 lg:row-start-2">
       {/* Hiệu suất: chỉ dòng có kết luận, nói bằng chữ */}
-      <section className={CARD} aria-label="Hiệu suất so mặt bằng">
+      <section className={CARD} aria-label="Hiệu suất so trung bình nhóm">
         <div className="flex items-baseline justify-between gap-2">
-          <h3 className={SECTION_TITLE}>Bạn so với mặt bằng</h3>
+          <h3 className={SECTION_TITLE}>Bạn so với trung bình nhóm</h3>
           <span className="text-[11px] text-[var(--text-faint)]">{STANDING_DAYS} ngày gần nhất</span>
         </div>
         {standing.clear.length + standing.unclear.length === 0 ? (
-          <p className="text-xs text-[var(--text-faint)]">Chưa có ca nào có số trong {STANDING_DAYS} ngày gần nhất.</p>
+          <p className="text-xs text-[var(--text-faint)]">Chưa có ca nào có số liệu trong {STANDING_DAYS} ngày gần nhất.</p>
         ) : (
           <>
             {standing.clear.map((r) => (
@@ -310,13 +310,13 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
             ))}
             {standing.unclear.length > 0 && (
               <p className="text-xs text-[var(--text-muted)]">
-                {standing.clear.length > 0 ? `${standing.unclear.length} kênh khác` : `Cả ${standing.unclear.length} kênh bạn đã chạy`} chưa đủ số để nói bạn cao hay thấp hơn mặt bằng.
+                {standing.clear.length > 0 ? `${standing.unclear.length} kênh khác` : `Cả ${standing.unclear.length} kênh bạn đã live`} chưa đủ số để nói bạn cao hay thấp hơn trung bình nhóm.
               </p>
             )}
             <details className="text-[11px] text-[var(--text-faint)]">
               <summary className="cursor-pointer font-bold min-h-6 flex items-center">Cách tính · xem từng kênh</summary>
               <p className="mt-1">
-                GMV thực của ca bạn ÷ GMV nếu bán bằng trung bình cả nhóm cùng kênh, cùng tháng, cùng loại ngày (lịch camp cố định) và buổi.
+                GMV thực của ca bạn ÷ GMV nếu đạt bằng trung bình cả nhóm cùng kênh, cùng tháng, cùng loại ngày (lịch Campaign cố định) và buổi.
                 Chỉ kết luận cao/thấp khi khoảng tin cậy 95% nằm hẳn một phía.
               </p>
               <ul className="mt-1.5 space-y-1">
@@ -340,7 +340,7 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
         </summary>
         <div className="grid grid-cols-3 gap-2 text-xs px-4 pb-4">
           <div>
-            <div className="text-[var(--text-muted)]">Ca đã chạy</div>
+            <div className="text-[var(--text-muted)]">Ca đã live</div>
             <div className="font-bold text-[var(--text)]">
               {myReal.sessionCount + myReal.assistSessionCount > 0 ? `${myReal.sessionCount + myReal.assistSessionCount} ca` : <Empty>chưa có ca nào</Empty>}
             </div>

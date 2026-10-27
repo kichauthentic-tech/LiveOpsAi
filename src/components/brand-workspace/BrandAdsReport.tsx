@@ -301,7 +301,7 @@ function TikTokAdsPanel({ brandId, brandName, month, canManage, isPublished, onM
           {adsStats.zeroOrderDays.length > 0 && (
             <div className="flex items-start gap-2 text-[11px] text-amber-300 bg-amber-950/60 border border-amber-800/50 rounded-xl p-2.5">
               <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
-              {adsStats.zeroOrderDays.length} ngày tiêu tiền mà 0 đơn ({adsStats.zeroOrderDays.map((d) => fmtDateVn(d.date, false)).join(", ")}) — tổng{" "}
+              {adsStats.zeroOrderDays.length} ngày có chi phí Ads nhưng không phát sinh đơn ({adsStats.zeroOrderDays.map((d) => fmtDateVn(d.date, false)).join(", ")}) — tổng{" "}
               {fmtVndFull(adsStats.zeroOrderDays.reduce((a, d) => a + d.cost, 0))}.
             </div>
           )}

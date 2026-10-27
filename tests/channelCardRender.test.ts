@@ -67,7 +67,7 @@ describe("bản tin + cổng brand", () => {
     const t = bulletinText(bulletinFromCard(world()), "Đẩy Ads cho Pay Day", "https://x/brand/franklin/dashboard?san=tiktok");
     expect(t).toMatch(/Franklin · tháng 10\/2026/);
     expect(t).toMatch(/so kế hoạch tới nay/);
-    expect(t).toMatch(/Dự kiến cuối tháng ~/);
+    expect(t).toMatch(/Dự báo cuối tháng ~/);
     expect(t).toContain("Đẩy Ads cho Pay Day");
     expect(t).not.toMatch(/Khó đạt|Sẽ hụt|Chắc đạt|Có thể đạt|khả năng|NaN|undefined/);
   });

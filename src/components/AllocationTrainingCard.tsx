@@ -61,13 +61,13 @@ export const AllocationTrainingCard: React.FC<Props> = ({ brandId, sessions, par
           <div className="text-xs space-y-2">
             <p className="font-bold text-[var(--text-muted)]">Đã học gì {model ? <span className="font-normal text-[var(--text-faint)]">· {model.sessions} ca · {model.months.length} tháng ({platform})</span> : null}</p>
             {!model ? (
-              <p className="text-[var(--text-muted)]">Chưa đủ lịch sử cho mô hình v2 (cần ≥ {params.allocMinMonths} tháng, ≥ 15 ca có số) — Kế Hoạch Tháng đang dùng cách cũ hoặc dự báo engine.</p>
+              <p className="text-[var(--text-muted)]">Chưa đủ lịch sử cho mô hình v2 (cần ≥ {params.allocMinMonths} tháng, ≥ 15 ca có số liệu) — Kế Hoạch Tháng đang dùng cách cũ hoặc dự báo engine.</p>
             ) : (
               <>
                 <div className="grid grid-cols-4 gap-x-2 gap-y-0.5">
                   {(["dday", "midmonth", "payday", "daily"] as const).map((b) => (
                     <React.Fragment key={b}>
-                      <span className="text-[var(--text-muted)]">{{ dday: "D-Day", midmonth: "Mid-Month", payday: "Pay Day", daily: "Ngày thường" }[b]}</span>
+                      <span className="text-[var(--text-muted)]">{{ dday: "D-Day", midmonth: "Mid-Month", payday: "Pay Day", daily: "Daily" }[b]}</span>
                       <b className="text-[var(--text)] text-right">{mult(model.bucket[b])}</b>
                     </React.Fragment>
                   ))}
@@ -130,7 +130,7 @@ export const AllocationTrainingCard: React.FC<Props> = ({ brandId, sessions, par
             <ol className="list-decimal pl-4 space-y-0.5">
               <li>Sửa <code>src/lib/performance/allocationModel.ts</code> (mô hình + trộn + backtest cùng một file; thêm hệ số mới = thêm cột trong <code>fitAllocationModel</code> và một dòng trong <code>glmWeights</code>).</li>
               <li>Thêm tham số tương ứng vào <code>EngineParams</code> (<code>engineParams.ts</code>, nhóm Target) — nó tự hiện ở cột Tham số.</li>
-              <li>Mở lại bảng này cho CẢ HAI sàn và các brand: chỉ nâng khi sai số gộp thấp hơn ở ≥ 2 tháng và không tệ đi ở brand khác.</li>
+              <li>Mở lại bảng này cho CẢ HAI sàn và các brand: chỉ nâng khi sai số gộp thấp hơn ở ≥ 2 tháng và không kém đi ở brand khác.</li>
               <li>Chạy <code>npx vitest run tests/allocationModel.test.ts</code>, rồi ghi số đo vào <code>docs/WORKSPACE_HISTORY.md</code>.</li>
               <li>Đã thử và KHÔNG giúp (khỏi thử lại): thứ trong tuần, tuần trong tháng, tương tác loại ngày × khung, ô trực tiếp n ≥ 5, vị trí ngày trong D-Day, trọng số tháng gần, cắt ngoại lệ, học chung nhiều brand. Còn thiếu dữ liệu để thử: Ads theo ca, nội dung/gift của ca.</li>
             </ol>

@@ -101,7 +101,7 @@ const ShrinkCell: React.FC<{ s: ChannelShrinkage }> = ({ s }) => (
     }
   >
     {pct1(s.applied)}
-    {s.source !== "channel" && <span className="ml-1 text-[11px] text-[var(--text-faint)]">{s.source === "agency" ? "TB agency" : "sàn"}</span>}
+    {s.source !== "channel" && <span className="ml-1 text-[11px] text-[var(--text-faint)]">{s.source === "agency" ? "trung bình YFB" : "sàn"}</span>}
   </span>
 );
 
@@ -259,7 +259,7 @@ export const NowDesk: React.FC<DeskProps> = (p) => {
                     {reasonText(h.shortByReason) && <span className="text-[var(--text-faint)]"> ({reasonText(h.shortByReason)})</span>}
                   </span>
                 )}
-                {h.estimated > 0 && <span className="text-[var(--text-faint)]" title="Ca đã live chưa có giờ live thật (chưa up file) — tạm tính theo lịch"> · {h.estimated} ca tạm tính</span>}
+                {h.estimated > 0 && <span className="text-[var(--text-faint)]" title="Ca đã live chưa có giờ live thật (chưa tải lên file) — tạm tính theo lịch"> · {h.estimated} ca tạm tính</span>}
               </p>
             </div>
             <ul className="min-w-0 space-y-1 text-xs">

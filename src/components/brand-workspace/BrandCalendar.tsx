@@ -243,7 +243,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
         badge={
           daySchemes.length > 0 ? (
             <span
-              title={`${daySchemes.length} scheme khuyến mãi — xem chi tiết ở bảng dưới hàng tuần`}
+              title={`${daySchemes.length} chương trình khuyến mãi — xem chi tiết ở bảng dưới hàng tuần`}
               className="flex items-center justify-center w-4 h-4 rounded-full bg-[var(--warning)] text-white"
             >
               <Tag className="w-2.5 h-2.5" />

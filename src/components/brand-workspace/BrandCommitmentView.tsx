@@ -57,7 +57,7 @@ interface BrandCommitmentViewProps {
 const STATUS_LABEL: Record<CommitmentProgress["status"], string> = {
   no_commitment: "Chưa có cam kết",
   met: "Đã đủ cam kết",
-  on_track: "Đang đúng nhịp",
+  on_track: "Đúng tiến độ",
   at_risk: "Cần chú ý",
   behind: "Đang chậm"
 };

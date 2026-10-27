@@ -541,7 +541,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                     <p className="hidden sm:block text-[11px] text-[var(--text-muted)] line-clamp-2 mt-1">
                       {roleKey === "admin" && "Mọi thứ CEO làm được, thêm AI Training Center (chỉ admin)."}
                       {roleKey === "ceo" && "Toàn bộ màn agency, Finance & P&L, CRM và phân quyền."}
-                      {roleKey === "operations" && "Lập kế hoạch tháng, xếp và chốt người cho ca, up số liệu, đối soát, làm report. Không thấy Finance."}
+                      {roleKey === "operations" && "Lập kế hoạch tháng, xếp và chốt người cho ca, tải số liệu lên, đối soát, làm report. Không thấy Finance."}
                       {roleKey === "trainer" && "Xếp lịch tuần: hạn đăng ký, chọn host/trợ cho ca, dời/thêm ca, công bố lịch. Thấy rate và Finance (chỉ đọc)."}
                       {roleKey === "brand" && "Chỉ thấy workspace của brand mình: lịch, sổ ca, report tháng đã phát hành, cam kết, kế hoạch tháng sau."}
                       {roleKey === "talent" && "Ca của mình, lịch cả agency, đăng ký ca và hồ sơ cá nhân (giao ca do OP làm trên máy phòng live)."}

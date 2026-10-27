@@ -175,7 +175,7 @@ export function campWindows(sessions: LiveSession[], bucketOf: BucketOf): CampWi
   }
   const out: CampWindow[] = [];
   for (const [k, arr] of wins) {
-    if (arr.length !== 3) continue; // đợt phải đủ 3 ngày có số mới so vị trí được
+    if (arr.length !== 3) continue; // đợt phải đủ 3 ngày có số liệu mới so vị trí được
     arr.sort((a, b) => a[0].localeCompare(b[0]));
     const avg = arr.reduce((a, x) => a + x[1].g, 0) / arr.reduce((a, x) => a + x[1].h, 0);
     const [b, m] = k.split("|");

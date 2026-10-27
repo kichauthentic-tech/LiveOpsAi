@@ -121,7 +121,7 @@ export function allocateDraftTargets(drafts: PlanDraftSlot[], targetTotal: numbe
 // ---------------------------------------------------------------------------
 
 export const GROUP_BUCKETS: CampDayBucket[] = ["dday", "midmonth", "payday", "daily"];
-export const GROUP_LABEL: Record<CampDayBucket, string> = { dday: "D-Day", midmonth: "Mid-Month", payday: "Pay Day", daily: "Ngày thường" };
+export const GROUP_LABEL: Record<CampDayBucket, string> = { dday: "D-Day", midmonth: "Mid-Month", payday: "Pay Day", daily: "Daily" };
 
 export interface GroupTargetSpec {
   /** Loại ngày của ca — nhớ truyền khung camp nhập tay của tháng (resolveCampBucketType(d, campRanges)). */

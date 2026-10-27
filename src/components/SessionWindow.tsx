@@ -88,7 +88,7 @@ const WEEKDAY = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
 const STATUS_LABEL = SESSION_STATUS_LABEL_VI;
 const STATUS_CLS = SESSION_STATUS_CLS;
 const missingLabel = (step: MissingStep, file: string): string =>
-  step === "snapshot" ? `Chưa up file ${file}` : step === "report" ? "Chưa giao ca" : "Chưa đối soát";
+  step === "snapshot" ? `Chưa tải lên file ${file}` : step === "report" ? "Chưa giao ca" : "Chưa đối soát";
 
 function fmtDate(d: string): string {
   const [y, m, day] = d.split("-").map(Number);
@@ -522,7 +522,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
               </div>
               {handoverCollapsed && (
                 <p className="text-xs text-[var(--text-muted)] flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <span>Hết ca lúc {s.endTime.slice(0, 5)} thì up file {prof.reconciliationFile} và giao ca ở đây.</span>
+                  <span>Hết ca lúc {s.endTime.slice(0, 5)} thì tải lên file {prof.reconciliationFile} và giao ca ở đây.</span>
                   {canHandover && (
                     <button onClick={() => setEarlyHandover(true)} className="text-[11px] font-bold text-[var(--accent-text)] hover:underline">
                       Mở giao ca ngay
@@ -532,10 +532,10 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
               )}
               {handoverDone && !editingHandover && (
                 <div className="space-y-1.5 text-xs">
-                  <p className="text-[var(--text-muted)]">{snapshotDone ? `Đã up file ${prof.reconciliationFile} — số của ca ở "Số liệu ca" bên dưới.` : "Chưa có file số liệu."}</p>
+                  <p className="text-[var(--text-muted)]">{snapshotDone ? `Đã tải lên file ${prof.reconciliationFile} — số của ca ở "Số liệu ca" bên dưới.` : "Chưa có file số liệu."}</p>
                   {canHandover && (
                     <button onClick={() => setEditingHandover(true)} className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-emerald-950 text-emerald-300 border border-emerald-800 hover:bg-emerald-900 transition-colors">
-                      Sửa giao ca / up lại file
+                      Sửa giao ca / tải lại file
                     </button>
                   )}
                 </div>

@@ -157,7 +157,7 @@ export function BulkFinalizePanel({
           </h3>
           <p className="text-[11px] text-[var(--text-muted)] mt-1 max-w-3xl">
             Mỗi ca được gợi ý Host xếp hạng cao nhất mà <strong>đang rảnh khung giờ đó</strong> — xét cả ca đã có trong hệ thống
-            lẫn các ca khác trong chính mẻ này, nên không ai bị xếp 2 ca trùng giờ. Đây chỉ là đề xuất: sửa hoặc bỏ tick dòng nào
+            lẫn các ca khác trong chính mẻ này, nên không ai bị xếp 2 ca trùng giờ. Đây chỉ là đề xuất: sửa hoặc bỏ chọn dòng nào
             cũng được trước khi chốt.
           </p>
         </div>
@@ -183,7 +183,7 @@ export function BulkFinalizePanel({
                 Tick tất cả
               </button>
               <button onClick={() => setAllIncluded(false)} disabled={running} className="px-2.5 py-1 rounded-lg bg-[var(--surface-base)] border border-[var(--border)] text-[11px] font-bold text-[var(--text-muted)] hover:text-[var(--text)] disabled:opacity-40">
-                Bỏ tick tất cả
+                Bỏ chọn tất cả
               </button>
             </div>
           </div>
@@ -289,7 +289,7 @@ export function BulkFinalizePanel({
             </button>
             {blocked.length > 0 && (
               <span className="text-[11px] text-rose-400">
-                {blocked.length} dòng đang tick nhưng vướng trùng lịch — sẽ bị bỏ qua, sửa Host hoặc bỏ tick để hết cảnh báo.
+                {blocked.length} dòng đang chọn nhưng vướng trùng lịch — sẽ bị bỏ qua, sửa Host hoặc bỏ chọn để hết cảnh báo.
               </span>
             )}
           </div>

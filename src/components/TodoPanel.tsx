@@ -132,7 +132,7 @@ export const TodoPanel: React.FC<Props> = ({ brands, channels, sessions, shiftSl
         {dayRows.length > 0 && <span className="text-[11px] text-[var(--text-muted)]">{dayRows.length} việc</span>}
       </div>
       {dayRows.length === 0 ? (
-        <p className="text-xs text-emerald-300">Không có việc gấp: ca đã qua đều có số, 48 giờ tới đủ người và phòng.</p>
+        <p className="text-xs text-emerald-300">Không có việc gấp: ca đã qua đều có số liệu, 48 giờ tới đủ người và phòng.</p>
       ) : (
         <ul className="divide-y divide-[var(--border-muted)]">{dayRows.map(row)}</ul>
       )}

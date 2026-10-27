@@ -9,7 +9,7 @@ import type { SnapshotRoomRow } from "./extractRooms";
 export type BreakReason = "network" | "manual_restart" | "device_change" | "platform_cut" | "test_room" | "other";
 
 export const BREAK_REASONS: { key: BreakReason; label: string; hint: string }[] = [
-  { key: "network", label: "Rớt mạng / app crash", hint: "Máy treo, mất wifi — TikTok đóng room, bật lại ra Room ID mới" },
+  { key: "network", label: "Mất kết nối / ứng dụng lỗi", hint: "Thiết bị treo, mất wifi — TikTok kết thúc phiên, mở lại ra Room ID mới" },
   { key: "manual_restart", label: "Tắt bật lại có chủ ý", hint: "Nghỉ giữa giờ, đổi cảnh, sửa tiêu đề/thumbnail" },
   { key: "device_change", label: "Đổi thiết bị / tài khoản", hint: "Đổi máy live hoặc người đăng nhập" },
   { key: "platform_cut", label: "TikTok cắt live", hint: "Cảnh báo vi phạm, lỗi kỹ thuật phía TikTok" },

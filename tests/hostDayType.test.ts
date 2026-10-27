@@ -102,7 +102,7 @@ test("câu vì sao: nêu host lệch nhiều tiền nhất, tách thừa số c�
   const lines = dayTypeDriverLines(rows.map((r) => ({ name: r.name, m: dayTypeMetrics(r.byBucket.daily) })), team, 5);
   expect(lines).toHaveLength(2);
   expect(lines[0]).toMatch(/^Hùng: GMV\/giờ \+\d+% so với cả team — nhờ Views\/giờ \+\d+%/);
-  expect(lines[0]).toMatch(/bị kéo lại bởi .*AOV −\d+%/);
+  expect(lines[0]).toMatch(/bị kéo giảm bởi .*AOV −\d+%/);
   expect(lines[1]).toMatch(/^Vân: GMV\/giờ −\d+% so với cả team — do Views\/giờ −\d+%/);
   expect(lines.join(" ")).not.toMatch(/An:/);
 });

@@ -232,7 +232,7 @@ export function allocatorWeights(a: Allocator, slots: SlotLike[], bucketOf: Buck
 export type AllocMethod = "hours" | "old" | "glm" | "v2";
 export const ALLOC_METHOD_LABEL: Record<AllocMethod, string> = {
   hours: "Chia đều theo giờ",
-  old: "Cách cũ (loại ngày + khung ngày thường + vị trí ngày)",
+  old: "Cách cũ (loại ngày + khung Daily + vị trí ngày)",
   glm: "Mô hình v2 riêng",
   v2: "v2 trộn với cách cũ (đang dùng)"
 };

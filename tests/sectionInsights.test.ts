@@ -37,8 +37,8 @@ test("Vì sao — CROCS 1–22/09 vs 1–22/08: tiêu đề là nhóm ngày kéo
     groups: [g("daily", 28_800_000, 17_900_000), g("camp", 27_300_000, 22_100_000)],
     mixRate: { delta: -8_300_000, mix: -100_000, rate: -8_200_000 }
   })!;
-  expect(w.headline).toBe("Phần giảm dồn vào Daily: GMV/giờ Daily −38%, campaign −19%.");
-  expect(w.points[0]).toBe("GMV/giờ −29%: Views/giờ −19%, LIVE CTR −6%, CTOR −13%, AOV +6% — cả traffic lẫn chuyển đổi cùng giảm.");
+  expect(w.headline).toBe("Mức giảm tập trung ở Daily: GMV/giờ Daily −38%, campaign −19%.");
+  expect(w.points[0]).toBe("GMV/giờ −29%: Views/giờ −19%, LIVE CTR −6%, CTOR −13%, AOV +6% — cả traffic lẫn tỷ lệ chuyển đổi cùng giảm.");
   expect(w.points[1]).toMatch(/^Không phải do lịch campaign: thay đổi cơ cấu giờ live giữa các loại ngày chỉ giải thích −100K\/giờ, hiệu suất trong từng loại ngày −8,2M\/giờ\.$/);
   // Quà tặng đã ở Kết luận + bảng Xu hướng — không nhắc lần ba.
   expect(w.points.join("\n")).not.toMatch(/Quà tặng/);
@@ -50,7 +50,7 @@ test("Vì sao — CROCS T8 vs T7: chuyển đổi kéo lên, traffic bù một p
   const t7 = stats(5_187_000_000, 213.6, 724_500, { liveCtr: 54.16, ctor: 1.23, aov: 1_072_000 });
   const t8 = stats(5_885_000_000, 228.6, 725_100, { liveCtr: 56.28, ctor: 1.31, aov: 1_104_000 });
   const w = whyInsight(t7, t8)!;
-  expect(w.headline).toContain("chuyển đổi kéo lên, traffic bù một phần");
+  expect(w.headline).toContain("tỷ lệ chuyển đổi là nguyên nhân chính khiến GMV/giờ tăng, traffic bù một phần");
   // Hai nhóm ngày lệch < 10 điểm ⇒ tiêu đề vẫn là dòng thừa số, nhóm ngày xuống gạch đầu dòng.
   const g = (key: "daily" | "camp", a: number, b: number) => ({ key, prev: stats(a * 10, 10, 1000), cur: stats(b * 10, 10, 1000) });
   const close = whyInsight(t7, t8, { groups: [g("daily", 24_000_000, 25_000_000), g("camp", 26_000_000, 27_500_000)] })!;
@@ -86,7 +86,7 @@ test("Người — chỉ nêu tên khi so mặt bằng 4 tháng chắc chắn; c
   const i = peopleInsight(hosts, rel)!;
   expect(i.headline).toBe("Hùng dẫn đầu GMV (1,71B, 75% tổng host); là host duy nhất cao hơn trung bình có ý nghĩa thống kê (khoảng tin cậy 95%, 59 phiên): +11% (+2% … +23%).");
   // Cận dưới sát mặt bằng ⇒ nói rõ là kết luận yếu (số thật CROCS sau khi dùng phân phối t: +0,0% … +23%).
-  expect(peopleInsight(hosts, [{ ...rel[0], lo: 1.0003 }, ...rel.slice(1)])!.headline).toMatch(/\+11% \(\+0,0% … \+23%\) — sát ngưỡng, cần thêm tháng để chắc\.$/);
+  expect(peopleInsight(hosts, [{ ...rel[0], lo: 1.0003 }, ...rel.slice(1)])!.headline).toMatch(/\+11% \(\+0,0% … \+23%\) — sát ngưỡng, cần thêm dữ liệu tháng sau để kết luận\.$/);
   expect(i.points).toEqual(["3 host còn lại chưa khác biệt rõ so với trung bình (khoảng tin cậy còn cắt qua mức trung bình)."]);
   expect(i.points.join(" ")).not.toContain("Thy");
   expect(i.action).toBeNull(); // Hùng live nhiều giờ nhất ⇒ không gợi ý thêm ca
@@ -131,11 +131,11 @@ test("Hàng — SKU dẫn đầu giảm mạnh: nêu ở kết luận, không l�
   };
   const i = productsInsight(skus, { name: "[Double day 7-9.9] VC 10% bill 900K", gmv: 570_000_000, orders: 559 })!;
   expect(i.headline).toMatch(/^Baya Platform - Winter White giữ hạng 1 \(.*GMV mỗi ngày −32%\)/);
-  const down = i.points.find((l) => l.startsWith("Đi xuống"))!;
+  const down = i.points.find((l) => l.startsWith("Giảm hạng"))!;
   expect(down).not.toContain("Baya Platform - Winter White");
   expect(down).toContain("Baya Platform - Barely Pink (3 → 6");
   expect(i.points.find((l) => l.startsWith("Lên hạng"))).toContain("Bayaband - White (20 → 5");
-  expect(i.points.some((l) => /^Baya - White được bấm nhiều/.test(l))).toBe(true);
+  expect(i.points.some((l) => /^Baya - White có Product CTR cao/.test(l))).toBe(true);
   expect(i.action).toMatch(/^Kiểm tra Baya Platform - Winter White/);
   expect(productsInsight(null, null)).toBeNull();
   expect(shortSku("Classic - Bone - 10001-2Y2")).toBe("Classic - Bone");
@@ -190,15 +190,15 @@ test("Bối cảnh — đếm khung camp tăng/giảm cùng khung tháng trướ
     ]
   )!;
   // Audit 27/10: trang Host & khung giờ mở bằng câu khung giờ — GMV Daily đã ở trang 1 và 3, không thêm con số Daily thứ ba.
-  expect(i.headline).toBe("Khung giờ bắt đầu phiên: tối (từ 17h) bán tốt nhất (20,5M/giờ), sáng (trước 12h) thấp nhất (19,5M/giờ, 18 phiên).");
+  expect(i.headline).toBe("Khung giờ bắt đầu phiên: tối (từ 17h) hiệu quả nhất (20,5M/giờ), sáng (trước 12h) thấp nhất (19,5M/giờ, 18 phiên).");
   expect(i.points).toEqual([]);
   expect(`${i.headline} ${i.points.join(" ")}`).not.toMatch(/Daily −22,5%/);
-  expect(i.action).toMatch(/^Xem lại cách chạy Daily: GMV\/giờ −37%/);
+  expect(i.action).toMatch(/^Rà soát cách vận hành Daily: GMV\/giờ −37%/);
 });
 
 test("Bối cảnh — câu Ads (file TikTok Ads): có ca thì thêm một điểm; tháng chưa có ca nào (Franklin T9) vẫn nói Ads", () => {
   const ads = { cost: 36_047_613, roi: 22.14, prevCost: 24_300_000, prevRoi: 10.5, zeroOrderDays: 2 };
-  const line = "Ads toàn cửa hàng: chi 36M (+48% so với cùng kỳ), ROI 22,1x (tháng trước 10,5x); 2 ngày tiêu tiền mà 0 đơn.";
+  const line = "Ads toàn cửa hàng: chi 36M (+48% so với cùng kỳ), ROI 22,1x (tháng trước 10,5x); 2 ngày có chi phí Ads nhưng không phát sinh đơn.";
   expect(contextInsight([], [], ads)).toEqual({ headline: line, points: [], action: null });
   expect(contextInsight([], [], null)).toBeNull();
   expect(contextInsight([], [], { ...ads, cost: 0 })).toBeNull();
@@ -211,7 +211,7 @@ test("Việc cần làm của các phần gom về phần 7, bỏ việc autoNex
     why: ins("Điểm nghẽn ở traffic vào phòng — xem lại khung giờ, thumbnail, tiêu đề phiên và ngân sách Ads cho live."),
     products: ins("Kiểm tra Baya Platform - Winter White: tồn kho, giá và thời lượng giới thiệu trên live (GMV mỗi ngày −32%)."),
     people: ins(null),
-    context: ins("Xem lại cách chạy Daily: GMV/giờ −38% so với cùng kỳ tháng trước.")
+    context: ins("Rà soát cách vận hành Daily: GMV/giờ −38% so với cùng kỳ tháng trước.")
   };
   // CROCS T9: ngày thường hụt do vận hành ⇒ chỉ còn việc về SKU.
   expect(sectionNextSteps(all, "daily")).toEqual(["Kiểm tra Baya Platform - Winter White: tồn kho, giá và thời lượng giới thiệu trên live (GMV mỗi ngày −32%)."]);

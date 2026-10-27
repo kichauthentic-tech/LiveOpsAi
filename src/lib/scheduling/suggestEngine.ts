@@ -70,7 +70,7 @@ export interface HistorySummary {
   // Lớp 2 — học từ lịch sử nếu đủ ca (≥ 5), không thì 1.0 và chỉ ghi nhãn.
   eventMultipliers: Record<CalendarEventKind, number>;
   eventLearned: Record<CalendarEventKind, boolean>;
-  schemeMultiplier: number; // ngày trùng scheme khuyến mãi so với ngày không
+  schemeMultiplier: number; // ngày trùng chương trình khuyến mãi so với ngày không
   schemeLearned: boolean;
   /** Đ12 (2026-09-24) — lịch sử này KHÔNG phải của brand đang xem: hình dạng (ô thứ×giờ, hệ số
    *  camp/lễ/scheme, lợi suất giảm dần) mượn của toàn agency, còn MỨC (`brandGmvPerHour`) là con số
@@ -85,7 +85,7 @@ export const ALL_BRANDS = "*";
 
 export interface HistoryContext {
   events?: CalendarEvent[]; // lịch sự kiện dùng chung (calendar_events)
-  schemes?: DateRange[]; // scheme khuyến mãi của brand (quá khứ lẫn tương lai)
+  schemes?: DateRange[]; // chương trình khuyến mãi của brand (quá khứ lẫn tương lai)
   params?: EngineParams; // thiếu = mặc định
 }
 
@@ -97,7 +97,7 @@ export interface SuggestConstraints {
   // "hours" (mặc định): xếp đủ committedHours. "target": xếp tới khi dự báo chạm targetGmv (hoặc hết
   // chỗ trong khung) — trả về số giờ cần; committedHours chỉ dùng để so trong ghi chú.
   mode?: "hours" | "target";
-  camp?: CampOverrides; // khoảng ngày camp riêng của kế hoạch (trống = lịch camp cố định)
+  camp?: CampOverrides; // khoảng ngày Campaign riêng của kế hoạch (trống = lịch Campaign cố định)
   liveWindowStart: string;
   liveWindowEnd: string;
   defaultSlotHours: number;
@@ -726,8 +726,8 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
   {
     const raised = (["dday", "midmonth", "payday"] as CampDayBucket[]).filter((b) => dayCapOf(b) > maxPerDay);
     if (raised.length > 0) {
-      const label: Record<CampDayBucket, string> = { daily: "ngày thường", dday: "D-Day", midmonth: "Mid-Month", payday: "Pay Day" };
-      notes.push(`Khuôn ngày camp học từ lịch sử: ${raised.map((b) => `${label[b]} ~${fmtFixed(history.campHoursPerDay[b], 0)}h/ngày`).join(", ")} → lấp đủ giờ ngày camp trước (tới ${raised.map((b) => `${dayCapOf(b)} ca`).join("/")}), phần còn lại mới chia cho ngày thường (tối đa ${maxPerDay} ca); tối đa ca/ngày của kế hoạch được nâng theo khi áp gợi ý.`);
+      const label: Record<CampDayBucket, string> = { daily: "Daily", dday: "D-Day", midmonth: "Mid-Month", payday: "Pay Day" };
+      notes.push(`Khuôn ngày Campaign học từ lịch sử: ${raised.map((b) => `${label[b]} ~${fmtFixed(history.campHoursPerDay[b], 0)}h/ngày`).join(", ")} → xếp đủ giờ ngày Campaign trước (tới ${raised.map((b) => `${dayCapOf(b)} ca`).join("/")}), phần còn lại mới chia cho ngày thường (tối đa ${maxPerDay} ca); tối đa ca/ngày của kế hoạch được nâng theo khi áp gợi ý.`);
     }
   }
   if (c.calibration && c.calibration.size > 0) notes.push(`Đã hiệu chỉnh GMV/giờ theo kế hoạch vs thực tế các tháng trước (${c.calibration.size} ô thứ × giờ có dữ liệu).`);
@@ -753,11 +753,11 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
     const top = s.cellRefs[0];
     const reasonParts = [
       `GMV/giờ kỳ vọng ${fmtM(s.baseGph)} (${top ? `${top.n} ca lịch sử` : "ô chưa có lịch sử"}, ${history.months} tháng)`,
-      brandGph > 0 ? `${s.baseGph >= brandGph ? "+" : "−"}${Math.abs(Math.round((s.baseGph / brandGph - 1) * 100))}% vs TB brand` : "",
+      brandGph > 0 ? `${s.baseGph >= brandGph ? "+" : "−"}${Math.abs(Math.round((s.baseGph / brandGph - 1) * 100))}% so với trung bình brand` : "",
       s.bucket !== "daily" ? `${s.bucket === "dday" ? "D-Day" : s.bucket === "midmonth" ? "Mid-Month" : "Pay Day"} ×${fmtFixed(history.campMultipliers[s.bucket], 2)}${history.campLearned[s.bucket] ? "" : " (mặc định)"}` : "",
-      top?.tag === "traffic_low_cvr" ? "nhiều người xem, chuyển đổi yếu — ca kéo follow/giới thiệu SP" : "",
+      top?.tag === "traffic_low_cvr" ? "traffic cao, CVR thấp — ca tăng New followers / giới thiệu sản phẩm" : "",
       eventByDate.get(s.date) ? `${eventByDate.get(s.date)!.label} ×${fmtFixed(history.eventMultipliers[eventByDate.get(s.date)!.kind], 2)}${history.eventLearned[eventByDate.get(s.date)!.kind] ? "" : " (chưa có lịch sử, chỉ ghi nhãn)"}` : "",
-      schemeOf(s.date) ? `trùng KM ×${fmtFixed(history.schemeMultiplier, 2)}${history.schemeLearned ? "" : " (chưa học được)"}` : "",
+      schemeOf(s.date) ? `trùng khuyến mãi ×${fmtFixed(history.schemeMultiplier, 2)}${history.schemeLearned ? "" : " (chưa học được)"}` : "",
       fixedKeys.has(`${s.date}|${toHhmm(s.start)}`) ? "ops đặt tay" : ""
     ].filter(Boolean);
     return {
@@ -790,7 +790,7 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
   const totalHours = all.reduce((a, s) => a + s.hours, 0);
   if (stopAtTarget) {
     if (forecastGmv >= c.targetGmv) notes.push(`Xếp theo target: cần ${totalHours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h để dự báo chạm ${fmtM(c.targetGmv)}${committed > 0 ? ` (cam kết ${committed}h → ${totalHours > committed ? "thiếu" : "dư"} ${Math.abs(totalHours - committed).toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h)` : ""}.`);
-    else notes.push(`Xếp theo target: lấp hết chỗ (${totalHours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h trong khung giờ / tối đa ca/ngày) vẫn chỉ dự báo ${fmtM(forecastGmv)} / ${fmtM(c.targetGmv)} — target vượt sức lịch sử; nới khung giờ, tăng CVR/AOV hoặc hạ target.`);
+    else notes.push(`Xếp theo target: xếp kín chỗ (${totalHours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h trong khung giờ / tối đa ca/ngày) vẫn chỉ dự báo ${fmtM(forecastGmv)} / ${fmtM(c.targetGmv)} — target vượt sức lịch sử; nới khung giờ, tăng CVR/AOV hoặc hạ target.`);
   } else if (committed > 0 && totalHours + 0.01 < committed) notes.push(`Chỉ xếp được ${totalHours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h / ${committed}h — hết chỗ trong khung giờ hoặc chạm tối đa ca/ngày; nới khung hoặc số ca/ngày.`);
   if (c.targetGmv > 0 && !stopAtTarget) {
     const gap = c.targetGmv - forecastGmv;

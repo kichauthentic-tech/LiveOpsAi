@@ -72,7 +72,7 @@ describe("buildTodos", () => {
     // T6 ngoài 90 ngày nhưng chưa phát hành ⇒ tính; T7 trong 90 ngày nhưng đã phát hành ⇒ không tính.
     const sessions = [ca("t6a", "2026-06-05", { hostId: "" }), ca("t6b", "2026-06-06", { hostId: "" }), ca("t7", "2026-07-20", { hostId: "" }), ca("t9", "2026-09-21", { hostId: "" })];
     const t = buildTodos(base({ sessions, monthlyReports: new Map([["crocs|2026-07", { status: "published" } as BrandMonthlyReport]]) })).find((x) => x.id === "no-host")!;
-    expect(t.title).toBe("3 ca đã chạy chưa gán host");
+    expect(t.title).toBe("3 ca đã live chưa gán host");
   });
 
   // ---- Ca ngoài kế hoạch + ca tăng cường (0165) ----

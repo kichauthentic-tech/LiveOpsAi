@@ -599,7 +599,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                   {METRIC.gmvPerHour} theo kênh (brand × sàn)
                 </p>
                 {selectedBrandPerf.every((b) => b.sessions === 0) ? (
-                  <p className="text-[11px] text-[var(--text-faint)]">Chưa chạy ca nào có số cho kênh nào.</p>
+                  <p className="text-[11px] text-[var(--text-faint)]">Chưa chạy ca nào có số liệu cho kênh nào.</p>
                 ) : (
                   <ul className="space-y-1">
                     {selectedBrandPerf.filter((b) => b.sessions > 0).map((b) => {
@@ -619,7 +619,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                   </ul>
                 )}
                 <p className="text-[11px] text-[var(--text-faint)] leading-relaxed">
-                  Không có số GMV/giờ gộp mọi brand hay gộp hai sàn: chỉ số này phụ thuộc ngành hàng, giá bán và sàn hơn là người chạy.
+                  Không có số liệu GMV/giờ gộp mọi brand hay gộp hai sàn: chỉ số này phụ thuộc ngành hàng, giá bán và sàn hơn là người chạy.
                   Muốn xếp hạng host trong một brand thì mở Hiệu Suất Host (có lọc brand, thứ và khung giờ).
                 </p>
               </div>

@@ -191,7 +191,7 @@ export const BrandSkuShowcase: React.FC<BrandSkuShowcaseProps> = ({ brandId, cur
         )}
         {canEdit && !perfError && perfByName && !perfHasBatch && (
           <div className="px-4 py-2.5 border-b border-[var(--border)] bg-[var(--surface-base)] text-[var(--text-faint)] text-xs">
-            Chưa có file Sản Phẩm của tháng {fmtMonthShort(currentMonth)} — cột hiệu suất sẽ trống tới khi up file đó ở Dữ Liệu Gốc.
+            Chưa có file Sản Phẩm của tháng {fmtMonthShort(currentMonth)} — cột hiệu suất sẽ trống tới khi tải lên file đó ở Dữ Liệu Gốc.
           </div>
         )}
 

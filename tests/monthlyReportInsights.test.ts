@@ -112,7 +112,7 @@ test("kết luận trước: kết quả, nguyên nhân quy ra tiền, thị tr�
     nextPlan: { targetGmv: 5_500_000_000, status: "draft" as const, slotCount: 75 },
     controlLine: "So với các kênh còn lại của shop (Daily): livestream YFB −19%, các kênh còn lại +1%, lượt vào shop −4% ⇒ phần giảm nằm ở vận hành livestream.",
     controlOpsGroup: "daily" as const,
-    dailyGap: { line: "Nếu Daily giữ GMV/giờ kỳ trước (28,8M/giờ, nay 17,9M/giờ) với 98,2 giờ live đã chạy, LIVE GMV có thêm ~1,07B.", value: 1_070_000_000 },
+    dailyGap: { line: "Nếu Daily giữ GMV/giờ kỳ trước (28,8M/giờ, nay 17,9M/giờ) với 98,2 giờ live đã thực hiện, LIVE GMV có thêm ~1,07B.", value: 1_070_000_000 },
     giftLine: "Quà tặng kèm (sản phẩm giá dưới 20K) giảm từ 0,13 xuống 0,00 món mỗi đơn toàn shop (T8 → nay) — đây là lý do chính UPT giảm; không tính quà tặng, UPT toàn shop 1,11 → 1,08."
   };
   const lines = autoSummary(input);
@@ -227,5 +227,5 @@ test("KPI cả shop: tháng đủ so thẳng (deck Crocs T8 9,1 tỷ vs KPI 8,4 
     liveCur: t9, livePrev: t8, drivers: null, targetGmv: null, nextMonth: "2026-09", nextPlan: null
   };
   expect(autoSummary({ ...base, shopKpi: full })[0]).toContain("Total GMV đạt 108% KPI 8,4B (vượt 700M).");
-  expect(autoSummary({ ...base, shopKpi: sep })[0]).toMatch(/Total GMV đạt 65% KPI 8B; theo nhịp cùng kỳ tháng trước, dự kiến cuối tháng ~7,02B \(88% KPI\)\./);
+  expect(autoSummary({ ...base, shopKpi: sep })[0]).toMatch(/Total GMV đạt 65% KPI 8B; theo tốc độ cùng kỳ tháng trước, dự báo cuối tháng ~7,02B \(88% KPI\)\./);
 });

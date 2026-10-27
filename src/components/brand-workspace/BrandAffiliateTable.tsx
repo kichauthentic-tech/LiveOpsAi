@@ -871,13 +871,13 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
                   {outsidePlan.map((r) => unplannedRow(r, false))}
                   {alreadyIn.length > 0 && (
                     <>
-                      <div className={title}>Đã có số trong bảng ({alreadyIn.length}) — bỏ qua, tick nếu muốn thêm lần nữa</div>
+                      <div className={title}>Đã có số liệu trong bảng ({alreadyIn.length}) — bỏ qua, chọn nếu muốn thêm lần nữa</div>
                       {alreadyIn.map((r) => unplannedRow(r, true))}
                     </>
                   )}
                   {lateUnmatched.length > 0 && (
                     <>
-                      <div className={title}>Kế hoạch đã qua ngày nhưng file không có phiên ({lateUnmatched.length}) — tick để đánh dấu Huỷ / dời</div>
+                      <div className={title}>Kế hoạch đã qua ngày nhưng file không có phiên ({lateUnmatched.length}) — chọn để đánh dấu Huỷ / dời</div>
                       {lateUnmatched.map((e) => (
                         <label key={e._key} className="flex flex-wrap items-center gap-2 py-1 border-b border-[var(--border)]/50 cursor-pointer">
                           <input
@@ -896,7 +896,7 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
                           <span className="font-mono">{e.liveDateLabel}</span>
                           <span className="font-semibold">{e.creatorName}</span>
                           <span className="text-[var(--text-faint)]">kế hoạch {e.planTimelineLabel || "—"} · target {e.targetGmv != null ? fmtVndFull(e.targetGmv) : "—"}</span>
-                          <span className="px-1.5 rounded bg-red-100 text-red-800">chưa có số</span>
+                          <span className="px-1.5 rounded bg-red-100 text-red-800">chưa có số liệu</span>
                         </label>
                       ))}
                     </>

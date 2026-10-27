@@ -83,7 +83,7 @@ export const LateCard: React.FC<{ s: Scope }> = ({ s }) => {
       {worst.length > 0 && (
         <div className="mt-3">
           <p className="text-xs font-bold text-[var(--text)] mb-1">Trễ nhiều nhất {s.label}</p>
-          <Table head={["Host", "Sessions", "Trễ >5p", "Trễ TB", "Kỳ trước"]}>
+          <Table head={["Host", "Sessions", "Trễ >5p", "Trễ trung bình", "Kỳ trước"]}>
             {worst.map(([k, p]) => {
               const q = mb.get(k);
               return (
@@ -182,7 +182,7 @@ export const HostTable: React.FC<{ s: Scope; brands: Brand[]; showBrand: boolean
   return (
     <Card>
       <BlockHead title={title} sub={`${s.label} · ${minSessions > 1 ? `host từ ${minSessions} ca` : "mọi host có ca"}${weakBelow > minSessions ? `, dưới ${weakBelow} ca hiển thị mờ` : ""} · GMV = các ca người đó làm host · chỉ số 100 = GMV/giờ trung bình của chính kênh đó · so với ${s.prevLabel}`} />
-      <Table head={["Host", "Sessions", "Giờ live", "GMV", "Chỉ số", "vs kỳ trước"]} empty={rows.length ? undefined : minSessions > 1 ? `Chưa host nào có từ ${minSessions} ca trong kỳ này.` : `Chưa có ca có số trong ${s.label}.`}>
+      <Table head={["Host", "Sessions", "Giờ live", "GMV", "Chỉ số", "vs kỳ trước"]} empty={rows.length ? undefined : minSessions > 1 ? `Chưa host nào có từ ${minSessions} ca trong kỳ này.` : `Chưa có ca có số liệu trong ${s.label}.`}>
         {rows.map((r) => (
           <tr key={r.id}>
             <td className={`${TD} font-semibold text-[var(--text)]`}>{r.name}{brandTag(r.brandIds, brands, showBrand)}</td>
@@ -260,7 +260,7 @@ export const SlotTable: React.FC<{ s: Scope; within?: string }> = ({ s, within =
   return (
     <Card>
       <BlockHead title="Khung giờ của kênh" sub={`${s.label} so với ${s.prevLabel} · theo giờ bắt đầu ca · chỉ số 100 = GMV/giờ trung bình của kênh trong ${within} · dưới 5 ca hiển thị mờ`} />
-      <Table head={["Khung giờ", "Sessions", "Giờ live", "GMV/giờ", "Chỉ số", "vs kỳ trước"]} empty={rows.length ? undefined : `Không có ca có số trong ${s.label}.`}>
+      <Table head={["Khung giờ", "Sessions", "Giờ live", "GMV/giờ", "Chỉ số", "vs kỳ trước"]} empty={rows.length ? undefined : `Không có ca có số liệu trong ${s.label}.`}>
         {rows.map((r) => {
           const weak = r.x!.n < WEAK_SESSIONS || !r.y || r.y.n < WEAK_SESSIONS;
           return (
@@ -278,8 +278,8 @@ export const SlotTable: React.FC<{ s: Scope; within?: string }> = ({ s, within =
       {rows.length > 0 && (
         <p className="text-xs text-[var(--text-faint)] mt-3 leading-snug">
           {best && worst && best !== worst
-            ? <><b className="text-[var(--text-muted)]">{slotLabel(best.bl)}</b> đang bán tốt nhất (chỉ số {best.x!.index}, {best.x!.n} ca); <b className="text-[var(--text-muted)]">{slotLabel(worst.bl)}</b> thấp nhất (chỉ số {worst.x!.index}, {hrs(worst.x!.hours)} giờ). Chỉ so các khung từ 5 ca.</>
-            : "Chưa đủ khung nào có từ 5 ca để so khung tốt / khung yếu."}
+            ? <><b className="text-[var(--text-muted)]">{slotLabel(best.bl)}</b> đang hiệu quả nhất (chỉ số {best.x!.index}, {best.x!.n} ca); <b className="text-[var(--text-muted)]">{slotLabel(worst.bl)}</b> thấp nhất (chỉ số {worst.x!.index}, {hrs(worst.x!.hours)} giờ). Chỉ so các khung từ 5 ca.</>
+            : "Chưa đủ khung nào có từ 5 ca để so khung giờ hiệu suất cao / thấp."}
         </p>
       )}
     </Card>

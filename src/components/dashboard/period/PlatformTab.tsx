@@ -204,7 +204,7 @@ export const CumChart: React.FC<{ sessions: LiveSession[]; P: ResolvedPeriod; ca
       <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-[11px] text-[var(--text-faint)]">
         <span className="inline-flex items-center gap-1.5"><i className="w-4 border-t-2 border-[var(--accent)]" />{rangeLabel(P.start, P.end)}</span>
         {!P.noBase && <span className="inline-flex items-center gap-1.5"><i className="w-4 border-t-2 border-dashed border-[var(--text-faint)]" />{P.isCurrentMonth ? fmtMonth(P.prevStart.slice(0, 7)) : rangeLabel(P.prevStart, P.prevEnd)}</span>}
-        {showTgt && <span className="inline-flex items-center gap-1.5"><i className="w-4 border-t-2 border-dashed border-[var(--warning)]" />Target cộng dồn</span>}
+        {showTgt && <span className="inline-flex items-center gap-1.5"><i className="w-4 border-t-2 border-dashed border-[var(--warning)]" />Target luỹ kế</span>}
         {showTgt && <span className="inline-flex items-center gap-1.5"><i className="w-4 border-t-2 border-dotted border-[var(--text-muted)]" />Tới dự báo cuối tháng (thẻ kênh)</span>}
       </div>
     </Card>
@@ -258,7 +258,7 @@ export const CampTable: React.FC<{ sessions: LiveSession[]; P: ResolvedPeriod }>
   return (
     <Card>
       <BlockHead title="So công bằng theo loại ngày" sub={`${rangeLabel(P.start, P.end)} so với ${P.noBase ? "—" : rangeLabel(P.prevStart, P.prevEnd)} · GMV trung bình mỗi ngày có ca, theo từng loại ngày`} />
-      <Table head={["Loại ngày", "Kỳ này", "Kỳ so sánh", "GMV/ngày", "so kỳ trước", "GMV/giờ", "so kỳ trước"]} empty={rows.length ? undefined : "Kỳ này chưa có ca có số."}>
+      <Table head={["Loại ngày", "Kỳ này", "Kỳ so sánh", "GMV/ngày", "so kỳ trước", "GMV/giờ", "so kỳ trước"]} empty={rows.length ? undefined : "Kỳ này chưa có ca có số liệu."}>
         {rows.map((k) => {
           const x = cm.get(k), y = pm.get(k);
           const gd = x ? x.gmv / x.days.size : null, gdB = y ? y.gmv / y.days.size : null;

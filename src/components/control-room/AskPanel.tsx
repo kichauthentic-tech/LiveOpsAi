@@ -29,8 +29,8 @@ const PREF_KEY = "control-room-ask-provider";
 const NAME: Record<Prefer, string> = { claude: "Claude", gemini: "Gemini" };
 const SUGGEST = [
   "Kênh nào còn cửa về đích tháng này, kênh nào không, vì sao?",
-  "Tuần này ca nào kéo xác suất xuống nhiều nhất?",
-  "Host nào thật sự giỏi hơn mặt bằng, chắc đến đâu?",
+  "Tuần này ca nào làm giảm xác suất đạt nhiều nhất?",
+  "Host nào có hiệu suất cao hơn trung bình nhóm, độ tin cậy bao nhiêu?",
   "Tháng trước giảm vì giờ, vì cơ cấu ca hay vì năng suất?",
   "Ai đang quá tải?"
 ];
@@ -171,7 +171,7 @@ export const AskPanel: React.FC<{ open: boolean; onClose: () => void; buildConte
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(q); } }}
             rows={2}
-            placeholder="Ví dụ: vì sao Franklin TikTok tụt xác suất hôm 10/10?"
+            placeholder="Ví dụ: vì sao xác suất đạt của Franklin TikTok giảm hôm 10/10?"
             className="flex-1 resize-none bg-[var(--surface-muted)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-[var(--text)]"
           />
           <button type="submit" disabled={busy || !q.trim()} className="self-end inline-flex items-center justify-center w-10 h-10 rounded-xl bg-[var(--accent)] text-[var(--accent-contrast)] disabled:opacity-40" aria-label="Gửi câu hỏi"><Send className="w-4 h-4" /></button>

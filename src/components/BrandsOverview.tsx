@@ -94,7 +94,7 @@ const REPORT_STATUS_CLS: Record<BrandMonthlyReport["status"] | "none", string> =
 const COMMIT_STATUS_LABEL: Record<CommitmentStatus, string> = {
   no_commitment: "Chưa có cam kết",
   met: "Đã đủ cam kết",
-  on_track: "Đang đúng nhịp",
+  on_track: "Đúng tiến độ",
   at_risk: "Cần chú ý",
   behind: "Đang chậm"
 };
@@ -225,7 +225,7 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ platform, brands
       <PageHeader
         icon={LayoutGrid}
         title="Toàn Cảnh Brand"
-        description="Mỗi brand trong tháng đang xem: đã lập kế hoạch, nhập hợp đồng, nhập giá chưa, số thật đã chạy — và phát hành / thu hồi Report Tháng ngay ở cột Report. Ô nào còn thiếu có nút dẫn tới chỗ nhập."
+        description="Mỗi brand trong tháng đang xem: đã lập kế hoạch, nhập hợp đồng, nhập giá chưa, số liệu thực tế đã live — và phát hành / thu hồi Report Tháng ngay ở cột Report. Ô nào còn thiếu có nút dẫn tới chỗ nhập."
         actions={
           <>
             <MonthPicker value={month} onChange={setMonth} />
@@ -420,7 +420,7 @@ const ReportCell: React.FC<{
       ) : month >= currentMonth ? (
         <span className="block text-[11px] text-[var(--text-faint)] mt-1" title="Phát hành là đóng sổ số của tháng — chỉ làm sau khi hết tháng.">Chờ hết tháng</span>
       ) : nothingToPublish ? (
-        <span className="flex items-center gap-1 text-[11px] text-[var(--text-faint)] mt-1" title="Tháng này brand chưa có ca nào và cũng chưa ai tạo dòng report — không có số gì để gửi.">
+        <span className="flex items-center gap-1 text-[11px] text-[var(--text-faint)] mt-1" title="Tháng này brand chưa có ca nào và cũng chưa ai tạo dòng report — không có số liệu gì để gửi.">
           <Ban className="w-3 h-3 shrink-0" /> Không có gì để phát hành
         </span>
       ) : (

@@ -41,7 +41,7 @@ const fmtDay = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
 const fmtInt = (n: number) => Math.round(n).toLocaleString("vi-VN");
 const fmtH = (n: number) => `${n.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h`;
 const fmtPct = (x: number | null, d = 0) => (x === null ? "—" : `${(x * 100).toLocaleString("vi-VN", { maximumFractionDigits: d })}%`);
-const MISSING_LABEL: Record<MissingStep, string> = { snapshot: "chưa up file", report: "chưa giao ca", reconcile: "chưa đối soát" };
+const MISSING_LABEL: Record<MissingStep, string> = { snapshot: "chưa tải lên file", report: "chưa giao ca", reconcile: "chưa đối soát" };
 
 // Hoisted ra module scope (react-hooks/static-components, audit 2026-09-24) — định nghĩa lại bên
 // trong BrandWeeklyReport thì mỗi render tạo ra một component KHÁC (identity mới), React coi như
@@ -51,7 +51,7 @@ const Kpi: React.FC<{ label: string; value: string; delta?: number | null; hint?
   <StatTile frame="card" label={label} value={value} tone={tone ? KPI_TONE[tone] : undefined}>
     {delta !== undefined && (
       <p className={`text-[11px] font-bold mt-0.5 flex items-center gap-1 ${delta === null ? "text-[var(--text-faint)]" : delta >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-        {delta === null ? "tuần trước chưa có số" : <>{delta >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />} {fmtPct(Math.abs(delta))} {vsLabel}</>}
+        {delta === null ? "tuần trước chưa có số liệu" : <>{delta >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />} {fmtPct(Math.abs(delta))} {vsLabel}</>}
       </p>
     )}
     {hint && <p className="text-[11px] text-[var(--text-faint)] mt-0.5">{hint}</p>}
@@ -288,8 +288,8 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
           </div>
         </div>
         <p className="text-[11px] text-[var(--text-muted)]">
-          {weekSessions.length} ca trong tuần — {cur.done} có số ({cur.reconciled} đã đối soát{cur.snapshot > 0 ? `, ${cur.snapshot} số lúc giao ca` : ""}{cur.manual > 0 ? `, ${cur.manual} tự khai` : ""})
-          {cur.noData > 0 && <> · <span className="text-amber-300">{cur.noData} đã qua chưa có số</span></>}
+          {weekSessions.length} ca trong tuần — {cur.done} có số liệu ({cur.reconciled} đã đối soát{cur.snapshot > 0 ? `, ${cur.snapshot} số lúc giao ca` : ""}{cur.manual > 0 ? `, ${cur.manual} tự khai` : ""})
+          {cur.noData > 0 && <> · <span className="text-amber-300">{cur.noData} đã qua chưa có số liệu</span></>}
           {cur.upcoming > 0 && <> · {cur.upcoming} sắp tới</>}
           {cur.cancelled > 0 && <> · {cur.cancelled} huỷ</>}
         </p>
@@ -298,13 +298,13 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
       {/* KPI tuần */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <Kpi label="LIVE GMV tuần" value={fmtVndShort(cur.gmv)} delta={wow(cur.gmv, prev.gmv)} vsLabel={vsLabel} tone={cur.gmv > 0 ? "good" : undefined} />
-        <Kpi label="Target GMV tuần" value={cur.target > 0 ? fmtVndShort(cur.target) : "—"} hint={cur.achieved !== null ? `${fmtPct(cur.achieved)} Target tới ngày có số${through && through < weekEnd && through >= weekStart ? ` (${fmtDay(through)})` : ""}` : cur.target > 0 ? "chưa có ca xong" : "chưa có kế hoạch đã chốt"} tone={cur.achieved === null ? undefined : cur.achieved >= 1 ? "good" : cur.achieved >= 0.9 ? "warn" : "bad"} />
+        <Kpi label="Target GMV tuần" value={cur.target > 0 ? fmtVndShort(cur.target) : "—"} hint={cur.achieved !== null ? `${fmtPct(cur.achieved)} Target tới ngày có số liệu${through && through < weekEnd && through >= weekStart ? ` (${fmtDay(through)})` : ""}` : cur.target > 0 ? "chưa có ca xong" : "chưa có kế hoạch đã chốt"} tone={cur.achieved === null ? undefined : cur.achieved >= 1 ? "good" : cur.achieved >= 0.9 ? "warn" : "bad"} />
         <Kpi label="Giờ live" value={fmtH(cur.hours)} delta={wow(cur.hours, prev.hours)} vsLabel={vsLabel} hint={`${cur.done} ca`} />
         <Kpi label="GMV/giờ" value={fmtVndShort(cur.gmvPerHour)} delta={wow(cur.gmvPerHour, prev.gmvPerHour)} vsLabel={vsLabel} />
         <Kpi
           label={`Run-rate tháng ${monthKey.slice(5, 7)}`}
           value={monthRr?.runRate === null || monthRr?.runRate === undefined ? "—" : fmtPct(monthRr.runRate)}
-          hint={monthRr ? `${fmtVndShort(monthRr.actualDone)} / ${fmtVndShort(monthRr.targetTotal)} · dự kiến ${fmtVndShort(monthRr.projected)}` : "tháng chưa có target"}
+          hint={monthRr ? `${fmtVndShort(monthRr.actualDone)} / ${fmtVndShort(monthRr.targetTotal)} · dự báo ${fmtVndShort(monthRr.projected)}` : "tháng chưa có target"}
           tone={monthRr?.runRate == null ? undefined : monthRr.runRate >= 1 ? "good" : monthRr.runRate >= 0.9 ? "warn" : "bad"}
         />
       </div>
@@ -367,7 +367,7 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
             {slice.missingDays.length > 0 && <> · thiếu file {slice.missingDays.length} ngày ({slice.missingDays.map(fmtDay).join(", ")})</>}.
           </p>
         ) : (
-          <p className="text-[11px] text-[var(--text-faint)]">Chưa có file Dữ Liệu Gốc tuần này — chỉ có số từ ca.</p>
+          <p className="text-[11px] text-[var(--text-faint)]">Chưa có file Dữ Liệu Gốc tuần này — chỉ có số liệu từ ca.</p>
         )}
       </div>
 
@@ -376,7 +376,7 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
         <div className="bg-[var(--surface)] rounded-2xl border border-[var(--border)] p-4 space-y-2">
           <h4 className="font-bold text-[var(--text)] text-sm">Top ca tuần</h4>
           {topSessions.length === 0 ? (
-            <p className="text-xs text-[var(--text-faint)] italic">Chưa có ca nào có số.</p>
+            <p className="text-xs text-[var(--text-faint)] italic">Chưa có ca nào có số liệu.</p>
           ) : (
             <ul className="grid grid-cols-1 lg:grid-cols-2 gap-1.5">
               {topSessions.map((s, i) => (

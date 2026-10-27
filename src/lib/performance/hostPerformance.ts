@@ -27,7 +27,7 @@ export interface PerfRow extends KeyMetrics {
 export interface DataQuality {
   total: number;
   reconciled: number; // đã đối soát chốt
-  snapshot: number; // số thật lúc giao ca, TikTok còn cập nhật trễ
+  snapshot: number; // số liệu thực tế lúc giao ca, TikTok còn cập nhật trễ
   manual: number; // host tự khai, chưa có gì bảo chứng
 }
 
@@ -373,8 +373,8 @@ export function dayTypeDriverLines(
       const against = parts.filter((x) => x.d > 0 !== up).sort((a, b) => Math.abs(b.d) - Math.abs(a.d));
       let line = `${h.name}: ${METRIC.gmvPerHour} ${signedPct(h.diff!)} so với cả team`;
       if (same.length) line += ` — ${up ? "nhờ" : "do"} ${same.map((x) => `${x.label} ${signedPct(x.d)}`).join(", ")}`;
-      else line += " — không thừa số nào lệch ≥ 5%, lệch dồn đều cả 4";
-      if (against.length) line += `; ${up ? "bị kéo lại bởi" : "bù lại được"} ${against.map((x) => `${x.label} ${signedPct(x.d)}`).join(", ")}`;
+      else line += " — không yếu tố nào lệch ≥ 5%, chênh lệch phân bổ đều cả 4 yếu tố";
+      if (against.length) line += `; ${up ? "bị kéo giảm bởi" : "được bù lại bởi"} ${against.map((x) => `${x.label} ${signedPct(x.d)}`).join(", ")}`;
       return `${line}.`;
     });
 }

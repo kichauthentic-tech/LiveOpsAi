@@ -117,7 +117,7 @@ export const AdsTrackingPanel: React.FC<Props> = ({ brandId, brandName, platform
           </h3>
           <p className="text-[11px] text-[var(--text-faint)] mt-1">
             Dán từ file tracking của brand (sheet &quot;Daily Ads Report&quot;: Month · Date · Target by TTS · target Total/Live/Product/Creator · actual Total/Live/Product/Creator …).
-            Dán được nhiều tháng một lần; ngày đã có thì ghi đè. Cột MTD và runrate của sheet không lấy — app tự tính, cắt ở ngày cuối có số thực.
+            Dán được nhiều tháng một lần; ngày đã có thì ghi đè. Cột MTD và runrate của sheet không lấy — app tự tính, cắt ở ngày cuối có số liệu thực tế.
           </p>
         </div>
         {canManage && s && (
@@ -170,7 +170,7 @@ export const AdsTrackingPanel: React.FC<Props> = ({ brandId, brandName, platform
                   <th className="py-1.5 px-2 text-right">Số ngày</th>
                   <th className="py-1.5 px-2 text-right">Target cả tháng</th>
                   <th className="py-1.5 px-2 text-right">Thực tế</th>
-                  <th className="py-1.5 px-2">Có số thực tới</th>
+                  <th className="py-1.5 px-2">Có số liệu thực tế tới</th>
                 </tr>
               </thead>
               <tbody>
@@ -218,7 +218,7 @@ export const AdsTrackingPanel: React.FC<Props> = ({ brandId, brandName, platform
         <>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <Tile label="Target cả tháng" value={fmtVndShort(s.monthTarget)} note={`${s.days} ngày có target`} />
-            <Tile label={through ? `Thực tế tới ${through}` : "Thực tế"} value={fmtVndShort(s.mtdActual)} note={s.spentOfMonth != null ? `${fmtFixed(s.spentOfMonth, 1)}% target cả tháng` : "chưa có ngày nào có số"} />
+            <Tile label={through ? `Thực tế tới ${through}` : "Thực tế"} value={fmtVndShort(s.mtdActual)} note={s.spentOfMonth != null ? `${fmtFixed(s.spentOfMonth, 1)}% target cả tháng` : "chưa có ngày nào có số liệu"} />
             <Tile
               label="So target luỹ kế"
               value={pctTxt(s.runrate)}

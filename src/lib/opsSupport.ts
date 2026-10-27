@@ -29,7 +29,7 @@ export interface SessionBenchmark {
   aov: number;
   liveCtr: number | null; // click sản phẩm / lượt xem — từ ca có file của brand cùng thứ
   adsPerHour: number | null; // từ report (adsCost) của brand
-  dayFactor: number; // dự báo / (GMV-giờ nền × giờ) — >1 là ngày camp/lễ/scheme
+  dayFactor: number; // dự báo / (GMV-giờ nền × giờ) — >1 là ngày Campaign/lễ/scheme
   thin: boolean; // ô lịch sử mỏng (< 3 ca) → chỉ tham khảo
   cellTags: string[];
 }

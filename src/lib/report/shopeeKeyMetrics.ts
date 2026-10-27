@@ -84,7 +84,7 @@ export interface ShopeeKeyMetrics extends ShopeeKeyCounts {
   viewersPerHour: number | null; // tự tính: Viewers ÷ Giờ live
   atcRate: number | null; // tự tính: ATC ÷ Viewers (%)
   abs: number | null; // ABS(Placed Order) = GMV ÷ Orders
-  gmvPerAtc: number | null; // tự tính: GMV ÷ ATC — "mỗi lần thêm giỏ đáng bao nhiêu tiền"
+  gmvPerAtc: number | null; // tự tính: GMV ÷ ATC — "GMV mang về trên mỗi lần thêm vào giỏ"
 }
 
 export function shopeeKeyMetrics(c: ShopeeKeyCounts): ShopeeKeyMetrics {
@@ -116,8 +116,8 @@ type Kind = "money" | "int" | "hours";
 export type ShopeeMetricGroup = "result" | "traffic";
 
 export const SHOPEE_METRIC_GROUPS: { group: ShopeeMetricGroup; label: string; hint: string }[] = [
-  { group: "result", label: "Kết quả", hint: "Tiền thu được trên số giờ đã chạy. Orders, ABS, Items Sold có sau khi đối soát bằng Live List." },
-  { group: "traffic", label: "Viewers và ATC", hint: "Shopee đưa bao nhiêu người vào phòng live và bao nhiêu lần họ thêm vào giỏ (ATC có sau khi đối soát bằng Live List)." }
+  { group: "result", label: "Kết quả", hint: "GMV trên số giờ live. Orders, ABS, Items Sold có sau khi đối soát bằng Live List." },
+  { group: "traffic", label: "Viewers và ATC", hint: "Shopee phân phối bao nhiêu người vào phiên live và bao nhiêu lần họ thêm vào giỏ (ATC có sau khi đối soát bằng Live List)." }
 ];
 
 export interface ShopeeMetricDef {

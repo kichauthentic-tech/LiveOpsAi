@@ -129,7 +129,7 @@ export function ShopeeAdsPanel({ brandId, brandName, month, canManage, isPublish
           </h3>
           <p className="text-[11px] text-[var(--text-faint)] mt-1">
             Nguồn: file &quot;Shopee Live Ads Report&quot; (Quảng cáo Shopee → Quảng cáo Livestream → xuất dữ liệu, chọn đúng một tháng). File là
-            tổng cả tháng theo từng chiến dịch — không có số theo ngày. ROAS = GMV từ Ads ÷ chi phí, cùng cách Shopee tính.
+            tổng cả tháng theo từng chiến dịch — không có số liệu theo ngày. ROAS = GMV từ Ads ÷ chi phí, cùng cách Shopee tính.
           </p>
         </div>
         {importOfMonth && canManage && (

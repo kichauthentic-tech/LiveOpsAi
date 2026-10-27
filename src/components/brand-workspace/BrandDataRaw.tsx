@@ -39,7 +39,7 @@ const REPORT_TABS: { id: DataRawReportType; label: string; hint: string }[] = [
     label: "Creator Live Performance",
     hint: 'Export "Creator-Live-Performance" từ TikTok Creator Center — nguồn chính cho GMV/CTR/CTOR Livestream trong Report Tháng (thay thế Live Analysis).'
   },
-  { id: "live_analysis", label: "Live Analysis", hint: 'Export "Live Analysis" từ TikTok Shop Seller Center ở chế độ mặc định (chỉ tài khoản shop) — cột đối chiếu của Report Tuần. Phiên của creator affiliate up ở tab "Live Analysis — Affiliate".' },
+  { id: "live_analysis", label: "Live Analysis", hint: 'Export "Live Analysis" từ TikTok Shop Seller Center ở chế độ mặc định (chỉ tài khoản shop) — cột đối chiếu của Report Tuần. Phiên của creator affiliate tải lên ở tab "Live Analysis — Affiliate".' },
   { id: "affiliate_live_analysis", label: "Live Analysis — Affiliate", hint: 'Export "Live Analysis" từ TikTok Shop Seller Center ở chế độ xem creator affiliate (cùng định dạng, mỗi dòng là một phiên live của một creator affiliate) — nguồn cho trang Affiliate và mục Affiliate của Chốt tháng.' },
   { id: "shop_analytics", label: "Shop Analytics", hint: 'Export "Shop Analytics — Key metrics" từ TikTok Shop Seller Center.' },
   { id: "live_performance_core_stats", label: "Live Performance", hint: 'Export "Live Performance Core Stats" từ TikTok Shop Seller Center — GMV LIVE theo ngày. Report Tháng KHÔNG dùng (từ 2026-09-29): file này cộng cả live của creator affiliate nên không phải số agency; chỉ lưu để tra cứu.' }
@@ -49,7 +49,7 @@ const REPORT_TABS: { id: DataRawReportType; label: string; hint: string }[] = [
 const SHOPEE_TABS: { id: DataRawReportType; label: string; hint: string }[] = [
   { id: "shopee_overview", label: "Tổng quan tháng", hint: 'Export "overview-v2…csv" từ Shopee Seller Centre (Dữ liệu Live → Tổng quan, chọn đúng một tháng) — Sales, Viewers, ATC, Product Impressions/Clicks, Traffic Source, Coins/Voucher của live cả tháng.' },
   { id: "shopee_daily", label: "Theo ngày", hint: 'Export "export-sc__1m_…csv" từ Shopee Seller Centre — mỗi ngày một dòng (Sales đặt/xác nhận, Orders, Viewers, ATC, CTR, GPM…). Một file một tháng.' },
-  { id: "shopee_live_list", label: "Live List", hint: 'Export "…live_stream_list_export…xlsx" từ Shopee Seller Centre — mỗi phiên live một dòng: Start Time, Duration, Viewers, ATC, Orders, Items Sold, Sales. Dùng cho Report Shopee VÀ để đối soát ca Shopee — up ở đây là tự tạo lần đối soát ngay bên dưới.' },
+  { id: "shopee_live_list", label: "Live List", hint: 'Export "…live_stream_list_export…xlsx" từ Shopee Seller Centre — mỗi phiên live một dòng: Start Time, Duration, Viewers, ATC, Orders, Items Sold, Sales. Dùng cho Report Shopee VÀ để đối soát ca Shopee — tải lên ở đây là tự tạo lần đối soát ngay bên dưới.' },
   { id: "shopee_product_list", label: "Sản phẩm (Shopee)", hint: 'Export "…live_product_list_export…xlsx" từ Shopee Seller Centre — mỗi sản phẩm bán trong live một dòng (Product Clicks, ATC, Orders, Sales).' }
 ];
 // Mọi loại file; workspace chỉ hiện loại của sàn đang xem (hồ sơ sàn `dataRawTypes`) — không lẫn file hai sàn.
@@ -300,7 +300,7 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ platform, brandId, b
       <PageHeader
         icon={Database}
         title={`Dữ Liệu Gốc — ${brandName}`}
-        description={<>Nơi lưu nguyên trạng report Excel tải tay từ {prof.sellerCenterLabel} mỗi tuần/tháng (workspace này chỉ có file của sàn {platform}). Đây là cơ sở để dựng report + đối soát cuối tháng, sau này cần tra chỉ số nào chỉ cần mở lại import đúng kỳ. Up lại file trong cùng một tháng sẽ thay bản cũ của tháng đó {prof.dataRawReplaceNote}.</>}
+        description={<>Nơi lưu nguyên trạng report Excel tải tay từ {prof.sellerCenterLabel} mỗi tuần/tháng (workspace này chỉ có file của sàn {platform}). Đây là cơ sở để dựng report + đối soát cuối tháng, sau này cần tra chỉ số nào chỉ cần mở lại import đúng kỳ. Tải lại file trong cùng một tháng sẽ thay bản cũ của tháng đó {prof.dataRawReplaceNote}.</>}
       >
         <div className="flex flex-wrap gap-2">
           {visibleTabs.map((t) => (
@@ -455,7 +455,7 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ platform, brandId, b
                             <button
                               onClick={() => void handleReconcileImport(imp)}
                               disabled={reconBusyId !== null}
-                              title="Tạo lần đối soát từ lần tải này (không cần up lại file)"
+                              title="Tạo lần đối soát từ lần tải này (không cần tải lại file)"
                               className="shrink-0 text-[11px] font-bold px-2 py-1 rounded-lg bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-[var(--text)] disabled:opacity-40"
                             >
                               {reconBusyId === imp.id ? "Đang tạo..." : "Đối soát"}

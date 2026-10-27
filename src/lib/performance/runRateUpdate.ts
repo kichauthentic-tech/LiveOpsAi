@@ -342,7 +342,7 @@ const STATUS_LABEL: Record<WaveStatus, string> = { done: "đã xong", live: "đa
 // Xuất Excel — đúng những gì đã hiện trên màn hình, mỗi dòng thuộc MỘT tài khoản (không dòng tổng gộp)
 // ---------------------------------------------------------------------------
 
-export const SHIFT_STATE_LABEL: Record<PlanSlotState, string> = { done: "Đã có số", no_data: "Chưa có số", pending: "Chưa tới", cancelled: "Đã huỷ (giữ target)" };
+export const SHIFT_STATE_LABEL: Record<PlanSlotState, string> = { done: "Đã có số liệu", no_data: "Chưa có số liệu", pending: "Chưa tới", cancelled: "Đã huỷ (giữ target)" };
 const WEEKDAY_NAMES = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
 const weekdayOf = (d: string) => WEEKDAY_NAMES[(new Date(`${d}T00:00:00Z`).getUTCDay() + 6) % 7];
 const pctNum = (v: number | null) => (v == null ? "" : Math.round(v * 1000) / 10);
@@ -365,18 +365,18 @@ export function runRateExportSheets(accounts: ExportAccount[]): { name: string; 
       "% target tháng": pctNum(r?.total.pctTarget ?? null),
       "Dự báo cuối tháng": round(a.forecast ?? null),
       "Cần mỗi ngày còn lại": round(r?.total.needPerRemainingDay ?? null),
-      "Ghi chú": r ? a.landing ?? "" : a.missing === "no_plan" ? "Chưa chốt Kế Hoạch Tháng" : "Tháng này chưa có số"
+      "Ghi chú": r ? a.landing ?? "" : a.missing === "no_plan" ? "Chưa chốt Kế Hoạch Tháng" : "Tháng này chưa có số liệu"
     };
   });
   const waves: Row[] = withReport.flatMap((a) =>
     a.report.waves.map((w) => ({
       "Tài khoản": a.name, "Đợt": w.label, "Từ": w.from, "Đến": w.to, "Trạng thái": STATUS_LABEL[w.status],
-      "Target đợt": round(w.target), "Kỳ vọng tới ngày": round(w.targetToDate), "Thực đạt": round(w.actual), "Run-rate (%)": pctNum(w.runRate), "% target cả đợt": pctNum(w.pctTarget), "Còn thiếu": round(w.gap), "Ngày còn lại": w.daysLeft, "Cần đạt các ngày còn lại (% target)": pctNum(w.needRate), "Số ca": w.shifts, "Ca có số": w.shiftsDone
+      "Target đợt": round(w.target), "Kỳ vọng tới ngày": round(w.targetToDate), "Thực đạt": round(w.actual), "Run-rate (%)": pctNum(w.runRate), "% target cả đợt": pctNum(w.pctTarget), "Còn thiếu": round(w.gap), "Ngày còn lại": w.daysLeft, "Cần đạt các ngày còn lại (% target)": pctNum(w.needRate), "Số ca": w.shifts, "Ca có số liệu": w.shiftsDone
     }))
   );
   const days: Row[] = withReport.flatMap((a) =>
     a.report.days.filter((d) => d.shifts > 0 || d.target > 0 || d.actual > 0).map((d) => ({
-      "Tài khoản": a.name, "Ngày": d.date, "Thứ": weekdayOf(d.date), "Đợt": WAVE_NAME[d.bucket], "Số ca": d.shifts, "Ca có số": d.withData,
+      "Tài khoản": a.name, "Ngày": d.date, "Thứ": weekdayOf(d.date), "Đợt": WAVE_NAME[d.bucket], "Số ca": d.shifts, "Ca có số liệu": d.withData,
       "Target": round(d.target), "Thực đạt": round(d.actual), "% target ngày": pctNum(d.pctTarget), "Tình trạng": d.counted ? "Đã vào run-rate" : d.state === "partial" ? "Tạm tính" : "Chưa tới"
     }))
   );

@@ -114,7 +114,7 @@ export const CumulativeChart: React.FC<{ r: AccountRunRate; color: string; showP
     endLabels[1 - up].y += 8;
   }
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="GMV cộng dồn so với target cộng dồn">
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="GMV luỹ kế so với Target luỹ kế">
       <defs>
         <linearGradient id={gid} x1="0" x2="0" y1="0" y2="1">
           <stop offset="0%" stopColor={color} stopOpacity="0.32" />
@@ -144,7 +144,7 @@ export const CumulativeChart: React.FC<{ r: AccountRunRate; color: string; showP
       {endLabels.map((l) => <text key={l.text} x={W - R + 8} y={l.y} dominantBaseline="middle" style={{ fill: l.fill, fontSize: 11, fontWeight: 800 }}>{l.text}</text>)}
       {r.days.map((d, i) => (
         <rect key={d.date} x={x(i) - colW / 2} y={T} width={colW} height={H - T - B} fill="transparent"
-          data-tip={`${dayTip(d)}\n\nCộng dồn target: ${money(pts[i].target)}${pts[i].actual != null ? `\nCộng dồn đạt: ${money(pts[i].actual)}` : showPace && pts[i].projected != null ? `\nDự báo nếu giữ tiến độ: ${money(pts[i].projected)}` : ""}`} />
+          data-tip={`${dayTip(d)}\n\nTarget luỹ kế: ${money(pts[i].target)}${pts[i].actual != null ? `\nĐã đạt luỹ kế: ${money(pts[i].actual)}` : showPace && pts[i].projected != null ? `\nDự báo nếu giữ tiến độ: ${money(pts[i].projected)}` : ""}`} />
       ))}
     </svg>
   );
@@ -152,9 +152,9 @@ export const CumulativeChart: React.FC<{ r: AccountRunRate; color: string; showP
 
 export const CumulativeLegend: React.FC<{ color: string; showPace?: boolean }> = ({ color, showPace = true }) => (
   <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-[var(--text-muted)]">
-    <span className="inline-flex items-center gap-1.5"><i className="w-4 h-[3px] rounded inline-block" style={{ background: color }} />Đã đạt (cộng dồn)</span>
+    <span className="inline-flex items-center gap-1.5"><i className="w-4 h-[3px] rounded inline-block" style={{ background: color }} />Đã đạt (luỹ kế)</span>
     {showPace && <span className="inline-flex items-center gap-1.5"><i className="w-4 h-[3px] rounded inline-block" style={{ background: `repeating-linear-gradient(90deg,${color} 0 5px,transparent 5px 8px)` }} />Nếu giữ tiến độ hiện tại</span>}
-    <span className="inline-flex items-center gap-1.5"><i className="w-4 h-[3px] rounded inline-block" style={{ background: "repeating-linear-gradient(90deg,var(--text-faint) 0 3px,transparent 3px 6px)" }} />Target cộng dồn</span>
+    <span className="inline-flex items-center gap-1.5"><i className="w-4 h-[3px] rounded inline-block" style={{ background: "repeating-linear-gradient(90deg,var(--text-faint) 0 3px,transparent 3px 6px)" }} />Target luỹ kế</span>
     <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: "var(--accent)", opacity: 0.35 }} />Ngày camp</span>
   </div>
 );
@@ -207,7 +207,7 @@ export const DayBarsLegend: React.FC = () => (
     <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: "var(--warning)" }} />85–95%</span>
     <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: "var(--danger)" }} />Dưới 85%</span>
     <span className="inline-flex items-center gap-1.5"><i className="w-3.5 h-[2px] inline-block" style={{ background: "var(--text)" }} />Target của ngày</span>
-    <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-sm inline-block border border-dashed" style={{ borderColor: "var(--text-faint)" }} />Chưa có số</span>
+    <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-sm inline-block border border-dashed" style={{ borderColor: "var(--text-faint)" }} />Chưa có số liệu</span>
   </div>
 );
 

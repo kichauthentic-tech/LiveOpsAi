@@ -479,8 +479,8 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
           </div>
           <p className="text-[11px] text-amber-300">
             {manualOnly.length > 0 && `${manualOnly.length} phiên là số talent tự khai, chưa có gì bảo chứng. `}
-            {snapshotOnly > 0 && `${snapshotOnly} phiên đã có số lúc giao ca nhưng ${platform} còn cập nhật đơn/hoàn/huỷ sau đó. `}
-            Đối soát trước khi phát hành report cho khách — vào Dữ Liệu Gốc → file {profileOf(platform).reconciliationFile}, up file rồi bấm Áp dụng ở mục Đối soát số liệu.
+            {snapshotOnly > 0 && `${snapshotOnly} phiên đã có số liệu lúc giao ca nhưng ${platform} còn cập nhật đơn/hoàn/huỷ sau đó. `}
+            Đối soát trước khi phát hành report cho khách — vào Dữ Liệu Gốc → file {profileOf(platform).reconciliationFile}, tải lên file rồi bấm Áp dụng ở mục Đối soát số liệu.
           </p>
           <div className="flex flex-wrap gap-1.5">
             {unreconciledSessions.slice(0, 12).map((s) => (

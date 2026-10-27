@@ -178,13 +178,13 @@ export const SchemeDayPanel: React.FC<SchemeDayPanelProps> = ({ brandId, date, s
               }}
               className="flex items-center gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-400 hover:text-amber-700"
             >
-              <Plus className="w-3.5 h-3.5" /> Thêm scheme
+              <Plus className="w-3.5 h-3.5" /> Thêm khuyến mãi
             </button>
           ) : (
             <div className="flex flex-wrap items-center gap-1.5">
               <input
                 type="text"
-                placeholder="Hạng mục (vd Voucher scheme)"
+                placeholder="Hạng mục (vd Voucher shop)"
                 value={newRow.category}
                 onChange={(e) => setNewRow((d) => ({ ...d, category: e.target.value }))}
                 list="scheme-categories-day"

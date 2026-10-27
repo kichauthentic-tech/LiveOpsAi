@@ -865,7 +865,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             })),
             { "Chỉ Số": "Target GMV", "Kỳ trước": "", "Kỳ này": n(kpiTargetGmvCur) },
             { "Chỉ Số": "KPI GMV", "Kỳ trước": "", "Kỳ này": n(shopKpi?.target) },
-            { "Chỉ Số": "Total GMV dự kiến cuối tháng", "Kỳ trước": "", "Kỳ này": n(shopKpi?.projected) },
+            { "Chỉ Số": "Total GMV dự báo cuối tháng", "Kỳ trước": "", "Kỳ này": n(shopKpi?.projected) },
             { "Chỉ Số": `So sánh: ${cmp.label}`, "Kỳ trước": "", "Kỳ này": "" }
           ]
         },
@@ -1117,14 +1117,14 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
               change={shopCur && shopPrevSame ? pctChange(shopPrevSame.gmv, shopCur.gmv) : null}
               note={
                 shopKpi
-                  ? `${fmtPct(shopKpi.pct)} KPI ${fmtVndShort(shopKpi.target)}${shopKpi.partial ? ` · dự kiến ${fmtPct(shopKpi.projectedPct)}` : ""}`
+                  ? `${fmtPct(shopKpi.pct)} KPI ${fmtVndShort(shopKpi.target)}${shopKpi.partial ? ` · dự báo ${fmtPct(shopKpi.projectedPct)}` : ""}`
                   : shopCur
                     ? shopWin !== cmp
                       ? `Shop Analytics — file tới ${shopWin.curEnd.slice(8)}/${month.slice(5)}, % so ${shopWin.label.split(" so với ")[1] ?? "cùng kỳ"}`
                       : "Shop Analytics — mọi kênh"
                     : canManage
                       ? "chưa có file Shop Analytics"
-                      : "chưa có số toàn shop"
+                      : "chưa có số liệu toàn shop"
               }
             />
             <KpiTile
@@ -1144,7 +1144,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
               value={nmvRate != null ? fmtVndShort(liveCurStats.gmv * (1 - nmvRate / 100)) : "—"}
               note={nmvRate != null ? `trừ ${fmtPct(nmvRate)} — ${nmvSource}` : canManage ? "chưa có tỷ lệ hoàn hủy (CRM) / Refund rate (Shop Analytics)" : "chưa có Refund rate"}
             />
-            <KpiTile label="Giờ live" value={fmtHours(liveCurStats.hours)} change={pctChange(livePrevStats.hours, liveCurStats.hours)} note={`${liveCurStats.sessions} phiên có số`} />
+            <KpiTile label="Giờ live" value={fmtHours(liveCurStats.hours)} change={pctChange(livePrevStats.hours, liveCurStats.hours)} note={`${liveCurStats.sessions} phiên có số liệu`} />
             <KpiTile label="GMV/giờ" value={liveCurStats.gmvPerHour != null ? fmtVndShort(liveCurStats.gmvPerHour) : "—"} change={pctChange(livePrevStats.gmvPerHour, liveCurStats.gmvPerHour)} />
           </div>
 
@@ -1191,7 +1191,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             footnote={
               kpiTargetGmvCur
                 ? runRate && runRate.pendingCount > 0 && runRate.runRate != null
-                  ? `Run-rate ${fmtFixed(runRate.runRate * 100, 0)}% (${runRate.doneCount} phiên đã live · ${runRate.pendingCount} phiên còn lại) · dự kiến cuối tháng ${fmtVndShort(runRate.projected)}, ${runRate.gap > 0 ? "thiếu" : "vượt"} ${fmtVndShort(Math.abs(runRate.gap))}.`
+                  ? `Run-rate ${fmtFixed(runRate.runRate * 100, 0)}% (${runRate.doneCount} phiên đã live · ${runRate.pendingCount} phiên còn lại) · dự báo cuối tháng ${fmtVndShort(runRate.projected)}, ${runRate.gap > 0 ? "thiếu" : "vượt"} ${fmtVndShort(Math.abs(runRate.gap))}.`
                   : undefined
                 : canManage
                   ? `Tháng ${month.slice(5)} chưa có target chốt / KPI GMV ở Kế Hoạch Tháng — khi có, bảng điểm hiện % Target từng loại ngày.`
@@ -1226,7 +1226,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
               <Panel
                 title="Livestream YFB so với các kênh còn lại của shop"
                 icon={<Scale className="w-4 h-4" />}
-                sub={`${shopWin.label} · các kênh còn lại = Affiliate LIVE, Video, Product card (cùng thị trường, YFB không vận hành) · lệch ≥ 10 điểm mới coi là khác thị trường`}
+                sub={`${shopWin.label} · các kênh còn lại = Affiliate LIVE, Video, Product card (cùng thị trường, YFB không vận hành) · chênh lệch ≥ 10 điểm % mới xem là khác xu hướng thị trường`}
               >
                 <ReportTable head={["Loại ngày", "Livestream YFB", "Các kênh còn lại", "Lượt vào shop", "CVR shop", "Đánh giá"]}>
                   {control.map((r, idx) => {
@@ -1268,11 +1268,11 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
               <Panel
                 title="Nhịp bán theo ngày"
                 icon={<Activity className="w-4 h-4" />}
-                sub={`${METRIC.totalGmv} cả shop mỗi ngày (Shop Analytics) · đường vàng = trung bình 7 ngày · đường xanh = ${METRIC.liveGmv} YFB · ${rhythm.points.length} ngày có số`}
+                sub={`${METRIC.totalGmv} cả shop mỗi ngày (Shop Analytics) · đường vàng = trung bình 7 ngày · đường xanh = ${METRIC.liveGmv} YFB · ${rhythm.points.length} ngày có số liệu`}
               >
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-3 mb-4">
                   <KpiTile frame="plain" label="5 ngày cao nhất chiếm" value={rhythm.top5Pct != null ? fmtPct(rhythm.top5Pct) : "—"} note={`${METRIC.totalGmv} của kỳ`} />
-                  <KpiTile frame="plain" label="Số ngày tạo 80% GMV" value={rhythm.daysFor80 != null ? `${rhythm.daysFor80}/${rhythm.points.length}` : "—"} note="càng ít ngày càng dồn vào campaign" />
+                  <KpiTile frame="plain" label="Số ngày tạo 80% GMV" value={rhythm.daysFor80 != null ? `${rhythm.daysFor80}/${rhythm.points.length}` : "—"} note="càng ít ngày càng tập trung vào campaign" />
                   <KpiTile frame="plain" label="Ngày cao nhất" value={rhythm.best ? fmtVndShort(rhythm.best.gmv) : "—"} note={rhythm.best?.label} />
                   <KpiTile frame="plain" label="Ngày thấp nhất" value={rhythm.worst ? fmtVndShort(rhythm.worst.gmv) : "—"} note={rhythm.worst?.label} />
                 </div>
@@ -1293,9 +1293,9 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                 <div className="mt-3">
                   <ReportTable head={["Thứ", ...rhythm.weekday.map((w) => w.label)]}>
                     <tr style={rowStyle(0)}>
-                      <td className="py-2 px-3 font-semibold whitespace-nowrap" style={{ color: PAL.gold }}>Chỉ số (100 = ngày TB)</td>
+                      <td className="py-2 px-3 font-semibold whitespace-nowrap" style={{ color: PAL.gold }}>Chỉ số (100 = ngày trung bình)</td>
                       {rhythm.weekday.map((w) => (
-                        <td key={w.label} className="py-2 px-3 text-right font-mono" style={{ color: w.index == null ? PAL.muted : w.index >= 110 ? PAL.green : w.index <= 90 ? PAL.red : PAL.cream }} title={`${w.days} ngày · TB ${fmtVndShort(w.avgGmv)}/ngày`}>
+                        <td key={w.label} className="py-2 px-3 text-right font-mono" style={{ color: w.index == null ? PAL.muted : w.index >= 110 ? PAL.green : w.index <= 90 ? PAL.red : PAL.cream }} title={`${w.days} ngày · trung bình ${fmtVndShort(w.avgGmv)}/ngày`}>
                           {w.index != null ? fmtInt(w.index) : "—"}
                         </td>
                       ))}
@@ -1308,7 +1308,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
               </Panel>
             )}
             {channelMixes.every((c) => !c) ? (
-              <p className="text-sm py-4" style={{ color: PAL.muted }}>{canManage ? "Chưa có file Shop Analytics cho các tháng này ở Dữ Liệu Gốc." : "Chưa có số toàn shop cho các tháng này."}</p>
+              <p className="text-sm py-4" style={{ color: PAL.muted }}>{canManage ? "Chưa có file Shop Analytics cho các tháng này ở Dữ Liệu Gốc." : "Chưa có số liệu toàn shop cho các tháng này."}</p>
             ) : (
               <Panel
                 title="Cơ cấu Total GMV theo kênh"
@@ -1420,7 +1420,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             >
               {!topSku?.hasAnyBatch ? (
                 <p className="text-sm text-center py-6" style={{ color: PAL.muted }}>
-                  {canManage ? "Chưa có file \"Product List\" nào được import trong Dữ Liệu Gốc cho tháng này." : "Chưa có số sản phẩm tháng này."}
+                  {canManage ? "Chưa có file \"Product List\" nào được import trong Dữ Liệu Gốc cho tháng này." : "Chưa có số liệu sản phẩm tháng này."}
                 </p>
               ) : skuMoveData ? (
                 <ReportTable head={["Hạng", "Sản phẩm", "GMV", skuMoveData.perDay ? "± GMV/ngày" : "± GMV", "Tỷ trọng Seller LIVE", "Orders", "Items sold", "Product CTR", "CTOR"]}>
@@ -1509,7 +1509,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             >
               {!topPromo?.hasAnyBatch ? (
                 <p className="text-sm text-center py-6" style={{ color: PAL.muted }}>
-                  {canManage ? "Chưa có file \"Shop Promotion List\" nào được import trong Dữ Liệu Gốc cho tháng này." : "Chưa có số chương trình khuyến mãi tháng này."}
+                  {canManage ? "Chưa có file \"Shop Promotion List\" nào được import trong Dữ Liệu Gốc cho tháng này." : "Chưa có số liệu chương trình khuyến mãi tháng này."}
                 </p>
               ) : topPromo.items.length === 0 ? (
                 <p className="text-sm text-center py-6" style={{ color: PAL.muted }}>
@@ -1588,7 +1588,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                 notes.push(`ROI cao nhất ở ${DAY_TYPE_SHORT[hi]} (${roiX(adsCur.byBucket![hi].roi)}), thấp nhất ở ${DAY_TYPE_SHORT[lo]} (${roiX(adsCur.byBucket![lo].roi)}).`);
               }
               if (adsCur.zeroOrderDays.length) {
-                notes.push(`${adsCur.zeroOrderDays.length} ngày tiêu tiền mà 0 đơn (${adsCur.zeroOrderDays.map((d) => fmtDateVn(d.date, false)).join(", ")}) — ${fmtVndFull(adsCur.zeroOrderDays.reduce((a, d) => a + d.cost, 0))}.`);
+                notes.push(`${adsCur.zeroOrderDays.length} ngày có chi phí Ads nhưng không phát sinh đơn (${adsCur.zeroOrderDays.map((d) => fmtDateVn(d.date, false)).join(", ")}) — ${fmtVndFull(adsCur.zeroOrderDays.reduce((a, d) => a + d.cost, 0))}.`);
               }
               if (adsCur.lowRoiDays.length) {
                 notes.push(`Ngày ROI thấp nhất trong các ngày chi đáng kể: ${adsCur.lowRoiDays.map((d) => `${fmtDateVn(d.date, false)} (${roiX(d.roi)}, chi ${fmtVndShort(d.cost)})`).join("; ")}.`);
@@ -1795,11 +1795,11 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
         {/* ===== Affiliate ===== */}
         {sectionShown.affiliate && (
         <section id="mr-affiliate" className="space-y-4 scroll-mt-16">
-          <SectionHead no={secNo("affiliate")} title={secTitle("affiliate")} sub="Phiên livestream của creator trong tháng · số thực từ tab Affiliate" />
+          <SectionHead no={secNo("affiliate")} title={secTitle("affiliate")} sub="Phiên livestream của creator trong tháng · số liệu thực tế từ tab Affiliate" />
           {creatorRows.length > 0 ? (
             <AffiliatePanel rows={creatorRows} totals={creatorSum} shopAffiliate={shopAffiliateCur} agencyGmvPerHour={liveCurStats.gmvPerHour} />
           ) : (
-            canManage && warnBox(<>Tháng {month.slice(5)} chưa có phiên creator nào có số ở tab Affiliate (kế hoạch + Nạp Từ Dữ Liệu Gốc). Brand không dùng affiliate thì bỏ qua — brand không thấy trang này.</>)
+            canManage && warnBox(<>Tháng {month.slice(5)} chưa có phiên creator nào có số liệu ở tab Affiliate (kế hoạch + Nạp Từ Dữ Liệu Gốc). Brand không dùng affiliate thì bỏ qua — brand không thấy trang này.</>)
           )}
         </section>
         )}

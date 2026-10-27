@@ -75,7 +75,7 @@ export const AdsPlanPanel: React.FC<{ s: AdsMonthSummary; month: string }> = ({ 
       )}
       {hasLive && (
         <p className="mt-2 text-[11px]" style={{ color: PAL.muted }}>
-          ROAS Live là ước tính: Ads Live của shop có thể đẩy cả phiên ngoài livestream YFB, còn LIVE GMV chỉ gồm phiên YFB.
+          ROAS Live là ước tính: Ads Live của shop có thể phân phối cho cả phiên ngoài livestream YFB, còn LIVE GMV chỉ gồm phiên YFB.
         </p>
       )}
     </Panel>

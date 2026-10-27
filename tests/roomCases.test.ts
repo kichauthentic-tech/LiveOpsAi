@@ -54,7 +54,7 @@ describe("nextLinkStatus / breakReasonLabel", () => {
     expect(nextLinkStatus(true, true)).toBe("ready");
   });
   it("nhãn lý do; lý do lạ trả nguyên khoá", () => {
-    expect(breakReasonLabel("network")).toBe("Rớt mạng / app crash");
+    expect(breakReasonLabel("network")).toBe("Mất kết nối / ứng dụng lỗi");
     expect(breakReasonLabel("???")).toBe("???");
   });
 });

@@ -11,7 +11,7 @@ import { PageHeader } from "../common/PageHeader";
 import { StatTile } from "../common/StatTile";
 
 // CỔNG BRAND (21/10/2026, đề xuất "một thẻ kênh" — user chốt cả 4 điểm): role brand mở Dashboard thấy 4 khối — số tháng này (bản tin
-// ops gửi), giờ live đã chạy so cam kết, lịch 7 ngày tới, báo cáo tháng đã phát hành. Brand đã xem GMV từng phiên trong Seller Center,
+// ops gửi), giờ live đã thực hiện so với cam kết, lịch 7 ngày tới, báo cáo tháng đã phát hành. Brand đã xem GMV từng phiên trong Seller Center,
 // nên cổng chỉ mang thứ agency có. KHÔNG có nhãn "khó đạt/sẽ hụt" hay xác suất (luật 4); KHÔNG tự tính số tháng chưa phát hành từ ca
 // (bị che ở live_sessions_secure — 0107) — số trong tháng chỉ tới qua bản tin (0179).
 
@@ -56,7 +56,7 @@ export const BrandPortal: React.FC<{
 
   return (
     <div className="space-y-5">
-      <PageHeader icon={LayoutDashboard} title={`Tổng quan · ${name}`} description="Số tháng này YFB gửi, giờ live đã chạy so cam kết, lịch 7 ngày tới và báo cáo tháng." />
+      <PageHeader icon={LayoutDashboard} title={`Tổng quan · ${name}`} description="Số tháng này YFB gửi, giờ live đã thực hiện so với cam kết, lịch 7 ngày tới và báo cáo tháng." />
 
       <section className="space-y-3" aria-label="Tháng này">
         <div className="flex flex-wrap items-baseline justify-between gap-2 px-1">
@@ -68,13 +68,13 @@ export const BrandPortal: React.FC<{
         ) : loaded.error ? (
           <p className="text-sm text-rose-400 px-1">{loaded.error}</p>
         ) : !p ? (
-          <p className="rounded-xl border border-dashed border-[var(--border)] px-4 py-5 text-sm text-[var(--text-muted)]">YFB chưa gửi bản tin tháng này. Bản tin có số đã đạt so kế hoạch, dự kiến cuối tháng và giờ live đã chạy.</p>
+          <p className="rounded-xl border border-dashed border-[var(--border)] px-4 py-5 text-sm text-[var(--text-muted)]">YFB chưa gửi bản tin tháng này. Bản tin có số liệu đã đạt so kế hoạch, dự báo cuối tháng và giờ live đã thực hiện.</p>
         ) : (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <StatTile frame="card" size="lg" label="Đã đạt" value={fmtVndShort(p.actual)} hint={p.target ? <>target tháng {fmtVndShort(p.target)}{p.runRate != null ? <> · <b className="text-[var(--text)]">{pct(p.runRate)}</b> so kế hoạch tới nay</> : ""}</> : "tháng này chưa có target kế hoạch"} />
-              <StatTile frame="card" size="lg" label="Dự kiến cuối tháng" value={p.forecast != null ? `~${fmtVndShort(p.forecast)}` : "—"} hint={p.forecast != null ? "theo lịch live còn lại và GMV/giờ gần đây" : "kênh mới, chưa đủ lịch sử để ước tính"} />
-              <StatTile frame="card" size="lg" label="Giờ live đã chạy" value={p.hours ? `${hrs(p.hours.delivered)} / ${hrs(p.hours.committed)}` : "—"} hint={p.hours ? `cam kết hợp đồng · còn ${hrs(p.hours.scheduled)} trong lịch` : "chưa có cam kết giờ cho tháng này"}>
+              <StatTile frame="card" size="lg" label="Dự báo cuối tháng" value={p.forecast != null ? `~${fmtVndShort(p.forecast)}` : "—"} hint={p.forecast != null ? "theo lịch live còn lại và GMV/giờ gần đây" : "kênh mới, chưa đủ lịch sử để ước tính"} />
+              <StatTile frame="card" size="lg" label="Giờ live đã thực hiện" value={p.hours ? `${hrs(p.hours.delivered)} / ${hrs(p.hours.committed)}` : "—"} hint={p.hours ? `cam kết hợp đồng · còn ${hrs(p.hours.scheduled)} trong lịch` : "chưa có cam kết giờ cho tháng này"}>
                 {p.hours && p.hours.committed > 0 && (
                   <div className="relative h-2 mt-1.5 rounded bg-[var(--surface-base)]" role="img" aria-label={`Đã chạy ${hrs(p.hours.delivered)} trên ${hrs(p.hours.committed)} cam kết`}>
                     <div className="absolute inset-y-0 left-0 rounded bg-[var(--success)]" style={{ width: `${Math.min(100, (p.hours.delivered / p.hours.committed) * 100)}%` }} />

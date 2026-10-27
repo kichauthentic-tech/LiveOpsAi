@@ -169,9 +169,9 @@ function SlotChip({ d, p, active, onEdit }: { d: PlanDraftSlot; p: Props; active
     right = <span className="text-[var(--text-faint)]">huỷ</span>;
     title += " · ca đã huỷ — vẫn giữ target trong run-rate";
   } else if (o?.state === "no_data") {
-    right = <span className="text-amber-400 font-bold">chưa số</span>;
+    right = <span className="text-amber-400 font-bold">chưa số liệu</span>;
     border = "border-amber-800";
-    title += " · đã qua giờ, chưa có số";
+    title += " · đã qua giờ, chưa có số liệu";
   } else {
     right = <span className={d.highExpectation ? "text-amber-400 font-bold" : "text-[var(--text)]"}>{d.targetGmv > 0 ? fmtVndShort(d.targetGmv) : "0"}</span>;
     if (d.expectedGmv !== undefined) title += ` · dự báo ${fmtVndShort(d.expectedGmv)}`;
@@ -227,7 +227,7 @@ function WeekCell({ days, p }: { days: string[]; p: Props }) {
           <span className={`text-lg font-black leading-none ${pctTone(s.pct!)}`}>{Math.round(s.pct! * 100)}%</span>
           <span className="text-[var(--text-muted)]">{fmtVndShort(s.actual)} / {fmtVndShort(s.targetToDate)}</span>
           {s.dueCount < s.slots && <span className="text-[var(--text-faint)]">còn {s.slots - s.dueCount} ca chưa tới</span>}
-          {s.noDataCount > 0 && <span className="text-amber-400">{s.noDataCount} ca chưa số</span>}
+          {s.noDataCount > 0 && <span className="text-amber-400">{s.noDataCount} ca chưa số liệu</span>}
         </>
       ) : (
         <>

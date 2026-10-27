@@ -130,7 +130,7 @@ export const HostPerformancePanel: React.FC<{
         })}
       </div>
       {/* Chú thích màu đặt ngay trên bảng — để ở phụ đề thì người đọc không biết xanh/đỏ so với cái gì. Tab Cả tháng: một dòng
-          nghĩa của màu hiện luôn, cách tính "mặt bằng" dài 3 dòng gập vào "Cách tính" (bố cục 18/10 đợt 2). */}
+          nghĩa của màu hiện luôn, cách tính "trung bình nhóm" dài 3 dòng gập vào "Cách tính" (bố cục 18/10 đợt 2). */}
       {isAll ? (
         <div className="mb-2">
           <p className="text-[11px]" style={{ color: PAL.muted }}>
@@ -146,7 +146,7 @@ export const HostPerformancePanel: React.FC<{
       ) : (
         <p className="text-[11px] mb-2" style={{ color: PAL.muted }}>
           <span style={{ color: PAL.green }}>▲ xanh</span> / <span style={{ color: PAL.red }}>▼ đỏ</span> = cao / thấp hơn cột Cả team từ {DAY_TYPE_DIFF_THRESHOLD}% trở lên (cùng loại ngày). Host
-          chỉ có 1 phiên không so. Dùng để hiểu yếu tố nào kéo GMV/giờ, không dùng để xếp hạng host (xếp hạng xem tab Cả tháng).
+          chỉ có 1 phiên không so. Dùng để hiểu yếu tố nào tác động tới GMV/giờ, không dùng để xếp hạng host (xếp hạng xem tab Cả tháng).
         </p>
       )}
       <ReportTable

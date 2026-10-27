@@ -224,7 +224,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   const blockedMove = (session: LiveSession, targetDateStr: string): string | null => {
     if (session.status === "Cancelled") return "Ca đã huỷ — không dời được.";
     if (hasSessionData(session)) return "Ca đã có số liệu — không dời ngày được (ranh giới snapshot/đối soát tính theo giờ ca).";
-    if (targetDateStr < getTodayDateString()) return "Không kéo ca vào ngày đã qua — ca sẽ thành \"đã xong\" mà không có số.";
+    if (targetDateStr < getTodayDateString()) return "Không kéo ca vào ngày đã qua — ca sẽ thành \"đã xong\" mà không có số liệu.";
     const want = { ...session, date: targetDateStr };
     const st = studioClash(sessions, shiftSlots, want, { excludeSessionId: session.id });
     if (st) return `Phòng ${session.studioName || ""} ngày ${targetDateStr} đã có ${studioClashLabel(st)}.`;
@@ -870,7 +870,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                     </span>
                   )}
                   {/* Gọi ở MỌI ô (kể cả ngày thường) — ô thường chừa dải trống cùng chiều cao nên
-                      số ngày của 3 ngày camp không bị đẩy tụt so với cả hàng. */}
+                      số ngày của 3 ngày Campaign không bị đẩy tụt so với cả hàng. */}
                   <CampaignDayRibbon
                     info={campaignDay}
                     columnIndex={idx % 7}
@@ -1019,7 +1019,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   }`}
                 >
                   {/* Desktop (md:grid-cols-7, hàng ngang thật): dải banner nối liền qua 3 ngày của
-                      đợt camp, đồng bộ kỹ thuật với Poster Calendar/lịch tháng. Mobile xếp dọc
+                      đợt Campaign, đồng bộ kỹ thuật với Poster Calendar/lịch tháng. Mobile xếp dọc
                       1 cột nên "nối ngang" vô nghĩa — vẫn dùng badge rời như cũ. */}
                   <div className="hidden md:block">
                     <CampaignDayRibbon

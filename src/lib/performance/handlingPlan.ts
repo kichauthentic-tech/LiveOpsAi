@@ -134,7 +134,7 @@ export function handlingPlan(x: PlanInput): HandlingPlan {
       id: "data_missing",
       tone: "fix",
       title: `Cập nhật số liệu ${missingPast.length} ca đã live`,
-      detail: `Đang tạm tính ${g > 0 ? `khoảng ${fmtVndShort(g)} ` : ""}theo dự báo từng ca. Cập nhật file giao ca / đối soát để thay bằng số thật — dự báo và Run-rate sẽ chính xác hơn.`,
+      detail: `Đang tạm tính ${g > 0 ? `khoảng ${fmtVndShort(g)} ` : ""}theo dự báo từng ca. Cập nhật file giao ca / đối soát để thay bằng số liệu thực tế — dự báo và Run-rate sẽ chính xác hơn.`,
       gmv: g > 0 ? g : null,
       hours: round1(missingPast.reduce((a, p) => a + p.hours, 0)),
       basis: "Ca đã qua ngày live mà chưa có số liệu."
@@ -148,7 +148,7 @@ export function handlingPlan(x: PlanInput): HandlingPlan {
     levers.push({
       id: "open_slots",
       tone: "fix",
-      title: `Lấp ${open.length} ca còn mở chưa có người`,
+      title: `Xếp người cho ${open.length} ca còn mở chưa có người`,
       detail: `${h1(open.reduce((a, p) => a + p.hours, 0))} giờ đang nằm trong dự báo. Không ai nhận thì dự báo mất khoảng ${fmtVndShort(g)} GMV.`,
       gmv: g,
       hours: round1(open.reduce((a, p) => a + p.hours, 0)),
@@ -176,11 +176,11 @@ export function handlingPlan(x: PlanInput): HandlingPlan {
         levers.push({
           id: "camp_coverage",
           tone: "grow",
-          title: `Ngày camp còn lại đang ít giờ hơn thường: ${thin.length} ngày`,
-          detail: `Lịch mới có ${h1(thin.reduce((a, r) => a + r.sched, 0))}h so với khoảng ${h1(typical * thin.length)}h mọi khi (${h1(typical)}h/ngày camp). Đủ giờ thì thêm khoảng ${h1(miss)}h.`,
+          title: `Ngày Campaign còn lại đang xếp ít giờ hơn mức thông thường: ${thin.length} ngày`,
+          detail: `Lịch mới có ${h1(thin.reduce((a, r) => a + r.sched, 0))}h so với mức thông thường ~${h1(typical * thin.length)}h (${h1(typical)}h/ngày Campaign). Đủ giờ thì thêm khoảng ${h1(miss)}h.`,
           gmv: miss * marginalCamp,
           hours: round1(miss),
-          basis: `Giờ trung bình một ngày camp trong 120 ngày gần nhất (${hist.length} ngày) × GMV/giờ camp 28 ngày, ${elNote}.`
+          basis: `Giờ trung bình một ngày Campaign trong 120 ngày gần nhất (${hist.length} ngày) × GMV/giờ Campaign 28 ngày, ${elNote}.`
         });
       }
     }
@@ -222,7 +222,7 @@ export function handlingPlan(x: PlanInput): HandlingPlan {
       id: "rate_needed",
       tone: "info",
       title: `Nếu giữ nguyên lịch: cần GMV/giờ cao hơn ${Math.round(up * 100)}%`,
-      detail: up > 0.25 ? "Mức tăng này khó đạt chỉ bằng kịch bản/ưu đãi — nên kèm thêm giờ hoặc báo brand sớm khả năng hụt." : "Tăng trong tầm với bằng ưu đãi và kịch bản chốt ở các ca còn lại.",
+      detail: up > 0.25 ? "Mức tăng này khó đạt chỉ bằng kịch bản/ưu đãi — nên kèm thêm giờ hoặc báo brand sớm rủi ro hụt target." : "Tăng trong tầm với bằng ưu đãi và kịch bản chốt ở các ca còn lại.",
       gmv: null,
       hours: null,
       basis: `Cần ${fmtVndShort(needRate)}/giờ trên ${h1(remainingHours)}h còn lại, dự báo ${fmtVndShort(blendedRate)}/giờ.`
@@ -237,7 +237,7 @@ export function handlingPlan(x: PlanInput): HandlingPlan {
         id: "scale_hours",
         tone: "grow",
         title: `Mở rộng: mỗi ca ${slotHours}h thêm ≈ ${fmtVndShort(per)} GMV`,
-        detail: `${bestBlock ? `Khung ${SLOT_BLOCK_LABEL[bestBlock.block].toLowerCase()} đang tốt nhất (chỉ số ${bestBlock.idx.toLocaleString("vi-VN", { maximumFractionDigits: 2 })}). ` : ""}Chi phí và lãi của giờ thêm sẽ tính được khi đã nhập commission và rate.`,
+        detail: `${bestBlock ? `Khung ${SLOT_BLOCK_LABEL[bestBlock.block].toLowerCase()} đang tốt nhất (chỉ số ${bestBlock.idx.toLocaleString("vi-VN", { maximumFractionDigits: 2 })}). ` : ""}Chi phí và lợi nhuận của giờ thêm sẽ tính được khi đã nhập commission và rate.`,
         gmv: per,
         hours: slotHours,
         basis: `GMV/giờ ngày Daily 28 ngày × hệ số co giãn; ${elNote}.`
@@ -247,7 +247,7 @@ export function handlingPlan(x: PlanInput): HandlingPlan {
           id: "raise_target",
           tone: "info",
           title: `Dự báo vượt target ${Math.round((landing.ratio - 1) * 100)}% — cân nhắc đề xuất brand nâng target`,
-          detail: "Nâng target giữa tháng giúp run-rate phản ánh đúng mục tiêu và mở cửa thêm ngân sách giờ live.",
+          detail: "Nâng target giữa tháng giúp run-rate phản ánh đúng mục tiêu và mở thêm ngân sách giờ live.",
           gmv: null,
           hours: null,
           basis: "Dự báo ÷ target; vùng tin cậy nằm trên target."
@@ -258,7 +258,7 @@ export function handlingPlan(x: PlanInput): HandlingPlan {
         id: "keep_pace",
         tone: "info",
         title: "Giữ tiến độ hiện tại, chưa cần thêm giờ — nhưng chưa chắc chắn",
-        detail: "Dự báo đạt target nhưng vùng tin cậy vẫn xuống dưới target. Lấp hết ca mở và cập nhật số liệu ca đã live trước khi cân nhắc mở rộng.",
+        detail: "Dự báo đạt target nhưng vùng tin cậy vẫn xuống dưới target. Xếp đủ người cho các ca còn mở và cập nhật số liệu ca đã live trước khi cân nhắc mở rộng.",
         gmv: null,
         hours: null,
         basis: "Xác suất đạt target dưới 80%."

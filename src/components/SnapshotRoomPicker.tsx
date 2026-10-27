@@ -111,25 +111,25 @@ export function SnapshotRoomPicker({ session: s, rows, fileName, untilMin, previ
 
       <div className={`rounded-lg px-2.5 py-2 text-xs ${selected.length === 0 ? "bg-rose-950/50 text-rose-200 border border-rose-800" : "bg-emerald-950/40 text-emerald-200 border border-emerald-800"}`}>
         {selected.length === 0 ? (
-          `Chưa tick ${noun} nào.`
+          `Chưa chọn ${noun} nào.`
         ) : (
           <>
             Ca này = <b>{totals.rooms} {noun}</b> · <b className="font-mono">GMV {fmtVndFull(totals.gmv)} · {fmtCount(totals.orders)} đơn · {fmtCount(totals.views)} {viewsWord}</b>
-            <span className="text-[11px] opacity-80"> (số cộng dồn của {noun}; ca nối cùng {noun} app tự trừ lần up trước)</span>
+            <span className="text-[11px] opacity-80"> (số cộng dồn của {noun}; ca nối cùng {noun} app tự trừ lần tải lên trước)</span>
           </>
         )}
       </div>
       {edgeTicked.length > 0 && (
         <p className="text-[11px] text-amber-300 flex items-start gap-1.5">
           <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
-          Bạn đã tick {noun} chủ yếu nằm ngoài ca. Nếu ca kề bên chưa up file thì số cả {noun} sẽ bị tính cho ca này.
+          Bạn đã chọn {noun} chủ yếu nằm ngoài ca. Nếu ca kề bên chưa tải lên file thì số cả {noun} sẽ bị tính cho ca này.
         </p>
       )}
 
       {outsideTicked.length > 0 && (
         <p className="text-[11px] text-amber-300 flex items-start gap-1.5">
           <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
-          Bạn đã tick {outsideTicked.length} {noun} nằm ngoài giờ ca theo file ({outsideTicked.map((c) => shortRoomId(c.row.roomId)).join(", ")}). App vẫn tính cho ca này — chỉ tick khi chắc {noun} đó đúng là của ca.
+          Bạn đã chọn {outsideTicked.length} {noun} nằm ngoài giờ ca theo file ({outsideTicked.map((c) => shortRoomId(c.row.roomId)).join(", ")}). App vẫn tính cho ca này — chỉ chọn khi chắc {noun} đó đúng là của ca.
         </p>
       )}
 

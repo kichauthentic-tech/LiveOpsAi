@@ -107,7 +107,7 @@ function tiktokSnapshotRows(parsed: ParsedDataRawImport): SnapshotRoomRow[] {
 
   const rows: SnapshotRoomRow[] = [];
   for (const r of mapped) {
-    if (!r.roomId) continue; // không có Room ID thì không có khoá để trừ ở lần up sau
+    if (!r.roomId) continue; // không có Room ID thì không có khoá để trừ ở lần tải lên sau
     rows.push({
       roomId: r.roomId,
       roomTitle: r.roomTitle,

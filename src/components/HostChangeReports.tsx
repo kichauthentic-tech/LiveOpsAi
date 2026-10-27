@@ -69,7 +69,7 @@ function BoundaryCard({ session: s, boundary: b, canSubmit, onSaved }: { boundar
           {b.fromName || "Host"} xuống · {b.toName || "host mới"} vào lúc <span className="font-mono">{b.clock}</span>
         </p>
         <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${done ? "bg-emerald-950 text-emerald-300 border-emerald-800" : "bg-amber-950 text-amber-300 border-amber-800"}`}>
-          {done ? "đã up số" : "chưa up số"}
+          {done ? "đã tải số liệu" : "chưa tải số liệu"}
         </span>
       </div>
 
@@ -84,13 +84,13 @@ function BoundaryCard({ session: s, boundary: b, canSubmit, onSaved }: { boundar
           </p>
           {canSubmit && (
             <button type="button" onClick={() => setOpen(true)} className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-emerald-950 text-emerald-300 border border-emerald-800 hover:bg-emerald-900 transition-colors">
-              Up lại file
+              Tải lại file
             </button>
           )}
         </div>
       )}
 
-      {open && !canSubmit && <p className="text-xs text-[var(--text-muted)]">Trợ live (hoặc OPS khi ca không có trợ) up số khi host xuống.</p>}
+      {open && !canSubmit && <p className="text-xs text-[var(--text-muted)]">Trợ live (hoặc OPS khi ca không có trợ) tải số liệu lên khi host xuống.</p>}
       {open && canSubmit && pending && (
         <div className="space-y-2">
           <SnapshotRoomPicker
@@ -111,7 +111,7 @@ function BoundaryCard({ session: s, boundary: b, canSubmit, onSaved }: { boundar
           <div className="rounded-xl border border-dashed border-[var(--border)] p-3 text-center">
             <Upload className="w-5 h-5 text-[var(--text-faint)] mx-auto mb-1.5" />
             <p className="text-[11px] text-[var(--text-muted)] mb-2">
-              Tải file <span className="font-bold">{prof.reconciliationFile}</span> từ {prof.liveFileWhere} <b>ngay lúc {b.fromName || "host"} xuống</b> rồi up vào đây — đừng đợi hết ca, vì lúc đó không còn tách được phần của từng host.
+              Tải file <span className="font-bold">{prof.reconciliationFile}</span> từ {prof.liveFileWhere} <b>ngay lúc {b.fromName || "host"} xuống</b> rồi tải lên đây — đừng đợi hết ca, vì lúc đó không còn tách được phần của từng host.
             </p>
             <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void readFile(f); }} />
             <button type="button" onClick={() => fileRef.current?.click()} disabled={saving} className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-lg bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-[var(--text)] disabled:opacity-40">
@@ -144,7 +144,7 @@ export function HostChangeReports({ session: s, canSubmit, onSaved }: Props) {
         </span>
       </div>
       <p className="text-[11px] text-[var(--text-faint)]">
-        Ca đổi host có HAI chỗ nhập report: số lúc host xuống (ở đây — up file {profileOf(s).reconciliationFile} của sàn) và Giao ca cuối ca (bên dưới). Thiếu số lúc đổi thì GMV của ca chỉ chia cho các host theo giờ — không đúng người bán.
+        Ca đổi host có HAI chỗ nhập report: số lúc host xuống (ở đây — tải lên file {profileOf(s).reconciliationFile} của sàn) và Giao ca cuối ca (bên dưới). Thiếu số lúc đổi thì GMV của ca chỉ chia cho các host theo giờ — không đúng người bán.
       </p>
       {bounds.map((b) => (
         <BoundaryCard key={`${b.atMin}-${s.staffCheckpoints?.find((c) => c.atMin === b.atMin)?.reportedAt ?? "new"}`} session={s} boundary={b} canSubmit={canSubmit} onSaved={onSaved} />

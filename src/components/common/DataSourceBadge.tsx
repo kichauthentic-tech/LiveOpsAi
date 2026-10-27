@@ -36,7 +36,7 @@ export const DataSourceBadge: React.FC<DataSourceBadgeProps> = ({ dataSource, pl
         className={`inline-flex items-center gap-1 whitespace-nowrap text-[11px] font-bold px-2 py-0.5 rounded-full border bg-sky-950 text-sky-300 border-sky-800 ${className}`}
         title={
           dataSource === "live_snapshot"
-            ? `Số đọc từ file ${prof.reconciliationFile} trợ live up lúc giao ca — chờ đối soát cuối kỳ`
+            ? `Số đọc từ file ${prof.reconciliationFile} trợ live tải lên lúc giao ca — chờ đối soát cuối kỳ`
             : `Số dashboard ${shop} trợ live gõ lúc giao ca (đã trừ ca nối) — thường thấp hơn số chốt, chờ đối soát bằng ${prof.reconciliationFile}`
         }
       >
@@ -48,7 +48,7 @@ export const DataSourceBadge: React.FC<DataSourceBadgeProps> = ({ dataSource, pl
   return (
     <span
       className={`inline-flex items-center gap-1 whitespace-nowrap text-[11px] font-bold px-2 py-0.5 rounded-full border bg-amber-950 text-amber-300 border-amber-800 ${className}`}
-      title={`Số nạp từ bảng tính vận hành hoặc tự khai — chưa có số lúc giao ca, chờ đối soát với báo cáo chính thức từ ${shop}`}
+      title={`Số nạp từ bảng tính vận hành hoặc tự khai — chưa có số liệu lúc giao ca, chờ đối soát với báo cáo chính thức từ ${shop}`}
     >
       <Clock className="w-3 h-3" /> Tạm Tính
     </span>

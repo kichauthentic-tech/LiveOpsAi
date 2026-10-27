@@ -61,7 +61,7 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
   const insights = useMemo(() => shopeeInsights(s), [s]);
   const brandNotes = useMemo(() => shopeeNotes(s, "brand"), [s]);
   const opsNotes = useMemo(() => (canManage ? shopeeNotes(s, "ops") : []), [canManage, s]);
-  const fileHint = (what: string) => (canManage ? `Chưa có file ${what} của tháng này — up ở Dữ Liệu Gốc.` : "Chưa có số cho phần này trong tháng.");
+  const fileHint = (what: string) => (canManage ? `Chưa có file ${what} của tháng này — tải lên ở Dữ Liệu Gốc.` : "Chưa có số liệu cho phần này trong tháng.");
 
   const insight = (key: ShopeeSection) => (
     <InsightBox
@@ -134,7 +134,7 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
         {s.days.length === 0 ? (
           <EmptyNote text={fileHint("theo ngày (export-sc…csv)")} />
         ) : (
-          <Panel title={`${METRIC.gmv} theo ngày`} icon={<BarChart3 className="w-4 h-4" />} sub="Cột sáng = ngày camp (D-Day, Mid-Month, Pay Day)">
+          <Panel title={`${METRIC.gmv} theo ngày`} icon={<BarChart3 className="w-4 h-4" />} sub="Cột sáng = ngày Campaign (D-Day, Mid-Month, Pay Day)">
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
@@ -158,7 +158,7 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
           </Panel>
         )}
         {s.days.length > 0 && (
-          <Panel title="Ngày cao nhất" icon={<ShoppingBag className="w-4 h-4" />} sub={`Top 5 trên ${s.days.length} ngày có số`}>
+          <Panel title="Ngày cao nhất" icon={<ShoppingBag className="w-4 h-4" />} sub={`Top 5 trên ${s.days.length} ngày có số liệu`}>
             <ReportTable head={["Ngày", METRIC.gmv, METRIC.salesConfirmed, METRIC.orders, "Total Viewers", "% GMV tháng"]}>
               {[...s.days]
                 .sort((a, b) => b.salesPlaced - a.salesPlaced)
@@ -246,7 +246,7 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
               <KpiTile label={METRIC.gmvPerHour} value={h.gmvPerHour != null ? fmtVndShort(h.gmvPerHour) : "—"} />
             </div>
             <Panel title="Theo khung giờ" icon={<Clock className="w-4 h-4" />}>
-              <ReportTable head={["Khung giờ", "Phiên", "Giờ live", METRIC.gmv, METRIC.gmvPerHour, `${METRIC.viewers} TB/phiên`]}>
+              <ReportTable head={["Khung giờ", "Phiên", "Giờ live", METRIC.gmv, METRIC.gmvPerHour, `${METRIC.viewers} trung bình/phiên`]}>
                 {s.slots.map((x) => (
                   <tr key={x.key} style={{ borderBottom: `1px solid ${PAL.line}`, color: PAL.cream }}>
                     <td className={TD1}>{x.label}</td>
@@ -288,7 +288,7 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
           <Panel
             title={`Xếp hạng ${METRIC.gmvPerHour}`}
             icon={<Users className="w-4 h-4" />}
-            sub={canManage ? (s.quality.manual > 0 ? `${s.quality.manual}/${s.quality.total} ca còn là số tạm (chưa đối soát bằng Live List)` : "Tất cả ca đã đối soát") : undefined}
+            sub={canManage ? (s.quality.manual > 0 ? `${s.quality.manual}/${s.quality.total} ca còn là số tạm tính (chưa đối soát bằng Live List)` : "Tất cả ca đã đối soát") : undefined}
           >
             <ReportTable head={["Host", "Phiên", "Giờ", METRIC.gmv, METRIC.gmvPerHour]}>
               {s.hosts.map((x) => (

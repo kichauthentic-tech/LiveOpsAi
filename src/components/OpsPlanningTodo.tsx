@@ -192,7 +192,7 @@ export default function OpsPlanningTodo({ brands, channels, sessions, talents, s
                   <p className="text-[11px] text-[var(--text-muted)] mt-1 leading-relaxed">
                     Đã live {num(g.deliveredHours)}h · đã chốt chưa live {num(g.scheduledHours)}h · đang mở chờ chốt {num(g.openSlotHours)}h ({g.openSlotCount} ca)
                     {g.unconfirmedSessions > 0 && (
-                      <span className="text-amber-300"> · {num(g.unconfirmedHours)}h ({g.unconfirmedSessions} ca) đã qua giờ chưa có số — xác nhận hoặc huỷ trước khi mở bù</span>
+                      <span className="text-amber-300"> · {num(g.unconfirmedHours)}h ({g.unconfirmedSessions} ca) đã qua giờ chưa có số liệu — xác nhận hoặc huỷ trước khi mở bù</span>
                     )}
                   </p>
                 </div>

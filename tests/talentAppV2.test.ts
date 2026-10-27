@@ -86,8 +86,8 @@ describe("Hiệu suất chỉ dòng có kết luận", () => {
     const s = A.splitStanding([row("unclear", 1.16), row("below", 0.65), row("unclear", 0.95), row("above", 1.2)]);
     expect(s.clear.map((r) => r.verdict)).toEqual(["below", "above"]);
     expect(s.unclear).toHaveLength(2);
-    expect(A.standingSentence(row("below", 0.65))).toBe("thấp hơn mặt bằng khoảng 35%");
-    expect(A.standingSentence(row("above", 1.2))).toBe("cao hơn mặt bằng khoảng 20%");
+    expect(A.standingSentence(row("below", 0.65))).toBe("thấp hơn trung bình nhóm khoảng 35%");
+    expect(A.standingSentence(row("above", 1.2))).toBe("cao hơn trung bình nhóm khoảng 20%");
   });
 });
 

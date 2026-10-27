@@ -28,7 +28,7 @@ interface Props {
 
 const pct = (v: number | null | undefined, sign = false) => (v == null || !Number.isFinite(v) ? "—" : `${sign && v > 0 ? "+" : ""}${fmtFixed(v * 100, 1)}%`);
 const tone = (v: number | null | undefined, ok: number) => (v == null ? "text-[var(--text-faint)]" : Math.abs(v) <= ok ? "text-emerald-400" : Math.abs(v) <= ok * 2 ? "text-amber-400" : "text-rose-400");
-const BUCKET_LABEL = { daily: "Ngày thường", dday: "D-Day", midmonth: "Mid-Month", payday: "Pay Day" } as const;
+const BUCKET_LABEL = { daily: "Daily", dday: "D-Day", midmonth: "Mid-Month", payday: "Pay Day" } as const;
 
 export const ForecastTrainingCard: React.FC<Props> = ({ brandId, sessions, params, today, schemes }) => {
   const brandSessions = useMemo(() => sessions.filter((s) => s.brandId === brandId), [sessions, brandId]);
@@ -89,7 +89,7 @@ export const ForecastTrainingCard: React.FC<Props> = ({ brandId, sessions, param
     { label: "Sai số dự báo ở ngày 18", goal: "≤ 5% mọi tháng", value: bt.within5AtDay18.of ? `${bt.within5AtDay18.hit}/${bt.within5AtDay18.of} tháng` : "—", sub: `trung bình ${pct(bt.inMonthMape[18])}`, good: bt.within5AtDay18.of > 0 && bt.within5AtDay18.hit === bt.within5AtDay18.of },
     { label: "Lệch hệ thống 3 tháng", goal: "trong ±5%", value: pct(bt.bias, true), sub: "dự báo lúc lập ÷ thực tế − 1", good: bt.bias != null && Math.abs(bt.bias) <= 0.05 },
     { label: "Đạt ≥ 95% target (3 mốc)", goal: "mọi tháng", value: bt.reach95.of ? `${bt.reach95.hit}/${bt.reach95.of} tháng` : "—", sub: `mô phỏng, bù tối đa +${Math.round(params.fcCheckpointCap * 100)}% giờ`, good: bt.reach95.of > 0 && bt.reach95.hit === bt.reach95.of },
-    { label: "Rơi trong dải ~80%", goal: "≈ 80% số tháng", value: bt.coverage.of ? `${bt.coverage.hit}/${bt.coverage.of} tháng` : "—", sub: `lúc lập, sai lúc lập TB ${pct(bt.planMape)}`, good: bt.coverage.of > 0 && bt.coverage.hit / bt.coverage.of >= 0.7 }
+    { label: "Rơi trong dải ~80%", goal: "≈ 80% số tháng", value: bt.coverage.of ? `${bt.coverage.hit}/${bt.coverage.of} tháng` : "—", sub: `lúc lập, sai số trung bình lúc lập ${pct(bt.planMape)}`, good: bt.coverage.of > 0 && bt.coverage.hit / bt.coverage.of >= 0.7 }
   ];
 
   return (
@@ -105,11 +105,11 @@ export const ForecastTrainingCard: React.FC<Props> = ({ brandId, sessions, param
         )}
       </div>
       <Explain summary="Engine dự báo thế nào">
-        <p>Dự báo ca = mức × (giờ × loại ngày × khung giờ × vị trí ngày) — cùng mô hình với bộ chia target. Mức = trung bình nhân của {params.fcRecentDays} ngày gần nhất và 3 tháng gần nhất. Trong tháng, mức cập nhật bằng GMV đã có ÷ kỳ vọng của chính các ca đã có số. Dùng ở Kế Hoạch Tháng (dự báo lưới), Dashboard, run-rate, Hỗ Trợ Vận Hành.</p>
+        <p>Dự báo ca = mức × (giờ × loại ngày × khung giờ × vị trí ngày) — cùng mô hình với bộ chia target. Mức = trung bình nhân của {params.fcRecentDays} ngày gần nhất và 3 tháng gần nhất. Trong tháng, mức cập nhật bằng GMV đã có ÷ kỳ vọng của chính các ca đã có số liệu. Dùng ở Kế Hoạch Tháng (dự báo lưới), Dashboard, run-rate, Hỗ Trợ Vận Hành.</p>
       </Explain>
 
       {!platform || channel.length === 0 ? (
-        <p className="text-xs text-[var(--text-muted)]">Brand chưa có ca nào có số — chưa có gì để dự báo.</p>
+        <p className="text-xs text-[var(--text-muted)]">Brand chưa có ca nào có số liệu — chưa có gì để dự báo.</p>
       ) : (
         <>
           <div className="grid grid-cols-2 gap-2">
@@ -121,7 +121,7 @@ export const ForecastTrainingCard: React.FC<Props> = ({ brandId, sessions, param
           <div className="text-xs space-y-1">
             <p className="font-bold text-[var(--text-muted)]">Tháng {Number(nextMonth.slice(5))} engine đang nghĩ gì</p>
             {!fc ? (
-              <p className="text-[var(--text-muted)]">Chưa đủ lịch sử (cần ≥ 15 ca có số) — Kế Hoạch Tháng dùng engine cũ, Dashboard dùng GMV/giờ 28 ngày.</p>
+              <p className="text-[var(--text-muted)]">Chưa đủ lịch sử (cần ≥ 15 ca có số liệu) — Kế Hoạch Tháng dùng engine cũ, Dashboard dùng GMV/giờ 28 ngày.</p>
             ) : (
               <>
                 <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px]">
@@ -133,7 +133,7 @@ export const ForecastTrainingCard: React.FC<Props> = ({ brandId, sessions, param
                 {fc.pastErrors.length > 0 && (
                   <p className="text-[11px] text-[var(--text-muted)]">Lệch lúc lập các tháng trước: {fc.pastErrors.map((e) => <b key={e.month} className={`${tone(e.error, 0.05)} mr-1.5`}>T{Number(e.month.slice(5))} {pct(e.error, true)}</b>)}{fc.biasFactor !== 1 ? `— đang tự hiệu chỉnh ×${fmtFixed(fc.biasFactor, 2)}` : params.fcBiasCorrect ? "— chưa đủ điều kiện tự hiệu chỉnh" : "— tự hiệu chỉnh đang tắt"}</p>
                 )}
-                {fc.mostlyManual && <p className="text-[11px] text-amber-300">Lịch sử chủ yếu là số nhập tay (chưa đối soát) — độ tin thấp hơn.</p>}
+                {fc.mostlyManual && <p className="text-[11px] text-amber-300">Lịch sử chủ yếu là số nhập tay (chưa đối soát) — độ tin cậy thấp hơn.</p>}
               </>
             )}
           </div>
@@ -210,12 +210,12 @@ export const ForecastTrainingCard: React.FC<Props> = ({ brandId, sessions, param
             )}
           </div>
 
-          <Explain summary="Tín hiệu dẫn — có kéo sai số lúc lập xuống không">
+          <Explain summary="Chỉ báo sớm (leading indicator) — có giảm sai số lúc lập không">
             {leading.map((c) => (
               <p key={c.signal} className="text-[11px] text-[var(--text-muted)] leading-snug">
                 <b className="text-[var(--text)]">{c.signal === "ads" ? "Ngân sách Ads (Kế Hoạch Tháng)" : "Scheme khuyến mãi"}</b>:{" "}
                 {c.months < LEADING_MIN_MONTHS
-                  ? `chưa đủ — ${c.months}/${c.needed} tháng có ${c.signal === "ads" ? "ngân sách Ads" : "scheme"} kèm dự báo lúc lập. ${c.signal === "ads" ? "Nhập ô Ngân sách Ads ở Kế Hoạch Tháng mỗi tháng." : "Nhập scheme của brand ở CRM / lịch KM."}`
+                  ? `chưa đủ — ${c.months}/${c.needed} tháng có ${c.signal === "ads" ? "ngân sách Ads" : "chương trình khuyến mãi"} kèm dự báo lúc lập. ${c.signal === "ads" ? "Nhập ô Ngân sách Ads ở Kế Hoạch Tháng mỗi tháng." : "Nhập chương trình khuyến mãi của brand ở CRM / lịch KM."}`
                   : <>sai lúc lập {pct(c.mapeBefore)} → <b className={c.helps ? "text-emerald-400" : "text-[var(--text)]"}>{pct(c.mapeAfter)}</b> nếu dùng (kiểm bỏ-một-tháng). {c.helps ? "Có lợi — đủ điều kiện đưa vào mức dự báo (cần sửa code, ghi vào WORKSPACE)." : "Chưa có lợi rõ (cần giảm ≥ 2 điểm %) — chưa dùng."}</>}
               </p>
             ))}

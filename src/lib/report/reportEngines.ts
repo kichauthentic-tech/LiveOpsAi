@@ -61,7 +61,7 @@ const TIKTOK_ENGINE: ReportEngine = {
     const s = snap as MonthlyReportSnapshot;
     // Chỉ loại file report còn đọc — bản chụp cũ còn ghi Live Performance (21/09) làm mốc sai.
     const ends = COVERAGE_TYPES.map((t) => s.coverage.datarawThrough[t]).filter((d): d is string => !!d).sort();
-    return `${s.coverage.sessionsThrough ? `ca có số tới ${dm(s.coverage.sessionsThrough)}` : "chưa có ca nào có số"} · ${ends.length ? `Dữ Liệu Gốc tới ${dm(ends[0])}` : "chưa có file Dữ Liệu Gốc"}`;
+    return `${s.coverage.sessionsThrough ? `ca có số liệu tới ${dm(s.coverage.sessionsThrough)}` : "chưa có ca nào có số liệu"} · ${ends.length ? `Dữ Liệu Gốc tới ${dm(ends[0])}` : "chưa có file Dữ Liệu Gốc"}`;
   },
   headlineChange: (b0, a0) => {
     const before = snapshotHeadline(b0 as MonthlyReportSnapshot), after = snapshotHeadline(a0 as MonthlyReportSnapshot);
@@ -69,7 +69,7 @@ const TIKTOK_ENGINE: ReportEngine = {
     return [
       line("Total GMV", fmtVndShort(before.shopGmv), fmtVndShort(after.shopGmv)),
       line("LIVE GMV (agency)", fmtVndShort(before.totalGmv), fmtVndShort(after.totalGmv)),
-      line("Ca có số", String(before.sessionsWithNumbers), String(after.sessionsWithNumbers)),
+      line("Ca có số liệu", String(before.sessionsWithNumbers), String(after.sessionsWithNumbers)),
       line("Giờ live", hours(before.liveHours), hours(after.liveHours)),
       line("Video GMV", fmtVndShort(before.videoGmv), fmtVndShort(after.videoGmv)),
       line("Product card GMV", fmtVndShort(before.cardGmv), fmtVndShort(after.cardGmv)),
@@ -77,8 +77,8 @@ const TIKTOK_ENGINE: ReportEngine = {
     ].join("\n");
   },
   description:
-    'Số liệu vận hành tính từ các ca có số trong tháng (Dữ Liệu Gốc chỉ dự phòng) và được CHỐT tại một thời điểm — mở report không tính lại; ops bấm "Cập nhật số liệu" khi muốn lấy số mới. File Ads (TikTok Ads) tải ở tab {ads}; nhận xét cho brand viết bằng nút "Sửa Insight" ở từng phần.',
-  createHint: "Bấm để tổng hợp số liệu từ ca có số và Dữ Liệu Gốc rồi chốt lại."
+    'Số liệu vận hành tính từ các ca có số liệu trong tháng (Dữ Liệu Gốc chỉ dự phòng) và được CHỐT tại một thời điểm — mở report không tính lại; ops bấm "Cập nhật số liệu" khi muốn lấy số mới. File Ads (TikTok Ads) tải ở tab {ads}; nhận xét cho brand viết bằng nút "Sửa Insight" ở từng phần.',
+  createHint: "Bấm để tổng hợp số liệu từ ca có số liệu và Dữ Liệu Gốc rồi chốt lại."
 };
 
 const SHOPEE_ENGINE: ReportEngine = {

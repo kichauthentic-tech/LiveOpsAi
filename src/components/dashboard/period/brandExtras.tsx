@@ -167,7 +167,7 @@ const Suggestions: React.FC<{ sessions: LiveSession[]; bucketOf: (d: string) => 
               {campOk && recent28?.camp != null && <> Dời 1 ca 3h từ ngày 3 sang ngày 1 ≈ <b className="text-[var(--text)]">+{fmtVndShort(3 * (cPos[0].idx - cPos[2].idx) * recent28.camp)}</b> mỗi đợt.</>}
             </p>
           ) : (
-            <p className="text-[var(--text-faint)]">Chưa đủ 2 đợt Mid-Month / Pay Day có số cả 3 ngày.</p>
+            <p className="text-[var(--text-faint)]">Chưa đủ 2 đợt Mid-Month / Pay Day có số liệu cả 3 ngày.</p>
           )}
         </div>
         <div className="border-l-2 border-[var(--border)] pl-3 space-y-1 opacity-80">
