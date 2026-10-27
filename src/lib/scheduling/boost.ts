@@ -12,14 +12,18 @@ export interface BoostFillItem {
 
 /**
  * Target đề xuất cho các ca đang chờ = dự báo engine của chính ca (cùng quy ước "ca thêm sau chốt nhận target = dự báo").
- * Dự báo ≤ 0 (engine chưa có gì để nói) thì BỎ QUA ca đó — để nó vẫn "đang chờ" thay vì ghi 0 và trông như đã có target.
+ * Dự báo ≤ 0 (engine chưa có gì để nói — kênh ít lịch sử) thì dùng `fallback` (target/giờ của chính kế hoạch × giờ ca; audit 27/10:
+ * ca tăng cường JOCKEY 11/10 "chờ target" 16 ngày vì engine không bao giờ có dự báo). Không có cả hai thì BỎ QUA ca đó — để nó
+ * vẫn "đang chờ" thay vì ghi 0 và trông như đã có target. `expected` chỉ ghi khi là dự báo thật.
  */
-export function boostFillItems(pending: Pick<BoostSlot, "id">[], forecasts: number[]): BoostFillItem[] {
+export function boostFillItems(pending: Pick<BoostSlot, "id">[], forecasts: number[], fallback: number[] = []): BoostFillItem[] {
   if (pending.length !== forecasts.length) throw new Error("boostFillItems: hai danh sách khác số ca");
   const items: BoostFillItem[] = [];
   pending.forEach((b, i) => {
     const f = Math.round(forecasts[i]);
+    const fb = Math.round(fallback[i] ?? 0);
     if (Number.isFinite(f) && f > 0) items.push({ id: b.id, target: f, expected: f });
+    else if (Number.isFinite(fb) && fb > 0) items.push({ id: b.id, target: fb, expected: 0 });
   });
   return items;
 }

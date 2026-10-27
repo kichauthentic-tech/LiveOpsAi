@@ -90,6 +90,21 @@ test("hết chỗ trong khung hoặc đủ số ca/ngày thì trả null", () =>
   expect(nextSlotForDay("2026-10-06", full, PLAN)).toBeNull();
 });
 
+test("audit 27/10: sau ca cuối không đủ một ca trọn thì lấp khoảng trống đủ dài đầu tiên", () => {
+  const win = { ...PLAN, defaultSlotHours: 3, liveWindowStart: "09:00", liveWindowEnd: "23:00" };
+  expect(nextSlotForDay("2026-11-06", [d("2026-11-06", "19:00", "22:00")], win)).toMatchObject({ startTime: "09:00", endTime: "12:00" });
+  // không còn khoảng nào đủ dài ⇒ cắt ngắn sau ca cuối như cũ
+  expect(nextSlotForDay("2026-11-06", [d("2026-11-06", "09:00", "22:00")], win)).toMatchObject({ startTime: "22:00", endTime: "23:00" });
+});
+
+test("audit 27/10: ca cuối qua nửa đêm ⇒ không sinh ca 00:30–03:30 ngoài khung", () => {
+  const win = { ...PLAN, defaultSlotHours: 3, liveWindowStart: "09:00", liveWindowEnd: "23:59" };
+  const s = nextSlotForDay("2026-11-05", [d("2026-11-05", "21:00", "00:30")], win);
+  expect(s).toMatchObject({ startTime: "09:00", endTime: "12:00" });
+  expect(validateDrafts([d("2026-11-05", "21:00", "00:30"), s!], win)).toEqual([]);
+  expect(nextSlotForDay("2026-11-05", [d("2026-11-05", "09:00", "21:00"), d("2026-11-05", "21:00", "00:30")], win)).toBeNull();
+});
+
 // ── allocateDraftTargets: TIỀN ────────────────────────────────────────────────────────────────────
 
 const sum = (ds: PlanDraftSlot[]) => ds.reduce((a, x) => a + x.targetGmv, 0);

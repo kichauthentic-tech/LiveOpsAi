@@ -44,7 +44,7 @@ describe("#12 kiểm chéo brand khác khi lập kế hoạch", () => {
   const slots = [slot("v-open", { brandId: "vera", brandName: "VERA", studioId: "p2" })];
   const r = crossBrandCheck(
     [draft("a", "2026-10-10", "20:00", "22:00"), draft("b", "2026-10-11", "20:00", "22:00"), draft("past", "2026-10-01", "19:00", "21:00")],
-    { brandId: "crocs", studioId: "p1", sessions, shiftSlots: slots, today: "2026-10-04" }
+    { brandId: "crocs", platform: "TikTok", studioId: "p1", sessions, shiftSlots: slots, today: "2026-10-04" }
   );
   test("trùng phòng mặc định với ca brand khác (ca huỷ và ca của chính brand không tính)", () => {
     expect(r.clashes.map((c) => c.key)).toEqual(["a"]);
@@ -56,6 +56,13 @@ describe("#12 kiểm chéo brand khác khi lập kế hoạch", () => {
   });
   test("ca ngày đã qua bị bỏ qua", () => {
     expect(r.clashes.some((c) => c.key === "past")).toBe(false);
+  });
+  test("chính brand ở SÀN KHÁC cùng phòng cùng giờ là trùng (audit 27/10: VERA TikTok vs VERA Shopee)", () => {
+    const shopee = ca("vs", { brandId: "vera", brandName: "VERA", platform: "Shopee", studioId: "p1", date: "2026-11-10", startTime: "19:00", endTime: "22:00" });
+    const sameSide = ca("vt", { brandId: "vera", brandName: "VERA", platform: "TikTok", studioId: "p9", date: "2026-11-10", startTime: "19:00", endTime: "22:00" });
+    const x = crossBrandCheck([draft("n", "2026-11-10", "19:00", "22:00")], { brandId: "vera", platform: "TikTok", studioId: "p1", sessions: [shopee, sameSide], shiftSlots: [], today: "2026-10-27" });
+    expect(x.clashes.map((c) => c.roomTakenBy)).toEqual(["VERA Shopee 19:00–22:00"]);
+    expect(x.peak?.concurrent).toBe(2); // chính nó + VERA Shopee; ca cùng sàn của chính kênh không tính
   });
 });
 

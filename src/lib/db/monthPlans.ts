@@ -185,6 +185,17 @@ export interface PlanSlotDraft {
 // Đổi giờ một ca = khoá mới → dòng mới, dòng cũ bị xoá (slot_id cũ mất theo — ca thật cũ sẽ được
 // lock_month_plan 0091 huỷ khi chốt lại).
 export async function replacePlanSlots(planId: string, drafts: PlanSlotDraft[]): Promise<BrandMonthPlanSlot[]> {
+  // 0185: một transaction ở DB (xoá ca bỏ + ghi ca còn lại; lỗi là không đổi gì). DB chưa chạy 0185 thì rơi về cách cũ bên dưới.
+  const { error: eRpc } = await supabase.rpc("replace_plan_slots", {
+    p_plan_id: planId,
+    p_slots: drafts.map((d) => ({ date: d.date, start_time: d.startTime, end_time: d.endTime, target_gmv: d.targetGmv, expected_gmv: d.expectedGmv ?? 0, note: d.note }))
+  });
+  if (!eRpc) {
+    const { data, error } = await supabase.from("brand_month_plan_slots").select("*").eq("plan_id", planId).order("date").order("start_time");
+    if (error) throw error;
+    return (data as DbPlanSlot[]).map(slotFromDb);
+  }
+  if (eRpc.code !== "PGRST202") throw eRpc;
   const keyOf = (d: { date: string; startTime: string; endTime: string }) => `${d.date}|${d.startTime}|${d.endTime}`;
   const want = new Set(drafts.map(keyOf));
   const { data: existing, error: e0 } = await supabase.from("brand_month_plan_slots").select("id,date,start_time,end_time").eq("plan_id", planId);
@@ -224,6 +235,7 @@ export interface LockPlanResult {
   total_slots: number;
   skipped_past?: number; // 0099: ca kế hoạch ở ngày đã qua, không sinh slot
   linked_sessions?: number; // 0151: ca kế hoạch gắn vào ca thật nạp sẵn (không mở đăng ký)
+  kept_cancelled?: number; // 0185: ca kế hoạch đã huỷ, không có ca thay thế — giữ huỷ, không mở lại
 }
 
 export async function lockMonthPlan(planId: string): Promise<LockPlanResult> {

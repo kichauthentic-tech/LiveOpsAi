@@ -4,6 +4,7 @@ import type { CampDayBucket } from "../campaignDays";
 import { sessionDurationHours } from "../pnl";
 import { dateTimeRangesOverlap } from "../dateUtils";
 import { planMonthSlots } from "./planMonthSlots";
+import { platformOf, type ReportPlatform } from "../reportPlatform";
 
 export interface PlanDraftSlot {
   key: string; // khoá cục bộ cho React/diff — dòng đã có = id DB, dòng mới = "new-…"
@@ -46,16 +47,29 @@ export function draftsFromSaved(slots: BrandMonthPlanSlot[]): PlanDraftSlot[] {
   return slots.map((s) => ({ key: s.id, id: s.id, date: s.date, startTime: s.startTime, endTime: s.endTime, targetGmv: s.targetGmv, note: s.note, slotId: s.slotId, expectedGmv: s.expectedGmv > 0 ? s.expectedGmv : undefined }));
 }
 
-// Ca mới cho 1 ngày: nối sau ca cuối của ngày (hoặc đầu khung giờ), dài = mặc định, không vượt
-// cuối khung. Trả null nếu đã đủ số ca tối đa hoặc hết chỗ trong khung.
+// Ca mới cho 1 ngày: nối sau ca cuối của ngày (hoặc đầu khung giờ), dài = mặc định, không vượt cuối khung. Sau ca cuối không
+// đủ một ca trọn (audit 27/10: ngày chỉ có ca 19–22 ⇒ "+ ca" ra ca 1 giờ 22–23) thì lấp khoảng trống ĐỦ dài đầu tiên trong khung;
+// không có thì mới cắt ngắn như cũ. Ca cuối qua nửa đêm thì không còn chỗ "sau" nó (trước đây sinh ca 00:30–03:30 ngoài khung).
+// Trả null nếu đã đủ số ca tối đa hoặc hết chỗ trong khung.
 export function nextSlotForDay(day: string, drafts: PlanDraftSlot[], plan: Pick<BrandMonthPlan, "defaultSlotHours" | "liveWindowStart" | "liveWindowEnd" | "maxSlotsPerDay">): PlanDraftSlot | null {
   const sameDay = drafts.filter((d) => d.date === day).sort((a, b) => a.startTime.localeCompare(b.startTime));
   if (sameDay.length >= plan.maxSlotsPerDay) return null;
-  const start = sameDay.length > 0 ? sameDay[sameDay.length - 1].endTime : plan.liveWindowStart;
-  if (start >= plan.liveWindowEnd) return null;
-  const end = addHours(start, plan.defaultSlotHours) > plan.liveWindowEnd ? plan.liveWindowEnd : addHours(start, plan.defaultSlotHours);
-  if (end <= start) return null;
-  return { key: newKey(), date: day, startTime: start, endTime: end, targetGmv: 0, note: "" };
+  const make = (start: string, end: string): PlanDraftSlot => ({ key: newKey(), date: day, startTime: start, endTime: end, targetGmv: 0, note: "" });
+  const full = (start: string) => addHours(start, plan.defaultSlotHours);
+  const last = sameDay.at(-1);
+  const after = !last ? plan.liveWindowStart : endsAfterMidnight(last) ? null : last.endTime;
+  if (after !== null && after < plan.liveWindowEnd && full(after) <= plan.liveWindowEnd && full(after) > after) return make(after, full(after));
+  // Khoảng trống đủ một ca trọn, từ đầu khung giờ.
+  let cursor = plan.liveWindowStart;
+  for (const s of sameDay) {
+    if (s.startTime > cursor && full(cursor) <= s.startTime && full(cursor) > cursor) return make(cursor, full(cursor));
+    const end = endsAfterMidnight(s) ? "23:59" : s.endTime;
+    if (end > cursor) cursor = end;
+  }
+  if (after === null || after >= plan.liveWindowEnd) return null;
+  const end = full(after) > plan.liveWindowEnd ? plan.liveWindowEnd : full(after);
+  if (end <= after) return null;
+  return make(after, end);
 }
 
 // Nạp từ quy tắc lặp của brand: thêm ca chưa có (theo khoá ngày|giờ), giữ nguyên ca đang có.
@@ -292,16 +306,20 @@ export interface CrossBrandClash {
 
 export function crossBrandCheck(
   drafts: PlanDraftSlot[],
-  opts: { brandId: string; studioId?: string; sessions: LiveSession[]; shiftSlots: ShiftSlot[]; today: string }
+  opts: { brandId: string; platform: ReportPlatform; studioId?: string; sessions: LiveSession[]; shiftSlots: ShiftSlot[]; today: string }
 ): { clashes: CrossBrandClash[]; peak: CrossBrandClash | null } {
-  // Ca chưa huỷ của brand khác + ca chờ đăng ký còn mở của brand khác (ca chờ đã gắn ca thật thì ca thật đại diện).
+  // Ca chưa huỷ của KÊNH khác + ca chờ đăng ký còn mở của kênh khác (ca chờ đã gắn ca thật thì ca thật đại diện). Kênh khác gồm cả
+  // chính brand này ở sàn kia (audit 27/10: VERA TikTok và VERA Shopee live cùng giờ — người và phòng là vật lý, không theo sàn).
+  const otherChannel = (x: { brandId?: string; platform?: string | null }) => x.brandId !== opts.brandId || platformOf(x) !== opts.platform;
+  const tag = (x: { brandId?: string; brandName?: string; platform?: string | null }) =>
+    x.brandId === opts.brandId ? `${x.brandName ?? ""} ${platformOf(x)}` : x.brandName ?? "";
   const others: { label: string; studioId?: string; date: string; startTime: string; endTime: string }[] = [
     ...opts.sessions
-      .filter((s) => s.brandId !== opts.brandId && s.status !== "Cancelled" && s.date >= opts.today)
-      .map((s) => ({ label: `${s.brandName} ${s.startTime}–${s.endTime}`, studioId: s.studioId, date: s.date, startTime: s.startTime, endTime: s.endTime })),
+      .filter((s) => otherChannel(s) && s.status !== "Cancelled" && s.date >= opts.today)
+      .map((s) => ({ label: `${tag(s)} ${s.startTime}–${s.endTime}`, studioId: s.studioId, date: s.date, startTime: s.startTime, endTime: s.endTime })),
     ...opts.shiftSlots
-      .filter((sl) => sl.brandId !== opts.brandId && sl.status === "open" && !sl.sessionId && sl.date >= opts.today)
-      .map((sl) => ({ label: `${sl.brandName} ${sl.startTime}–${sl.endTime} (chờ đăng ký)`, studioId: sl.studioId, date: sl.date, startTime: sl.startTime, endTime: sl.endTime }))
+      .filter((sl) => otherChannel(sl) && sl.status === "open" && !sl.sessionId && sl.date >= opts.today)
+      .map((sl) => ({ label: `${tag(sl)} ${sl.startTime}–${sl.endTime} (chờ đăng ký)`, studioId: sl.studioId, date: sl.date, startTime: sl.startTime, endTime: sl.endTime }))
   ];
   const clashes: CrossBrandClash[] = [];
   let peak: CrossBrandClash | null = null;

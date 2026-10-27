@@ -2162,6 +2162,7 @@ export default function App() {
                     brandStudios={brandStudios}
                     onOpenCrm={(brandId, platform) => { requestCrmFocus(brandId, platform); navigateTo("crm"); }}
                     talents={talents}
+                    role={currentRole}
                   />
                 )}
 

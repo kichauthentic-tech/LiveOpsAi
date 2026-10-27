@@ -6596,3 +6596,25 @@ OCT 337,7M/31 ≈ 10,9M.
 **Cập nhật 28/10 (sau khi user chạy 0184):** kiểm trên app (cổng 3100, phiên admin, DB thật): dán khối sheet T3→T10 ⇒ xem trước 245 ngày, 8 tháng khớp sheet ⇒ Lưu
 ⇒ CROCS có 245 dòng `brand_ads_daily`. Nhập Ads T9: +0,1%, D-Day 112%, 9 ngày lệch ≥ 30%. Report Tháng T10 trang Quảng cáo: target 378,3M, đã chi 342,5M tới 25/10
 (90,5%), so target −4,8%, Creator 53,3% target, ROAS Live 14,7x (Daily 21,7x, Pay Day 8,9x). Commit + push cùng ngày.
+
+## Audit + sửa Kế Hoạch Tháng (2026-10-27/28)
+
+Audit 27/10 (đọc code + 6 kế hoạch T10 trên DB thật, chỉ đọc + mô phỏng hàm thuần) ra 12 điểm gãy; 28/10 sửa hết, `0185_month_plan_integrity.sql`.
+
+Số đo trên DB thật 27/10: 6 kế hoạch (đều T10, đều đã chốt), 0 kế hoạch T11. Ca đã huỷ có trong kế hoạch: Franklin Shopee/TikTok, JOCKEY, CROCS ngày
+17/10 11–14h (target giữ: 7,4tr / 17,5tr / 2,7tr / 46,2tr) + CROCS 19/10 (target 0) — tất cả ngày đã qua nên chưa có ca nào bị Chốt lại mở lại, nhưng
+CROCS bấm Chốt lại sẽ bị báo "bỏ qua 2 ca ngày đã qua (ca nào đã live thì mở bù)". Ca kế hoạch lệch giờ ca thật: CROCS 27, 30, 31/10 (kế hoạch 20–23h,
+ca thật 21–24h, cả shift_slot cũng 20–23h) + Franklin Shopee 11/10 (19–22h → 21–24h). Ca ngoài kế hoạch có GMV: VERA TikTok 15 ca 01–07/10 (26,9tr,
+run-rate 57,7% → 52,9% nếu bỏ ra), CROCS 4 ca 18–21h ca tăng cường (37,6tr, 95,1% → 94,3%), JOCKEY 11/10, VERA Shopee 1 ca 0 phút. Ca tăng cường JOCKEY 11/10 "chờ target"
+từ 11/10 (engine không dự báo được). FUJIWA TikTok kênh active, không có kế hoạch T10.
+
+Mô phỏng (hàm thuần): target nhóm ngày 1 tỷ, nhập D-Day 300tr + Ngày thường 400tr, lưới không có ca Mid-Month/Pay Day ⇒ Σ ca 700tr, không cảnh báo;
+"+ ca" sau ca 21:00–00:30 ⇒ 00:30–03:30 (lỗi ngoài khung); ngày chỉ có 19–22h ⇒ "+ ca" ra 22–23h; `crossBrandCheck` VERA TikTok vs VERA Shopee cùng phòng
+cùng giờ ⇒ 0 trùng, đếm song song 1.
+
+Bẫy mới: `insert … on conflict do update` trên `brand_month_plan_slots` chạy trigger BEFORE INSERT cả với dòng rơi vào conflict ⇒ guard coi upsert lại một
+ca ngày đã qua là "thêm ca vào ngày đã qua". `replace_plan_slots` (0185) tách UPDATE rồi INSERT dòng chưa có. Trong test SQL, gọi hàm ghi và đếm kết quả
+phải ở hai câu riêng (cùng câu thì phép đếm đọc snapshot trước khi hàm ghi).
+
+Kiểm: `supabase/tests/0185_month_plan_integrity.sql` 21 mục trên bản replay 0001→0185 (trước 0185 đỏ ở mục 1); test 0164 (20 mục) và 0151 (11 mục)
+vẫn xanh sau 0185; vitest 1048/1051 — 3 đỏ có sẵn ở file khác (shiftSlots.ts `?? "TikTok"`, BrandPages.tsx `text-[10px]`, OpenMonthWizard.tsx h2).

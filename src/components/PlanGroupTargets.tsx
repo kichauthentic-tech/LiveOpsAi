@@ -67,6 +67,13 @@ export const PlanGroupTargetsBlock: React.FC<Props> = ({ rows, targets, targetTo
             ? <p className="text-[11px] text-[var(--text-faint)]">Phần còn lại {fmtVndShort(remain)} chia cho {restWithSlots.map((r) => GROUP_LABEL[r.bucket]).join(", ")}.</p>
             : <p className="text-[11px] text-amber-300">Các nhóm đã nhập đã dùng hết Target tháng — {restWithSlots.map((r) => GROUP_LABEL[r.bucket]).join(", ")} không còn phần nào (target ca = 0). Nhập thêm target nhóm đó hoặc tăng Target tháng.</p>
         )}
+        {/* Audit 27/10: tháng 1 tỷ, nhập D-Day 300tr + Ngày thường 400tr, lưới không có ca Mid-Month/Pay Day ⇒ 300tr không về ca nào
+            mà trước đây không một dòng báo — chỉ lộ ở hộp xác nhận lúc Chốt, và chốt xong target tháng thành 700tr. */}
+        {!all && given.length > 0 && restWithSlots.length === 0 && remain > 0 && (
+          <p className="text-[11px] text-amber-300">
+            Phần còn lại {fmtVndShort(remain)} của Target tháng KHÔNG có ca nào để chia (lưới chưa có ca của nhóm bỏ trống) — tổng target các ca sẽ thiếu {fmtVndShort(remain)}, chốt xong Target tháng = tổng ca. Thêm ca cho nhóm bỏ trống, hoặc cộng phần này vào một nhóm đã nhập.
+          </p>
+        )}
         {given.length > 0 && editable && !locked && (
           <button onClick={() => onChange({})} className="min-h-6 px-1 text-[11px] text-[var(--text-faint)] hover:text-rose-400 underline">Bỏ target nhóm, chia theo Target tháng</button>
         )}

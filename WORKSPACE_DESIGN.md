@@ -13,6 +13,19 @@
 
 ## 1. Giai đoạn hiện tại (cập nhật 2026-10-28)
 
+- **27–28/10: AUDIT + SỬA KẾ HOẠCH THÁNG (chưa commit; `0185` CHƯA CHẠY — chạy TRƯỚC deploy)** — 12 điểm gãy, sửa hết:
+  P1 — Chốt lại không mở lại ca đã huỷ (`lock_month_plan` giữ huỷ, trả `kept_cancelled`); sau chốt đổi target ca có sẵn chỉ ceo/admin + mọi đổi
+  target tháng (sửa/thêm/bỏ ca) ghi `plan_target_audit` (guard 0185; ô target khoá theo `role`); cấm live ngày trên kế hoạch đã chốt phải xác nhận;
+  target nhóm ngày báo khi phần còn lại không có ca nào nhận; OP dời giờ ca thật ⇒ shift_slot + ca kế hoạch dời theo (trigger
+  `trg_sync_session_plan_time`, 0185 đồng bộ một lần 4 ca đang lệch: CROCS 27/30/31, Franklin Shopee 11/10); cảnh báo "N ca đã live ngoài kế hoạch"
+  lấy đúng `planRunRate(...).offPlan` (đính chính audit: VERA TikTok 15 ca ngoài kế hoạch nhưng 14 đã "loại khỏi báo cáo" ⇒ chỉ 1 ca 03/10 2,1M, 53,3% vs 52,9%;
+  CROCS 1 ca 24/10 37,6M). Kiểm trên app (dev, DB thật, không lưu gì) 28/10: cảnh báo VERA T10 "1 ca … từ 03/10 … GMV 2,1M"; hỏi khi rời trang có cam kết gõ dở;
+  cảnh báo nhóm ngày "Phần còn lại 300M … KHÔNG có ca nào để chia". Chưa thử được trên app: hộp hỏi cấm live (mọi ca tương lai thật đã chốt người), ô target khoá với role ops.
+  P2 — `crossBrandCheck` tính cả chính brand ở sàn kia; banner "tháng này còn nháp" đọc lại sau chốt/xoá; cam kết gõ dở tính là chưa lưu;
+  "+ ca" lấp khoảng trống đủ dài, không sinh ca sau ca qua đêm; ca tăng cường engine không dự báo được nhận target/giờ của kế hoạch;
+  lưu lưới = RPC `replace_plan_slots` một transaction (DB chưa có thì rơi về cách cũ). Kiểm: `supabase/tests/0185_month_plan_integrity.sql`
+  21 mục trên bản replay (trước 0185 đỏ ở mục 1); vitest monthPlanGrid/boost/workflowIntegrity. Chi tiết: lịch sử `## Audit + sửa Kế Hoạch Tháng (2026-10-27/28)`.
+
 - **28/10: Bảng điểm Report Tháng khớp Dashboard (chưa commit, chưa kiểm trên app thật)** — tháng còn dở (`cmp.partial`) + plan đã chốt: % Target tính trên **target tới nay** (`planRunRate.buckets[].targetToDate`, cùng số run-rate Dashboard; Daily 103% thay vì 81%, cả tháng 95% thay vì 86%), ô Target hiện "tới nay · cả tháng". Tháng đủ: không đổi. Dòng Total GMV (file shop) giữ nguyên. Code: `scoreRows(..., toDate)` ở `lib/report/brandReport.ts`, `planRR` memo ở `MonthlyReportTabs.tsx`, test trong `tests/brandReport.test.ts`.
 - **28/10: ADS THEO NGÀY DÁN TỪ FILE TRACKING (đã push, `0184` ĐÃ CHẠY 28/10; CROCS T3→T10 đã dán, 245 ngày)** — CROCS theo dõi Ads bằng file "Performance Tracking" (sheet "Daily Ads
   Report": target + actual × Live/Product/Creator mỗi ngày). Nhập Ads có khung dán (`AdsTrackingPanel`, bộ đọc `lib/ads/adsTracking.ts`, bảng `brand_ads_daily`
@@ -58,6 +71,9 @@
 ## 2. Việc còn treo
 
 **Cần user làm:**
+- **Kế Hoạch Tháng (28/10, `0185` CHƯA CHẠY):** dán `0185_month_plan_integrity.sql` vào SQL Editor TRƯỚC khi deploy client (nó tự đồng bộ giờ 4 ca CROCS/Franklin đang lệch).
+  Kiểm đã chạy: gọi `replace_plan_slots` không còn `PGRST202`. Quyết: VERA TikTok T10 có đưa 15 ca 01–07/10 vào kế hoạch không ("Chia lại theo lịch hiện có", ceo/admin).
+  T11 chưa có kế hoạch nào (27/10) — "Mở lịch tháng 11" ở Điều Phối Lịch Live.
 - **Ads theo ngày (28/10, 0184 ĐÃ CHẠY, CROCS T3→T10 đã dán):** cuối mỗi ngày/tháng dán lại khối "Daily Ads Report" để cập nhật actual (ghi đè ngày trùng).
 - **Action plan (27/10, 0182 ĐÃ CHẠY):** commit + deploy; lập plan thật cho CROCS T10 (deck T9 có 9 việc) trước khi chốt T10; đầu T11 ops chấm các việc "Ops tự chấm" ở report T10.
 - **0179 ĐÃ CHẠY 21/10.** Còn: mở Dashboard brand Franklin (ops) → "Gửi bản tin cho brand" → đăng nhập tài khoản brand Franklin xem trang Tổng quan.
@@ -141,6 +157,9 @@
    `shift_slots` mở → talent đăng ký rảnh (RLS 0133: chỉ ca còn mở, chưa qua ngày) → ops chốt người qua RPC
    `finalize_shift_slot` (0133: một transaction, khoá dòng slot, từ chối slot không còn mở) ⇒ `live_sessions`. Kế hoạch
    đã chốt: ca đã chốt người không dời/bỏ trong lưới, ca ngày đã qua giữ giờ + target (trigger `trg_guard_locked_plan_slot`);
+   **0185:** đổi target ca có sẵn sau chốt chỉ ceo/admin, mọi đổi target tháng sau chốt có dòng `plan_target_audit`; ca kế hoạch huỷ thì Chốt lại
+   GIỮ huỷ (chỉ gắn lại khi đã có ca thật thay thế đúng giờ); giờ ca kế hoạch đi theo ca thật (`sync_session_plan_time`, trừ dời sang tháng khác);
+   lưu lưới chỉ qua `replace_plan_slots` (KHÔNG `insert … on conflict` trên bảng này — BEFORE INSERT chạy cả với dòng rơi vào conflict, guard coi là thêm ca ngày đã qua);
    không còn "Lưu nháp"/"Gợi ý"/"Chia lại target"/"Xoá hết" — chỉ "Chốt lại" + "Chia lại theo lịch hiện có…" (0164, ceo/admin). Lưới cảnh báo trùng phòng với brand khác +
    số ca song song toàn agency (`crossBrandCheck`, chỉ đề xuất).
 2. **Số liệu ca — 3 bậc tin cậy** (`live_sessions.data_source`): `manual` (talent tự khai qua report ca) < `live_snapshot`
@@ -447,6 +466,7 @@ target khung camp ở Nhập Ads bỏ 06/10 — tháng không có kế hoạch c
 
 | Mục trong file lịch sử | Tóm tắt |
 |---|---|
+| `## Audit + sửa Kế Hoạch Tháng (2026-10-27/28)` | 12 điểm gãy, số đo DB thật T10 (ca huỷ, ca lệch giờ, ca ngoài kế hoạch), mô phỏng; bẫy upsert + BEFORE INSERT; SQL 21 mục |
 | `## Điều Phối Lịch Live bản gọn đợt 1–2 (2026-10-25)` | 1 màn + thẻ tháng + việc có nút; trình mở tháng 3 bước; 0181 thông báo hàng loạt (34 ca ≈ 900 tin); thử DB thật tới bước 3 (525 ca) |
 | `## Điều Phối Lịch Live — vì sao khó dùng (2026-10-24)` | đếm màn/nút/chữ, luồng chưa ai đi (94% ca T10 nạp từ Sheet), tuần lặp 20% giờ/5% host, đề xuất 1 màn + 4 quyết định |
 | `## Điều Phối Lịch Live — audit (2026-10-24)` + `… đợt 1 (2026-10-24)` + `… đợt 2 (2026-10-24)` | audit: hao hụt theo kênh, ca tắt sớm = ca yếu · đợt 1: giờ live thật cho cam kết, verify tab 3100 nạp code 3102 · đợt 2: 0180, SQL 21 mục |

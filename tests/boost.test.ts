@@ -14,6 +14,13 @@ describe("ca tăng cường (0165)", () => {
     expect(boostFillItems([{ id: "a" }, { id: "b" }, { id: "c" }], [0, Number.NaN, 5_000_000])).toEqual([{ id: "c", target: 5_000_000, expected: 5_000_000 }]);
   });
 
+  test("audit 27/10: engine không dự báo được thì dùng target/giờ của kế hoạch (expected 0 — không phải dự báo)", () => {
+    expect(boostFillItems([{ id: "a" }, { id: "b" }, { id: "c" }], [0, 7_000_000, 0], [9_000_000.4, 1, 0])).toEqual([
+      { id: "a", target: 9_000_000, expected: 0 },
+      { id: "b", target: 7_000_000, expected: 7_000_000 }
+    ]);
+  });
+
   test("hai danh sách lệch số ca thì ném lỗi (không ghi nhầm target sang ca khác)", () => {
     expect(() => boostFillItems([{ id: "a" }], [1, 2])).toThrow();
   });

@@ -49,6 +49,7 @@ import { fmtMonth, fmtFixed, fmtVndShort, fmtVndFull } from "../lib/format";
 import { MonthPicker } from "./common/MonthPicker";
 import { channelTitle, platformOf, brandPlatformKey, type ReportPlatform } from "../lib/reportPlatform";
 import { platformsOfBrand } from "../lib/channels";
+import { planRunRate } from "../lib/performance/planRunRate";
 interface MonthPlanProps {
   /** Sàn của workspace agency (07/10): kế hoạch, target, cam kết của sàn này — không còn nút chuyển sàn trong màn. */
   platform: ReportPlatform;
@@ -75,6 +76,8 @@ interface MonthPlanProps {
   onOpenCrm?: (brandId: string, platform: "TikTok" | "Shopee") => void;
   // Chỉ để so số ca chạy song song toàn agency với số người (audit workflow #12).
   talents: Talent[];
+  /** Role người đang dùng: sau chốt, đổi target ca có sẵn / chia lại cả tháng chỉ ceo/admin (DB chặn bằng guard 0185 + RPC 0164). */
+  role: string;
 }
 
 // Lưới bắt đầu Thứ 2 như Lịch & Studio / Điều Phối Lịch Live (bố cục 18/10).
@@ -124,9 +127,11 @@ export default function MonthPlan({
   engineParams,
   brandStudios,
   onOpenCrm,
-  talents
+  talents,
+  role
 }: MonthPlanProps) {
   const confirm = useConfirm();
+  const canRetarget = role === "ceo" || role === "admin";
   const today = todayVn();
   const [brandId, setBrandId] = useDefaultBrand(brands, sessions, today);
   // Kế hoạch theo sàn (0140): mỗi brand × tháng × sàn một kế hoạch, target riêng (user chốt 06/10). Đổi brand mà sàn đã
@@ -143,14 +148,21 @@ export default function MonthPlan({
   const [settings, setSettings] = useState<PlanSettings>(DEFAULT_SETTINGS);
   const [drafts, setDrafts] = useState<PlanDraftSlot[]>([]);
   const [dirty, setDirty] = useState(false);
-  // Đổi brand/tháng (hoặc tải lại trang) khi lưới có sửa chưa lưu thì mất sạch, trước đây không một câu hỏi.
-  const leaveDirty = async () => !dirty || (await confirm("Lưới đang có sửa CHƯA LƯU. Đổi sang kế hoạch khác thì các sửa đó mất. Bỏ các sửa đó?", { danger: true }));
+  // Cam kết tháng đang gõ dở (chuỗi = đang gõ; null = theo số đã lưu / hợp đồng). Khai báo trước để `leaveDirty` tính cả nó.
+  const [commitHoursDraft, setCommitHoursDraft] = useState<string | null>(null);
+  const [commitGmvDraft, setCommitGmvDraft] = useState<string | null>(null);
+  const commitDirty = commitHoursDraft !== null || commitGmvDraft !== null;
+  // Đổi brand/tháng (hoặc tải lại trang) khi lưới có sửa chưa lưu thì mất sạch, trước đây không một câu hỏi. Giờ/GMV cam kết gõ dở
+  // cũng vậy (audit 27/10: đổi brand là mất số đang gõ, không hỏi).
+  const leaveDirty = async () =>
+    (!dirty && !commitDirty) ||
+    (await confirm(`${dirty ? "Lưới" : "Cam kết tháng"} đang có sửa CHƯA LƯU. Đổi sang kế hoạch khác thì các sửa đó mất. Bỏ các sửa đó?`, { danger: true }));
   useEffect(() => {
-    if (!dirty) return;
+    if (!dirty && !commitDirty) return;
     const onBeforeUnload = (e: BeforeUnloadEvent) => { e.preventDefault(); };
     window.addEventListener("beforeunload", onBeforeUnload);
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
-  }, [dirty]);
+  }, [dirty, commitDirty]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -169,9 +181,6 @@ export default function MonthPlan({
   const [suggestion, setSuggestion] = useState<{ history: HistorySummary; result: SuggestResult } | null>(null);
   // Cam kết CỦA THÁNG NÀY (gộp cấu hình 06/10): chỗ nhập duy nhất. Mặc định = điều khoản hợp đồng ở CRM; sửa ở đây là
   // lưu thật vào dòng cam kết của tháng (trước đó là ô "giờ cần xếp" không lưu + module Cam Kết Hợp Đồng riêng).
-  // Chuỗi = đang gõ; null = theo số đã lưu / hợp đồng.
-  const [commitHoursDraft, setCommitHoursDraft] = useState<string | null>(null);
-  const [commitGmvDraft, setCommitGmvDraft] = useState<string | null>(null);
   const [commitSaving, setCommitSaving] = useState(false);
   const [events, setEvents] = useState<CalendarEventRow[]>([]);
   const [strategy, setStrategy] = useState<SuggestStrategy>("max");
@@ -204,6 +213,11 @@ export default function MonthPlan({
   const nextMonth = nextMonthOf(today.slice(0, 7), 1);
   // `initial` = lượt mount (lấy bản nạp trước nếu có); sau khi chốt/xoá kế hoạch thì luôn đọc mới.
   const refreshMissing = (initial = false) => {
+    // Banner "tháng này còn nháp" cũng đọc lại sau chốt/xoá — trước đây chỉ tính lúc mở màn nên chốt xong vẫn nhắc (audit 27/10).
+    if (!initial)
+      fetchPlanStatuses(today.slice(0, 7))
+        .then((m) => setCurMonthDrafts(brands.filter((b) => m.get(brandPlatformKey(b.id, platformProp))?.status === "draft")))
+        .catch(() => undefined);
     (initial ? planStatusesRead.take(nextMonth) : fetchPlanStatuses(nextMonth))
       .then((m) =>
         setNextMonthMissing(
@@ -284,7 +298,6 @@ export default function MonthPlan({
     () => monthCommitmentOf(commitments, contracts, brandId, platform, `${month}-01`),
     [commitments, contracts, brandId, platform, month]
   );
-  const commitDirty = commitHoursDraft !== null || commitGmvDraft !== null;
   const commitHoursText = commitHoursDraft ?? (monthCommit.source === "none" ? "" : String(monthCommit.hours));
   const commitGmvText = commitGmvDraft ?? (monthCommit.gmv === undefined ? "" : String(monthCommit.gmv));
   // Engine xếp đúng số giờ cam kết của tháng (đang gõ cũng tính — để "Gợi ý phân bổ" thử ngay số mới).
@@ -353,8 +366,8 @@ export default function MonthPlan({
   const errors = useMemo(() => validateDrafts(drafts, settings), [drafts, settings]);
   // #12: kế hoạch từng brand không thấy brand khác — trùng phòng mặc định + số ca chạy song song toàn agency.
   const crossBrand = useMemo(
-    () => crossBrandCheck(drafts, { brandId, studioId: brandStudioId || undefined, sessions, shiftSlots, today }),
-    [drafts, brandId, brandStudioId, sessions, shiftSlots, today]
+    () => crossBrandCheck(drafts, { brandId, platform, studioId: brandStudioId || undefined, sessions, shiftSlots, today }),
+    [drafts, brandId, platform, brandStudioId, sessions, shiftSlots, today]
   );
   const clashKeys = useMemo(() => new Set(crossBrand.clashes.map((c) => c.key)), [crossBrand]);
   const hostCapacity = talents.filter((t) => t.role !== "Assistant").length;
@@ -434,7 +447,10 @@ export default function MonthPlan({
         if (pending.length > 0 && !boostFilling.current) {
           boostFilling.current = true;
           try {
-            const items = boostFillItems(pending, forecastsFor(pending));
+            // Engine không dự báo được (kênh ít lịch sử) ⇒ target/giờ của chính kế hoạch × giờ ca.
+            const t = totalsOf(drafts);
+            const perHour = t.hours > 0 ? t.target / t.hours : 0;
+            const items = boostFillItems(pending, forecastsFor(pending), pending.map((b) => perHour * slotHours(b)));
             if (items.length > 0 && (await setBoostTargets(plan.id, items)) > 0) rows = await fetchBoostSlots(plan.id);
           } catch (e) {
             console.warn("Điền target ca tăng cường không được:", e);
@@ -472,7 +488,17 @@ export default function MonthPlan({
       targetGmv: locked && !d.id && d.targetGmv === 0 && w[i] > 0 ? Math.round(w[i]) : d.targetGmv
     }));
   };
-  const toggleBlackout = (day: string) => {
+  const toggleBlackout = async (day: string) => {
+    // Kế hoạch đã chốt: cấm live bỏ ca của ngày đó khỏi kế hoạch = trừ target của chúng khỏi target tháng — hỏi như nút bỏ từng ca
+    // (audit 27/10: trước đây bỏ âm thầm). Ca không chạy được nhưng vẫn tính mẫu số run-rate thì huỷ ở Bảng Vận Hành.
+    if (locked && !settings.blackoutDates.includes(day)) {
+      const gone = drafts.filter((d) => d.date === day && d.id && !timeLocked(d));
+      const lost = totalsOf(gone).target;
+      if (gone.length > 0 && !(await confirm(
+        `Cấm live ${day.slice(8)}/${day.slice(5, 7)} sẽ BỎ ${gone.length} ca khỏi kế hoạch đã chốt${lost > 0 ? ` — target ${fmtVndShort(lost)} bị trừ khỏi target tháng` : ""}.\n\nNếu chỉ là ngày không chạy được (vẫn tính vào mẫu số run-rate) thì huỷ ca ở Bảng Vận Hành thay vì cấm live.`,
+        { danger: true }
+      ))) return;
+    }
     setSettings((st) => ({ ...st, blackoutDates: st.blackoutDates.includes(day) ? st.blackoutDates.filter((d) => d !== day) : [...st.blackoutDates, day].sort() }));
     // Ca đã chốt người của ngày đó giữ lại — DB không cho bỏ (0133), huỷ ở Cửa sổ Ca Live trước.
     setDrafts((prev) => withForecast(prev.filter((d) => d.date !== day || settings.blackoutDates.includes(day) || timeLocked(d))));
@@ -827,7 +853,8 @@ export default function MonthPlan({
     // 0151: ca kế hoạch trùng giờ với ca đã nhập thì được GẮN vào ca đó (không mở ca chờ đăng ký), kể cả ngày đã qua.
     const enteredKeys = new Set(monthSessions.map(draftKeyOf));
     const matchedCount = drafts.filter((d) => !d.slotId && enteredKeys.has(draftKeyOf(d))).length;
-    const pastCount = drafts.filter((d) => d.date < today && !enteredKeys.has(draftKeyOf(d))).length;
+    // Ca đã gắn ca thật (kể cả ca đã huỷ — 0185 giữ huỷ, không mở lại) không thuộc nhóm "ngày đã qua chưa có ca".
+    const pastCount = drafts.filter((d) => !d.slotId && d.date < today && !enteredKeys.has(draftKeyOf(d))).length;
     const matchedNote = matchedCount > 0 ? `\n\n${matchedCount} ca trùng giờ với ca đã nhập sẽ được GẮN vào ca đó (nhận target, không mở đăng ký). Cần migration 0151 đã chạy — chưa chạy thì chốt sẽ mở thêm ca chờ đăng ký trùng giờ.` : "";
     const pastNote =
       pastCount > 0
@@ -859,7 +886,7 @@ export default function MonthPlan({
       setLockedSlotsTick((t) => t + 1);
       setMsg(
         `Đã chốt: mở ${r.created} ca mới${(r.linked_sessions ?? 0) > 0 ? `, gắn ${r.linked_sessions} ca đã nhập` : ""}${r.linked > 0 ? `, gắn ${r.linked} ca đã có sẵn` : ""}${r.cancelled > 0 ? `, huỷ ${r.cancelled} ca bị bỏ` : ""}` +
-          `${r.kept_registered > 0 ? `, GIỮ ${r.kept_registered} ca bị bỏ nhưng đã có người đăng ký (xử lý ở Bảng Vận Hành)` : ""}${(r.skipped_past ?? 0) > 0 ? `, bỏ qua ${r.skipped_past} ca ngày đã qua (ca nào đã live: mở ca đúng giờ ở Lịch & Studio rồi bấm Chốt lại để gắn target)` : ""} — ${r.total_slots} ca kế hoạch đã có ca thật/ca chờ${r.created > 0 ? ` (${r.created} ca đang chờ đăng ký)` : ""}.`
+          `${r.kept_registered > 0 ? `, GIỮ ${r.kept_registered} ca bị bỏ nhưng đã có người đăng ký (xử lý ở Bảng Vận Hành)` : ""}${(r.kept_cancelled ?? 0) > 0 ? `, giữ huỷ ${r.kept_cancelled} ca đã huỷ (không mở lại)` : ""}${(r.skipped_past ?? 0) > 0 ? `, bỏ qua ${r.skipped_past} ca ngày đã qua (ca nào đã live: mở ca đúng giờ ở Lịch & Studio rồi bấm Chốt lại để gắn target)` : ""} — ${r.total_slots} ca kế hoạch đã có ca thật/ca chờ${r.created > 0 ? ` (${r.created} ca đang chờ đăng ký)` : ""}.`
       );
     } catch (e) {
       setMsg(`Không chốt được: ${errorMessage(e)}`);
@@ -910,6 +937,22 @@ export default function MonthPlan({
       setSaving(false);
     }
   };
+
+  // Ca đã live NGOÀI kế hoạch đã chốt (target 0) — GMV của chúng vẫn cộng vào thực đạt của run-rate nên % cao hơn thực. Lấy đúng
+  // danh sách `offPlan` của planRunRate (cùng phép nối ca kế hoạch → ca thật, cùng bỏ ca "loại khỏi báo cáo") để số khớp Dashboard.
+  // Đo 28/10: CROCS T10 1 ca (24/10, ca tăng cường, 37,6tr: 95,1% thay vì 94,3%); VERA TikTok 15 ca ngoài kế hoạch nhưng 14 đã loại.
+  // Chỉ báo; đưa vào kế hoạch là việc của "Chia lại theo lịch hiện có" (ceo/admin quyết target mới).
+  const offPlan = useMemo(() => {
+    if (!locked) return null;
+    const planSlots = lockedSlots.filter((ps) => ps.date.startsWith(month));
+    if (planSlots.length === 0) return null;
+    const rr = planRunRate(month, planSlots, shiftSlots, platformSessions.filter((s) => s.brandId === brandId), today, campRanges);
+    const xs = rr.offPlan.map((x) => x.session);
+    if (xs.length === 0) return null;
+    const boostIds = new Set(boostSlots.map((b) => b.shiftSlotId));
+    const boost = xs.filter((s) => shiftSlots.some((sl) => sl.sessionId === s.id && boostIds.has(sl.id))).length;
+    return { count: xs.length, boost, gmv: rr.offPlanActual, first: xs.map((s) => s.date).sort()[0] };
+  }, [locked, lockedSlots, month, shiftSlots, platformSessions, brandId, today, campRanges, boostSlots]);
 
   const hoursDelta = planHours > 0 ? totals.hours - planHours : null;
   const targetDelta = targetTotal > 0 ? totals.target - targetTotal : null;
@@ -1171,7 +1214,7 @@ export default function MonthPlan({
               </>
             )}
             {editable && locked && (
-              <button onClick={openRetarget} className="px-3 py-1.5 rounded-lg border border-[var(--accent)]/60 text-xs font-bold text-[var(--accent-text)] hover:bg-[var(--surface-elevated)] flex items-center gap-1.5" title="Chỉ ceo/admin. Lấy mọi ca đang có trên lịch (kể cả ca OP thêm và ca đã qua), bỏ ca huỷ, chia lại target tháng, có nhật ký"><Wand2 className="w-3.5 h-3.5" /> Chia lại theo lịch hiện có…</button>
+              <button onClick={openRetarget} disabled={!canRetarget} className="px-3 py-1.5 rounded-lg border border-[var(--accent)]/60 text-xs font-bold text-[var(--accent-text)] hover:bg-[var(--surface-elevated)] disabled:opacity-40 flex items-center gap-1.5" title="Chỉ ceo/admin. Lấy mọi ca đang có trên lịch (kể cả ca OP thêm và ca đã qua), bỏ ca huỷ, chia lại target tháng, có nhật ký"><Wand2 className="w-3.5 h-3.5" /> Chia lại theo lịch hiện có…</button>
             )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -1195,6 +1238,16 @@ export default function MonthPlan({
         )}
       </div>
 
+
+      {offPlan && (
+        <div className="bg-amber-950/40 border border-amber-900 rounded-xl px-4 py-2.5 text-xs text-amber-200 flex flex-wrap items-center gap-2" data-testid="off-plan-warning">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span>
+            <b>{offPlan.count} ca đã live ngoài kế hoạch</b>{offPlan.boost > 0 ? ` (${offPlan.boost} ca tăng cường)` : ""}, từ {offPlan.first.slice(8)}/{offPlan.first.slice(5, 7)}: target 0 nhưng GMV {fmtVndShort(offPlan.gmv)} vẫn cộng vào thực đạt ⇒ run-rate tháng này cao hơn thực.
+            {canRetarget ? " Đưa vào kế hoạch: \"Chia lại theo lịch hiện có…\"." : " Báo ceo/admin nếu cần đưa vào kế hoạch."}
+          </span>
+        </div>
+      )}
 
       {/* Chia lại target CẢ LƯỚI sau chốt (0162): xem trước tính phía client, bấm Áp dụng mới ghi (RPC, chỉ ceo/admin, có nhật ký). */}
       {retargetOpen && (
@@ -1277,7 +1330,7 @@ export default function MonthPlan({
           })()}
           {retargetHistory.length > 0 && (
             <div className="space-y-1">
-              <div className="font-bold text-[var(--text-muted)]">Các vòng đã chia lại ({retargetHistory.length})</div>
+              <div className="font-bold text-[var(--text-muted)]">Nhật ký đổi target sau chốt ({retargetHistory.length} lượt — chia lại, sửa tay, thêm/bỏ ca)</div>
               <ul className="space-y-0.5 text-[11px] text-[var(--text-muted)]">
                 {retargetHistory.slice(0, 6).map((b) => (
                   <li key={b.batchId} className="flex flex-wrap gap-x-3">
@@ -1441,7 +1494,7 @@ export default function MonthPlan({
                   <span className="text-[11px] text-[var(--text-faint)] flex items-center gap-1">
                     {list.length > 0 ? `${list.length} ca · ${fmtH(dayHours)}h` : ""}
                     {/* -m-1.5 p-1.5: vùng bấm 24×24 (sàn WCAG 2.5.8) nhưng không đẩy cao dòng ngày — M5. */}
-                    {!past && <button onClick={() => toggleBlackout(day)} className={`-m-1.5 p-1.5 ${isBlackout ? "text-rose-400" : "text-[var(--text-faint)] hover:text-rose-400"}`} title={isBlackout ? "Bỏ cấm live ngày này" : "Cấm live ngày này (engine bỏ qua)"}><Ban className="w-3 h-3" /></button>}
+                    {!past && <button onClick={() => void toggleBlackout(day)} className={`-m-1.5 p-1.5 ${isBlackout ? "text-rose-400" : "text-[var(--text-faint)] hover:text-rose-400"}`} title={isBlackout ? "Bỏ cấm live ngày này" : "Cấm live ngày này (engine bỏ qua)"}><Ban className="w-3 h-3" /></button>}
                   </span>
                 </div>
                 {(ev || sch) && <div className="text-[11px] text-[var(--accent-text)] truncate" title={[ev?.label, sch?.label].filter(Boolean).join(" · ")}>{ev?.label}{ev && sch ? " · " : ""}{sch ? `KM: ${sch.label}` : ""}</div>}
@@ -1464,11 +1517,11 @@ export default function MonthPlan({
                     <div className="flex items-center gap-1">
                       <input
                         type="number"
-                        disabled={!editable || isPastFrozen(d)}
+                        disabled={!editable || isPastFrozen(d) || (locked && !!d.id && !canRetarget)}
                         value={d.targetGmv}
                         onChange={(e) => update(d.key, { targetGmv: Number(e.target.value) })}
                         aria-label="Target GMV của ca"
-                        title="Target GMV của ca"
+                        title={locked && !!d.id && !canRetarget ? "Kế hoạch đã chốt: chỉ ceo/admin đổi target ca (có nhật ký)" : "Target GMV của ca"}
                         className="w-full min-w-0 min-h-6 bg-[var(--surface-base)] border border-[var(--border)] rounded px-1 py-0.5 font-mono text-[11px] text-[var(--text)] disabled:opacity-70"
                       />
                       {editable && !timeLocked(d) && <button onClick={() => void remove(d.key)} className="shrink-0 p-1.5 text-rose-400 hover:text-rose-300" title="Bỏ ca"><X className="w-3 h-3" /></button>}
