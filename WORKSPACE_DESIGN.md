@@ -13,7 +13,7 @@
 
 ## 1. Giai đoạn hiện tại (cập nhật 2026-10-28; mục KH Tháng bản gọn 27/10)
 
-- **27/10: TARGET CA TĂNG CƯỜNG HIỆN KHẮP APP + DB TỰ ĐIỀN TARGET TẠM (chưa commit; `0186` CHƯA CHẠY)** — check engine target trên DB thật:
+- **27/10: TARGET CA TĂNG CƯỜNG HIỆN KHẮP APP + DB TỰ ĐIỀN TARGET TẠM (đã push `aea3acd`; `0186` CHƯA CHẠY)** — check engine target trên DB thật:
   ca OP mở sau chốt có target đề xuất ở `plan_boost_slots` nhưng `applyAllocatedTargets` gán 0 cho mọi ca ngoài kế hoạch ⇒ Lịch/Sổ Ca/Bảng
   Vận Hành/app talent hiện 0 (CROCS 24/10 15–18 52,8M; 27, 30, 31/10 18–21 66,5M); target chỉ được điền khi có người mở Kế Hoạch Tháng
   (JOCKEY TikTok 11/10 chờ 16 ngày). Sửa: (1) `fetchBoostTargets` + effect theo chữ ký `shiftSlots` ở `useWorkspaceData` ⇒ ca mang target
@@ -93,7 +93,7 @@
 ## 2. Việc còn treo
 
 **Cần user làm:**
-- **0186 (27/10):** chạy `0186_boost_provisional_target.sql` (trước hay sau deploy đều được) — xong thì ca JOCKEY TikTok 11/10 20–23 có target tạm; commit + deploy client.
+- **0186 (27/10):** chạy `0186_boost_provisional_target.sql` (trước hay sau deploy đều được) — xong thì ca JOCKEY TikTok 11/10 20–23 có target tạm; client đã push `aea3acd` (Vercel tự deploy).
 - **Kế Hoạch Tháng bản gọn (27/10, đã push `db5311c`):** deploy; sau khi "Mở lịch tháng 11" ở Điều Phối, vào Kế Hoạch Tháng từng kênh bấm "Đặt target…" (ceo/admin).
 - **Kế Hoạch Tháng (28/10, `0185` ĐÃ CHẠY + push `ff61f96`):** còn thử bằng tài khoản ops: ô target ca đã chốt bị khoá, DB từ chối đổi target. T11 chưa có kế
   hoạch nào (27/10) — "Mở lịch tháng 11" ở Điều Phối Lịch Live.
