@@ -13,6 +13,13 @@
 
 ## 1. Giai đoạn hiện tại (cập nhật 2026-10-27)
 
+- **27/10: tab up riêng "Live Analysis — Affiliate" (loại `affiliate_live_analysis`, `0183` CHƯA CHẠY, chưa commit)** — view "linked accounts" không ra phiên của tài khoản affiliate nên thêm loại file mới (cùng 28 cột, dùng chung `parseLiveAnalysis`). Trang Affiliate (`affiliateLiveSessionSlice`) đọc CẢ `live_analysis` + `affiliate_live_analysis`; mục Affiliate của Chốt tháng (`monthClose.ts`) chỉ tính `affiliate_live_analysis`; Report Tuần vẫn chỉ đọc `live_analysis` nên số affiliate không lọt vào cột đối chiếu. Chạy `0183` trước khi up file (không thì DB báo check_violation). Chưa up thử file mẫu thật `Live Analysis20261027035737.xlsx` (T10, 6 phiên, 3 creator) vào app.
+- **27/10 tối: ACTION PLAN REPORT THÁNG (chưa commit, `0182` ĐÃ CHẠY 27/10 — đọc được cột qua REST)** — học deck CROCS T9 slide "Plans for OCT": trang "Tháng sau" có bảng
+  Hành động · Căn cứ · Chỉ tiêu theo dõi (`ActionPlanPanel`, report/ActionPlan.tsx); plan lưu ở report tháng VIẾT ra nó (`brand_monthly_reports.action_plan`,
+  đường ghi riêng `saveMonthlyReportActionPlan`); report tháng sau có khối "Kết quả action plan tháng trước" tự chấm (`gradeAction`, lib/report/actionPlan.ts,
+  test `tests/actionPlan.test.ts`). Ô "Việc tháng sau" trong khung sửa kết luận đã bỏ (một chỗ nhập). Verify bản build production nối DB thật: CROCS T9
+  lập plan (GMV/giờ Daily ≥ "19,9M" lưu 19.900.000, % Target, việc chữ) → report T10 "Đang theo dõi · đang dưới mức" 19.366.638 (Key Metrics Daily 19,4M),
+  % Target 86,0% = bảng điểm; 375px không tràn; xoá plan về null (dòng T9 nháp rỗng còn lại). Chưa thử được: nút ops tự chấm (chỉ hiện khi tháng chấm đã hết), góc nhìn brand.
 - **27/10: AUDIT REPORT THÁNG + SỬA A + CHỐT THÁNG B (đã push main 27/10, không migration)** — audit https://claude.ai/artifact/Hh4aiZB3EuFpr7J9HVwith.
   A: 7 lỗi report (Affiliate % target/ROAS chỉ trên phiên có số `creatorRates`; host yếu → `peopleOpsNote` chỉ ops; ô trang 1 cùng kỳ; ẩn trang Toàn shop/Sản phẩm
   với brand khi trống; Insight trang 7 mở bằng khung giờ; report Shopee bản 4: khung camp theo Kế Hoạch Tháng, chữ "phiên", ghi chú `shopeeNotes(s,"brand"|"ops")`).
@@ -47,6 +54,7 @@
 ## 2. Việc còn treo
 
 **Cần user làm:**
+- **Action plan (27/10, 0182 ĐÃ CHẠY):** commit + deploy; lập plan thật cho CROCS T10 (deck T9 có 9 việc) trước khi chốt T10; đầu T11 ops chấm các việc "Ops tự chấm" ở report T10.
 - **0179 ĐÃ CHẠY 21/10.** Còn: mở Dashboard brand Franklin (ops) → "Gửi bản tin cho brand" → đăng nhập tài khoản brand Franklin xem trang Tổng quan.
 - **0178 (17/10):** chạy `0178_ops_flow_integrity.sql` — trước hay sau deploy đều được (client chưa có hàm ⇒ quay về `update_session_with_children`;
   view chưa có cột ⇒ đọc lại không có `live_evidence`, mỗi lần mở app tốn 2 request 400 tới khi chạy). Sau khi chạy: Bảng Vận Hành / Sổ Ca
@@ -368,6 +376,10 @@ live = `sessionHours`. GMV/giờ đem NHÂN với giờ lịch thì chia trên g
 - **Chốt tháng (27/10):** hạn chốt = ngày 3 tháng sau (`closeDeadline`); độ phủ file đếm từ ngày có ca đầu tiên của kênh (`firstDueDay`); file toàn shop
   (`SHOP_FILE`: TikTok Shop Analytics, Shopee theo ngày) đã tải mà thiếu ngày ⇒ `publishBlocker` chặn phát hành — chưa tải gì thì được (bản chỉ livestream,
   trang toàn shop tự ẩn với brand). Nút Phát hành mới phải gọi `publishBlocker`. Tỷ lệ gộp (% target, ROAS, GMV/giờ) chỉ trên phần tử có đủ tử lẫn mẫu.
+- **Action plan (27/10):** chỉ tiêu tự chấm = một Key Metric (`KEY_METRICS`) hoặc % Target, phạm vi Cả tháng / một loại ngày, ≥/≤ ngưỡng; chấm bằng
+  bộ số của report tháng SAU (`actionCtx`: `liveCurStats` + `campDetailRows`, target Kế Hoạch Tháng đã chốt). Tháng chấm còn dở (`cmp.partial`) ⇒ chỉ
+  "Đang theo dõi", không Đạt/Chưa đạt; % Target giữa tháng không nói đang đạt hay không. Phạm vi không có phiên ⇒ "Không có số" (không phải Chưa đạt).
+  Việc không đo bằng số ⇒ ops chấm ở report tháng sau, ghi ngược vào `items[].manual` của dòng tháng viết plan. Tiền in đủ số (`fmtVndFull`).
 - **Report gửi brand (24/10):** mọi % thay đổi theo loại ngày / khung giờ / Key Metrics chỉ tô màu khi vượt **ngưỡng dao động** `noiseBand`
   (1,96 × 26% × √(1/n₁+1/n₂), `SESSION_CV` ở brandReport.ts) — dưới ngưỡng ghi "trong ngưỡng dao động"; giờ live không đánh giá tốt/xấu. Mọi phép so có
   dùng file shop đi qua `shopCompareWindow` (cắt cả hai tháng tới ngày cuối file shop); Key Metrics chỉ đọc số phiên nên chỉ cắt khi số PHIÊN còn dở.

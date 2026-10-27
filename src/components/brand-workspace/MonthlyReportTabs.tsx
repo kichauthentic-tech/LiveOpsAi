@@ -16,7 +16,9 @@ import { controlGroup, liveGmvByDate, controlLabel, controlLine, controlVerdict,
 import { CreatorLivePerfRow, vnDateOf } from "../../lib/dataraw/creatorLivePerfSlice";
 import { fetchMonthPlan } from "../../lib/db/monthPlans";
 import type { BrandMonthPlan, BrandMonthPlanSlot } from "../../types";
-import { fetchMonthlyReport, saveMonthlyReportNarrative, saveMonthlyReportSectionNote } from "../../lib/db/monthlyReports";
+import { fetchMonthlyReport, saveMonthlyReportActionPlan, saveMonthlyReportNarrative, saveMonthlyReportSectionNote } from "../../lib/db/monthlyReports";
+import { gradeAction, type ActionGradeContext, type ActionItem } from "../../lib/report/actionPlan";
+import { ActionPlanPanel, ActionResultsPanel } from "./report/ActionPlan";
 import { contextInsight, HostInsightRow, hostVsPeer, InsightSection, insightToText, parseInsightText, peopleInsight, peopleOpsNote, productsInsight, sectionNextSteps, SectionInsight, shopInsight, shortSku, whyInsight } from "../../lib/report/sectionInsights";
 import { CAMP_DAY_BUCKET_LABEL, CAMP_DAY_BUCKET_ORDER, effectiveCamp, resolveCampBucketType, type CampDayBucket, type CampOverrides } from "../../lib/campaignDays";
 import { dailyRhythm, liveFunnel, sessionSpread } from "../../lib/report/rhythm";
@@ -94,6 +96,18 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
 
   const { start, end } = useMemo(() => monthRangeLocal(month), [month]);
   const prevMonth = useMemo(() => prevMonthStrLocal(month), [month]);
+  // Dòng report tháng trước — chỉ để đọc action plan viết ở đó và chấm bằng số tháng này (0182). Brand chỉ đọc được
+  // khi tháng trước đã phát hành (RLS 0051).
+  const [prevReportRow, setPrevReportRow] = useState<BrandMonthlyReportType | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetchMonthlyReport(brandId, `${prevMonth}-01`)
+      .then((row) => !cancelled && setPrevReportRow(row))
+      .catch(() => !cancelled && setPrevReportRow(null));
+    return () => {
+      cancelled = true;
+    };
+  }, [brandId, prevMonth]);
   const { start: prevStart, end: prevEnd } = useMemo(() => monthRangeLocal(prevMonth), [prevMonth]);
   const last4Months = useMemo(() => {
     const out: string[] = [];
@@ -300,6 +314,19 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
 
   const liveCurStats = useMemo(() => liveStatsFromRows(liveCurrent?.rows ?? [], cmp.curStart, cmp.curEnd), [liveCurrent, cmp]);
   const livePrevStats = useMemo(() => liveStatsFromRows(livePrev?.rows ?? [], cmp.prevStart, cmp.prevEnd), [livePrev, cmp]);
+  // Bộ số để chấm action plan tháng trước + gợi ý ngưỡng cho plan tháng sau: cả tháng + từng loại ngày, target theo
+  // Kế Hoạch Tháng đã chốt. Chỉ kết luận khi số phiên đủ tới cuối tháng (cmp.partial = còn dở).
+  const actionCtx = useMemo<ActionGradeContext>(() => {
+    const by = (k: CampDayBucket) => campDetailRows.find((r) => r.key === k);
+    const bucket = <T,>(f: (k: CampDayBucket) => T) => Object.fromEntries(CAMP_DAY_BUCKET_ORDER.map((k) => [k, f(k)])) as Record<CampDayBucket, T>;
+    return {
+      stats: { all: liveCurStats, ...bucket((k) => by(k)?.cur ?? null) },
+      targets: { all: kpiTargetGmvCur, ...bucket((k) => by(k)?.target ?? null) },
+      final: !cmp.partial
+    };
+  }, [liveCurStats, campDetailRows, kpiTargetGmvCur, cmp]);
+  const prevPlanItems = prevReportRow?.actionPlan?.items ?? null;
+  const prevGrades = useMemo(() => (prevPlanItems ? prevPlanItems.map((i) => gradeAction(i, actionCtx)) : null), [prevPlanItems, actionCtx]);
   const drivers = useMemo(() => driverBreakdown(livePrevStats, liveCurStats), [livePrevStats, liveCurStats]);
   const waterfallData = useMemo(() => toWaterfall(drivers, cmp, month, prevMonth), [drivers, cmp, month, prevMonth]);
 
@@ -662,12 +689,10 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
 
   const [editingNarrative, setEditingNarrative] = useState(false);
   const [summaryDraft, setSummaryDraft] = useState("");
-  const [nextDraft, setNextDraft] = useState("");
   const [narrativeSaving, setNarrativeSaving] = useState(false);
   const [narrativeError, setNarrativeError] = useState<string | null>(null);
   const startEditNarrative = () => {
     setSummaryDraft(summaryLines.join("\n"));
-    setNextDraft(nextLines.join("\n"));
     setNarrativeError(null);
     setEditingNarrative(true);
   };
@@ -678,7 +703,8 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
       const row = await saveMonthlyReportNarrative(
         brandId,
         `${month}-01`,
-        reset ? { summaryText: null, nextStepsText: null } : { summaryText: summaryDraft.trim() || null, nextStepsText: nextDraft.trim() || null }
+        // Việc tháng sau giờ nhập ở Action plan (0182) — giữ nguyên bản chữ cũ nếu có, "dùng lại bản tự sinh" bỏ cả hai.
+        reset ? { summaryText: null, nextStepsText: null } : { summaryText: summaryDraft.trim() || null, nextStepsText: monthlyReportRow?.nextStepsText ?? null }
       );
       setMonthlyReportRow(row);
       setEditingNarrative(false);
@@ -1101,9 +1127,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             {editingNarrative ? (
               <NarrativeEditor
                 summaryDraft={summaryDraft}
-                nextDraft={nextDraft}
                 onSummary={setSummaryDraft}
-                onNext={setNextDraft}
                 saving={narrativeSaving}
                 error={narrativeError}
                 onSave={() => saveNarrative(false)}
@@ -1120,10 +1144,10 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                 </ol>
                 {canManage && (
                   <div className="flex flex-wrap items-center gap-3 pt-2 text-[11px]" style={{ borderTop: `1px solid ${PAL.line}`, color: PAL.muted }}>
-                    <span>{narrativeEdited ? "Ops đã sửa đoạn này (kết luận + việc tháng sau)." : "Bản tự sinh từ số liệu — sửa trước khi phát hành nếu cần."}</span>
+                    <span>{narrativeEdited ? "Ops đã sửa kết luận." : "Bản tự sinh từ số liệu — sửa trước khi phát hành nếu cần."}</span>
                     {narrativeStale && <span style={{ color: PAL.gold }}>Số liệu đã cập nhật sau lần sửa — đọc lại cho khớp số mới.</span>}
                     <button onClick={startEditNarrative} className={LINK_BTN} style={{ color: PAL.gold }}>
-                      Sửa kết luận & việc tháng sau
+                      Sửa kết luận
                     </button>
                     {narrativeEdited && (
                       <button onClick={() => saveNarrative(true)} disabled={narrativeSaving} className={LINK_BTN} style={{ color: PAL.muted }}>
@@ -1757,14 +1781,30 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
         {/* ===== 7. Tháng sau ===== */}
         <section id="mr-next" className="space-y-4 scroll-mt-16">
           <SectionHead no={secNo("next")} title={secTitle("next")} sub={`Hành động tháng ${Number(nextMonth.slice(5))} + kế hoạch từ Kế Hoạch Tháng và tab Affiliate`} />
-          <div className="rounded-xl p-4" style={{ background: PAL.panel, border: `1px solid ${PAL.gold}44` }}>
-            <div className="text-xs mb-2 font-bold" style={{ color: PAL.gold }}>Hành động tháng sau</div>
-            <ol className="space-y-2 text-sm leading-relaxed list-decimal pl-5" style={{ color: PAL.cream }}>
-              {nextLines.map((l, i) => (
-                <li key={i}>{l}</li>
-              ))}
-            </ol>
-          </div>
+          {prevPlanItems && prevGrades && (
+            <ActionResultsPanel
+              planMonthLabel={`tháng ${Number(prevMonth.slice(5))}`}
+              monthLabel={`tháng ${Number(month.slice(5))}`}
+              items={prevPlanItems}
+              grades={prevGrades}
+              final={actionCtx.final}
+              throughNote={cmp.partial ? `số tới ${Number(cmp.curEnd.slice(8))}/${Number(month.slice(5))}` : null}
+              canManage={canManage}
+              onManual={async (id, status) => {
+                const at = new Date().toISOString();
+                const items: ActionItem[] = prevPlanItems.map((i) => (i.id === id ? { ...i, manual: status ? { status, at } : null } : i));
+                setPrevReportRow(await saveMonthlyReportActionPlan(brandId, `${prevMonth}-01`, items));
+              }}
+            />
+          )}
+          <ActionPlanPanel
+            items={monthlyReportRow?.actionPlan?.items ?? null}
+            fallbackLines={nextLines}
+            nextMonthLabel={`tháng ${Number(nextMonth.slice(5))}`}
+            ctx={actionCtx}
+            canManage={canManage}
+            onSave={async (items) => setMonthlyReportRow(await saveMonthlyReportActionPlan(brandId, `${month}-01`, items))}
+          />
           <SectionDetail open={detailOpen("next")} onOpen={() => openDetail("next")}>
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
               <KpiTile label={`Target GMV tháng ${nextMonth.slice(5)}`} value={nextPlan && nextPlan.targetGmv > 0 ? fmtVndShort(nextPlan.targetGmv) : "—"} note={nextPlan ? (nextPlan.status === "locked" ? "đã chốt" : "đang lên lịch") : "chưa lập kế hoạch"} />

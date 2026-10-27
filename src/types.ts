@@ -343,6 +343,8 @@ export interface BrandMonthlyReport {
   summarySavedAt?: string;
   /** Insight từng phần ops đã sửa (0121): khoá = shop | why | people | products | context. */
   sectionNotes?: Record<string, { text: string; savedAt: string }>;
+  /** Action plan tháng sau (0182) — report tháng sau tự chấm. */
+  actionPlan?: import("./lib/report/actionPlan").ActionPlan | null;
   publishedAt?: string;
   publishedBy?: string;
   createdAt: string;
@@ -426,7 +428,10 @@ export type DataRawReportType =
   | "shopee_overview"
   // migration 0142 (2026-10-06) — "Shopee Live Ads Report" (1 dòng / chiến dịch cho cả tháng), chi phí Ads của Report Shopee
   // (lib/dataraw/shopeeAds.ts). Tải ở Nhập Ads khi chọn sàn Shopee.
-  | "shopee_ads";
+  | "shopee_ads"
+  // migration 0183 (2026-10-27) — "Live Analysis" xuất ở view creator AFFILIATE (cùng 28 cột với live_analysis, nhưng toàn
+  // dòng phiên của creator affiliate). Nguồn của trang Affiliate; live_analysis chỉ còn dòng shop cho Report Tuần.
+  | "affiliate_live_analysis";
 // Đã gỡ 2026-09-22 (quyết định của user):
 //   - "product_card_traffic_stats" (migration 0064): chưa từng có file thật nào được upload nên 2
 //     dòng Video/Product Card GMV của Report Tháng luôn bằng 0. Nay lấy từ shop_analytics +

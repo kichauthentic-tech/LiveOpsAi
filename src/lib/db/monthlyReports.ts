@@ -3,6 +3,7 @@ import { fetchAllPages } from "./fetchAllPages";
 import { BrandMonthlyReport } from "../../types";
 import { prefetchable } from "./prefetch";
 import { brandMonthKey, platformOf, type ReportPlatform } from "../reportPlatform";
+import { readActionPlan, type ActionItem } from "../report/actionPlan";
 
 // Report tháng Brand Workspace (migration 0051) — số liệu vận hành (GMV/Host/SKU) không lưu ở
 // đây, luôn tính live từ LiveSession[] phía component. Bảng chỉ giữ phần nhập tay + trạng thái
@@ -18,6 +19,7 @@ interface DbMonthlyReport {
   next_steps_text: string | null;
   summary_saved_at: string | null;
   section_notes?: Record<string, { text: string; savedAt: string }> | null;
+  action_plan?: unknown;
   published_at: string | null;
   published_by: string | null;
   created_at: string;
@@ -35,6 +37,7 @@ function reportFromDb(row: DbMonthlyReport): BrandMonthlyReport {
     nextStepsText: row.next_steps_text ?? undefined,
     summarySavedAt: row.summary_saved_at ?? undefined,
     sectionNotes: row.section_notes ?? undefined,
+    actionPlan: readActionPlan(row.action_plan),
     publishedAt: row.published_at ?? undefined,
     publishedBy: row.published_by ?? undefined,
     createdAt: row.created_at,
@@ -132,6 +135,23 @@ export async function saveMonthlyReportSectionNote(brandId: string, periodMonth:
   const { data, error } = await supabase
     .from("brand_monthly_reports")
     .upsert({ brand_id: brandId, period_month: periodMonth, platform, section_notes: Object.keys(notes).length ? notes : null }, { onConflict: "brand_id,period_month,platform" })
+    .select()
+    .single();
+  if (error) throw error;
+  return reportFromDb(data as DbMonthlyReport);
+}
+
+// Action plan (0182) — đường ghi riêng như Insight: chỉ mang cột action_plan nên Insight/tóm tắt/trạng thái giữ nguyên.
+// items rỗng = xoá plan (report quay về danh sách việc tự sinh). Ops chấm tay ở report tháng sau cũng ghi qua đây,
+// vào dòng của tháng VIẾT plan.
+export async function saveMonthlyReportActionPlan(brandId: string, periodMonth: string, items: ActionItem[], platform: ReportPlatform = "TikTok"): Promise<BrandMonthlyReport> {
+  const clean = items.filter((i) => i.action.trim());
+  const { data, error } = await supabase
+    .from("brand_monthly_reports")
+    .upsert(
+      { brand_id: brandId, period_month: periodMonth, platform, action_plan: clean.length ? { items: clean, savedAt: new Date().toISOString() } : null },
+      { onConflict: "brand_id,period_month,platform" }
+    )
     .select()
     .single();
   if (error) throw error;
