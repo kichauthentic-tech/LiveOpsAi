@@ -22,7 +22,9 @@
   (về đích→xác suất đạt target, Đã chạy→Đã live ở Cam Kết brand, Nhịp bán→GMV theo ngày, Off sớm→Kết thúc sớm, bảo chứng→được xác thực,
   PAY-DAY→PAY DAY, Đặt lại MK, % commission→% hoa hồng…), mẫu mới thêm vào `tests/uiWording.test.ts`. Vòng 3 (28/10): `0187_error_wording.sql`
   định nghĩa lại NGUYÊN VĂN 10 hàm (bản mới nhất), chỉ đổi 14 câu `raise exception` "up file/up số/off sớm" → "tải lên file/cập nhật số liệu/kết thúc sớm";
-  đã kiểm diff (chỉ 14 dòng raise khác nguồn) + parse trên Postgres tạm. **`0187` ĐÃ CHẠY 28/10.**
+  đã kiểm diff (chỉ 14 dòng raise khác nguồn) + parse trên Postgres tạm. **`0187` ĐÃ CHẠY 28/10.** Vòng 3b: quét chuỗi trong bản mới nhất của MỌI hàm SQL ⇒ `0188_function_text_wording.sql` sửa
+  4 hàm còn sót (nhắc giao ca "up file", "up nhầm ca", "khả năng về đích", "GMV cộng dồn") + sửa chữ thông báo nhắc giao ca đã gửi;
+  `tests/uiWording.test.ts` có thêm test quét hàm SQL bản mới nhất. **`0188` CHƯA CHẠY.**
 - **27/10: TARGET CA TĂNG CƯỜNG HIỆN KHẮP APP + DB TỰ ĐIỀN TARGET TẠM (đã push `aea3acd`; `0186` ĐÃ CHẠY 27/10 — JOCKEY TikTok 11/10 20–23 = 4.918.033 = 100M ÷ 61h × 3h, đúng)** — check engine target trên DB thật:
   ca OP mở sau chốt có target đề xuất ở `plan_boost_slots` nhưng `applyAllocatedTargets` gán 0 cho mọi ca ngoài kế hoạch ⇒ Lịch/Sổ Ca/Bảng
   Vận Hành/app talent hiện 0 (CROCS 24/10 15–18 52,8M; 27, 30, 31/10 18–21 66,5M); target chỉ được điền khi có người mở Kế Hoạch Tháng

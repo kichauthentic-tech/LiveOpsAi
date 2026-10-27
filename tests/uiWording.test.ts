@@ -63,3 +63,30 @@ test("chữ hiển thị không dùng khẩu ngữ thay cho thuật ngữ chuyê
   }
   expect(hits).toEqual([]);
 });
+
+// Chữ trong hàm SQL (raise exception, thông báo) cũng hiện lên màn — 0187/0188 đã sửa. Chỉ xét bản định nghĩa
+// MỚI NHẤT của mỗi hàm (migration cũ là lịch sử, không sửa) và chuỗi trong nháy đơn của thân hàm.
+test("chữ trong hàm SQL bản mới nhất không dùng khẩu ngữ", () => {
+  const dir = join(__dirname, "..", "supabase", "migrations");
+  const latest = new Map<string, [string, string]>();
+  for (const name of readdirSync(dir).filter((n) => n.endsWith(".sql")).sort()) {
+    const sql = readFileSync(join(dir, name), "utf8");
+    const head = /create\s+or\s+replace\s+function\s+([\w.]+)\s*\(/gi;
+    for (let m; (m = head.exec(sql)); ) {
+      const tag = /\bas\s+(\$\w*\$)/gi;
+      tag.lastIndex = head.lastIndex;
+      const t = tag.exec(sql);
+      if (!t) continue;
+      const end = sql.indexOf(t[1], tag.lastIndex);
+      if (end < 0) continue;
+      latest.set(m[1].toLowerCase().replace(/^public\./, ""), [name, sql.slice(tag.lastIndex, end)]);
+    }
+    for (const d of sql.matchAll(/drop\s+function\s+(?:if\s+exists\s+)?([\w.]+)/gi)) latest.delete(d[1].toLowerCase().replace(/^public\./, ""));
+  }
+  const hits: string[] = [];
+  for (const [fn, [file, body]] of latest)
+    for (const lit of body.matchAll(/'((?:[^']|'')*)'/g))
+      for (const [re, fix] of BANNED) if (re.test(lit[1])) hits.push(`${file} ${fn} → dùng "${fix}": ${lit[1].slice(0, 100)}`);
+  expect(latest.size).toBeGreaterThan(100);
+  expect(hits).toEqual([]);
+});
