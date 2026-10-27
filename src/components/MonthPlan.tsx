@@ -32,7 +32,7 @@ import {
   validateDrafts
 } from "../lib/scheduling/monthPlanGrid";
 import { RetargetBatch } from "../lib/scheduling/retarget";
-import { boostFillItems, summarizeBoost } from "../lib/scheduling/boost";
+import { boostFillItems, boostLacksTarget, summarizeBoost } from "../lib/scheduling/boost";
 import { RebasePlan, RebaseSet, activeDrafts, buildRebase, collectRebase, mergeAllocated } from "../lib/scheduling/rebase";
 import { PlanGroupTargetsBlock } from "./PlanGroupTargets";
 import { PlanMonthGrid, type GridExtra } from "./monthplan/PlanMonthGrid";
@@ -953,7 +953,7 @@ export default function MonthPlan({
       for (const b of boostSlots) {
         const s = b.shiftSlotId ? liveBySlot.get(b.shiftSlotId) : undefined;
         if (s) used.add(s.id);
-        push({ key: `b-${b.id}`, date: b.date, startTime: b.startTime, endTime: b.endTime, kind: "boost", target: b.targetPending ? null : b.targetGmv, actual: s ? s.actualGmv ?? 0 : null, pending: b.targetPending });
+        push({ key: `b-${b.id}`, date: b.date, startTime: b.startTime, endTime: b.endTime, kind: "boost", target: boostLacksTarget(b) ? null : b.targetGmv, actual: s ? s.actualGmv ?? 0 : null, pending: boostLacksTarget(b), provisional: b.targetPending && b.targetGmv > 0 });
       }
     }
     for (const s of offPlan?.sessions ?? []) {

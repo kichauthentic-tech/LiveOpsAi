@@ -3,6 +3,7 @@ import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { ResponsiveContainer, ComposedChart, LineChart, ReferenceLine, BarChart, Bar, Line, XAxis, YAxis, Tooltip, CartesianGrid, ScatterChart, Scatter } from "recharts";
 import { Flame, ListOrdered, ShoppingBag, Megaphone, AlertTriangle, CalendarClock, PieChart as PieChartIcon, Activity, Download, Scale } from "lucide-react";
 import { LiveSession, BrandMonthlyReport as BrandMonthlyReportType, BrandPlatformRate, ShiftSlot } from "../../types";
+import { planTargetOf } from "../../lib/performance/targetAllocation";
 import { METRIC, metricHint } from "../../lib/metricGlossary";
 import { downloadSheetsAsXlsx } from "../../lib/exportXlsx";
 import { useToast } from "../../hooks/useToast";
@@ -298,7 +299,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   const sumSessionTargets = (s: string, e: string) =>
     sessions
       .filter((x) => x.brandId === brandId && x.date >= s && x.date <= e && x.status !== "Cancelled")
-      .reduce((sum, x) => sum + (x.targetGmv || 0), 0);
+      .reduce((sum, x) => sum + planTargetOf(x), 0);
   const scheduledTargetGmv = (s: string, e: string) => plannedMonthTarget(s, e) ?? sumSessionTargets(s, e);
 
   const hasReturnRateConfig = brandPlatformRates.some((r) => r.brandId === brandId);

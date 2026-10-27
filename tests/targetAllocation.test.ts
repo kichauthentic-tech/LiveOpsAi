@@ -1,7 +1,7 @@
 // Đ5 (2026-09-24) — target tháng khi có Kế Hoạch Tháng đã chốt.
 // Chạy: npm test    (chỉ file này: npx vitest run tests/targetAllocation.test.ts)
 import { expect, test } from "vitest";
-import { applyAllocatedTargets } from "../src/lib/performance/targetAllocation";
+import { applyAllocatedTargets, planTargetOf } from "../src/lib/performance/targetAllocation";
 import { LiveSession } from "../src/types";
 
 const B = "brand-vera";
@@ -67,3 +67,36 @@ const planMonthTotals = new Map([[`${B}|${M}`, 100_000_000]]);
   eq("không đổi → trả đúng mảng đầu vào", out === input, true);
 }
 
+
+// 5) Ca tăng cường (0165/0186, check 27/10): ca ngoài kế hoạch có target đề xuất ⇒ ca mang số đó + cờ boostTarget (trước đây 0
+//    trên Lịch / Sổ Ca / app talent), nhưng planTargetOf = 0 nên không lọt vào target ngày/tháng/run-rate.
+{
+  const A = ca("A", "2026-09-25", "09:00", "12:00");
+  const C = ca("C", "2026-09-24", "15:00", "18:00");
+  const out = applyAllocatedTargets([A, C], new Map([["A", 50_000_000]]), planMonthTotals, new Map([["C", 52_826_829]]));
+  eq("ca tăng cường mang target đề xuất", targets(out), { A: 50_000_000, C: 52_826_829 });
+  eq("cờ boostTarget chỉ ở ca tăng cường", out.map((s) => !!s.boostTarget), [false, true]);
+  eq("planTargetOf: ca tăng cường 0, ca kế hoạch giữ số", out.map(planTargetOf), [50_000_000, 0]);
+}
+
+// 6) Ca có cả target kế hoạch lẫn dòng tăng cường (vừa được đưa vào kế hoạch) ⇒ target kế hoạch thắng, không cờ.
+{
+  const A = ca("A", "2026-09-25", "09:00", "12:00");
+  const out = applyAllocatedTargets([A], new Map([["A", 50_000_000]]), planMonthTotals, new Map([["A", 9]]));
+  eq("target kế hoạch thắng dòng tăng cường", [out[0].targetGmv, !!out[0].boostTarget], [50_000_000, false]);
+}
+
+// 7) Ca tăng cường đã huỷ ⇒ 0, không cờ.
+{
+  const C = ca("C", "2026-09-24", "15:00", "18:00", { status: "Cancelled" });
+  const out = applyAllocatedTargets([C], new Map(), planMonthTotals, new Map([["C", 1_000]]));
+  eq("ca tăng cường huỷ ⇒ 0", [out[0].targetGmv, !!out[0].boostTarget], [0, false]);
+}
+
+// 8) Gọi lại với cùng map ⇒ trả đúng mảng cũ (giữ identity, App gọi mỗi phút).
+{
+  const C = ca("C", "2026-09-24", "15:00", "18:00");
+  const boost = new Map([["C", 1_000]]);
+  const once = applyAllocatedTargets([C], new Map(), planMonthTotals, boost);
+  eq("chạy lại không đổi ⇒ cùng mảng", applyAllocatedTargets(once, new Map(), planMonthTotals, boost) === once, true);
+}

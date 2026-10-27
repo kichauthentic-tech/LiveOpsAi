@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { BrandMonthPlan, BrandMonthPlanSlot, LiveSession, ShiftSlot, UserRole } from "../../types";
+import { planTargetOf } from "../../lib/performance/targetAllocation";
 import { AlertTriangle, CalendarRange, ChevronLeft, ChevronRight, ClipboardList, Database, Download, Loader2, Radio, TrendingDown, TrendingUp, Users } from "lucide-react";
 import { fmtVndShort } from "../../lib/format";
 import { metricHint } from "../../lib/metricGlossary";
@@ -131,7 +132,7 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
   // Target một ngày: tháng có kế hoạch chốt ⇒ Σ target ca kế hoạch của ngày đó (ca huỷ GIỮ target — luật planRunRate);
   // tháng chưa chốt ⇒ như trước, Σ target các ca chưa huỷ.
   const targetOfDay = (d: string, daySessions: LiveSession[]) =>
-    lockedMonths.has(d.slice(0, 7)) ? planTargetByDate.get(d) ?? 0 : daySessions.filter((s) => s.status !== "Cancelled").reduce((a, s) => a + (s.targetGmv ?? 0), 0);
+    lockedMonths.has(d.slice(0, 7)) ? planTargetByDate.get(d) ?? 0 : daySessions.filter((s) => s.status !== "Cancelled").reduce((a, s) => a + planTargetOf(s), 0);
 
   const totals = (list: LiveSession[], from: string, to: string) => {
     const done = list.filter(hasLiveNumbers);

@@ -8,6 +8,7 @@ import { platformsOfBrand } from "./channels";
 import { brandPriceSet } from "./brandPricing";
 import { findPersonClashes } from "./scheduling/conflicts";
 import { draftKeyOf, draftsFromSaved } from "./scheduling/monthPlanGrid";
+import { boostLacksTarget } from "./scheduling/boost";
 import { collectRebase } from "./scheduling/rebase";
 import { parseDayLabel } from "./affiliate/plan";
 import type { ShiftAck } from "./db/shiftAcks";
@@ -180,9 +181,10 @@ export function buildTodos(input: TodoInput): Todo[] {
         if (outside > 0) {
           out.push({ id: `plan-outside-${b.id}${sfx}`, level: "medium", title: `${name}: ${outside} ca trên lịch chưa có trong kế hoạch tháng ${fmtMonth(month)}`, detail: "Ca nạp bù hoặc ca OP mở ngoài kế hoạch nên chưa có target. Ở Kế Hoạch Tháng bấm \"Chia lại theo lịch hiện có…\" để đưa vào và chia target.", tab: "month_plan", rememberBrandId: b.id, rememberPlatform: p, action: "Mở Kế Hoạch Tháng" });
         }
-        const pendingBoost = boost.filter((x) => x.targetPending).length;
+        // 0186: DB tự điền target tạm lúc tạo ca ⇒ chỉ nhắc ca chưa có số nào (kế hoạch chưa đặt target).
+        const pendingBoost = boost.filter(boostLacksTarget).length;
         if (pendingBoost > 0) {
-          out.push({ id: `plan-boost-${b.id}${sfx}`, level: "low", title: `${name}: ${pendingBoost} ca tăng cường chưa có target đề xuất`, detail: "Mở Kế Hoạch Tháng của kênh này thì engine tự điền target đề xuất (không cộng vào target tháng).", tab: "month_plan", rememberBrandId: b.id, rememberPlatform: p, action: "Mở Kế Hoạch Tháng" });
+          out.push({ id: `plan-boost-${b.id}${sfx}`, level: "low", title: `${name}: ${pendingBoost} ca tăng cường chưa có target đề xuất`, detail: "Kế hoạch tháng chưa có target nên DB chưa tính được target tạm. Mở Kế Hoạch Tháng của kênh này: engine điền target đề xuất (không cộng vào target tháng).", tab: "month_plan", rememberBrandId: b.id, rememberPlatform: p, action: "Mở Kế Hoạch Tháng" });
         }
       }
 

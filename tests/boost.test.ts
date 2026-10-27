@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { boostFillItems, summarizeBoost } from "../src/lib/scheduling/boost";
+import { boostFillItems, boostLacksTarget, summarizeBoost } from "../src/lib/scheduling/boost";
 
 describe("ca tăng cường (0165)", () => {
   test("target đề xuất = dự báo engine làm tròn, mỗi ca một số riêng", () => {
@@ -35,5 +35,18 @@ describe("ca tăng cường (0165)", () => {
       "2026-10-10"
     );
     expect(s).toEqual({ count: 3, pending: 1, targetSum: 5_000_000, past: 2 });
+  });
+
+  test("0186: ca có target tạm (chờ engine) KHÔNG tính là chờ, số tạm vào Σ đề xuất", () => {
+    expect(boostLacksTarget({ targetGmv: 1_062, targetPending: true })).toBe(false);
+    expect(boostLacksTarget({ targetGmv: 0, targetPending: true })).toBe(true);
+    const s = summarizeBoost(
+      [
+        { date: "2026-10-03", targetGmv: 1_062, targetPending: true },
+        { date: "2026-10-20", targetGmv: 0, targetPending: true }
+      ],
+      "2026-10-10"
+    );
+    expect(s).toEqual({ count: 2, pending: 1, targetSum: 1_062, past: 1 });
   });
 });

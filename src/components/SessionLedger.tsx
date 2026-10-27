@@ -498,6 +498,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
                         {showTargetCol && (
                           <td className={`${SUB_COL} text-right text-[var(--text-muted)] whitespace-nowrap`}>
                             {s.targetGmv ? fmtVndShort(s.targetGmv) : "—"}
+                            {s.boostTarget && <span className="ml-1 text-[11px] font-normal" title="Ca tăng cường: target đề xuất, không thuộc target tháng">đề xuất</span>}
                           </td>
                         )}
                         <td className="py-2.5 px-2 text-right font-bold text-[var(--success)] whitespace-nowrap">

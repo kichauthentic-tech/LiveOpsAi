@@ -266,7 +266,7 @@ export const buildPctBadge = (s: LiveSession, viewerRole?: "agency" | "brand"): 
   if (viewerRole === "brand") return undefined;
   const t = targetPct(s);
   if (!t) return undefined;
-  return { label: `${t.pct}%`, level: t.level, title: `% Target: ${fmtVndFull(s.actualGmv ?? 0)} / ${fmtVndFull(s.targetGmv)}` };
+  return { label: `${t.pct}%`, level: t.level, title: `% Target${s.boostTarget ? " đề xuất (ca tăng cường — không thuộc target tháng)" : ""}: ${fmtVndFull(s.actualGmv ?? 0)} / ${fmtVndFull(s.targetGmv)}` };
 };
 
 /** Chip Host + Trợ live. Target GMV KHÔNG nằm trong danh sách này — nó có viên thuốc riêng cuối thẻ (prop

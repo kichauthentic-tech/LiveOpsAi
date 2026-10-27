@@ -1,4 +1,5 @@
 import { BrandPlatformRate, DataRawReportType, LiveSession } from "../../types";
+import { planTargetOf } from "../performance/targetAllocation";
 import { CreatorLivePerfMonthSlice, fetchCreatorLivePerfMonthSlice } from "../dataraw/creatorLivePerfSlice";
 import {
   AdsMonthSlice,
@@ -211,7 +212,8 @@ export interface BuildSnapshotResult {
 function trimSession(s: LiveSession): SnapshotSession {
   const out: Record<string, unknown> = {};
   for (const f of SNAPSHOT_SESSION_FIELDS) {
-    const v = s[f];
+    // Bản chụp brand đọc được: ca tăng cường chỉ mang target kế hoạch (0) — target đề xuất là số nội bộ (RLS 0165).
+    const v = f === "targetGmv" ? planTargetOf(s) : s[f];
     // Bỏ trống/0-mặc-định để JSON gọn — hydrate trả lại đúng mặc định đó.
     if (v === undefined || v === null || v === "") continue;
     out[f] = v;

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { LiveSession, ShiftSlot, ShiftRegistration, Studio, Talent, Brand, PromoScheme, UserRole, BrandStudio, AuditLogEntry, BrandChannel } from "../types";
+import { planTargetOf } from "../lib/performance/targetAllocation";
 import { schemesForDate } from "../lib/schemeUtils";
 
 import { clashDescriptions, clashedSessionIds, findPersonClashes, personClash, studioClash, studioClashLabel } from "../lib/scheduling/conflicts";
@@ -826,7 +827,8 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
               const isSelected = cell.dateStr === selectedDate;
               const isToday = cell.dateStr === getTodayDateString();
               // Target tách theo sàn — user chốt 07/10: không cộng target/GMV TikTok với Shopee.
-              const dayTarget = sumByPlatform(daySessions, (s) => s.targetGmv);
+              // planTargetOf: target đề xuất của ca tăng cường không cộng vào target ngày (0165/0186).
+              const dayTarget = sumByPlatform(daySessions, planTargetOf);
               const dayTargetPlatforms = platformsWithValue(dayTarget);
               const hasLiveNow = daySessions.some((s) => s.status === "Live Now");
 

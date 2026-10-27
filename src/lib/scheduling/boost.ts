@@ -28,9 +28,12 @@ export function boostFillItems(pending: Pick<BoostSlot, "id">[], forecasts: numb
   return items;
 }
 
+/** Ca chưa có số target nào (kể cả target tạm 0186 — kế hoạch Σ target 0). Ca có target tạm chờ engine KHÔNG tính là chờ. */
+export const boostLacksTarget = (b: Pick<BoostSlot, "targetGmv" | "targetPending">): boolean => b.targetPending && !(b.targetGmv > 0);
+
 export interface BoostSummary {
   count: number;
-  /** Ca chưa có target đề xuất. */
+  /** Ca chưa có số target nào (boostLacksTarget). */
   pending: number;
   /** Σ target đề xuất của các ca đã có target. KHÔNG cộng vào target tháng. */
   targetSum: number;
@@ -43,7 +46,7 @@ export function summarizeBoost(slots: Pick<BoostSlot, "date" | "targetGmv" | "ta
   let targetSum = 0;
   let past = 0;
   for (const b of slots) {
-    if (b.targetPending) pending++;
+    if (boostLacksTarget(b)) pending++;
     else targetSum += b.targetGmv;
     if (b.date < today) past++;
   }

@@ -203,6 +203,9 @@ export interface LiveSession {
   endTime: string;
   status: "Live Now" | "Upcoming" | "Completed" | "Cancelled";
   targetGmv: number;
+  /** true = `targetGmv` là target ĐỀ XUẤT của ca tăng cường (0165/0186), KHÔNG thuộc target tháng — mọi phép cộng target
+   *  (ngày, kỳ, tháng, run-rate) đọc `planTargetOf(s)` (lib/performance/targetAllocation.ts), không đọc thẳng `targetGmv`. */
+  boostTarget?: boolean;
   /** Tháng của ca này đã phát hành Report Tháng cho brand chưa (migration 0107).
    *  Với ceo/admin/operations/talent luôn là true — cờ chỉ có ý nghĩa với role brand.
    *  UI hiện số cho brand PHẢI xét cờ này trước: các cột số bị che về 0, hiện thẳng sẽ đọc

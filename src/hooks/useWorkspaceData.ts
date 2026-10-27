@@ -46,7 +46,7 @@ import { fetchBrandPlatformRateHistory } from "../lib/db/brandPlatformRateHistor
 import { fetchBrandSkus } from "../lib/db/brandSkus";
 import { fetchPromoSchemes } from "../lib/db/promoSchemes";
 import { fetchAllMonthlyReports } from "../lib/db/monthlyReports";
-import { fetchLockedPlanTargets } from "../lib/db/monthPlans";
+import { fetchBoostTargets, fetchLockedPlanTargets } from "../lib/db/monthPlans";
 import { fetchEngineParams } from "../lib/db/engineParams";
 import { DEFAULT_ENGINE_PARAMS, EngineParams } from "../lib/scheduling/engineParams";
 import { applyAllocatedTargets } from "../lib/performance/targetAllocation";
@@ -147,6 +147,8 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
   // chốt người thì chưa có live_session, cộng ngược sẽ ra thiếu.
   const [planMonthTotals, setPlanMonthTotals] = useState<Map<string, number>>(new Map());
   const [planSlotTargets, setPlanSlotTargets] = useState<Map<string, { date: string; target: number }[]>>(new Map());
+  // shift_slot id → target đề xuất của ca tăng cường (0165/0186). Đổ xuống ca để hiện, KHÔNG cộng vào target tháng (planTargetOf).
+  const [boostTargetsBySlotId, setBoostTargetsBySlotId] = useState<Map<string, number>>(new Map());
   // Tham số engine Kế Hoạch Tháng (0095) — nạp cùng Phase 14; lỗi thì dùng mặc định, không chặn app.
   const [engineParams, setEngineParams] = useState<EngineParams>(DEFAULT_ENGINE_PARAMS);
   const [engineParamsUpdatedAt, setEngineParamsUpdatedAt] = useState<string | null>(null);
@@ -160,6 +162,17 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
     }
     return out;
   }, [planTargetsBySlotId, shiftSlots]);
+  // Ca tăng cường sinh ở DB (trigger 0165, target tạm 0186) mỗi khi có ca mới / dời giờ — đường tạo ca thì nhiều (Lịch & Studio,
+  // Điều Phối, Bảng Vận Hành, RPC mở khung) nên nạp lại theo chữ ký danh sách ca thay vì vá từng chỗ. Bảng nhỏ (vài dòng/tháng).
+  const boostSlotSig = useMemo(() => shiftSlots.map((sl) => `${sl.id}${sl.date}${sl.startTime}${sl.endTime}${sl.status}`).join("|"), [shiftSlots]);
+  const boostTargetsBySessionId = useMemo(() => {
+    const out = new Map<string, number>();
+    if (boostTargetsBySlotId.size === 0) return out;
+    for (const sl of shiftSlots) {
+      if (sl.sessionId && boostTargetsBySlotId.has(sl.id)) out.set(sl.sessionId, boostTargetsBySlotId.get(sl.id)!);
+    }
+    return out;
+  }, [boostTargetsBySlotId, shiftSlots]);
   // Trạng thái hiển thị theo giờ thật (0096): tick mỗi phút để "Đang live"/"Đã xong" tự đổi khi mở lâu.
   const [nowMs, setNowMs] = useState(() => Date.now());
   useEffect(() => {
@@ -167,8 +180,8 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
     return () => window.clearInterval(t);
   }, []);
   const sessions = useMemo(
-    () => applyAllocatedTargets(withEffectiveStatus(rawSessions, nowMs), planTargetsBySessionId, planMonthTotals),
-    [rawSessions, nowMs, planTargetsBySessionId, planMonthTotals]
+    () => applyAllocatedTargets(withEffectiveStatus(rawSessions, nowMs), planTargetsBySessionId, planMonthTotals, boostTargetsBySessionId),
+    [rawSessions, nowMs, planTargetsBySessionId, planMonthTotals, boostTargetsBySessionId]
   );
   // Kế hoạch tháng được sửa ở Report Tháng (Tab 05) mà App không nhận callback — nạp lại mỗi khi
   // đổi tab là đủ, bảng nhỏ và target chỉ cần đúng khi người dùng nhìn sang màn khác.
@@ -229,6 +242,15 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
   // thêm `session` vào dep (12 lỗi); guard bằng chính `authUserId` thì rule hết đòi mà hành vi y nguyên
   // — `authUserId` truthy đúng khi và chỉ khi có session kèm user.
   const authUserId = session?.user?.id;
+  // Nạp target ca tăng cường theo `boostSlotSig` (khai báo ở trên, cạnh `boostTargetsBySessionId`).
+  useEffect(() => {
+    if (!authUserId || !boostSlotSig) return;
+    let cancelled = false;
+    fetchBoostTargets()
+      .then((m) => { if (!cancelled) setBoostTargetsBySlotId(m); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [authUserId, boostSlotSig]);
 
   // Đã nạp xong lần đầu cho user nào (audit UX 2026-09-29, Đợt 0 #1). Trước đây state bắt đầu bằng
   // [] / Map rỗng mà không có cờ ⇒ 1–3 s đầu mọi màn hiện "0 ca", "Chưa có ca nào có số" (Talent Pool
@@ -668,6 +690,7 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
     setPlanMonthTotals,
     planSlotTargets,
     setPlanSlotTargets,
+    setBoostTargetsBySlotId,
     engineParams,
     setEngineParams,
     engineParamsUpdatedAt,

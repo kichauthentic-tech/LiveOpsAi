@@ -418,6 +418,20 @@ export async function fetchBoostSlots(planId: string): Promise<BoostSlot[]> {
   }));
 }
 
+// shift_slot id → target đề xuất của ca tăng cường (> 0, kể cả target tạm 0186 đang chờ engine) — để App đổ xuống ca thật
+// (applyAllocatedTargets). RLS chỉ cho nhân sự agency đọc; brand/talent nhận map rỗng. Chưa chạy 0165 ⇒ map rỗng.
+export async function fetchBoostTargets(): Promise<Map<string, number>> {
+  const rows = await fetchAllPages<{ shift_slot_id: string | null; target_gmv: number | string }>((from, to) =>
+    supabase.from("plan_boost_slots").select("shift_slot_id,target_gmv").not("shift_slot_id", "is", null).gt("target_gmv", 0).order("id").range(from, to)
+  ).catch((e: { code?: string }) => {
+    if (e?.code === "42P01" || e?.code === "PGRST205") return [];
+    throw e;
+  });
+  const out = new Map<string, number>();
+  for (const r of rows) if (r.shift_slot_id) out.set(r.shift_slot_id, Number(r.target_gmv) || 0);
+  return out;
+}
+
 // Điền target đề xuất của engine cho ca tăng cường (ceo/admin/operations). Trả số dòng đã ghi.
 export async function setBoostTargets(planId: string, items: BoostFillItem[]): Promise<number> {
   if (items.length === 0) return 0;

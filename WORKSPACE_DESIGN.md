@@ -13,6 +13,16 @@
 
 ## 1. Giai đoạn hiện tại (cập nhật 2026-10-28; mục KH Tháng bản gọn 27/10)
 
+- **27/10: TARGET CA TĂNG CƯỜNG HIỆN KHẮP APP + DB TỰ ĐIỀN TARGET TẠM (chưa commit; `0186` CHƯA CHẠY)** — check engine target trên DB thật:
+  ca OP mở sau chốt có target đề xuất ở `plan_boost_slots` nhưng `applyAllocatedTargets` gán 0 cho mọi ca ngoài kế hoạch ⇒ Lịch/Sổ Ca/Bảng
+  Vận Hành/app talent hiện 0 (CROCS 24/10 15–18 52,8M; 27, 30, 31/10 18–21 66,5M); target chỉ được điền khi có người mở Kế Hoạch Tháng
+  (JOCKEY TikTok 11/10 chờ 16 ngày). Sửa: (1) `fetchBoostTargets` + effect theo chữ ký `shiftSlots` ở `useWorkspaceData` ⇒ ca mang target
+  đề xuất + cờ `LiveSession.boostTarget`; nhãn "đề xuất" ở Sổ Ca / SessionPlanVsActual / thẻ ca; (2) `0186`: `ensure_boost_slot` chèn target
+  TẠM = Σ target ÷ Σ giờ ca kế hoạch gốc × giờ ca (ca qua đêm +24h), `target_pending` vẫn true để engine thay khi mở Kế Hoạch Tháng; điền một lần
+  các dòng đang chờ có target 0. Lưới hiện "target tạm", Việc cần làm chỉ nhắc ca chưa có số nào (`boostLacksTarget`). Kiểm: replay cả chuỗi
+  + `supabase/tests/0186_boost_provisional_target.sql` (đỏ trước 0186, 7/7 sau, 0185 vẫn 21/21); vitest targetAllocation/boost/noCrossPlatformPerf;
+  dev nối DB thật: Sổ Ca CROCS 27/10 18–21 "66,5M đề xuất". Số đo độ lệch engine T10 (thực/target 47–99%, thực/dự báo VERA ~60%, lệch theo
+  khung giờ sáng/chiều) ghi ở memory `project_engine_target_v3` — chưa làm backtest/sửa engine.
 - **27/10: KẾ HOẠCH THÁNG BẢN GỌN (đã push `db5311c`, không migration; đề xuất + demo https://claude.ai/artifact/WCc9XbDXLCf4n7BAQAdAYY, user duyệt cả 4 quyết định)** —
   đầu trang = dải 4 bước (Giờ & target · Lưới · Chốt · Theo dõi/Target tháng) + hàng 5 số (ⓘ thay dòng giải thích) + MỘT dòng tham số ("sửa" mở khung;
   kế hoạch mới mở sẵn) thay 3 thẻ 704px; lưới tách sang `components/monthplan/PlanMonthGrid.tsx`: ca = một nút rút gọn, sửa trong khung nổi; đã chốt ⇒ ca
@@ -83,6 +93,7 @@
 ## 2. Việc còn treo
 
 **Cần user làm:**
+- **0186 (27/10):** chạy `0186_boost_provisional_target.sql` (trước hay sau deploy đều được) — xong thì ca JOCKEY TikTok 11/10 20–23 có target tạm; commit + deploy client.
 - **Kế Hoạch Tháng bản gọn (27/10, đã push `db5311c`):** deploy; sau khi "Mở lịch tháng 11" ở Điều Phối, vào Kế Hoạch Tháng từng kênh bấm "Đặt target…" (ceo/admin).
 - **Kế Hoạch Tháng (28/10, `0185` ĐÃ CHẠY + push `ff61f96`):** còn thử bằng tài khoản ops: ô target ca đã chốt bị khoá, DB từ chối đổi target. T11 chưa có kế
   hoạch nào (27/10) — "Mở lịch tháng 11" ở Điều Phối Lịch Live.
@@ -407,7 +418,7 @@ live = `sessionHours`. GMV/giờ đem NHÂN với giờ lịch thì chia trên g
   thực tế × Live/Product/Creator; actual null = chưa có số). Không lưu cột MTD/runrate của sheet — so target luỹ kế cắt ở ngày
   cuối có số thực (`adsTrackingMonth`). Hai nguồn không cộng nhau: file TikTok Ads = chi phí cả cửa hàng do TikTok xuất; bảng dán = kế hoạch brand.
 - **Run-rate chỉ tính bằng `planRunRate`** (28/09): target = Σ target ca của Kế Hoạch Tháng đã chốt (không chia lại khi lịch
-  đổi); ca kế hoạch huỷ GIỮ target; ca ngoài kế hoạch target 0; ca thêm vào lưới sau khi chốt nhận target = dự báo. **Ca tăng cường (0165, 10/10):** ca OP mở thêm sau chốt có dòng ở `plan_boost_slots` với target đề xuất của engine, KHÔNG cộng vào target tháng/run-rate — mọi chỗ cộng target tháng chỉ đọc `brand_month_plan_slots`, đừng đưa bảng boost vào đó. **Ngoại lệ do user chủ động "Chia lại theo lịch hiện có" (0164, 10/10):** ca huỷ về 0, ca OP thêm (kể cả đã qua) vào kế hoạch, Σ target = target mới.
+  đổi); ca kế hoạch huỷ GIỮ target; ca ngoài kế hoạch target 0; ca thêm vào lưới sau khi chốt nhận target = dự báo. **Ca tăng cường (0165, 10/10):** ca OP mở thêm sau chốt có dòng ở `plan_boost_slots` với target đề xuất của engine, KHÔNG cộng vào target tháng/run-rate — mọi chỗ cộng target tháng chỉ đọc `brand_month_plan_slots`, đừng đưa bảng boost vào đó. **Từ 27/10:** ca tăng cường mang target đề xuất trên `LiveSession.targetGmv` kèm cờ `boostTarget` (để hiện) ⇒ MỌI phép cộng target ca (ngày/kỳ/tháng/run-rate, bản chụp report brand) đọc `planTargetOf(s)`, không đọc thẳng `targetGmv` (`tests/noCrossPlatformPerf` canh cả `planTargetOf`); target tạm do DB tính lúc tạo ca (0186), engine thay khi mở Kế Hoạch Tháng. **Ngoại lệ do user chủ động "Chia lại theo lịch hiện có" (0164, 10/10):** ca huỷ về 0, ca OP thêm (kể cả đã qua) vào kế hoạch, Σ target = target mới.
 - **Report Tháng là nơi DUY NHẤT nói số một tháng SAU khi hết tháng** (đọc bản chụp; so cùng kỳ cắt 1..N khi tháng chưa hết).
   Dashboard brand là màn TRONG tháng, dùng chung hàm. Phân tích mới thì thêm vào 1 trong 10 trang, không dựng trang riêng.
 - **Chốt tháng (27/10):** hạn chốt = ngày 3 tháng sau (`closeDeadline`); độ phủ file đếm từ ngày có ca đầu tiên của kênh (`firstDueDay`); file toàn shop

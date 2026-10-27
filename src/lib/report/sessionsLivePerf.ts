@@ -1,4 +1,5 @@
 import { LiveSession } from "../../types";
+import { planTargetOf } from "../performance/targetAllocation";
 import type { MonthEndProjection, PlanRunRate } from "../performance/planRunRate";
 import { isCountable, sessionHours } from "../performance/hostPerformance";
 import { CreatorLivePerfMonthSlice, CreatorLivePerfRow } from "../dataraw/creatorLivePerfSlice";
@@ -126,15 +127,16 @@ export function monthRunRateFromPlan(r: PlanRunRate, projection?: MonthEndProjec
 }
 
 export function monthRunRate(sessions: LiveSession[], brandId: string, start: string, end: string): MonthRunRate | null {
-  const ss = sessions.filter((s) => s.brandId === brandId && s.date >= start && s.date <= end && s.status !== "Cancelled" && (s.targetGmv ?? 0) > 0);
+  // planTargetOf: ca tăng cường (target đề xuất, 0165/0186) không thuộc target tháng / run-rate.
+  const ss = sessions.filter((s) => s.brandId === brandId && s.date >= start && s.date <= end && s.status !== "Cancelled" && planTargetOf(s) > 0);
   if (ss.length === 0) return null;
   const done = ss.filter(hasLiveNumbers);
   const pending = ss.filter((s) => s.status === "Upcoming" || s.status === "Live Now");
   const sum = (xs: LiveSession[], f: (s: LiveSession) => number) => xs.reduce((a, s) => a + f(s), 0);
-  const targetTotal = sum(ss, (s) => s.targetGmv);
+  const targetTotal = sum(ss, planTargetOf);
   const actualDone = sum(done, (s) => s.actualGmv ?? 0);
-  const targetDone = sum(done, (s) => s.targetGmv);
-  const targetPending = sum(pending, (s) => s.targetGmv);
+  const targetDone = sum(done, planTargetOf);
+  const targetPending = sum(pending, planTargetOf);
   const runRate = targetDone > 0 ? actualDone / targetDone : null;
   const projected = actualDone + targetPending * (runRate ?? 1);
   return { targetTotal, doneCount: done.length, pendingCount: pending.length, actualDone, targetDone, targetPending, runRate, projected, gap: targetTotal - projected };

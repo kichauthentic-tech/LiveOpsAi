@@ -28,7 +28,7 @@ import { fetchBrandPlatformRateHistory } from "./lib/db/brandPlatformRateHistory
 import { createBrandSku, updateBrandSku, deleteBrandSku } from "./lib/db/brandSkus";
 import { createPromoScheme, updatePromoScheme, deletePromoScheme } from "./lib/db/promoSchemes";
 import { fetchAllMonthlyReports } from "./lib/db/monthlyReports";
-import { fetchLockedPlanTargets } from "./lib/db/monthPlans";
+import { fetchBoostTargets, fetchLockedPlanTargets } from "./lib/db/monthPlans";
 import { errorMessage } from "./lib/errorMessage";
 import { requestShiftDropout } from "./lib/db/notifications";
 import {
@@ -361,6 +361,7 @@ export default function App() {
     setPlanMonthTotals,
     planSlotTargets,
     setPlanSlotTargets,
+    setBoostTargetsBySlotId,
     engineParams,
     setEngineParams,
     engineParamsUpdatedAt,
@@ -1247,11 +1248,12 @@ export default function App() {
   // ca để Đăng Ký & Chốt Lịch / lịch thấy ngay, không cần F5.
   const reloadShiftSlots = async () => {
     try {
-      const [slots, planTargets] = await Promise.all([fetchShiftSlots(), fetchLockedPlanTargets()]);
+      const [slots, planTargets, boostTargets] = await Promise.all([fetchShiftSlots(), fetchLockedPlanTargets(), fetchBoostTargets().catch(() => new Map<string, number>())]);
       setShiftSlots(slots);
       setPlanTargetsBySlotId(planTargets.bySlotId);
       setPlanMonthTotals(planTargets.monthTotals);
       setPlanSlotTargets(planTargets.slotTargets);
+      setBoostTargetsBySlotId(boostTargets);
     } catch (e) {
       showToast(`Không nạp lại được danh sách ca: ${errorMessage(e)}`);
     }

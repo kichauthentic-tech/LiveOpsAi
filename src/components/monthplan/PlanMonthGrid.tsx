@@ -23,6 +23,8 @@ export interface GridExtra {
   target: number | null;
   actual: number | null;
   pending?: boolean;
+  /** Target tạm của DB (0186: target/giờ của kế hoạch × giờ ca), engine chưa tính dự báo riêng. */
+  provisional?: boolean;
 }
 
 interface Props {
@@ -200,7 +202,7 @@ function ExtraChip({ x }: { x: GridExtra }) {
   const ok = x.actual !== null && x.target !== null && x.actual >= x.target;
   const title =
     x.kind === "boost"
-      ? `Ca tăng cường ${x.startTime}–${x.endTime}: ${x.pending ? "chờ target đề xuất" : `đề xuất ${fmtVndShort(x.target ?? 0)}`}${x.actual !== null ? ` → thực đạt ${fmtVndShort(x.actual)}` : ""}. Không cộng vào target tháng; GMV vẫn cộng vào thực đạt.`
+      ? `Ca tăng cường ${x.startTime}–${x.endTime}: ${x.pending ? "chờ target đề xuất" : x.provisional ? `target tạm ${fmtVndShort(x.target ?? 0)} (target/giờ của kế hoạch × giờ ca, engine chưa tính)` : `đề xuất ${fmtVndShort(x.target ?? 0)}`}${x.actual !== null ? ` → thực đạt ${fmtVndShort(x.actual)}` : ""}. Không cộng vào target tháng; GMV vẫn cộng vào thực đạt.`
       : `Ca live ngoài kế hoạch ${x.startTime}–${x.endTime}: target 0, GMV ${fmtVndShort(x.actual ?? 0)} vẫn cộng vào thực đạt ⇒ run-rate cao hơn thực. Đưa vào kế hoạch: "Chia lại theo lịch hiện có…".`;
   return (
     <div title={title} className="w-full min-h-6 flex items-center justify-between gap-1 rounded-md border border-dashed border-sky-700 px-1.5 text-[11px] tabular-nums bg-sky-950/20">

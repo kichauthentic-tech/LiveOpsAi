@@ -75,7 +75,7 @@ describe("lib/platforms/perf", () => {
 
 // ---------- bộ quét ----------
 const SRC = join(__dirname, "..", "src");
-const PERF = "actualGmv|targetGmv|totalOrders|totalViews|peakViewers|impressions|productImpressions|productClicks|attributedItemsSold|cumGmv";
+const PERF = "actualGmv|targetGmv|planTargetOf|totalOrders|totalViews|peakViewers|impressions|productImpressions|productClicks|attributedItemsSold|cumGmv";
 const PERF_RE = new RegExp(`\\b(${PERF})\\b`);
 const SUM_RE = new RegExp(`reduce\\s*[<(]|\\+=|\\+\\s*\\(?\\s*[\\w!?.]+\\.(${PERF})\\b`);
 

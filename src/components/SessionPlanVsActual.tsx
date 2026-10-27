@@ -104,7 +104,7 @@ export function SessionPlanVsActual({ session: s, planHours, liveHours, hideMetr
         <div className={row}>
           <span className={label} title={metricHint("GMV")}>GMV</span>
           <span className={cell}>
-            {isBrandView ? none("—") : s.targetGmv > 0 ? <>{fmtVndShort(s.targetGmv)}<span className="ml-1 text-[11px] font-normal text-[var(--text-muted)]">target</span></> : none("chưa có target")}
+            {isBrandView ? none("—") : s.targetGmv > 0 ? <>{fmtVndShort(s.targetGmv)}<span className="ml-1 text-[11px] font-normal text-[var(--text-muted)]" title={s.boostTarget ? "Ca tăng cường: target đề xuất, không thuộc target tháng" : undefined}>{s.boostTarget ? "target đề xuất" : "target"}</span></> : none("chưa có target")}
           </span>
           <span className={`${cell} ${!hideMetrics && actualGmv > 0 ? "!text-[var(--success)]" : ""}`}>
             {hideMetrics ? none("chưa phát hành") : actualGmv > 0 ? fmtVndShort(actualGmv) : none("—")}
