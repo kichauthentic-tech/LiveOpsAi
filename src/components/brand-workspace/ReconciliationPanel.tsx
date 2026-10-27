@@ -21,6 +21,7 @@ import { useConfirm } from "../../hooks/useConfirm";
 import { fmtPeriodLabel, fmtVndFull, fmtVndShort } from "../../lib/format";
 import { LiveSession } from "../../types";
 import { suggestMergeGroups } from "../../lib/reconciliation/mergeRestarts";
+import { checkReconGroups, type CheckKind } from "../../lib/reconciliation/groupCheck";
 import { GmvEditor } from "../GmvEditor";
 
 // Đối soát số liệu của MỘT brand + MỘT sàn, nằm ngay trong Dữ Liệu Gốc (gộp 07/10 — trước đây là màn riêng
@@ -38,37 +39,22 @@ interface Props {
   onApplied: () => Promise<void> | void;
 }
 
-const BUCKET_LABEL: Record<ReconciliationBucket, string> = {
-  agency: "Khớp ca agency",
-  review: "Cần xem lại — thiếu snapshot ranh giới",
-  unassigned: "Chưa gán nhãn",
-  inhouse: "Ca inhouse của brand"
-};
-
-const BUCKET_HINT: Record<ReconciliationBucket, string> = {
-  agency: "Chia đúng theo snapshot trợ live tải lên lúc giao ca; ca cuối không tải lên thì nhận phần sau mốc cuối.",
-  review: "Có ca chưa tải snapshot lên hoặc tải lên trễ — phần không có mốc chia theo giờ (ô ≈), phần có mốc vẫn chia đúng. Nên nhắc trợ live tải lên đúng lúc giao ca.",
-  unassigned: "Không nằm trong khung giờ ca nào của agency. Không ảnh hưởng số liệu ca, chỉ cần gán nhãn để còn so hiệu suất agency với inhouse.",
-  inhouse: "Đã xác nhận là brand tự live, không tính vào ca nào của agency."
-};
-
-const BUCKET_TONE: Record<ReconciliationBucket, string> = {
-  agency: "border-emerald-800 bg-emerald-950/30",
-  review: "border-amber-700 bg-amber-950/30",
-  unassigned: "border-[var(--border)] bg-[var(--surface-base)]",
-  inhouse: "border-sky-800 bg-sky-950/30"
-};
-
 // Chỉ hai rổ này được ghi vào ca khi Áp dụng — nên chỉ ở đây mới chọn phiên nào đối soát.
 const APPLIED_BUCKETS: ReconciliationBucket[] = ["agency", "review"];
-
-const ORDER: ReconciliationBucket[] = ["agency", "review", "unassigned", "inhouse"];
 
 const METHOD_TITLE: Record<ReconShare["method"], string> = {
   whole: "Cả phiên thuộc ca này",
   snapshot: "Theo snapshot lúc giao ca",
   time: "Có phần ước lượng theo giờ — thiếu snapshot hoặc tải lên trễ",
   manual: "GMV gõ tay — phần còn lại của phiên chia cho các ca kia"
+};
+
+const ISSUE_TITLE: Record<CheckKind, string> = {
+  sum_mismatch: "Tổng lệch file",
+  chip_stale: "Số trên ca lệch",
+  outside_shift: "Ngoài khung ca",
+  gap: "Ca nối bị hở",
+  no_room: "Ca không có phiên"
 };
 
 function fmtTime(iso?: string): string {
@@ -180,48 +166,125 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
   const mergePicked = mergeGroups.filter((g) => !mergeOff.has(g.ids[0]));
   const applicable = rows.filter((r) => APPLIED_BUCKETS.includes(r.bucket));
   const selectedCount = applicable.filter((r) => !r.excluded).length;
-  // Rổ hiển thị của dòng agency/review theo bản chia thật (có ô ước lượng hay không) — snapshot up sau lúc nạp lô đổi được rổ.
-  const shownBucket = (r: ReconciliationRow): ReconciliationBucket => {
-    const shares = preview?.get(r.id);
-    if (!APPLIED_BUCKETS.includes(r.bucket) || !shares?.length) return r.bucket;
-    return shares.some((sh) => sh.method === "time") ? "review" : "agency";
+  // Kiểm tra theo nhóm liên thông (ca nối / restart / ngắt dùng chung một phép kiểm): tổng ca = tổng phiên trong file, số trên ca = số đúng
+  // theo file (ca mà lần đối soát gần nhất là lô này — lô cũ ghi sau lô mới sẽ đè số mới, đo 13/10), phiên ngoài khung ca, ca không có phiên.
+  const check = useMemo(() => checkReconGroups({
+    rows,
+    shares: preview,
+    sessions,
+    appliedAt,
+    periodStart: active?.periodStart,
+    periodEnd: active?.periodEnd,
+    batchCreatedAt: active?.createdAt,
+    appliedBuckets: APPLIED_BUCKETS
+  }), [rows, preview, sessions, appliedAt, active]);
+  const staleSessions = check.issues.filter((i) => i.kind === "chip_stale").length;
+  const issueSessionIds = useMemo(() => new Set(check.issues.map((i) => i.sessionId).filter((x): x is string => !!x)), [check]);
+  const [showAllIssues, setShowAllIssues] = useState(false);
+  const ISSUES_SHOWN = 12;
+
+  const [view, setView] = useState<"ketqua" | "cancheck">("ketqua");
+  const attention = check.counts.canCheck + mergeGroups.length;
+  const listed = applicable.slice().sort((a, b) => (a.startedAt ?? "").localeCompare(b.startedAt ?? ""));
+  const listedPicked = listed.filter((r) => !r.excluded);
+  const listedGmv = listedPicked.reduce((s, r) => s + r.gmv, 0);
+  const otherRows = rows.filter((r) => !APPLIED_BUCKETS.includes(r.bucket));
+  const unassignedRows = otherRows.filter((r) => r.bucket === "unassigned");
+  const inhouseRows = otherRows.filter((r) => r.bucket === "inhouse");
+
+  // Ô ca khớp của một phiên: ≈ ước tính theo giờ, ✎ gõ tay, viền đỏ = ca đang có lỗi ở "Cần check".
+  const sessionChips = (r: ReconciliationRow) => {
+    if (r.matchedSessionIds.length === 0) return "—";
+    return (
+      <span className="inline-flex gap-1 justify-end flex-wrap">
+        {r.matchedSessionIds.map((id) => {
+          const sh = preview?.get(r.id)?.find((x) => x.sessionId === id);
+          const est = sh?.method === "time";
+          const typed = sh?.method === "manual";
+          const flagged = issueSessionIds.has(id);
+          // Gõ tay chỉ có nghĩa khi phiên chia cho ≥ 2 ca (1 ca thì nhận trọn số file).
+          const editable = !!sh && APPLIED_BUCKETS.includes(r.bucket) && (preview?.get(r.id)?.length ?? 0) > 1;
+          if (editing?.rowId === r.id && editing.sessionId === id) {
+            return (
+              <span key={id} className="inline-flex items-center gap-1 whitespace-nowrap">
+                <span className="text-sky-300 font-bold">{sessionLabel(id)}</span>
+                <GmvEditor initial={sh?.gmv} busy={busy} onSave={(v) => void saveOverride(r.id, id, v)} onCancel={() => setEditing(null)} />
+                {typed && (
+                  <button onClick={() => void saveOverride(r.id, id, null)} disabled={busy} className="text-[11px] text-[var(--text-faint)] hover:text-[var(--text)] underline disabled:opacity-40">
+                    Bỏ số gõ
+                  </button>
+                )}
+              </span>
+            );
+          }
+          const Tag = editable ? "button" : "span";
+          return (
+            <Tag
+              key={id}
+              onClick={editable ? () => setEditing({ rowId: r.id, sessionId: id }) : undefined}
+              disabled={editable ? busy : undefined}
+              title={sh ? `${METHOD_TITLE[sh.method]} · ${fmtVndFull(sh.gmv)}${editable ? " · bấm để gõ GMV đúng của ca" : ""}` : undefined}
+              className={`inline-flex items-center px-1.5 py-0.5 rounded border font-bold whitespace-nowrap ${
+                flagged ? "border-rose-500 text-rose-300"
+                  : typed ? "border-violet-500 text-violet-300"
+                  : est ? "border-dashed border-amber-600 text-amber-300" : "border-sky-800 text-sky-300"
+              } ${editable ? "hover:bg-[var(--surface-hover)] cursor-pointer" : ""}`}
+            >
+              {sessionLabel(id)}
+              {sh && <span className="ml-1 font-normal">· {typed ? "✎ " : est ? "≈" : ""}{fmtVndShort(sh.gmv)}</span>}
+            </Tag>
+          );
+        })}
+      </span>
+    );
   };
-  const grouped = ORDER.map((bucket) => ({
-    bucket,
-    items: rows.filter((r) => shownBucket(r) === bucket)
-  })).filter((g) => g.items.length > 0);
-  // Lô đã Áp dụng mà ca đã đối soát đang khác bản chia mới (snapshot up/xoá sau lần Áp dụng) ⇒ nhắc Áp dụng lại.
-  // Chỉ tính ca mà lần đối soát GẦN NHẤT là lô này: ca đã được lô mới hơn ghi đè (file tải sau, số mới hơn) mà nhắc Áp dụng
-  // lại lô cũ thì sẽ đè số mới bằng số cũ (đo 13/10: CROCS 01–09/10 báo 13 ca "lệch" chỉ vì lô 01–10/10 đã ghi sau).
-  const staleSessions = useMemo(() => {
-    if (!preview || !appliedAt) return 0;
-    const appliedMs = Date.parse(appliedAt);
-    const lastByThisBatch = (id: string) => {
-      const at = sessionById.get(id)?.reconciledAt;
-      return !!at && Date.parse(at) <= appliedMs + 60_000;
-    };
-    const want = new Map<string, { gmv: number; current: number; source?: string }>();
-    for (const r of rows) {
-      if (r.excluded) continue;
-      for (const sh of preview.get(r.id) ?? []) {
-        if (!lastByThisBatch(sh.sessionId)) continue;
-        const w = want.get(sh.sessionId) ?? { gmv: 0, current: sh.currentGmv, source: sh.currentSource };
-        w.gmv += sh.gmv;
-        want.set(sh.sessionId, w);
-      }
-    }
-    // Lệch dưới 1% = hai cách ước lượng theo giờ khác nhau chút ít (vd ca nạp bù tách theo giờ ca, 0171 theo giờ live thật —
-    // CROCS T9 13/10: 27 ca lệch ≤ 0,6%) ⇒ không nhắc; chênh do mốc snapshot mới thì lớn hơn nhiều (VERA Shopee 09/10: 3,6–6%).
-    return [...want.values()].filter((w) => w.source === "tiktok_reconciled" && Math.abs(w.gmv - w.current) > Math.max(1, Math.abs(w.current) * 0.01)).length;
-  }, [preview, rows, appliedAt, sessionById]);
+
+  const roomTable = (items: ReconciliationRow[], selectable: boolean) => (
+    <div className="overflow-x-auto">
+      <table className="w-full text-[11px] min-w-[520px]">
+        <thead>
+          <tr className="text-[var(--text-faint)] text-left">
+            {selectable && <th className="font-bold pb-1.5 pr-2 w-6" aria-label="Đối soát phiên này" />}
+            <th className="font-bold pb-1.5 pr-3">Phiên live</th>
+            <th className="font-bold pb-1.5 pr-3">Thời gian</th>
+            <th className="font-bold pb-1.5 pr-3 text-right">GMV</th>
+            <th className="font-bold pb-1.5 pr-3 text-right">Orders</th>
+            <th className="font-bold pb-1.5 text-right">Ca khớp</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((r) => (
+            <tr key={r.id} className={`border-t border-[var(--border)]/60 ${r.excluded ? "opacity-50" : ""}`}>
+              {selectable && (
+                <td className="py-1.5 pr-2">
+                  <input
+                    type="checkbox"
+                    checked={!r.excluded}
+                    onChange={(e) => void setExcluded([r.id], !e.target.checked)}
+                    disabled={busy}
+                    aria-label={`Đối soát phiên ${r.roomTitle || r.roomId} ${fmtTime(r.startedAt)}`}
+                    className="w-3.5 h-3.5 accent-emerald-500 cursor-pointer"
+                  />
+                </td>
+              )}
+              <td className="py-1.5 pr-3 text-[var(--text-muted)] truncate max-w-[200px]">{r.roomTitle || r.roomId}</td>
+              <td className="py-1.5 pr-3 text-[var(--text-faint)] whitespace-nowrap">{fmtTime(r.startedAt)} → {fmtTime(r.endedAt)}</td>
+              <td className="py-1.5 pr-3 text-right font-bold text-[var(--text)]">{fmtVndFull(r.gmv)}</td>
+              <td className="py-1.5 pr-3 text-right text-[var(--text-muted)]">{r.orders}</td>
+              <td className="py-1.5 text-right text-[var(--text-muted)]">{sessionChips(r)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 
   return (
     <div className="space-y-3">
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">
         <h4 className="font-bold text-[var(--text)] text-xs">Đối soát số liệu — {brandName}</h4>
         <p className="text-[11px] text-[var(--text-muted)] mt-1 max-w-3xl">
-          Mỗi lần tải lên file ở dưới tự tạo một lần đối soát: app khớp từng phiên live với ca CÓ SẴN của brand theo giờ, bạn xem rổ rồi bấm Áp dụng để thay số tạm bằng số cuối của sàn.
-          Phiên chạy xuyên nhiều ca: chia theo các mốc snapshot (tính theo giờ tải lên thực tế), chỉ phần không có mốc mới chia theo giờ (≈) — tổng luôn đúng bằng file. Biết số đúng của một ca thì bấm vào ô ca để gõ (✎): phần còn lại tự chia cho các ca kia, đơn/lượt xem theo % GMV.
+          Mỗi file tải lên tạo một lần đối soát: số của từng ca phải khớp file {platform}. Phiên chạy qua nhiều ca chia theo snapshot, chưa có thì chia theo giờ (≈) — tổng luôn bằng file.
         </p>
 
         {batches.length > 0 && (
@@ -267,231 +330,17 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
         </div>
       )}
 
-      {active && mergeGroups.length > 0 && (
-        <div className="border border-violet-800 bg-violet-950/30 rounded-2xl p-4">
-          <p className="text-xs font-black text-[var(--text)]">Ca bị restart / ngắt giữa chừng · {mergeGroups.length} nhóm</p>
-          <p className="text-[11px] text-[var(--text-muted)] mt-0.5 max-w-2xl">
-            Mỗi lần tắt bật stream sàn sinh thêm một phiên (có khi chỉ 1–2 phút, GMV 0) nên một ca bị tách thành nhiều dòng. Gộp lại thành một phiên: giờ lấy từ đầu tới cuối,
-            GMV/đơn/lượt xem cộng lại (tổng không đổi), bỏ ca đã loại khỏi nhãn "Ca khớp". Chưa ghi gì vào ca cho tới khi bạn bấm Áp dụng.
-          </p>
-          <ul className="mt-2 space-y-1">
-            {mergeGroups.map((g) => {
-              const key = g.ids[0];
-              return (
-                <li key={key}>
-                  <label className="flex items-center gap-2 text-[11px] text-[var(--text-muted)] cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={!mergeOff.has(key)}
-                      onChange={(e) => setMergeOff((prev) => { const next = new Set(prev); if (e.target.checked) next.delete(key); else next.add(key); return next; })}
-                      disabled={busy}
-                      className="w-3.5 h-3.5 accent-violet-500 cursor-pointer"
-                    />
-                    <span className="whitespace-nowrap text-[var(--text)]">{fmtTime(g.startedAt)} → {fmtTime(g.endedAt)}</span>
-                    <span>· {g.ids.length} phiên{g.blips > 0 ? ` (${g.blips} mảnh ngắn)` : ""} · {fmtVndFull(g.gmv)}</span>
-                  </label>
-                </li>
-              );
-            })}
-          </ul>
-          <button
-            onClick={() => void run(async () => {
-              if (mergePicked.length === 0) throw new Error("Chưa chọn nhóm nào để gộp.");
-              if (!(await confirm(`Gộp ${mergePicked.length} nhóm (${mergePicked.reduce((s, g) => s + g.ids.length, 0)} dòng thành ${mergePicked.length})? Lần gộp này không hoàn lại được — muốn tách lại thì tạo lại lần đối soát từ file.`))) return;
-              const removed = await mergeReconciliationRows(active.id, mergePicked.map((g) => g.ids));
-              setRows(await fetchReconciliationRows(active.id));
-              await reloadBatchList();
-              setMergeOff(new Set());
-              setNote(`Đã gộp ${removed} dòng vào ${mergePicked.length} phiên.`);
-            })}
-            disabled={busy || mergePicked.length === 0}
-            className="mt-3 text-xs font-bold px-3 py-2 rounded-xl bg-violet-700 hover:bg-violet-600 text-white disabled:opacity-40 transition-colors"
-          >
-            Gộp {mergePicked.length} nhóm đã chọn
-          </button>
-        </div>
-      )}
-
       {active && (
-        <div className="space-y-3">
-          {grouped.map(({ bucket, items }) => {
-            const totalGmv = items.reduce((s, r) => s + r.gmv, 0);
-            const selectable = APPLIED_BUCKETS.includes(bucket);
-            const picked = items.filter((r) => !r.excluded);
-            const pickedGmv = picked.reduce((s, r) => s + r.gmv, 0);
-            const shown = selectable ? items : items.slice(0, 20);
-            return (
-              <div key={bucket} className={`border rounded-2xl p-4 ${BUCKET_TONE[bucket]}`}>
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <p className="text-xs font-black text-[var(--text)]">
-                      {BUCKET_LABEL[bucket]} · {items.length} phiên · {fmtVndFull(totalGmv)}
-                    </p>
-                    <p className="text-[11px] text-[var(--text-muted)] mt-0.5 max-w-2xl">{BUCKET_HINT[bucket]}</p>
-                    {selectable && (
-                      <p className="text-[11px] mt-1 text-[var(--text)]">
-                        Đối soát <span className="font-bold">{picked.length}/{items.length}</span> phiên · {fmtVndFull(pickedGmv)}
-                        {picked.length < items.length && <span className="text-amber-300"> · {items.length - picked.length} phiên bị bỏ qua, ca khớp giữ nguyên số hiện có</span>}
-                      </p>
-                    )}
-                  </div>
-                  {selectable && (
-                    <div className="shrink-0 flex items-center gap-3 text-[11px]">
-                      <button
-                        onClick={() => void setExcluded(items.filter((r) => r.excluded).map((r) => r.id), false)}
-                        disabled={busy || picked.length === items.length}
-                        className="font-bold text-emerald-300 hover:text-emerald-200 underline disabled:opacity-40 disabled:no-underline"
-                      >
-                        Chọn tất cả
-                      </button>
-                      <button
-                        onClick={() => void setExcluded(picked.map((r) => r.id), true)}
-                        disabled={busy || picked.length === 0}
-                        className="text-[var(--text-muted)] hover:text-[var(--text)] underline disabled:opacity-40 disabled:no-underline"
-                      >
-                        Bỏ chọn tất cả
-                      </button>
-                    </div>
-                  )}
-                  {bucket === "unassigned" && (
-                    <button
-                      onClick={() => void run(async () => {
-                        const n = await setReconciliationBucket(active.id, "unassigned", "inhouse");
-                        setRows(await fetchReconciliationRows(active.id));
-                        setNote(`Đã gán ${n} phiên thành ca inhouse.`);
-                      })}
-                      disabled={busy}
-                      className="shrink-0 text-[11px] font-bold px-3 py-1.5 rounded-lg bg-sky-900 hover:bg-sky-800 text-sky-200 disabled:opacity-40 transition-colors"
-                    >
-                      Toàn bộ rổ này là ca inhouse
-                    </button>
-                  )}
-                  {bucket === "inhouse" && (
-                    <button
-                      onClick={() => void run(async () => {
-                        await setReconciliationBucket(active.id, "inhouse", "unassigned");
-                        setRows(await fetchReconciliationRows(active.id));
-                      })}
-                      disabled={busy}
-                      className="shrink-0 text-[11px] text-[var(--text-muted)] hover:text-[var(--text)] underline disabled:opacity-40"
-                    >
-                      Bỏ gán nhãn
-                    </button>
-                  )}
-                </div>
-
-                <div className="mt-3 overflow-x-auto">
-                  <table className="w-full text-[11px] min-w-[520px]">
-                    <thead>
-                      <tr className="text-[var(--text-faint)] text-left">
-                        {selectable && <th className="font-bold pb-1.5 pr-2 w-6" aria-label="Đối soát phiên này" />}
-                        <th className="font-bold pb-1.5 pr-3">Phiên live</th>
-                        <th className="font-bold pb-1.5 pr-3">Thời gian</th>
-                        <th className="font-bold pb-1.5 pr-3 text-right">GMV</th>
-                        <th className="font-bold pb-1.5 pr-3 text-right">Orders</th>
-                        <th className="font-bold pb-1.5 text-right">Ca khớp</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {shown.map((r) => (
-                        <tr key={r.id} className={`border-t border-[var(--border)]/60 ${r.excluded ? "opacity-50" : ""}`}>
-                          {selectable && (
-                            <td className="py-1.5 pr-2">
-                              <input
-                                type="checkbox"
-                                checked={!r.excluded}
-                                onChange={(e) => void setExcluded([r.id], !e.target.checked)}
-                                disabled={busy}
-                                aria-label={`Đối soát phiên ${r.roomTitle || r.roomId} ${fmtTime(r.startedAt)}`}
-                                className="w-3.5 h-3.5 accent-emerald-500 cursor-pointer"
-                              />
-                            </td>
-                          )}
-                          <td className="py-1.5 pr-3 text-[var(--text-muted)] truncate max-w-[200px]">{r.roomTitle || r.roomId}</td>
-                          <td className="py-1.5 pr-3 text-[var(--text-faint)] whitespace-nowrap">
-                            {fmtTime(r.startedAt)} → {fmtTime(r.endedAt)}
-                          </td>
-                          <td className="py-1.5 pr-3 text-right font-bold text-[var(--text)]">{fmtVndFull(r.gmv)}</td>
-                          <td className="py-1.5 pr-3 text-right text-[var(--text-muted)]">{r.orders}</td>
-                          <td className="py-1.5 text-right text-[var(--text-muted)]">
-                            {r.matchedSessionIds.length === 0 ? "—" : (
-                              <span className="inline-flex gap-1 justify-end flex-wrap">
-                                {r.matchedSessionIds.map((id) => {
-                                  const sh = preview?.get(r.id)?.find((x) => x.sessionId === id);
-                                  const est = sh?.method === "time";
-                                  const typed = sh?.method === "manual";
-                                  // Gõ tay chỉ có nghĩa khi phiên chia cho ≥ 2 ca (1 ca thì nhận trọn số file).
-                                  const editable = !!sh && APPLIED_BUCKETS.includes(r.bucket) && (preview?.get(r.id)?.length ?? 0) > 1;
-                                  if (editing?.rowId === r.id && editing.sessionId === id) {
-                                    return (
-                                      <span key={id} className="inline-flex items-center gap-1 whitespace-nowrap">
-                                        <span className="text-sky-300 font-bold">{sessionLabel(id)}</span>
-                                        <GmvEditor
-                                          initial={sh?.gmv}
-                                          busy={busy}
-                                          onSave={(v) => void saveOverride(r.id, id, v)}
-                                          onCancel={() => setEditing(null)}
-                                        />
-                                        {typed && (
-                                          <button
-                                            onClick={() => void saveOverride(r.id, id, null)}
-                                            disabled={busy}
-                                            className="text-[11px] text-[var(--text-faint)] hover:text-[var(--text)] underline disabled:opacity-40"
-                                          >
-                                            Bỏ số gõ
-                                          </button>
-                                        )}
-                                      </span>
-                                    );
-                                  }
-                                  const Tag = editable ? "button" : "span";
-                                  return (
-                                    <Tag
-                                      key={id}
-                                      onClick={editable ? () => setEditing({ rowId: r.id, sessionId: id }) : undefined}
-                                      disabled={editable ? busy : undefined}
-                                      title={sh ? `${METHOD_TITLE[sh.method]} · ${fmtVndFull(sh.gmv)}${editable ? " · bấm để gõ GMV đúng của ca" : ""}` : undefined}
-                                      className={`inline-flex items-center px-1.5 py-0.5 rounded border font-bold whitespace-nowrap ${
-                                        typed ? "border-violet-500 text-violet-300"
-                                          : est ? "border-dashed border-amber-600 text-amber-300" : "border-sky-800 text-sky-300"
-                                      } ${editable ? "hover:bg-[var(--surface-hover)] cursor-pointer" : ""}`}
-                                    >
-                                      {sessionLabel(id)}
-                                      {sh && <span className="ml-1 font-normal">· {typed ? "✎ " : est ? "≈" : ""}{fmtVndShort(sh.gmv)}</span>}
-                                    </Tag>
-                                  );
-                                })}
-                              </span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {shown.length < items.length && (
-                    <p className="text-[11px] text-[var(--text-faint)] mt-2">… và {items.length - shown.length} phiên nữa</p>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-
-          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
-            <p className="text-[11px] text-[var(--text-muted)] max-w-xl">
-              {active.brandId ? (
-                <>
-                  File {active.platform} của <span className="font-bold">{brandName}</span> — chỉ khớp với ca {active.platform} của brand này. Áp dụng sẽ ghi đè số
-                  liệu của các ca thuộc rổ "khớp ca agency" và "cần xem lại", đổi nguồn dữ liệu thành <span className="font-bold">đã đối soát</span>.
-                  Chỉ các phiên được chọn mới được ghi; phiên bỏ chọn không đụng tới số của ca. Bỏ chọn sau khi đã áp dụng thì số đã ghi KHÔNG tự hoàn lại.
-                  Chạy lại nhiều lần được — mỗi lần tính lại từ đầu theo file này.
-                </>
-              ) : (
-                <span className="text-amber-300">
-                  Lô này nạp khi đối soát còn khớp ca theo giờ với MỌI brand (có thể chia nhầm GMV sang brand khác cùng giờ) — không áp dụng
-                  được nữa. Xoá lô rồi tạo lại từ lần tải ở Lịch Sử Import.
-                </span>
-              )}
-            </p>
+        <>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex gap-1.5" role="tablist">
+              <button role="tab" aria-selected={view === "ketqua"} onClick={() => setView("ketqua")} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${view === "ketqua" ? "seg-on" : "text-[var(--text-muted)] hover:bg-[var(--surface-hover)]"}`}>
+                Kết quả
+              </button>
+              <button role="tab" aria-selected={view === "cancheck"} onClick={() => setView("cancheck")} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${view === "cancheck" ? "seg-on" : "text-[var(--text-muted)] hover:bg-[var(--surface-hover)]"}`}>
+                Cần check{attention > 0 && <span className="ml-1.5 px-1.5 rounded-full bg-rose-600 text-white">{attention}</span>}
+              </button>
+            </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => void run(async () => {
@@ -507,7 +356,7 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
                   setNote(`Đã cập nhật ${n} ca theo số liệu đối soát.`);
                 })}
                 disabled={busy || !active.brandId || selectedCount === 0}
-                title={active.brandId ? undefined : "Lô nạp trước khi đối soát gắn brand — xoá lô rồi tạo lại từ Lịch Sử Import"}
+                title={active.brandId ? "Ghi đè số các ca khớp bằng số file; chạy lại nhiều lần được, mỗi lần tính lại từ file" : "Lô nạp trước khi đối soát gắn brand — xoá lô rồi tạo lại từ Lịch Sử Import"}
                 className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white disabled:opacity-40 transition-colors"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
@@ -527,7 +376,161 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
               </button>
             </div>
           </div>
-        </div>
+          {!active.brandId && (
+            <p className="text-[11px] text-amber-300">
+              Lô này nạp khi đối soát còn khớp ca theo giờ với MỌI brand — không áp dụng được nữa. Xoá lô rồi tạo lại từ lần tải ở Lịch Sử Import.
+            </p>
+          )}
+
+          {view === "ketqua" && (
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-2 text-[11px]">
+                <span className="px-2 py-1 rounded-lg border border-emerald-800 text-emerald-300">Chuẩn · {check.counts.chuan} nhóm · {fmtVndShort(check.gmv.chuan)}</span>
+                <span className="px-2 py-1 rounded-lg border border-dashed border-amber-600 text-amber-300" title="Phiên chạy qua nhiều ca, chưa có snapshot lúc hết ca nên chia theo giờ. Tổng vẫn đúng file.">Ước tính theo giờ · {check.counts.uocTinh} nhóm · {fmtVndShort(check.gmv.uocTinh)}</span>
+                <button onClick={() => setView("cancheck")} className={`px-2 py-1 rounded-lg border ${attention > 0 ? "border-rose-500 text-rose-300" : "border-[var(--border)] text-[var(--text-faint)]"}`}>Cần check · {attention}</button>
+              </div>
+
+              <div className="border border-[var(--border)] bg-[var(--surface)] rounded-2xl p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                  <p className="text-xs font-black text-[var(--text)]">
+                    Phiên khớp ca · đối soát {listedPicked.length}/{listed.length} · {fmtVndFull(listedGmv)}
+                    {listedPicked.length < listed.length && <span className="text-amber-300 font-normal"> · phiên bỏ chọn giữ nguyên số hiện có</span>}
+                  </p>
+                  <div className="flex items-center gap-3 text-[11px]">
+                    <button onClick={() => void setExcluded(listed.filter((r) => r.excluded).map((r) => r.id), false)} disabled={busy || listedPicked.length === listed.length} className="font-bold text-emerald-300 hover:text-emerald-200 underline disabled:opacity-40 disabled:no-underline">
+                      Chọn tất cả
+                    </button>
+                    <button onClick={() => void setExcluded(listedPicked.map((r) => r.id), true)} disabled={busy || listedPicked.length === 0} className="text-[var(--text-muted)] hover:text-[var(--text)] underline disabled:opacity-40 disabled:no-underline">
+                      Bỏ chọn tất cả
+                    </button>
+                  </div>
+                </div>
+                {listed.length > 0 ? roomTable(listed, true) : <p className="text-[11px] text-[var(--text-faint)]">Không phiên nào khớp ca.</p>}
+                <p className="text-[11px] text-[var(--text-faint)] mt-2">Biết số đúng của một ca trong phiên nhiều ca? Bấm vào ô ca để gõ (✎): phần còn lại tự chia cho các ca kia.</p>
+              </div>
+
+              {(unassignedRows.length > 0 || inhouseRows.length > 0) && (
+                <details className="border border-[var(--border)] bg-[var(--surface-base)] rounded-2xl p-4">
+                  <summary className="text-xs font-black text-[var(--text)] cursor-pointer">
+                    Phiên ngoài lịch ca · {unassignedRows.length + inhouseRows.length} phiên · {fmtVndFull(otherRows.reduce((s, r) => s + r.gmv, 0))}
+                  </summary>
+                  <p className="text-[11px] text-[var(--text-muted)] mt-1">Không nằm trong khung giờ ca nào của agency — không ảnh hưởng số ca. Gán inhouse nếu là brand tự live.</p>
+                  {unassignedRows.length > 0 && (
+                    <div className="mt-3">
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <p className="text-[11px] font-bold text-[var(--text)]">Chưa gán nhãn · {unassignedRows.length}</p>
+                        <button
+                          onClick={() => void run(async () => {
+                            const n = await setReconciliationBucket(active.id, "unassigned", "inhouse");
+                            setRows(await fetchReconciliationRows(active.id));
+                            setNote(`Đã gán ${n} phiên thành ca inhouse.`);
+                          })}
+                          disabled={busy}
+                          className="text-[11px] font-bold px-3 py-1.5 rounded-lg bg-sky-900 hover:bg-sky-800 text-sky-200 disabled:opacity-40 transition-colors"
+                        >
+                          Toàn bộ rổ này là ca inhouse
+                        </button>
+                      </div>
+                      {roomTable(unassignedRows.slice(0, 20), false)}
+                      {unassignedRows.length > 20 && <p className="text-[11px] text-[var(--text-faint)] mt-2">… và {unassignedRows.length - 20} phiên nữa</p>}
+                    </div>
+                  )}
+                  {inhouseRows.length > 0 && (
+                    <div className="mt-3">
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <p className="text-[11px] font-bold text-[var(--text)]">Ca inhouse của brand · {inhouseRows.length}</p>
+                        <button
+                          onClick={() => void run(async () => {
+                            await setReconciliationBucket(active.id, "inhouse", "unassigned");
+                            setRows(await fetchReconciliationRows(active.id));
+                          })}
+                          disabled={busy}
+                          className="text-[11px] text-[var(--text-muted)] hover:text-[var(--text)] underline disabled:opacity-40"
+                        >
+                          Bỏ gán nhãn
+                        </button>
+                      </div>
+                      {roomTable(inhouseRows.slice(0, 20), false)}
+                    </div>
+                  )}
+                </details>
+              )}
+            </div>
+          )}
+
+          {view === "cancheck" && (
+            <div className="space-y-3">
+              <div className={`border rounded-2xl p-4 ${check.counts.canCheck > 0 ? "border-rose-800 bg-rose-950/20" : "border-emerald-800 bg-emerald-950/20"}`}>
+                <p className="text-xs font-black text-[var(--text)]">Kiểm tra theo nhóm ca–phiên · {check.groups.length} nhóm</p>
+                <p className="text-[11px] text-[var(--text-muted)] mt-0.5 max-w-2xl">Ca nối, restart, ngắt giữa chừng dùng chung một phép kiểm: tổng các ca của nhóm phải bằng tổng phiên trong file.</p>
+                {check.issues.length === 0 ? (
+                  <p className="text-[11px] text-emerald-300 mt-2 flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5" /> Tổng các ca khớp file ở mọi nhóm, không ca nào lệch hay thiếu phiên.</p>
+                ) : (
+                  <>
+                    <ul className="mt-2 space-y-1">
+                      {(showAllIssues ? check.issues : check.issues.slice(0, ISSUES_SHOWN)).map((i, idx) => (
+                        <li key={`${i.kind}-${i.sessionId ?? ""}-${i.rowId ?? ""}-${idx}`} className="text-[11px] text-[var(--text-muted)] flex items-start gap-2">
+                          <span className="shrink-0 font-bold text-rose-300 w-28">{ISSUE_TITLE[i.kind]}</span>
+                          {i.sessionId && <span className="shrink-0 text-[var(--text)] font-bold whitespace-nowrap">{sessionLabel(i.sessionId)}</span>}
+                          <span>{i.text}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    {check.issues.length > ISSUES_SHOWN && (
+                      <button onClick={() => setShowAllIssues((v) => !v)} className="text-[11px] text-[var(--text-muted)] underline mt-2">
+                        {showAllIssues ? "Thu gọn" : `Xem thêm ${check.issues.length - ISSUES_SHOWN} mục`}
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {mergeGroups.length > 0 && (
+                <div className="border border-violet-800 bg-violet-950/30 rounded-2xl p-4">
+                  <p className="text-xs font-black text-[var(--text)]">Ca bị restart / ngắt giữa chừng · {mergeGroups.length} nhóm</p>
+                  <p className="text-[11px] text-[var(--text-muted)] mt-0.5 max-w-2xl">
+                    Mỗi lần tắt bật stream sàn sinh thêm một phiên (có khi chỉ 1–2 phút, GMV 0). Gộp lại thành một phiên: giờ từ đầu tới cuối, GMV/đơn/lượt xem cộng lại (tổng không đổi). Chưa ghi gì vào ca cho tới khi bạn bấm Áp dụng.
+                  </p>
+                  <ul className="mt-2 space-y-1">
+                    {mergeGroups.map((g) => {
+                      const key = g.ids[0];
+                      return (
+                        <li key={key}>
+                          <label className="flex items-center gap-2 text-[11px] text-[var(--text-muted)] cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={!mergeOff.has(key)}
+                              onChange={(e) => setMergeOff((prev) => { const next = new Set(prev); if (e.target.checked) next.delete(key); else next.add(key); return next; })}
+                              disabled={busy}
+                              className="w-3.5 h-3.5 accent-violet-500 cursor-pointer"
+                            />
+                            <span className="whitespace-nowrap text-[var(--text)]">{fmtTime(g.startedAt)} → {fmtTime(g.endedAt)}</span>
+                            <span>· {g.ids.length} phiên{g.blips > 0 ? ` (${g.blips} mảnh ngắn)` : ""} · {fmtVndFull(g.gmv)}</span>
+                          </label>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  <button
+                    onClick={() => void run(async () => {
+                      if (mergePicked.length === 0) throw new Error("Chưa chọn nhóm nào để gộp.");
+                      if (!(await confirm(`Gộp ${mergePicked.length} nhóm (${mergePicked.reduce((s, g) => s + g.ids.length, 0)} dòng thành ${mergePicked.length})? Lần gộp này không hoàn lại được — muốn tách lại thì tạo lại lần đối soát từ file.`))) return;
+                      const removed = await mergeReconciliationRows(active.id, mergePicked.map((g) => g.ids));
+                      setRows(await fetchReconciliationRows(active.id));
+                      await reloadBatchList();
+                      setMergeOff(new Set());
+                      setNote(`Đã gộp ${removed} dòng vào ${mergePicked.length} phiên.`);
+                    })}
+                    disabled={busy || mergePicked.length === 0}
+                    className="mt-3 text-xs font-bold px-3 py-2 rounded-xl bg-violet-700 hover:bg-violet-600 text-white disabled:opacity-40 transition-colors"
+                  >
+                    Gộp {mergePicked.length} nhóm đã chọn
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
