@@ -13,7 +13,7 @@
 
 ## 1. Giai đoạn hiện tại (cập nhật 2026-10-28; mục KH Tháng bản gọn 27/10)
 
-- **27/10: KẾ HOẠCH THÁNG BẢN GỌN (chưa commit, không migration; đề xuất + demo https://claude.ai/artifact/WCc9XbDXLCf4n7BAQAdAYY, user duyệt cả 4 quyết định)** —
+- **27/10: KẾ HOẠCH THÁNG BẢN GỌN (đã push `db5311c`, không migration; đề xuất + demo https://claude.ai/artifact/WCc9XbDXLCf4n7BAQAdAYY, user duyệt cả 4 quyết định)** —
   đầu trang = dải 4 bước (Giờ & target · Lưới · Chốt · Theo dõi/Target tháng) + hàng 5 số (ⓘ thay dòng giải thích) + MỘT dòng tham số ("sửa" mở khung;
   kế hoạch mới mở sẵn) thay 3 thẻ 704px; lưới tách sang `components/monthplan/PlanMonthGrid.tsx`: ca = một nút rút gọn, sửa trong khung nổi; đã chốt ⇒ ca
   tới hạn hiện thực đạt xanh/đỏ, đầu ô ngày + cột **Tuần** = % target tới nay (`lib/scheduling/planWeeks.ts` `summarizePlanSpan`, cùng luật run-rate,
@@ -83,7 +83,7 @@
 ## 2. Việc còn treo
 
 **Cần user làm:**
-- **Kế Hoạch Tháng bản gọn (27/10, chưa commit):** commit + deploy; sau khi "Mở lịch tháng 11" ở Điều Phối, vào Kế Hoạch Tháng từng kênh bấm "Đặt target…" (ceo/admin).
+- **Kế Hoạch Tháng bản gọn (27/10, đã push `db5311c`):** deploy; sau khi "Mở lịch tháng 11" ở Điều Phối, vào Kế Hoạch Tháng từng kênh bấm "Đặt target…" (ceo/admin).
 - **Kế Hoạch Tháng (28/10, `0185` ĐÃ CHẠY + push `ff61f96`):** còn thử bằng tài khoản ops: ô target ca đã chốt bị khoá, DB từ chối đổi target. T11 chưa có kế
   hoạch nào (27/10) — "Mở lịch tháng 11" ở Điều Phối Lịch Live.
 - **Ads theo ngày (28/10, 0184 ĐÃ CHẠY, CROCS T3→T10 đã dán):** cuối mỗi ngày/tháng dán lại khối "Daily Ads Report" để cập nhật actual (ghi đè ngày trùng).
