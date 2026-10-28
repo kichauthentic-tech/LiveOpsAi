@@ -1,5 +1,7 @@
 import { DataRawColumn } from "../../types";
 import { vnParts } from "./liveAnalysisRows";
+import { parsePlanTimeline } from "../affiliate/plan";
+import { normalizeName } from "../affiliate/planMatch";
 
 // Phần THUẦN của trang Affiliate (migration 0102): từ các batch Dataraw "Live Analysis" đã đọc
 // xong ra danh sách phiên live của creator affiliate. Không import supabaseClient để unit test
@@ -59,6 +61,8 @@ export interface AffiliateLiveSessionRow {
   ctor: number;
   /** Phiên của chính tài khoản shop (không phải affiliate) — UI bỏ tick sẵn. */
   isShopAccount: boolean;
+  /** Có khi dòng này là nhiều đoạn live liền nhau của cùng một creator (restart giữa phiên) đã gộp thành một — xem mergeRestartSessions. */
+  restartParts?: number;
   /** Không phát sinh click lẫn đơn cho brand. Thường là buổi live RIÊNG của creator lọt vào báo
    *  cáo chỉ vì còn sót 1 sản phẩm của shop trong giỏ (phiên 7/7/2026 của Kiot Khói: 60h44, 89
    *  lượt hiển thị, 0 click, 0đ — trong khi phiên chạy thật 6/7 có 1.752.176 hiển thị). Viewer
@@ -181,7 +185,81 @@ export function buildAffiliateRows(
     }
   }
 
-  return [...byKey.values()].sort((a, b) =>
+  const sorted = [...byKey.values()].sort((a, b) =>
     a.date === b.date ? a.timelineLabel.localeCompare(b.timelineLabel) : a.date.localeCompare(b.date)
   );
+  return mergeRestartSessions(sorted);
+}
+
+/** Khoảng nghỉ tối đa (phút) giữa hai đoạn live của cùng creator để coi là restart một phiên (D-Day 9/10/2026 của Khói: nghỉ 20 phút). */
+export const RESTART_MAX_GAP_MIN = 30;
+/** Đoạn sau được phép chồng lên đoạn trước tối đa chừng này (phút) — giờ thật của file hay lệch vài phút. */
+const RESTART_MAX_OVERLAP_MIN = 5;
+
+const sameAccount = (a: AffiliateLiveSessionRow, b: AffiliateLiveSessionRow): boolean =>
+  a.nickname && b.nickname ? a.nickname.toLowerCase() === b.nickname.toLowerCase() : normalizeName(a.creatorName) === normalizeName(b.creatorName);
+
+const startMinOf = (r: AffiliateLiveSessionRow): number | null => parsePlanTimeline(r.timelineLabel)?.startMin ?? null;
+const fmtClock = (min: number): string => {
+  const m = ((Math.round(min) % 1440) + 1440) % 1440;
+  return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+};
+
+/**
+ * Gộp các đoạn live LIỀN NHAU của cùng một creator trong cùng ngày thành một phiên — creator tắt bật stream (restart) thì
+ * TikTok sinh nhiều dòng, nhưng với brand đó là MỘT phiên (một dòng kế hoạch, một Target, một Budget Ads). Điều kiện gộp:
+ * cùng ngày, cùng tài khoản (nickname; thiếu thì tên creator) và đoạn sau bắt đầu trong khoảng [−5, +30] phút quanh giờ kết thúc
+ * đoạn trước (giờ kết thúc = giờ bắt đầu + thời lượng của file). Khoảng nghỉ dài hơn là hai phiên riêng.
+ *
+ * Cách cộng: GMV, đơn, món, viewer, lượt hiển thị/xem/nhấp và giờ live CỘNG lại (giờ live không tính khoảng nghỉ); giá trung bình
+ * theo số món; LIVE CTR = nhấp ÷ xem; CTOR theo số lượt nhấp. Viewer cộng thô nên có thể đếm một người xem hai lần.
+ * Hàm thuần: không đụng dòng không cần gộp (kể cả thứ tự).
+ */
+export function mergeRestartSessions(rows: AffiliateLiveSessionRow[], maxGapMin: number = RESTART_MAX_GAP_MIN): AffiliateLiveSessionRow[] {
+  const order = rows
+    .map((r, i) => ({ r, i, s: startMinOf(r) }))
+    .sort((a, b) => (a.r.date === b.r.date ? (a.s ?? 0) - (b.s ?? 0) : a.r.date.localeCompare(b.r.date)) || a.i - b.i);
+  const groups: AffiliateLiveSessionRow[][] = [];
+  for (const { r, s: start } of order) {
+    const last = groups[groups.length - 1];
+    const prev = last?.[last.length - 1];
+    const prevStart = prev ? startMinOf(prev) : null;
+    const gap = prev && prevStart != null && start != null ? start - (prevStart + prev.durationHours * 60) : null;
+    // Phiên cả tài khoản shop (không phải creator) không bao giờ gộp với phiên creator.
+    if (prev && last && prev.date === r.date && prev.isShopAccount === r.isShopAccount && sameAccount(prev, r) && gap != null && gap >= -RESTART_MAX_OVERLAP_MIN && gap <= maxGapMin) {
+      last.push(r);
+    } else groups.push([r]);
+  }
+  const merged = groups.map((g) => (g.length === 1 ? g[0] : combineParts(g)));
+  const keep = new Map(rows.map((r, i) => [r.key, i]));
+  return merged.sort((a, b) => (keep.get(a.key) ?? 0) - (keep.get(b.key) ?? 0));
+}
+
+function combineParts(parts: AffiliateLiveSessionRow[]): AffiliateLiveSessionRow {
+  const sum = (f: (r: AffiliateLiveSessionRow) => number) => parts.reduce((t, r) => t + (f(r) || 0), 0);
+  const first = parts[0];
+  const last = parts[parts.length - 1];
+  const views = sum((r) => r.views);
+  const clicks = sum((r) => r.productClicks);
+  const items = sum((r) => r.itemsSold);
+  const firstStart = startMinOf(first) ?? 0;
+  const lastStart = startMinOf(last) ?? firstStart;
+  return {
+    ...first,
+    timelineLabel: `${fmtClock(firstStart)} - ${fmtClock(lastStart + last.durationHours * 60)}`,
+    durationHours: sum((r) => r.durationHours),
+    directGmv: sum((r) => r.directGmv),
+    orders: sum((r) => r.orders),
+    itemsSold: items,
+    avgPrice: items > 0 ? sum((r) => r.itemsSold * r.avgPrice) / items : 0,
+    viewer: sum((r) => r.viewer),
+    views,
+    liveImpressions: sum((r) => r.liveImpressions),
+    productClicks: clicks,
+    ctrLive: views > 0 ? (clicks / views) * 100 : null,
+    ctor: clicks > 0 ? sum((r) => r.productClicks * r.ctor) / clicks : 0,
+    isShopAccount: parts.some((r) => r.isShopAccount),
+    noBrandActivity: parts.every((r) => r.noBrandActivity),
+    restartParts: parts.length
+  };
 }

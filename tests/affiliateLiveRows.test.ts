@@ -77,6 +77,58 @@ describe("gộp phiên trùng giữa 2 batch", () => {
   });
 });
 
+describe("gộp đoạn restart của cùng một phiên", () => {
+  // D-Day 9/10/2026 của Khói: tắt bật stream lúc 11:17 → 11:37, TikTok sinh 2 dòng nhưng brand chỉ có MỘT phiên kế hoạch (8 giờ).
+  const khoi = (o: Record<string, unknown> & { start: string }) => row({ creator: "Kiot Khói", nickname: "kiotkhoi", ...o });
+  const part1 = khoi({ start: "2026/10/09/ 09:28", duration: "1h 49min", gmv: 34_655_698, orders: 44, itemsSold: 45, avgPrice: 770_127, views: 10_000, clicks: 6_000, ctor: 1.25, viewers: 4_704, impressions: 112_268 });
+  const part2 = khoi({ start: "2026/10/09/ 11:37", duration: "3h 27min", gmv: 49_926_307, orders: 74, itemsSold: 74, avgPrice: 674_680, views: 14_000, clicks: 7_000, ctor: 1.7, viewers: 7_055, impressions: 126_896 });
+  const OCT = ["2026-10-01", "2026-10-31"] as const;
+
+  test("nghỉ 20 phút giữa hai đoạn ⇒ một dòng, số cộng lại, timeline phủ cả hai đoạn", () => {
+    const rows = buildAffiliateRows([batch([part1, part2])], ...OCT);
+    expect(rows).toHaveLength(1);
+    const r = rows[0];
+    expect(r.restartParts).toBe(2);
+    expect(r.directGmv).toBe(84_582_005);
+    expect(r.orders).toBe(118);
+    expect(r.itemsSold).toBe(119);
+    expect(r.viewer).toBe(11_759);
+    expect(r.liveImpressions).toBe(239_164);
+    expect(r.durationHours).toBeCloseTo(1 + 49 / 60 + 3 + 27 / 60, 5);
+    expect(r.timelineLabel).toBe("09:28 - 15:04");
+    // giá trung bình theo số món, CTOR theo số lượt nhấp, LIVE CTR = nhấp ÷ xem
+    expect(r.avgPrice).toBeCloseTo((45 * 770_127 + 74 * 674_680) / 119, 5);
+    expect(r.ctor).toBeCloseTo((6_000 * 1.25 + 7_000 * 1.7) / 13_000, 5);
+    expect(r.ctrLive).toBeCloseTo((13_000 / 24_000) * 100, 5);
+  });
+
+  test("nghỉ hơn 30 phút là hai phiên riêng", () => {
+    const late = khoi({ start: "2026/10/09/ 12:30", duration: "1h", gmv: 1 });
+    expect(buildAffiliateRows([batch([part1, late])], ...OCT)).toHaveLength(2);
+  });
+
+  test("hai creator khác nhau liền giờ không gộp; ngày khác nhau không gộp", () => {
+    const other = row({ creator: "Mạnh Ka", nickname: "manhka", start: "2026/10/09/ 11:37", duration: "1h" });
+    expect(buildAffiliateRows([batch([part1, other])], ...OCT)).toHaveLength(2);
+    const nextDay = khoi({ start: "2026/10/10/ 00:30", duration: "1h" });
+    expect(buildAffiliateRows([batch([khoi({ start: "2026/10/09/ 23:00", duration: "1h" }), nextDay])], ...OCT)).toHaveLength(2);
+  });
+
+  test("phiên có giờ kéo dài chồng lên phiên sau không bị gộp nhầm", () => {
+    // Long Pham 24/10: file ghi 42h54 dù timeline 07:05 — đoạn sau bắt đầu giữa thời lượng đó ⇒ chồng quá 5 phút ⇒ không gộp.
+    const long = row({ creator: "Long Pham", nickname: "longpham", start: "2026/10/24/ 07:05", duration: "42h 54min" });
+    const next = row({ creator: "Long Pham", nickname: "longpham", start: "2026/10/24/ 18:00", duration: "1h" });
+    expect(buildAffiliateRows([batch([long, next])], ...OCT)).toHaveLength(2);
+  });
+
+  test("ba đoạn liền nhau gộp thành một (restartParts = 3)", () => {
+    const p3 = khoi({ start: "2026/10/09/ 15:20", duration: "1h", gmv: 5 });
+    const rows = buildAffiliateRows([batch([part1, part2, p3])], ...OCT);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].restartParts).toBe(3);
+  });
+});
+
 describe("lọc theo dải ngày VN", () => {
   test("hai đầu dải đều được tính (inclusive)", () => {
     const rows = buildAffiliateRows(

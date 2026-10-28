@@ -18,7 +18,7 @@ import {
   toUsd,
   DEFAULT_FX_RATE
 } from "../src/lib/affiliate/plan";
-import { matchPlanToSessions, sameCreator } from "../src/lib/affiliate/planMatch";
+import { matchPlanToSessions, sameCreator, sessionAlreadyHasColumn } from "../src/lib/affiliate/planMatch";
 
 // Bản sheet T10 của ops, dán nguyên từ Google Sheet (Tab giữa các ô).
 const SHEET = [
@@ -232,5 +232,24 @@ describe("khớp phiên file với kế hoạch", () => {
       [{ key: "s", date: "2026-10-09", creatorName: "Khói Kiot Official", nickname: "kiotkhoi", timelineLabel: "10:00 - 12:00" }]
     );
     expect(r.pairs).toHaveLength(1);
+  });
+});
+
+describe("sessionAlreadyHasColumn — nạp lại không tạo cột trùng sau khi ops sửa tay", () => {
+  const file = { date: "2026-10-23", creatorName: "Long Phạm", nickname: "longphamdtest", directGmv: 2_436_919 };
+  const done = (o: Record<string, unknown>) => ({ creatorName: "Long Pham", liveDateLabel: "23/10/2026", directGmv: 2_436_919, status: "done" as const, ...o });
+
+  test("cùng creator, cùng ngày ⇒ đã có cột", () => {
+    expect(sessionAlreadyHasColumn([done({})], file)).toBe(true);
+  });
+  test("ops sửa Day thành 24/10 nhưng Direct GMV vẫn trùng file ⇒ vẫn là cột đó, không nạp lại", () => {
+    expect(sessionAlreadyHasColumn([done({ liveDateLabel: "24/10/2026" })], file)).toBe(true);
+  });
+  test("khác ngày và khác Direct GMV ⇒ phiên khác", () => {
+    expect(sessionAlreadyHasColumn([done({ liveDateLabel: "24/10/2026", directGmv: 5_000_000 })], file)).toBe(false);
+  });
+  test("khác creator dù trùng GMV ⇒ phiên khác; dòng kế hoạch chưa live không tính", () => {
+    expect(sessionAlreadyHasColumn([done({ creatorName: "Mạnh Ka" })], file)).toBe(false);
+    expect(sessionAlreadyHasColumn([done({ status: "planned" })], file)).toBe(false);
   });
 });

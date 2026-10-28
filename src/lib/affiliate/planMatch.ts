@@ -1,4 +1,5 @@
-import { parsePlanTimeline } from "./plan";
+import type { AffiliateActualEntry } from "../../types";
+import { dayLabelOf, entryStatus, parsePlanTimeline } from "./plan";
 
 // Khớp phiên trong file Live Analysis với dòng KẾ HOẠCH (migration 0155). Thuần, có unit test
 // (tests/affiliatePlan.test.ts) — UI ở BrandAffiliateTable chỉ lo hiển thị và áp dụng.
@@ -95,4 +96,23 @@ export function matchPlanToSessions(planned: PlannedRef[], sessions: SessionRef[
     unplannedSessions: sessions.filter((s) => !usedSession.has(s.key)).map((s) => s.key),
     unmatchedPlans: planned.filter((p) => !usedPlan.has(p.key)).map((p) => p.key)
   };
+}
+
+/**
+ * Phiên trong file Live Analysis đã có cột ĐÃ LIVE trong bảng Theo dõi chưa — để lần nạp sau không tạo cột trùng.
+ * Khớp khi cùng creator (mờ: "Khói" ≈ "Kiot Khói") VÀ một trong hai: cùng ngày, hoặc cùng Direct GMV. Điều kiện Direct GMV
+ * là để ops sửa tay Day / Timeline / Giờ live của cột đã nạp (vd file ghi phiên 23/10, ops ghi 24/10) mà không bị nạp lại
+ * thành cột mới; Direct GMV là số lẻ đến từng đồng nên trùng ngẫu nhiên giữa hai phiên gần như không xảy ra.
+ */
+export function sessionAlreadyHasColumn(
+  entries: Pick<AffiliateActualEntry, "creatorName" | "liveDateLabel" | "directGmv" | "status">[],
+  r: { date: string; creatorName: string; nickname?: string; directGmv: number }
+): boolean {
+  const label = dayLabelOf(r.date);
+  return entries.some(
+    (e) =>
+      entryStatus(e) === "done" &&
+      (sameCreator(e.creatorName, r.creatorName) || sameCreator(e.creatorName, r.nickname)) &&
+      (e.liveDateLabel === label || (r.directGmv > 0 && e.directGmv != null && Math.round(e.directGmv) === Math.round(r.directGmv)))
+  );
 }

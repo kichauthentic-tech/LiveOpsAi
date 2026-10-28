@@ -8,6 +8,7 @@ import { fetchAffiliateLiveSessions } from "../../lib/dataraw/affiliateLiveSessi
 import type { AffiliateLiveSessionRow } from "../../lib/dataraw/affiliateLiveRows";
 import {
   AffiliateRow,
+  CAMP_NAMES,
   DEFAULT_FX_RATE,
   PastedPlanRow,
   dayLabelOf,
@@ -23,7 +24,7 @@ import {
   suggestCampName,
   toUsd
 } from "../../lib/affiliate/plan";
-import { matchPlanToSessions, sameCreator } from "../../lib/affiliate/planMatch";
+import { matchPlanToSessions, sameCreator, sessionAlreadyHasColumn } from "../../lib/affiliate/planMatch";
 import { errorMessage } from "../../lib/errorMessage";
 import { downloadRowsAsXlsx } from "../../lib/exportXlsx";
 import { useToast } from "../../hooks/useToast";
@@ -526,10 +527,7 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
   // Đã có cột cho phiên này chưa — khớp theo ngày + tên creator (khớp mờ: "Khói" ≈ "Kiot Khói"), vì entry đã lưu
   // không giữ Room ID. Chỉ tính dòng ĐÃ LIVE: dòng kế hoạch chưa có số thì chính là chỗ phiên này sẽ khớp vào.
   function hasColumnFor(r: AffiliateLiveSessionRow): boolean {
-    const label = dayLabel(r.date);
-    return entries.some(
-      (e) => entryStatus(e) === "done" && e.liveDateLabel === label && (sameCreator(e.creatorName, r.creatorName) || sameCreator(e.creatorName, r.nickname))
-    );
+    return sessionAlreadyHasColumn(entries, r);
   }
 
   // Ghép phiên trong file với dòng kế hoạch chưa có số (cùng ngày, cùng creator, giờ bắt đầu gần nhất).
@@ -607,6 +605,29 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
     ) : (
       <input className={inputCls} aria-label={cellLabel(e, label)} value={e[key] ?? ""} onChange={(ev) => update(e, { [key]: ev.target.value })} />
     );
+
+  // Ô số của phần KẾ HOẠCH (Giờ kế hoạch / Budget Ads) ngay trong bảng Theo dõi: hiện số tự tính (từ Timeline kế hoạch / % target),
+  // gõ số riêng thì đè, xoá hết thì quay về số tự tính. Sửa ở đây hay ở tab Kế hoạch đều ghi cùng một trường.
+  const planInput = (e: Row, label: string, key: "planDurationHours" | "planBudgetAds", derived: number | undefined, fmt: (n?: number | null) => string) => {
+    const cellId = `${e._key}:${key}`;
+    const override = e[key];
+    if (readOnly) return <span>{derived != null ? fmt(derived) : "—"}</span>;
+    return (
+      <input
+        className={`${inputCls} ${override != null ? "font-bold" : ""}`}
+        title={override != null ? "Số riêng đã gõ — xoá hết để quay về số tự tính" : "Số tự tính — gõ để đặt số riêng"}
+        aria-label={cellLabel(e, label)}
+        value={focusedCell === cellId ? override ?? "" : override != null ? fmt(override) : derived != null ? fmt(derived) : ""}
+        inputMode="decimal"
+        onFocus={() => setFocusedCell(cellId)}
+        onBlur={() => setFocusedCell(null)}
+        onChange={(ev) => {
+          const v = ev.target.value.replace(/[.\s%]/g, "").replace(",", ".");
+          update(e, { [key]: v === "" ? undefined : Number(v) } as Partial<AffiliateActualEntry>);
+        }}
+      />
+    );
+  };
 
   // Dòng chỉ số: label + 1 ô cho mỗi cột phiên.
   //
@@ -822,6 +843,7 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
               const sessionInfo = (r: AffiliateLiveSessionRow) => (
                 <span className="text-[var(--text-faint)]">
                   {r.timelineLabel} · {fmtVndFull(r.directGmv)} · {fmtVndFull(r.viewer)} viewer · {fmtVndFull(r.liveImpressions)} hiển thị
+                  {r.restartParts ? ` · gộp ${r.restartParts} đoạn restart` : ""}
                 </span>
               );
               const unplannedRow = (r: AffiliateLiveSessionRow, exists: boolean) => (
@@ -1003,7 +1025,23 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
                   </select>
                 )
               )}
-              {metricRow("Camp", (e) => <span className="text-xs font-semibold">{e.campName || "—"}</span>)}
+              {metricRow("Camp", (e, label) =>
+                readOnly ? (
+                  <span className="text-xs font-semibold">{e.campName || "—"}</span>
+                ) : (
+                  <select
+                    aria-label={cellLabel(e, label)}
+                    value={e.campName ?? ""}
+                    onChange={(ev) => update(e, { campName: ev.target.value || undefined })}
+                    className="min-h-6 rounded px-1.5 py-0.5 text-xs font-semibold outline-none bg-[var(--surface-elevated)]"
+                  >
+                    <option value="">—</option>
+                    {CAMP_NAMES.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                )
+              )}
               {metricRow("Kế hoạch", (e) => (
                 <span className={`px-2 py-0.5 rounded text-xs font-semibold ${hasPlan(e) ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
                   {hasPlan(e) ? "Có kế hoạch" : "Ngoài kế hoạch"}
@@ -1013,7 +1051,7 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
               {metricRow("Day", (e, label) => textInput(e, label, "liveDateLabel"), "bg-emerald-50/60 font-semibold")}
               {metricRow("Timeline", (e, label) => textInput(e, label, "timelineLabel"))}
               {metricRow("Target GMV", (e, label) => numInput(e, label, "targetGmv", fmtInt), "bg-[var(--surface-elevated)] font-bold")}
-              {metricRow("Giờ kế hoạch", (e) => <span>{fmtNum(planHours(e), 1)}</span>)}
+              {metricRow("Giờ kế hoạch", (e, label) => planInput(e, label, "planDurationHours", planHours(e), (n) => fmtNum(n, 1)))}
               {metricRow("Direct GMV", (e, label) => numInput(e, label, "directGmv", fmtInt), "text-red-600 font-bold")}
               {metricRow("Giờ live", (e, label) => numInput(e, label, "durationHours", (n) => fmtNum(n, 1)))}
               {metricRow("GMV/giờ", (e) => <span>{e.directGmv && e.durationHours ? fmtInt(e.directGmv / e.durationHours) : "—"}</span>)}
@@ -1026,7 +1064,7 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
               {metricRow("LIVE CTR", (e, label) => numInput(e, label, "ctr", (n) => fmtPct(n)))}
               {metricRow("CTOR", (e, label) => numInput(e, label, "ctor", (n) => fmtPct(n)))}
               {metricRow("Ads cost", (e, label) => numInput(e, label, "adsCost", fmtInt))}
-              {metricRow("Budget Ads", (e) => <span>{planBudget(e) != null ? fmtInt(planBudget(e)) : "—"}</span>)}
+              {metricRow("Budget Ads", (e, label) => planInput(e, label, "planBudgetAds", planBudget(e), fmtInt))}
               {metricRow("Ads / Budget", (e) => {
                 const budget = planBudget(e);
                 if (e.adsCost == null || !budget) return <span>—</span>;

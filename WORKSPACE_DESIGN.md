@@ -512,6 +512,7 @@ target khung camp ở Nhập Ads bỏ 06/10 — tháng không có kế hoạch c
 
 | Mục trong file lịch sử | Tóm tắt |
 |---|---|
+| `## Affiliate: gộp đoạn restart của một phiên (2026-10-28)` | `mergeRestartSessions` (nghỉ ≤ 30 phút, cùng creator, cùng ngày), test, gộp tay Khói 9/10 CROCS T10, bản sao trước khi gộp |
 | `## Audit + sửa Kế Hoạch Tháng (2026-10-27/28)` | 12 điểm gãy, số đo DB thật T10 (ca huỷ, ca lệch giờ, ca ngoài kế hoạch), mô phỏng; bẫy upsert + BEFORE INSERT; SQL 21 mục |
 | `## Điều Phối Lịch Live bản gọn đợt 1–2 (2026-10-25)` | 1 màn + thẻ tháng + việc có nút; trình mở tháng 3 bước; 0181 thông báo hàng loạt (34 ca ≈ 900 tin); thử DB thật tới bước 3 (525 ca) |
 | `## Điều Phối Lịch Live — vì sao khó dùng (2026-10-24)` | đếm màn/nút/chữ, luồng chưa ai đi (94% ca T10 nạp từ Sheet), tuần lặp 20% giờ/5% host, đề xuất 1 màn + 4 quyết định |
