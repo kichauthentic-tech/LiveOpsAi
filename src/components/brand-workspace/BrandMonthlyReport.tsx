@@ -33,7 +33,7 @@ import { fmtDateVn, fmtMonth } from "../../lib/format";
 import { profileOf } from "../../lib/platforms/profiles";
 import { prefetchable, type TabPrefetchCtx } from "../../lib/db/prefetch";
 import { lazyNamed } from "../../lib/lazyNamed";
-import { buildStandaloneHtml, captureTabVariants, downloadHtml, waitForRender } from "../../lib/report/exportStandaloneHtml";
+import { buildStandaloneHtml, captureChartTooltips, captureTabVariants, downloadHtml, waitForRender } from "../../lib/report/exportStandaloneHtml";
 
 // 7 phần của Report Tháng kéo theo recharts + d3 + redux = 364 KB, chiếm 2/3 chunk của tab này (đo
 // 2026-10-01: chunk BrandMonthlyReport 534 KB, riêng thư viện biểu đồ 364 KB). Phần đó chỉ render khi
@@ -60,7 +60,7 @@ interface ReportViewProps {
 const REPORT_VIEWS: Record<ReportPlatform, { preload: () => void; Render: React.FC<ReportViewProps> }> = {
   TikTok: {
     preload: () => void MonthlyReportTabs.preload(),
-    Render: (p) => <MonthlyReportTabs brandId={p.brandId} brandName={p.brandName} month={p.month} snapshot={p.snapshot as MonthlyReportSnapshot} liveSessions={p.liveSessions} shiftSlots={p.shiftSlots} canManage={p.canManage} forBrand={p.forBrand} />
+    Render: (p) => <MonthlyReportTabs brandId={p.brandId} brandName={p.brandName} month={p.month} snapshot={p.snapshot as MonthlyReportSnapshot} liveSessions={p.liveSessions} shiftSlots={p.shiftSlots} canManage={p.canManage} forBrand={p.forBrand} showAll={p.forBrand} />
   },
   Shopee: {
     preload: () => void ShopeeMonthlyReportTabs.preload(),
@@ -335,8 +335,9 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
       await waitForRender(host);
       const title = `Report Tháng ${Number(monthM)}/${monthY} · ${channelTitle(brandName, platform, false)}`;
       const file = `${brandName}_${platform}_Report_T${Number(monthM)}-${monthY}.html`.replace(/[^\w.-]+/g, "_");
+      const tips = await captureChartTooltips(host);
       const variants = await captureTabVariants(host);
-      downloadHtml(file, buildStandaloneHtml(host, title, variants));
+      downloadHtml(file, buildStandaloneHtml(host, title, variants, tips));
       showToast("Đã tải file HTML gửi brand.", "success");
     } catch (e) {
       showToast(errorMessage(e), "error");

@@ -24,23 +24,87 @@ export async function waitForRender(root: HTMLElement, quietMs = 900, maxMs = 20
   }
 }
 
+export interface ChartTip {
+  /** Hướng quét: tooltip đổi theo vị trí ngang (cột/đường theo ngày) hay dọc (thanh ngang theo nhóm). */
+  axis: "x" | "y";
+  /** [phần-trăm vị trí bắt đầu đoạn (0–1), HTML hộp tooltip ("" = không hiện)]. */
+  seg: [number, string][];
+}
+
+/**
+ * Tooltip biểu đồ do recharts vẽ bằng JS lúc rê chuột nên DOM tĩnh không có. Ở đây rê chuột giả qua từng biểu đồ trong khung ẩn,
+ * ghi lại hộp tooltip theo vị trí, file xuất ra có script hiện lại đúng hộp đó khi rê chuột (mất đường/ô sáng nền của con trỏ).
+ */
+export async function captureChartTooltips(host: HTMLElement, stepPx = 10): Promise<Map<string, ChartTip>> {
+  const out = new Map<string, ChartTip>();
+  const wrappers = Array.from(host.querySelectorAll<HTMLElement>(".recharts-wrapper"));
+  // React gộp các mousemove liên tiếp, chỉ vẽ trạng thái mới nhất mỗi khung hình ⇒ phải chờ 1 khung hình sau mỗi bước, không thì bỏ sót nhóm.
+  // Tab đang ẩn thì rAF không chạy — dự phòng bằng setTimeout để không treo.
+  const tick = () =>
+    new Promise<void>((r) => {
+      const t = setTimeout(r, 60);
+      requestAnimationFrame(() => setTimeout(() => (clearTimeout(t), r()), 0));
+    });
+  const readTip = (w: HTMLElement): string => {
+    const tw = w.querySelector<HTMLElement>(".recharts-tooltip-wrapper");
+    if (!tw || tw.style.visibility === "hidden") return "";
+    return tw.firstElementChild?.outerHTML ?? "";
+  };
+  for (const [i, w] of wrappers.entries()) {
+    const svg = w.querySelector<SVGSVGElement>("svg.recharts-surface");
+    if (!svg) continue;
+    const rect = svg.getBoundingClientRect();
+    if (rect.width < 20 || rect.height < 20) continue;
+    const sweep = async (axis: "x" | "y"): Promise<[number, string][]> => {
+      const len = axis === "x" ? rect.width : rect.height;
+      const seg: [number, string][] = [];
+      for (let p = 0; p <= len; p += stepPx) {
+        const cx = rect.left + (axis === "x" ? p : rect.width / 2);
+        const cy = rect.top + (axis === "x" ? rect.height / 2 : p);
+        w.dispatchEvent(new MouseEvent("mousemove", { bubbles: true, clientX: cx, clientY: cy }));
+        await tick();
+        const html = readTip(w);
+        if (!seg.length || seg[seg.length - 1][1] !== html) seg.push([p / len, html]);
+      }
+      return seg;
+    };
+    let axis: "x" | "y" = "x";
+    let seg = await sweep("x");
+    if (seg.filter(([, h]) => h).length <= 1) {
+      const segY = await sweep("y");
+      if (segY.filter(([, h]) => h).length > 1) {
+        axis = "y";
+        seg = segY;
+      }
+    }
+    w.dispatchEvent(new MouseEvent("mouseout", { bubbles: true, relatedTarget: document.body }));
+    if (seg.some(([, h]) => h)) {
+      const id = `t${i}`;
+      w.setAttribute("data-tipid", id);
+      out.set(id, { axis, seg });
+    }
+  }
+  return out;
+}
+
 /**
  * Các bảng có tab (Host PFM, Key Metrics…) giữ tab đang chọn trong state React nên DOM tĩnh chỉ còn đúng 1 tab. Ở đây bấm lần lượt
  * từng tab thật trong khung ẩn, chụp HTML thân panel sau mỗi lần, để file xuất ra đổi tab được (script chuyển bản chụp).
- * Panel = khối bo tròn gần nhất bọc `role=tablist` (report/ui.tsx Panel). Không bắt component khai báo gì thêm.
+ * Hàng tab = `.tabs` (demo.css) hoặc `role=tablist`; panel = khối `.pn` gần nhất bọc nó. Không bắt component khai báo gì thêm.
  */
 export async function captureTabVariants(host: HTMLElement): Promise<Map<string, string[]>> {
   const out = new Map<string, string[]>();
-  const lists = Array.from(host.querySelectorAll<HTMLElement>('[role="tablist"]'));
+  const lists = Array.from(host.querySelectorAll<HTMLElement>('.tabs, [role="tablist"]'));
   for (const [gi, list] of lists.entries()) {
-    const panel = list.closest<HTMLElement>("div.overflow-hidden.rounded-2xl");
-    if (!panel) continue;
+    const panel = list.closest<HTMLElement>(".pn");
+    if (!panel || panel.hasAttribute("data-tabgroup")) continue;
+    const tabsOf = () => Array.from(panel.querySelectorAll<HTMLButtonElement>(".tabs button, [role='tablist'] button"));
     const id = `g${gi}`;
     panel.setAttribute("data-tabgroup", id);
-    const tabCount = panel.querySelectorAll('[role="tab"]').length;
+    const tabCount = tabsOf().length;
     const variants: string[] = [];
     for (let i = 0; i < tabCount; i++) {
-      const tab = panel.querySelectorAll<HTMLButtonElement>('[role="tab"]')[i];
+      const tab = tabsOf()[i];
       if (!tab || tab.disabled) {
         variants.push("");
         continue;
@@ -50,7 +114,7 @@ export async function captureTabVariants(host: HTMLElement): Promise<Map<string,
       variants.push(panel.innerHTML);
     }
     // Về tab đầu như lúc mở.
-    panel.querySelectorAll<HTMLButtonElement>('[role="tab"]')[0]?.click();
+    tabsOf()[0]?.click();
     await new Promise((r) => setTimeout(r, 300));
     out.set(id, variants);
   }
@@ -71,7 +135,7 @@ const collectCss = (): string => {
 
 const escapeHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
 
-export function buildStandaloneHtml(root: HTMLElement, title: string, tabVariants: Map<string, string[]> = new Map()): string {
+export function buildStandaloneHtml(root: HTMLElement, title: string, tabVariants: Map<string, string[]> = new Map(), chartTips: Map<string, ChartTip> = new Map()): string {
   const clone = root.cloneNode(true) as HTMLElement;
   // Khung ẩn ngoài màn hình (fixed, left −10000px) không được theo vào file.
   clone.removeAttribute("style");
@@ -102,10 +166,20 @@ export function buildStandaloneHtml(root: HTMLElement, title: string, tabVariant
   });
   clone.querySelectorAll(".recharts-tooltip-wrapper").forEach((el) => el.remove());
 
+  const tipData = JSON.stringify(Object.fromEntries(chartTips)).replace(/</g, "\\u003c");
   const script = `
+(function(){var T=JSON.parse(document.getElementById('tipdata').textContent);
+var tip=document.createElement('div');tip.style.cssText='position:fixed;z-index:99999;pointer-events:none;display:none';document.body.appendChild(tip);
+document.querySelectorAll('[data-tipid]').forEach(function(w){var d=T[w.getAttribute('data-tipid')];var svg=w.querySelector('svg');if(!d||!svg)return;
+w.addEventListener('mousemove',function(e){var r=svg.getBoundingClientRect();var f=d.axis==='x'?(e.clientX-r.left)/r.width:(e.clientY-r.top)/r.height;var h='';
+for(var i=0;i<d.seg.length;i++){if(d.seg[i][0]<=f)h=d.seg[i][1];else break;}
+if(!h){tip.style.display='none';return;}
+tip.innerHTML=h;tip.style.display='block';var x=e.clientX+14,y=e.clientY+14;var tw=tip.offsetWidth,th=tip.offsetHeight;
+if(x+tw>window.innerWidth-8)x=e.clientX-tw-14;if(y+th>window.innerHeight-8)y=e.clientY-th-14;tip.style.left=Math.max(4,x)+'px';tip.style.top=Math.max(4,y)+'px';});
+w.addEventListener('mouseleave',function(){tip.style.display='none';});});})();
 document.querySelectorAll('[data-tabgroup]').forEach(function(g){g.addEventListener('click',function(e){
-  var t=e.target.closest('[role=tab]');if(!t||t.disabled)return;
-  var tabs=[].slice.call(t.parentElement.querySelectorAll('[role=tab]'));var idx=tabs.indexOf(t);
+  var t=e.target.closest('.tabs button,[role=tab]');if(!t||t.disabled)return;
+  var tabs=[].slice.call(t.parentElement.querySelectorAll('button'));var idx=tabs.indexOf(t);
   var v=g.querySelector('[data-variant="'+idx+'"]');if(!v)return;
   g.querySelectorAll('[data-variant]').forEach(function(x){x.hidden=x!==v;});
 });});
@@ -134,6 +208,7 @@ svg.recharts-surface{width:100%;height:auto;max-width:100%}
 </head>
 <body>
 <div id="report-root">${clone.outerHTML}</div>
+<script type="application/json" id="tipdata">${tipData}</script>
 <script>${script}</script>
 </body>
 </html>`;
