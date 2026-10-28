@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
-import { Megaphone, AlertTriangle, Download } from "lucide-react";
+import { Megaphone, AlertTriangle } from "lucide-react";
 import { LiveSession, BrandMonthlyReport as BrandMonthlyReportType, BrandPlatformRate, ShiftSlot } from "../../types";
 import { planTargetOf } from "../../lib/performance/targetAllocation";
 import { METRIC } from "../../lib/metricGlossary";
@@ -1315,33 +1315,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     // hộp lồng hộp (đo trước: 44/47 hộp nằm trong hộp, sâu 4 tầng).
     <div className="rt rounded-2xl" style={{ background: PAL.bg }} ref={reportTopRef}>
       <div>
-        {showAll ? (
-        <div id="mr-toc" className="flex items-center gap-1 px-3 py-2 overflow-x-auto sticky -top-3 sm:-top-6 z-20 rounded-t-2xl" style={{ background: PAL.bg, borderBottom: `1px solid ${PAL.line}` }}>
-          {visibleSections.map((sec) => (
-            <button
-              key={sec.id}
-              data-sec={sec.id}
-              onClick={() => document.getElementById(`mr-${sec.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" })}
-              aria-current={sec.id === SECTIONS[0].id ? "true" : undefined}
-              className="px-3 py-1.5 text-xs font-bold whitespace-nowrap rounded-lg hover:opacity-100 focus-visible:outline focus-visible:outline-2"
-              style={sec.id === SECTIONS[0].id ? { color: PAL.gold, background: PAL.panel2 } : { color: PAL.muted }}
-            >
-              {secNo(sec.id)} · {sec.label}
-            </button>
-          ))}
-          <button
-            onClick={handleExportAll}
-            data-export-hide
-            title="Xuất toàn bộ Report Tháng ra 1 file Excel nhiều sheet"
-            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap shrink-0"
-            style={{ background: PAL.panel2, border: `1px solid ${PAL.line}`, color: PAL.gold }}
-          >
-            <Download className="w-3.5 h-3.5" /> Xuất Excel
-          </button>
-        </div>
-        ) : (
-          <PageRail ref={railRef} items={railItems} current={curPage} onSelect={goPage} onExcel={handleExportAll} />
-        )}
+        <PageRail ref={railRef} items={railItems} current={curPage} onSelect={goPage} onExcel={handleExportAll} />
         <div className="min-w-0">
       <div className="p-5 flex flex-col gap-8">
         {shopPiecesMissing && canManage && warnBox(<>Số liệu này chốt trước khi report có phần Shop Analytics — bấm "Cập nhật số liệu" ở trên để có đủ 7 phần.</>)}
