@@ -21,7 +21,7 @@ import { gradeAction, newActionItem, type ActionAutoData, type ActionGradeContex
 import { adsDayPoints, adsTypeRows } from "../../lib/report/adsSlide";
 import { ActionPlanPanel, ActionResultsPanel } from "./report/ActionPlan";
 import { BookingPlanPanel, NextLivePlanPanel } from "./report/NextMonthPanels";
-import { REFUND_FINAL_KEY, applyFinalRate, bookingTotals, decodeManualPlan, decodeRefundFinal, encodeManualPlan, encodeRefundFinal, manualBookingRows, manualLiveTotals, manualPlanKey, refundTrackRows, type ManualPlan } from "../../lib/report/nextMonthPlan";
+import { REFUND_FINAL_KEY, applyFinalRate, bookingTotals, decodeRefundFinal, encodeRefundFinal, refundTrackRows } from "../../lib/report/nextMonthPlan";
 import { BLOCK_KEYS, BLOCK_LABEL, decodeEdits, shownBlocks, type InsightBlocks, adsBlocks, affiliateBlocks, keyMetricsBlocks, nextBlocks, nmvBlocks, pageNoteKey, peopleBlocks, productsBlocks, shopBlocks, summaryBlocks, whyBlocks, type InsightPage } from "../../lib/report/pageInsights";
 import { contextInsight, HostInsightRow, hostVsPeer, InsightSection, peopleInsight, peopleOpsNote, productsInsight, sectionNextSteps, SectionInsight, shopInsight, shortSku, whyInsight } from "../../lib/report/sectionInsights";
 import { CAMP_DAY_BUCKET_LABEL, CAMP_DAY_BUCKET_ORDER, effectiveCamp, resolveCampBucketType, type CampDayBucket, type CampOverrides } from "../../lib/campaignDays";
@@ -214,34 +214,6 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   }, [brandId, month]);
   const planCur = plans[month] ?? null;
   const nextPlanFull = plans[nextMonth] ?? null;
-  // Nhập tay mục 1 (Target Live) và mục 2 (Booking Creator) ở trang Kế hoạch tháng sau — lưu section_notes của report, nối vào ô chỉ số đầu trang.
-  const [manualPlan, setManualPlan] = useState<ManualPlan>(() => decodeManualPlan(undefined));
-  const [manualStatus, setManualStatus] = useState("");
-  const manualSaved = useRef<string | null>(null);
-  const manualTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  useEffect(() => () => clearTimeout(manualTimer.current), []);
-  useEffect(() => {
-    const text = monthlyReportRow?.sectionNotes?.[manualPlanKey(month)]?.text;
-    if (text !== manualSaved.current) {
-      manualSaved.current = text ?? null;
-      setManualPlan(decodeManualPlan(text));
-    }
-  }, [monthlyReportRow, month]);
-  const changeManualPlan = (next: ManualPlan) => {
-    setManualPlan(next);
-    setManualStatus("Đang lưu…");
-    clearTimeout(manualTimer.current);
-    manualTimer.current = setTimeout(async () => {
-      try {
-        const enc = encodeManualPlan(next);
-        manualSaved.current = enc;
-        setMonthlyReportRow(await saveMonthlyReportSectionNote(brandId, `${month}-01`, manualPlanKey(month), enc));
-        setManualStatus("Đã lưu");
-      } catch (e) {
-        setManualStatus(errorMessage(e, "Lưu thất bại"));
-      }
-    }, 700);
-  };
 
   // Khung camp D-Day/Mid-Month/Pay Day, từng khung: khoảng nhập ở Nhập Ads (0071) → khoảng của Kế Hoạch
   // Tháng (0094) → lịch camp cố định (lib/campaignDays.ts).
@@ -965,8 +937,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
         }]
       : [];
     const adsCreatorRow = adsPlan && adsPlanRows ? adsTypeRows(adsPlanRows.rows, month).find((r) => r.key === "creator") : undefined;
-    const bookingSum = creatorPlan.length ? bookingTotals(creatorPlan) : bookingTotals(manualBookingRows(manualPlan.booking));
-    const liveManual = manualLiveTotals(manualPlan.live);
+    const bookingSum = bookingTotals(creatorPlan);
     const todoItems = monthlyReportRow?.actionPlan?.items?.length ? monthlyReportRow.actionPlan.items : nextLines.map((l) => newActionItem(l));
     const metrics: Record<InsightPage, PageMetric[]> = {
       summary: [totalGmv, liveGmv, nmv, gmvPerHour],
@@ -991,9 +962,9 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
         : adsCost != null ? [{ label: "Ads cost", value: fmtVndShort(adsCost) }] : [],
       affiliate: trackSum.sessions > 0 ? [{ label: `${METRIC.directGmv} · ${trackSum.sessions} phiên`, value: fmtVndShort(trackSum.directGmv) }, { label: `Target GMV · ${trackSum.sessions} phiên`, value: trackSum.targetGmv > 0 ? fmtVndShort(trackSum.targetGmv) : "—", badge: trackSum.pctTarget, badgeLabel: trackSum.pctTarget != null ? `${fmtFixed(trackSum.pctTarget, 1)}% ${METRIC.directGmv}` : undefined }, { label: `${METRIC.gmvPerHour} · ${trackSum.sessions} phiên`, value: trackSum.gmvPerHour != null ? fmtVndShort(trackSum.gmvPerHour) : "—", note: trackSum.hours > 0 ? `${fmtVndShort(trackSum.directGmv)} ÷ ${fmtFixed(trackSum.hours, 1)} giờ` : undefined }, { label: METRIC.roas, value: trackSum.roas != null ? `${fmtFixed(trackSum.roas, 1)}x` : "—", note: trackSum.adsCost > 0 ? `${METRIC.adsCost} ${fmtVndShort(trackSum.adsCost)}` : undefined }] : [],
       next: [
-        { label: `Target Live tháng ${Number(nextMonth.slice(5))}`, value: nextPlan && nextPlan.targetGmv > 0 ? fmtVndShort(nextPlan.targetGmv) : liveManual.filled > 0 ? fmtVndShort(liveManual.target) : "—", note: nextPlan && nextPlan.targetGmv > 0 ? `${nextPlan.slotCount} phiên trong Kế Hoạch Tháng` : liveManual.filled > 0 ? `${liveManual.filled}/4 loại ngày đã nhập · ${fmtFixed(liveManual.hours, 1)} giờ live` : "chưa nhập · bảng Kế hoạch Live" },
+        { label: `Target Live tháng ${Number(nextMonth.slice(5))}`, value: nextPlan && nextPlan.targetGmv > 0 ? fmtVndShort(nextPlan.targetGmv) : "—", note: nextPlan && nextPlan.targetGmv > 0 ? `${nextPlan.slotCount} phiên trong Kế Hoạch Tháng` : "chưa nhập · bảng Kế hoạch Live" },
         { label: `Target Creator tháng ${Number(nextMonth.slice(5))}`, value: bookingSum.target > 0 ? fmtVndShort(bookingSum.target) : "—", note: bookingSum.target > 0 ? "tổng Target lịch Booking" : "tổng Target lịch Booking, chưa nhập" },
-        { label: `Booking Creator tháng ${Number(nextMonth.slice(5))}`, value: `${bookingSum.sessions} phiên`, note: bookingSum.sessions > 0 ? `${fmtFixed(bookingSum.hours, 1)} giờ live` : `chưa có phiên nào (tab Affiliate hoặc nhập ở mục 2)` },
+        { label: `Booking Creator tháng ${Number(nextMonth.slice(5))}`, value: `${bookingSum.sessions} phiên`, note: bookingSum.sessions > 0 ? `${fmtFixed(bookingSum.hours, 1)} giờ live` : `chưa có phiên nào trong tab Affiliate (T${Number(nextMonth.slice(5))})` },
         { label: `Việc đề xuất cho tháng ${Number(nextMonth.slice(5))}`, value: String(todoItems.length), note: `${todoItems.filter((i) => i.target).length} app tự đánh giá · ${todoItems.filter((i) => !i.target).length} ops đánh giá` }
       ]
     };
@@ -1636,10 +1607,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
         <section id="mr-next" className="space-y-4 scroll-mt-16" style={secStyle("next")}>
           <PageHead {...head("next")} no={secNo("next")} title={secTitle("next")} sub={`Hành động tháng ${Number(nextMonth.slice(5))} + kế hoạch từ Kế Hoạch Tháng và tab Affiliate`} />
           <NextLivePlanPanel
-            typed={manualPlan.live}
-            onTyped={(live) => changeManualPlan({ ...manualPlan, live })}
-            status={manualStatus}
-            canManage={canManage}
+            nextMonth={nextMonth}
             curLabel={String(Number(month.slice(5)))}
             nextLabel={String(Number(nextMonth.slice(5)))}
             rows={(["daily", "dday", "midmonth", "payday"] as const).map((key) => {
@@ -1650,10 +1618,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             total={{ key: "all", name: "Cả tháng", achieved: liveCurStats.gmvPerHour, sessionsCur: liveCurStats.sessions }}
           />
           <BookingPlanPanel
-            typed={manualPlan.booking}
-            onTyped={(booking) => changeManualPlan({ ...manualPlan, booking })}
-            status={manualStatus}
-            canManage={canManage}
+            nextMonth={nextMonth}
             curLabel={String(Number(month.slice(5)))}
             nextLabel={String(Number(nextMonth.slice(5)))}
             planRows={creatorPlan.map((r) => ({ date: r.date, creator: r.creator, camp: r.campName, timeline: r.timeline, hours: r.hours, target: r.target, budgetAds: r.budgetAds, ref: r.bestGmvPerHour }))}
