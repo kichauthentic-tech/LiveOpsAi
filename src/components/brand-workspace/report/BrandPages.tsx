@@ -271,7 +271,7 @@ export const AffiliatePanel: React.FC<{ rows: CreatorSessionRow[]; totals: Creat
   const rate = creatorRates(totals);
   const partOf = (n: number) => (n < totals.sessions ? ` · ${n}/${totals.sessions} phiên` : "");
   return (
-  <Panel title="Phiên livestream của creator" icon={<Users className="w-4 h-4" />} sub="Tab Affiliate · Direct GMV trong phiên · % Target và ROAS chỉ tính trên các phiên có target / có Ads cost">
+  <Panel title="Phiên livestream của creator" icon={<Users className="w-4 h-4" />} sub="Tab Affiliate · GMV trong phiên creator · % Target và ROAS chỉ tính trên các phiên có target / có Ads cost">
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-3 mb-4">
       <KpiTile frame="plain" label={METRIC.directGmv} value={fmtVndShort(totals.gmv)} note={rate.pctTarget != null ? `${fmtPct(rate.pctTarget)} target ${fmtVndShort(totals.target)}${partOf(totals.targetSessions)}` : undefined} />
       <KpiTile frame="plain" label="Phiên · giờ" value={`${totals.sessions} · ${fmtHours(totals.hours)}`} note={`${totals.creators} creator`} />

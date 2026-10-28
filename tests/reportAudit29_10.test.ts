@@ -239,3 +239,81 @@ describe("N5 · Nguyên nhân chỉ chắc chắn khi yếu tố vượt ngưỡ
     expect(r.advise).not.toContain("làm chỉ số theo dõi chính");
   });
 });
+
+// ---------------- N6, C12–C14 ----------------
+import { KeyMetricsDemoPage } from "../src/components/brand-workspace/report/DemoSummaryPages";
+import { estimateSessionCv, keyMetricsTable, noiseBand, SESSION_CV, type KeyMetricsMonth } from "../src/lib/report/brandReport";
+import { affiliateBlocks, peopleBlocks, shopBlocks } from "../src/lib/report/pageInsights";
+
+describe("N6 · Đề xuất trang Toàn shop không bỏ sót kênh giảm lớn nhất", () => {
+  const ch = [{ label: "Affiliate LIVE", delta: -320e6 }, { label: "Video", delta: 165e6 }];
+  it("livestream cần rà soát và Affiliate giảm nhiều nhất ⇒ có cả hai việc", () => {
+    const b = shopBlocks({ totalChange: -2, windowLabel: "1–25/10", channels: ch, control: [{ label: "Campaign", liveChg: -2, restChg: 12, verdict: "ops" }] });
+    expect(b.advise).toContain("Rà soát khung giờ, host và kịch bản livestream ở Campaign");
+    expect(b.advise).toContain("Trao đổi với brand kế hoạch Affiliate LIVE");
+  });
+  it("không có kênh giảm ⇒ chỉ việc livestream", () => {
+    const b = shopBlocks({ totalChange: 1, windowLabel: "x", channels: [{ label: "Video", delta: 5e6 }], control: [{ label: "Daily", liveChg: -20, restChg: 0, verdict: "ops" }] });
+    expect(b.advise).not.toContain("Trao đổi với brand");
+  });
+});
+
+describe("C12 · ngưỡng dao động đo theo brand", () => {
+  const mk = (day: string, hour: number, gph: number) => ({ startTime: `${day}T${String(hour - 7).padStart(2, "0")}:00:00.000Z`, gmv: gph * 2, hours: 2 });
+  // 40 ca cùng tháng, cùng loại ngày, cùng buổi sáng, GMV/giờ dao động ±20% quanh 10M
+  const rows = Array.from({ length: 40 }, (_, i) => mk(`2026-10-${String(1 + (i % 20)).padStart(2, "0")}`, 9, i % 2 ? 12e6 : 8e6));
+  it("đo được CV ≈ 20% khi dao động ±20%", () => {
+    const cv = estimateSessionCv(rows, () => "daily")!;
+    expect(cv).toBeGreaterThan(0.19);
+    expect(cv).toBeLessThan(0.23);
+  });
+  it("dưới 30 ca ⇒ null (dùng mặc định); CV bị kẹp 0,15–0,45", () => {
+    expect(estimateSessionCv(rows.slice(0, 12), () => "daily")).toBeNull();
+    const flat = Array.from({ length: 40 }, (_, i) => mk(`2026-10-${String(1 + (i % 20)).padStart(2, "0")}`, 9, 10e6));
+    expect(estimateSessionCv(flat, () => "daily")).toBe(0.15);
+  });
+  it("noiseBand/keyMetricsTable nhận CV; không truyền thì giữ mặc định", () => {
+    expect(noiseBand(10, 10)).toBeCloseTo(noiseBand(10, 10, SESSION_CV)!);
+    expect(noiseBand(10, 10, 0.13)!).toBeCloseTo(noiseBand(10, 10)! / 2);
+    const st = (sessions: number) => ({ sessions } as never);
+    const months = [{ month: "2026-09", stats: { all: st(20), daily: st(10), dday: st(4), midmonth: st(3), payday: st(3) }, targets: null, gmvForTarget: {} as never }, { month: "2026-10", stats: { all: st(20), daily: st(10), dday: st(4), midmonth: st(3), payday: st(3) }, targets: null, gmvForTarget: {} as never }] as KeyMetricsMonth[];
+    expect(keyMetricsTable(months, "all", 0.13).bands[1]!).toBeCloseTo(keyMetricsTable(months, "all").bands[1]! / 2);
+  });
+  it("trang Key Metrics ghi nguồn CV", () => {
+    const base = { no: "2", title: "t", headline: "h", months: [] as KeyMetricsMonth[], monthLabel: (m: string) => m, insight: null };
+    // 2 tháng rỗng: chỉ cần phần phụ đề
+    const mo = (month: string) => ({ month, stats: { all: { sessions: 0 }, daily: { sessions: 0 }, dday: { sessions: 0 }, midmonth: { sessions: 0 }, payday: { sessions: 0 } }, targets: null, gmvForTarget: {} }) as never;
+    const h = (cvMeasured: boolean) => renderToStaticMarkup(React.createElement(KeyMetricsDemoPage, { ...base, months: [mo("2026-09"), mo("2026-10")], cv: 0.22, cvMeasured }));
+    expect(h(true)).toContain("±22%, đo trên phiên của brand");
+    expect(h(false)).toContain("mức mặc định");
+  });
+});
+
+describe("C13 · khung giờ: chỉ số khử loại ngày", () => {
+  const base = { hosts: [{ name: "A", verdict: "unclear" as const, ci: "", sessions: 8, borderline: false }], months: 3 };
+  it("xếp theo chỉ số so với trung bình cùng loại ngày, không theo GMV/giờ thô", () => {
+    // Tối có GMV/giờ thô cao nhất (nhiều ngày camp) nhưng chỉ số thấp nhất
+    const r = peopleBlocks({ ...base, slots: [{ label: "tối", gmvPerHour: 24e6, n: 20, index: 0.7 }, { label: "sáng", gmvPerHour: 15e6, n: 20, index: 1.1 }] });
+    expect(r.cause).toContain("đã so với trung bình cùng loại ngày");
+    expect(r.cause).toContain("sáng 15M/giờ (110% mức trung bình cùng loại ngày)");
+    expect(r.advise).toContain("dời bớt phiên tối sang sáng");
+  });
+  it("không có chỉ số ⇒ giữ cách cũ nhưng ghi chưa khử loại ngày", () => {
+    const r = peopleBlocks({ ...base, slots: [{ label: "tối", gmvPerHour: 10e6, n: 20 }, { label: "sáng", gmvPerHour: 20e6, n: 20 }] });
+    expect(r.advise).toContain("chưa khử hiệu ứng loại ngày");
+  });
+});
+
+describe("C14 · không dùng 'Direct GMV' cho GMV phiên creator", () => {
+  it("Insight Affiliate gọi là GMV phiên", () => {
+    const b = affiliateBlocks({ sessions: 6, creators: 3, gmv: 600e6, pctTarget: 75, top: { creator: "Khói", share: 64.7 }, gmvPerHour: 20e6, lowest: null });
+    expect(b.observe).toContain("GMV phiên");
+    expect(b.observe).not.toContain("Direct GMV");
+  });
+  it("Key Metrics ghi dòng Direct lấy từ mọi phiên tài khoản shop", () => {
+    const mo = (month: string) => ({ month, stats: { all: { sessions: 0 }, daily: { sessions: 0 }, dday: { sessions: 0 }, midmonth: { sessions: 0 }, payday: { sessions: 0 } }, targets: null, gmvForTarget: {} }) as never;
+    const share = { all: [70, 72], daily: [null, null], dday: [null, null], midmonth: [null, null], payday: [null, null] } as never;
+    const h = renderToStaticMarkup(React.createElement(KeyMetricsDemoPage, { no: "2", title: "t", headline: "h", months: [mo("2026-09"), mo("2026-10")], directShare: share, monthLabel: (m: string) => m, insight: null }));
+    expect(h).toContain("mọi phiên của tài khoản shop");
+  });
+});

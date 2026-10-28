@@ -38,8 +38,8 @@ export const AffiliateTrackPanel: React.FC<{ cols: AffiliateTrackColumn[]; month
     <>
       {bars.length > 0 && (
         <div className="pn">
-          <div className="pnh">Direct GMV so với Target từng phiên creator</div>
-          <div className="pns">Thanh = Direct GMV · vạch trắng = Target của phiên.</div>
+          <div className="pnh">GMV phiên so với Target từng phiên creator</div>
+          <div className="pns">Thanh = GMV phiên creator · vạch trắng = Target của phiên.</div>
           <div className="hb" id="c_aff" dangerouslySetInnerHTML={{ __html: hbars(bars) }} />
         </div>
       )}

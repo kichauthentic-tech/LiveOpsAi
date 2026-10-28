@@ -186,10 +186,12 @@ export function shopBlocks(i: ShopInsightPageInput): InsightBlocks {
       : "Chưa có nhóm đối chứng (cần file Shop Analytics của hai tháng).";
   const neg = byAbs.filter((c) => c.delta < 0)[0];
   const impact = neg ? `${neg.label} là kênh giảm lớn nhất (${moneySigned(neg.delta)}).` : "Không kênh nào giảm so với kỳ trước.";
+  // Kênh giảm lớn nhất (ngoài livestream) luôn có việc riêng, kể cả khi livestream cũng cần rà soát.
+  const negAdvice = neg ? `Trao đổi với brand kế hoạch ${neg.label} cho tháng sau và theo dõi tỷ trọng kênh.` : "";
   const advise = ops
-    ? `Rà soát khung giờ, host và kịch bản livestream ở ${ops.label} trước khi kết luận.`
+    ? join(`Rà soát khung giờ, host và kịch bản livestream ở ${ops.label} trước khi kết luận.`, negAdvice)
     : neg
-      ? `Trao đổi với brand kế hoạch ${neg.label} cho tháng sau và theo dõi tỷ trọng kênh.`
+      ? negAdvice
       : "Duy trì lịch livestream hiện tại.";
   return { observe, cause, impact, advise };
 }
@@ -295,7 +297,8 @@ export interface PeopleInsightInput {
   /** Host có live tháng này; verdict theo khoảng tin cậy 95% của so sánh gộp nhiều tháng. */
   hosts: { name: string; verdict: "above" | "below" | "unclear"; ci: string; sessions: number; borderline: boolean }[];
   months: number;
-  slots: { label: string; gmvPerHour: number; n: number }[];
+  /** `index` = GMV thực ÷ GMV kỳ vọng theo loại ngày (1 = trung bình); có thì xếp khung theo chỉ số này để khử hiệu ứng loại ngày. */
+  slots: { label: string; gmvPerHour: number; n: number; index?: number }[];
   minSessions?: number;
 }
 
@@ -307,15 +310,18 @@ export function peopleBlocks(i: PeopleInsightInput): InsightBlocks {
   const below = ranked.filter((h) => h.verdict === "below");
   const unclear = i.hosts.length - above.length - below.length;
   const txt = (h: (typeof above)[number]) => `${h.name} ${h.ci} (${h.sessions} phiên)`;
-  const slots = i.slots.filter((s) => s.n >= 3).sort((a, b) => b.gmvPerHour - a.gmvPerHour);
+  const slots = i.slots.filter((s) => s.n >= 3);
+  const adjusted = slots.length > 0 && slots.every((s) => s.index != null);
+  slots.sort((a, b) => (adjusted ? b.index! - a.index! : b.gmvPerHour - a.gmvPerHour));
   const bestS = slots[0], worstS = slots[slots.length - 1];
+  const slotNote = (s: (typeof slots)[number]) => `${s.label} ${money(s.gmvPerHour)}/giờ${adjusted ? ` (${Math.round(s.index! * 100)}% mức trung bình cùng loại ngày)` : ""}`;
   const observe = join(
     above.length ? `Cao hơn trung bình ${i.months} tháng có ý nghĩa thống kê (khoảng tin cậy 95%): ${above.map(txt).join("; ")}.` : "Không host nào cao hơn trung bình nhóm có ý nghĩa thống kê (khoảng tin cậy 95%).",
     below.length ? `Thấp hơn: ${below.map(txt).join("; ")}.` : "",
     unclear > 0 ? `${unclear} host chưa khác biệt rõ so với trung bình.` : ""
   );
   const cause = bestS && worstS && bestS !== worstS
-    ? `Khung giờ bắt đầu phiên: ${bestS.label} đạt ${money(bestS.gmvPerHour)}/giờ, ${worstS.label} ${money(worstS.gmvPerHour)}/giờ (${worstS.n} phiên).`
+    ? `Khung giờ bắt đầu phiên${adjusted ? " (đã so với trung bình cùng loại ngày)" : ""}: ${slotNote(bestS)}; ${slotNote(worstS)} (${worstS.n} phiên).`
     : "Chưa đủ phiên theo khung giờ để so sánh (cần từ 3 phiên mỗi khung).";
   const small = i.hosts.filter((h) => h.sessions < min).length;
   const impact = join(
@@ -325,7 +331,7 @@ export function peopleBlocks(i: PeopleInsightInput): InsightBlocks {
   ) || "Kết luận về host dựa trên so sánh gộp nhiều tháng, không dựa trên một tháng.";
   const advise = join(
     above[0] ? `Cân nhắc thêm phiên cho ${above[0].name}.` : "",
-    bestS && worstS && bestS !== worstS && worstS.gmvPerHour <= bestS.gmvPerHour * 0.8 ? `Cân nhắc dời bớt phiên ${worstS.label} sang ${bestS.label}.` : "",
+    bestS && worstS && bestS !== worstS && (adjusted ? worstS.index! <= bestS.index! * 0.8 : worstS.gmvPerHour <= bestS.gmvPerHour * 0.8) ? `Cân nhắc dời bớt phiên ${worstS.label} sang ${bestS.label}${adjusted ? "" : " (chưa khử hiệu ứng loại ngày)"}.` : "",
     !above[0] && !(bestS && worstS && bestS !== worstS) ? "Giữ lịch hiện tại và thu thêm phiên trước khi xếp hạng host." : ""
   );
   return { observe, cause, impact, advise };
@@ -384,9 +390,9 @@ export interface AffiliateInsightInput {
 export function affiliateBlocks(i: AffiliateInsightInput): InsightBlocks {
   if (i.sessions === 0) return { ...EMPTY, advise: "Nhập kế hoạch và số thực tế ở tab Affiliate để có số của trang này." };
   const observe = join(
-    `${i.sessions} phiên của ${i.creators} creator, Direct GMV ${money(i.gmv)}`,
+    `${i.sessions} phiên của ${i.creators} creator, GMV phiên ${money(i.gmv)}`,
     i.pctTarget != null ? `(${pctTxt(i.pctTarget)} Target).` : "(chưa có Target phiên).",
-    i.top ? `${i.top.creator} chiếm ${pctTxt(i.top.share, 0)} Direct GMV.` : ""
+    i.top ? `${i.top.creator} chiếm ${pctTxt(i.top.share, 0)} GMV phiên creator.` : ""
   );
   const cause = i.lowest ? `Phiên thấp nhất so với Target: ${i.lowest.creator} ${i.lowest.date}, đạt ${pctTxt(i.lowest.pct)} Target.` : "Chưa có phiên nào có Target để so sánh.";
   const impact = i.sessions / Math.max(1, i.creators) < 3

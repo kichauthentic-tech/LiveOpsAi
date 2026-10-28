@@ -43,7 +43,7 @@ import { platformOf } from "../../lib/reportPlatform";
 import type { AffiliateActualEntry, AffiliatePlanMonth } from "../../types";
 import { fetchAffiliateActuals } from "../../lib/db/affiliateActuals";
 import { fetchAffiliatePlanMonth } from "../../lib/db/affiliatePlanMonths";
-import { creatorRates, keyMetricsTable, bucketStats, campSpanLabels, changeTone, creatorPlanRows, creatorSessionRows, creatorTotals, dayTypeFactorRows, noiseBand, scoreRows, type KeyMetricsMonth, type KeyMetricsTab } from "../../lib/report/brandReport";
+import { creatorRates, keyMetricsTable, bucketStats, campSpanLabels, changeTone, creatorPlanRows, creatorSessionRows, creatorTotals, dayTypeFactorRows, estimateSessionCv, noiseBand, scoreRows, SESSION_CV, type KeyMetricsMonth, type KeyMetricsTab } from "../../lib/report/brandReport";
 import { AdsPlanPanel } from "./report/AdsPlanPanel";
 import { ProductsPageBody, productsKpis, type ProductsPageData } from "./report/ProductsPage";
 import { HostPageBody, hostKpis, type HostPageData } from "./report/HostPage";
@@ -499,23 +499,38 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
       { key: "evening", label: "Tối (từ 17h)", test: (h: number) => h >= 17 }
     ];
     const hourOf = (iso: string) => (new Date(iso).getUTCHours() + 7) % 24;
-    const agg = (rows: CreatorLivePerfRow[], s: string, e: string, test: (h: number) => boolean) => {
-      let n = 0, gmv = 0, hours = 0;
+    // Chỉ số khử loại ngày: GMV thực ÷ GMV kỳ vọng nếu mỗi phiên đạt GMV/giờ trung bình của loại ngày đó (1,00 = bằng trung bình).
+    // Khung tối hay rơi vào ngày camp nên GMV/giờ thô của khung lẫn hiệu ứng loại ngày.
+    const dayTypeMean = (rows: CreatorLivePerfRow[], s: string, e: string, bucketOf: (d: string) => CampDayBucket) => {
+      const acc: Partial<Record<CampDayBucket, { g: number; h: number }>> = {};
+      for (const r of rows) {
+        const d = vnDateOf(r.startTime);
+        if (d < s || d > e) continue;
+        const a = (acc[bucketOf(d)] ??= { g: 0, h: 0 });
+        a.g += r.gmv;
+        a.h += r.hours;
+      }
+      return (k: CampDayBucket) => (acc[k] && acc[k]!.h > 0 ? acc[k]!.g / acc[k]!.h : null);
+    };
+    const agg = (rows: CreatorLivePerfRow[], s: string, e: string, test: (h: number) => boolean, bucketOf: (d: string) => CampDayBucket) => {
+      const mean = dayTypeMean(rows, s, e, bucketOf);
+      let n = 0, gmv = 0, hours = 0, expected = 0;
       for (const r of rows) {
         const d = vnDateOf(r.startTime);
         if (d < s || d > e || !test(hourOf(r.startTime))) continue;
         n++;
         gmv += r.gmv;
         hours += r.hours;
+        expected += r.hours * (mean(bucketOf(d)) ?? 0);
       }
-      return { n, gmv, gmvPerHour: hours > 0 ? gmv / hours : null };
+      return { n, gmv, gmvPerHour: hours > 0 ? gmv / hours : null, index: expected > 0 ? gmv / expected : null };
     };
     return buckets.map((b) => ({
       ...b,
-      cur: agg(liveCurrent?.rows ?? [], cmp.curStart, cmp.curEnd, b.test),
-      prev: agg(livePrev?.rows ?? [], cmp.prevStart, cmp.prevEnd, b.test)
+      cur: agg(liveCurrent?.rows ?? [], cmp.curStart, cmp.curEnd, b.test, bucketCur),
+      prev: agg(livePrev?.rows ?? [], cmp.prevStart, cmp.prevEnd, b.test, bucketPrev)
     }));
-  }, [liveCurrent, livePrev, cmp]);
+  }, [liveCurrent, livePrev, cmp, bucketCur, bucketPrev]);
 
   // Phần 7 — kế hoạch tháng sau lấy từ Kế Hoạch Tháng (nguồn duy nhất của target/lịch tháng sau).
   const nextPlan = nextPlanFull ? { targetGmv: nextPlanFull.plan.targetGmv, status: nextPlanFull.plan.status, slotCount: nextPlanFull.slots.length } : null;
@@ -546,7 +561,17 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     [kpiTargetGmvCur, liveCurStats, campDetailRows, shopKpi, cmp.partial, planRR]
   );
   // Trang 3 — bảng nhiệt loại ngày × yếu tố (cùng các khối của bảng Campaign: mỗi tháng dùng khung camp của chính tháng đó).
-  const dayTypeRows = useMemo(() => dayTypeFactorRows(campDetailRows), [campDetailRows]);
+  // CV dao động của GMV/giờ một ca: đo trên ca của chính brand (2 tháng), thiếu ca thì dùng mặc định CROCS.
+  const sessionCvMeasured = useMemo(
+    () => [estimateSessionCv(liveCurrent?.rows ?? [], bucketCur), estimateSessionCv(livePrev?.rows ?? [], bucketPrev)] as const,
+    [liveCurrent, livePrev, bucketCur, bucketPrev]
+  );
+  const sessionCv = useMemo(() => {
+    const xs = sessionCvMeasured.filter((x): x is number => x != null);
+    return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : SESSION_CV;
+  }, [sessionCvMeasured]);
+  const sessionCvIsDefault = sessionCvMeasured.every((x) => x == null);
+  const dayTypeRows = useMemo(() => dayTypeFactorRows(campDetailRows, sessionCv), [campDetailRows, sessionCv]);
   // Trang 10 — Key Metrics 3 tháng, chỉ đọc số PHIÊN ⇒ chỉ cắt cùng số ngày khi số phiên của tháng report còn dở (cmp.partial),
   // không cắt theo file shop như Xu hướng/cơ cấu kênh (CROCS T9: phiên đủ 30/09, file shop tới 22/09).
   const keyCutEnd = (m: string) => {
@@ -729,7 +754,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     shortName: hostShortName,
     slots: slotRows.map((r) => {
       const c = pctChange(r.prev.gmvPerHour, r.cur.gmvPerHour);
-      const band = noiseBand(r.prev.n, r.cur.n);
+      const band = noiseBand(r.prev.n, r.cur.n, sessionCv);
       return { label: r.label, prevN: r.prev.n, curN: r.cur.n, prev: r.prev.gmvPerHour, cur: r.cur.gmvPerHour, change: c, band, tone: changeTone(c, band, true) as "up" | "down" | "flat" };
     }),
     spread,
@@ -783,7 +808,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   // ===== Insight tổng hợp cuối mỗi trang (lib/report/pageInsights.ts) — câu mẫu có chỗ trống, đọc đúng số trang đang hiện =====
   const pageAuto = (() => {
     const lastKey = keyMonths.length - 1;
-    const keyTable = keyMetricsTable(keyMonths, "all");
+    const keyTable = keyMetricsTable(keyMonths, "all", sessionCv);
     const dayLabel = (k: CampDayBucket) => DAY_TYPE_SHORT[k];
     const scoreAll = scoreboard.find((r) => r.key === "all");
     const sigDays = dayTypeRows.filter((r) => r.significant && (r.change.gmvPerHour ?? 0) !== 0);
@@ -845,7 +870,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
           return r ? [{ name: h.name, verdict: r.verdict, ci: reliabilityText(r), sessions: r.sessions, borderline: isBorderline(r) }] : [];
         }),
         months: relMonths,
-        slots: slotRows.filter((s) => s.cur.gmvPerHour != null).map((s) => ({ label: s.label.toLowerCase(), gmvPerHour: s.cur.gmvPerHour!, n: s.cur.n }))
+        slots: slotRows.filter((s) => s.cur.gmvPerHour != null).map((s) => ({ label: s.label.toLowerCase(), gmvPerHour: s.cur.gmvPerHour!, n: s.cur.n, index: s.cur.index ?? undefined }))
       }),
       ads: adsBlocks({
         cost: adsPlan?.mtdActual ?? adsCur?.cost ?? 0,
@@ -920,7 +945,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   const head = (id: InsightPage): { headline: string; metrics: PageMetric[] } => {
     const fb = `${SECTIONS.find((x) => x.id === id)!.label}: chưa đủ số liệu để nêu kết luận.`;
     const scoreAll = scoreboard.find((r) => r.key === "all");
-    const keyTable = keyMetricsTable(keyMonths, "all");
+    const keyTable = keyMetricsTable(keyMonths, "all", sessionCv);
     const lastKey = keyMonths.length - 1;
     const kmCell = (key: string) => keyTable.rows.find((r) => r.def.key === key);
     const kmMetric = (key: string, label?: string): PageMetric => {
@@ -1367,7 +1392,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             shop={shopKpi ? { actual: shopKpi.actual, throughDay: shopCur?.through ? Number(shopCur.through.slice(8, 10)) : null, target: shopKpi.target, projected: shopKpi.partial ? shopKpi.projected : null, projectedPct: shopKpi.partial ? shopKpi.projectedPct : null } : null}
             gmvPerHour={liveCurStats.gmvPerHour}
             gmvPerHourChange={pctChange(livePrevStats.gmvPerHour, liveCurStats.gmvPerHour)}
-            gmvPerHourBand={keyMetricsTable(keyMonths, "all").bands[keyMonths.length - 1] ?? null}
+            gmvPerHourBand={keyMetricsTable(keyMonths, "all", sessionCv).bands[keyMonths.length - 1] ?? null}
             hoursChange={pctChange(livePrevStats.hours, liveCurStats.hours)}
             bridge={bridgeTarget}
             score={scoreboard}
@@ -1413,7 +1438,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
               prev: { gmvPerHour: livePrevStats.gmvPerHour, viewsPerHour: keyMetricValue(livePrevStats, "viewsPerHour"), err: keyMetricValue(livePrevStats, "err"), ctor: keyMetricValue(livePrevStats, "ctor") },
               cur: { gmvPerHour: liveCurStats.gmvPerHour, viewsPerHour: keyMetricValue(liveCurStats, "viewsPerHour"), err: keyMetricValue(liveCurStats, "err"), ctor: keyMetricValue(liveCurStats, "ctor") }
             }}
-            band={noiseBand(livePrevStats.sessions, liveCurStats.sessions)}
+            band={noiseBand(livePrevStats.sessions, liveCurStats.sessions, sessionCv)}
             drivers={drivers}
             driverLabels={{ from: waterfallData[0]?.label ?? "", to: waterfallData[waterfallData.length - 1]?.label ?? "" }}
             funnel={funnel && funnel.length === 5 ? { impressions: funnel[0], views: funnel[1], productImpressions: funnel[2], productClicks: funnel[3], orders: funnel[4] } : null}
@@ -1662,6 +1687,8 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             headline={head("keymetrics").headline}
             months={keyMonths}
             directShare={keyDirectShare}
+            cv={sessionCv}
+            cvMeasured={!sessionCvIsDefault}
             monthLabel={monthShort}
             windowNote={cmp.partial ? `1–${Number(cmp.curEnd.slice(8))}` : undefined}
             insight={demoInsight("keymetrics")}

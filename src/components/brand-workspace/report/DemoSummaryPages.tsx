@@ -217,14 +217,17 @@ export const KeyMetricsDemoPage: React.FC<{
   months: KeyMetricsMonth[];
   /** Direct ÷ (Direct + Indirect) của Seller LIVE, điểm %, từng tab × từng tháng (cùng thứ tự `months`). */
   directShare?: Record<KeyMetricsTab, (number | null)[]>;
+  /** CV GMV/giờ một phiên dùng cho ngưỡng dao động; `cvMeasured` = đo trên phiên của brand (không phải mặc định CROCS). */
+  cv?: number;
+  cvMeasured?: boolean;
   monthLabel: (m: string) => string;
   /** "1–26" khi tháng còn dở. */
   windowNote?: string;
   insight: React.ReactNode;
-}> = ({ no, title, headline, months, directShare, monthLabel, windowNote, insight }) => {
+}> = ({ no, title, headline, months, directShare, cv, cvMeasured, monthLabel, windowNote, insight }) => {
   const [tab, setTab] = useState<KeyMetricsTab>("all");
   const last = months.length - 1;
-  const table = keyMetricsTable(months, tab);
+  const table = keyMetricsTable(months, tab, cv);
   const byKey = new Map(table.rows.map((r) => [r.def.key, r]));
   const rows: any[] = [];
   for (const o of KM_ORDER) {
@@ -265,7 +268,7 @@ export const KeyMetricsDemoPage: React.FC<{
       <DemoHead no={no} title={title} headline={headline} />
       <DemoPanel
         title={`${KEY_METRICS.length} chỉ số, ${months.length === 3 ? "ba" : months.length} tháng ${windowNote ? `cùng kỳ ${windowNote}` : "cả tháng"}`}
-        sub={`Màu xanh / đỏ khi thay đổi vượt ngưỡng dao động của tab đó. ${METRIC.liveHours} không đánh giá tốt hay xấu.`}
+        sub={`Màu xanh / đỏ khi thay đổi vượt ngưỡng dao động của tab đó${cv != null ? ` (độ lệch GMV/giờ mỗi phiên ±${Math.round(cv * 100)}%, ${cvMeasured ? "đo trên phiên của brand" : "mức mặc định, chưa đủ phiên để đo riêng"})` : ""}. ${METRIC.liveHours} không đánh giá tốt hay xấu.`}
       >
         <div className="tabs" role="tablist">
           {KEY_METRICS_TABS.map((t) => (
@@ -276,6 +279,7 @@ export const KeyMetricsDemoPage: React.FC<{
         </div>
         <DemoTable html={tbl(head, rows)} id="km" />
         <DemoLegend>
+          {directShare && <span>Dòng Direct vs Indirect lấy từ file Shop Analytics, tính trên mọi phiên của tài khoản shop.</span>}
           <span>{windowNote ? `Cùng kỳ ${windowNote} mỗi tháng` : "Cả tháng"} · số phiên {months.map((m) => monthLabel(m.month)).join(" → ")}: {sessionsLine} phiên</span>
         </DemoLegend>
       </DemoPanel>
