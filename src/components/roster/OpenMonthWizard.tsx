@@ -235,7 +235,7 @@ export const OpenMonthWizard: React.FC<{
       <div className="w-full max-w-4xl max-h-full flex flex-col rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl">
         <div className="px-4 sm:px-5 py-3 border-b border-[var(--border)] space-y-2.5">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-base font-black text-[var(--text)]">Mở lịch tháng {m}</h2>
+            <h2 className="text-lg font-black text-[var(--text)]">Mở lịch tháng {m}</h2>
             <button type="button" onClick={onClose} disabled={running} className="p-1.5 rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]" aria-label="Đóng">
               <X className="w-4 h-4" />
             </button>

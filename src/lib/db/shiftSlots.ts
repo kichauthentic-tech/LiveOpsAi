@@ -2,6 +2,7 @@ import { supabase } from "../supabaseClient";
 import { fetchAllPages } from "./fetchAllPages";
 import { assertAffected } from "./assertAffected";
 import { ShiftSlot } from "../../types";
+import { LEGACY_PLATFORM } from "../reportPlatform";
 
 const orNull = (v: string | undefined | null) => (v ? v : null);
 
@@ -104,7 +105,7 @@ export async function createOpenSlots(list: ShiftSlot[], notify = true): Promise
       end_time: s.endTime,
       brand_id: s.brandId ?? "",
       brand_name: s.brandName ?? "",
-      platform: s.platform ?? "TikTok",
+      platform: s.platform ?? LEGACY_PLATFORM,
       studio_id: s.studioId ?? "",
       studio_name: s.studioName ?? "",
       notes: s.notes ?? ""

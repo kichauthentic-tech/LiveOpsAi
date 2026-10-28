@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import React, { Suspense, useEffect, useMemo, useState } from "react";
 import { defaultReportMonth } from "../../lib/defaultMonth";
 import { LiveSession, ShiftSlot, UserRole, BrandMonthlyReport as BrandMonthlyReportType, BrandPlatformRate } from "../../types";
@@ -11,7 +12,8 @@ import {
   Clock,
   CalendarRange,
   RefreshCw,
-  Database
+  Database,
+  Download
 } from "lucide-react";
 import { getTodayMonth } from "../../lib/dateUtils";
 import { todayVn } from "../../lib/performance/brandCommitment";
@@ -31,6 +33,7 @@ import { fmtDateVn, fmtMonth } from "../../lib/format";
 import { profileOf } from "../../lib/platforms/profiles";
 import { prefetchable, type TabPrefetchCtx } from "../../lib/db/prefetch";
 import { lazyNamed } from "../../lib/lazyNamed";
+import { buildStandaloneHtml, captureTabVariants, downloadHtml, waitForRender } from "../../lib/report/exportStandaloneHtml";
 
 // 7 phần của Report Tháng kéo theo recharts + d3 + redux = 364 KB, chiếm 2/3 chunk của tab này (đo
 // 2026-10-01: chunk BrandMonthlyReport 534 KB, riêng thư viện biểu đồ 364 KB). Phần đó chỉ render khi
@@ -48,6 +51,7 @@ interface ReportViewProps {
   snapshot: AnySnapshot;
   report: BrandMonthlyReportType | null;
   canManage: boolean;
+  forBrand?: boolean;
   onReportChange: (r: BrandMonthlyReportType) => void;
   liveSessions: LiveSession[];
   shiftSlots?: ShiftSlot[];
@@ -56,7 +60,7 @@ interface ReportViewProps {
 const REPORT_VIEWS: Record<ReportPlatform, { preload: () => void; Render: React.FC<ReportViewProps> }> = {
   TikTok: {
     preload: () => void MonthlyReportTabs.preload(),
-    Render: (p) => <MonthlyReportTabs brandId={p.brandId} brandName={p.brandName} month={p.month} snapshot={p.snapshot as MonthlyReportSnapshot} liveSessions={p.liveSessions} shiftSlots={p.shiftSlots} canManage={p.canManage} />
+    Render: (p) => <MonthlyReportTabs brandId={p.brandId} brandName={p.brandName} month={p.month} snapshot={p.snapshot as MonthlyReportSnapshot} liveSessions={p.liveSessions} shiftSlots={p.shiftSlots} canManage={p.canManage} forBrand={p.forBrand} />
   },
   Shopee: {
     preload: () => void ShopeeMonthlyReportTabs.preload(),
@@ -133,6 +137,8 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
   // (lib/report/reportEngines.ts) và một khung hiển thị (REPORT_VIEWS). Sàn chọn ở workspace (App) — một chỗ cho mọi tab.
   const engine = REPORT_ENGINES[platform];
   const View = REPORT_VIEWS[platform];
+  // Xuất file HTML gửi brand: dựng ẨN một bản report như brand thấy (canManage=false, forBrand) rồi đóng gói DOM thành 1 file.
+  const [exportHost, setExportHost] = useState<HTMLDivElement | null>(null);
   // Mở THÁNG ĐÃ HẾT gần nhất có ca của brand — report chỉ phát hành được sau khi hết tháng (0133); mở tháng đang
   // chạy là gặp ngay "chưa tạo report" (audit người mới 2026-10-04). Xem tháng này: chọn ở bộ chọn tháng.
   const [month, setMonth] = useState(() => defaultReportMonth(`${getTodayMonth()}-01`, sessions.filter((s) => s.brandId === brandId)));
@@ -318,6 +324,28 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
     }
   };
 
+  const handleExportHtml = async () => {
+    if (exportHost || !stored) return;
+    const host = document.createElement("div");
+    host.setAttribute("aria-hidden", "true");
+    host.style.cssText = "position:fixed;left:-10000px;top:0;width:1180px;pointer-events:none";
+    document.body.appendChild(host);
+    setExportHost(host);
+    try {
+      await waitForRender(host);
+      const title = `Report Tháng ${Number(monthM)}/${monthY} · ${channelTitle(brandName, platform, false)}`;
+      const file = `${brandName}_${platform}_Report_T${Number(monthM)}-${monthY}.html`.replace(/[^\w.-]+/g, "_");
+      const variants = await captureTabVariants(host);
+      downloadHtml(file, buildStandaloneHtml(host, title, variants));
+      showToast("Đã tải file HTML gửi brand.", "success");
+    } catch (e) {
+      showToast(errorMessage(e), "error");
+    } finally {
+      setExportHost(null);
+      host.remove();
+    }
+  };
+
   const handleUnpublish = async () => {
     if (!report) return;
     if (!(await confirm(`Thu hồi report ${platform} đã phát hành về bản nháp?`))) return;
@@ -403,6 +431,16 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
                 {isPublished ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Clock className="w-3.5 h-3.5" />}
                 {isPublished ? `Đã Phát Hành ${report.publishedAt ? new Date(report.publishedAt).toLocaleDateString("vi-VN") : ""}` : "Bản Nháp"}
               </span>
+            )}
+            {canManage && stored && (
+              <button
+                onClick={handleExportHtml}
+                disabled={!!exportHost}
+                title="Tải report thành 1 file HTML độc lập để gửi brand (không dính link/giao diện app)"
+                className="px-3 py-2 rounded-xl text-xs font-bold border border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-elevated)] flex items-center gap-1.5 disabled:opacity-60"
+              >
+                {exportHost ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />} {exportHost ? "Đang đóng gói..." : "Tải bản gửi brand"}
+              </button>
             )}
             {canManage &&
               (isPublished ? (
@@ -563,6 +601,13 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
       )}
         </>
       )}
+      {exportHost && stored &&
+        createPortal(
+          <Suspense fallback={null}>
+            <View.Render brandId={brandId} brandName={brandName} month={month} snapshot={stored.snapshot as AnySnapshot} report={report} canManage={false} forBrand onReportChange={setReport} liveSessions={sessions} shiftSlots={shiftSlots} />
+          </Suspense>,
+          exportHost
+        )}
     </div>
   );
 };

@@ -75,7 +75,7 @@ export const ScoreboardPanel: React.FC<{ rows: ScoreRow[]; campSpans: Partial<Re
               {r.targetToDate != null && r.target && Math.round(r.targetToDate) !== Math.round(r.target) ? (
                 <>
                   {fmtVndShort(r.targetToDate)}
-                  <span className="block text-[10px] font-normal">tới nay · cả tháng {fmtVndShort(r.target)}</span>
+                  <span className="block text-[11px] font-normal">tới nay · cả tháng {fmtVndShort(r.target)}</span>
                 </>
               ) : r.target ? fmtVndShort(r.target) : "—"}
             </td>

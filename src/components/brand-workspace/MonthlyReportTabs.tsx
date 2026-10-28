@@ -62,9 +62,11 @@ interface MonthlyReportTabsProps {
   // (audit 2026-09-28 mục 5: truyền [] thì ca chờ đã huỷ thành "chưa diễn ra", ca dời giờ thành "ngoài kế hoạch").
   shiftSlots?: ShiftSlot[];
   canManage: boolean;
+  /** Dựng bản gửi brand từ phiên của ops (xuất file HTML): RLS không lọc hộ như khi brand tự đăng nhập, nên tự lọc kế hoạch/lịch chưa chốt. */
+  forBrand?: boolean;
 }
 
-export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, brandName, month, snapshot, liveSessions, shiftSlots = [], canManage }) => {
+export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, brandName, month, snapshot, liveSessions, shiftSlots = [], canManage, forBrand = false }) => {
 
   // Brand KHÔNG được thấy số của tháng chưa phát hành (quyết định 2026-09-22, 0107) — kể cả qua cột
   // "tháng trước"/biểu đồ xu hướng của report tháng này. Bản chụp do ops dựng nên có đủ số 4 tháng;
@@ -168,12 +170,12 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     let cancelled = false;
     const ms = [prev2Month, prevMonth, month, nextMonth];
     Promise.all(ms.map((m) => fetchMonthPlan(brandId, m).catch(() => null))).then((rs) => {
-      if (!cancelled) setPlans(Object.fromEntries(ms.map((m, i) => [m, rs[i]])));
+      if (!cancelled) setPlans(Object.fromEntries(ms.map((m, i) => [m, forBrand && rs[i]?.plan.status !== "locked" ? null : rs[i]])));
     });
     return () => {
       cancelled = true;
     };
-  }, [brandId, prev2Month, prevMonth, month, nextMonth]);
+  }, [brandId, prev2Month, prevMonth, month, nextMonth, forBrand]);
 
   // Affiliate (tab Affiliate, 0102/0155): phiên creator tháng report (trang 8) + lịch creator tháng sau (trang 9). Bảng nhỏ, đọc
   // thẳng như Kế Hoạch Tháng, không vào bản chụp. Role brand chỉ thấy tháng ops đã Chốt (RLS 0155) ⇒ không có dòng thì khối ẩn.
@@ -185,12 +187,12 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
       fetchAffiliateActuals(brandId, `${nextMonth}-01`).catch(() => []),
       fetchAffiliatePlanMonth(brandId, `${nextMonth}-01`).catch(() => null)
     ]).then(([cur, next, nextMeta]) => {
-      if (!cancelled) setAffiliate({ cur, next, nextMeta });
+      if (!cancelled) setAffiliate({ cur, next: forBrand && !nextMeta?.publishedAt ? [] : next, nextMeta });
     });
     return () => {
       cancelled = true;
     };
-  }, [brandId, month, nextMonth]);
+  }, [brandId, month, nextMonth, forBrand]);
   // Ads theo ngày dán từ file tracking của brand (0184): target + thực tế tách Live / Product / Creator. Bảng nhỏ, đọc thẳng như
   // Affiliate, không vào bản chụp; brand đọc được khi tháng đã phát hành (RLS). DB chưa chạy 0184 ⇒ coi như chưa có.
   const [adsPlanRows, setAdsPlanRows] = useState<{ key: string; rows: AdsDayRow[] } | null>(null);
@@ -1079,10 +1081,11 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
       {/* Mục lục các trang — trang cuộn (user chốt 2026-09-25): tab giấu nội dung, brand có thể không bao giờ mở tới.
           z-20 (10/10): cột đầu của bảng report (report/ui.tsx) dính ngang với z-10, đứng sau trong DOM nên
           cùng z-10 thì ô "NHÓM NGÀY"… vẽ đè lên mục lục khi cuộn qua. */}
-      <div ref={tocRef} className="flex items-center gap-1 px-3 py-2 overflow-x-auto sticky -top-3 sm:-top-6 z-20 rounded-t-2xl" style={{ background: PAL.bg, borderBottom: `1px solid ${PAL.line}` }}>
+      <div ref={tocRef} id="mr-toc" className="flex items-center gap-1 px-3 py-2 overflow-x-auto sticky -top-3 sm:-top-6 z-20 rounded-t-2xl" style={{ background: PAL.bg, borderBottom: `1px solid ${PAL.line}` }}>
         {visibleSections.map((sec) => (
           <button
             key={sec.id}
+            data-sec={sec.id}
             onClick={() => scrollTo(sec.id)}
             aria-current={activeSec === sec.id ? "true" : undefined}
             className="px-3 py-1.5 text-xs font-bold whitespace-nowrap rounded-lg hover:opacity-100 focus-visible:outline focus-visible:outline-2"
@@ -1093,6 +1096,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
         ))}
         <button
           onClick={handleExportAll}
+          data-export-hide
           title="Xuất toàn bộ Report Tháng ra 1 file Excel nhiều sheet"
           className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap shrink-0"
           style={{ background: PAL.panel2, border: `1px solid ${PAL.line}`, color: PAL.gold }}
