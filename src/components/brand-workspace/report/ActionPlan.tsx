@@ -1,259 +1,20 @@
-import React, { useState } from "react";
-import { ClipboardCheck, ListChecks, Plus, Trash2 } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
 import {
-  ACTION_METRICS,
-  ACTION_SCOPES,
-  ACTION_SCOPE_LABEL,
   ACTION_STATUS_LABEL,
-  gradeHeadline,
   newActionItem,
-  parseThreshold,
-  suggestThreshold,
-  thresholdInputText,
   trackLabel,
   type ActionGrade,
-  type ActionGradeContext,
   type ActionGradeStatus,
-  type ActionItem,
-  type ActionMetricKey,
-  type ActionScope
+  type ActionItem
 } from "../../../lib/report/actionPlan";
+import type { TodoMetaMap } from "../../../lib/report/nextMonthPlan";
 import { errorMessage } from "../../../lib/errorMessage";
-import { LINK_BTN, PAL } from "./theme";
-import { Panel, ReportTable } from "./ui";
 
-// Action plan tháng sau (0182) — 3 cột Hành động · Căn cứ · Chỉ tiêu theo dõi; report tháng sau tự chấm (lib/report/actionPlan.ts).
+// Hai khối cuối trang "Kế hoạch tháng sau" theo bản demo Report Tháng (#p9): "Đánh giá lại việc đề ra ở report tháng trước" (doneTbl)
+// và "Việc tháng sau" (todoTbl: bấm vào ô để sửa, Deadline, PIC chính, thêm/xoá việc). Markup/class nguyên từ demo.css.
+// Lưu: action plan ở cột action_plan (0182), Deadline + PIC ở section_notes (lib/report/nextMonthPlan.ts).
 
-const rowStyle = (idx: number) => ({ borderBottom: `1px solid ${PAL.line}`, background: idx % 2 ? `${PAL.panel2}55` : "transparent" });
-const FIELD = "w-full rounded-lg px-2.5 py-1.5 text-[13px] min-h-[32px]";
-const fieldStyle = { background: PAL.panel, border: `1px solid ${PAL.line}`, color: PAL.cream };
-
-type DraftRow = ActionItem & { mode: "metric" | "text"; thresholdText: string };
-
-const toDraft = (i: ActionItem): DraftRow => ({
-  ...i,
-  mode: i.target ? "metric" : "text",
-  thresholdText: i.target ? thresholdInputText(i.target.metric, i.target.value) : ""
-});
-const kindOf = (k: ActionMetricKey) => ACTION_METRICS.find((m) => m.key === k)!.kind;
-
-export const ActionPlanPanel: React.FC<{
-  items: ActionItem[] | null;
-  /** Việc tự sinh từ Insight — hiện khi chưa có plan, và là gợi ý khi lập plan. */
-  fallbackLines: string[];
-  nextMonthLabel: string;
-  /** Số tháng này — để gợi ý ngưỡng khi chọn chỉ số. */
-  ctx: ActionGradeContext;
-  canManage: boolean;
-  onSave: (items: ActionItem[]) => Promise<void>;
-}> = ({ items, fallbackLines, nextMonthLabel, ctx, canManage, onSave }) => {
-  const [draft, setDraft] = useState<DraftRow[] | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const start = () => {
-    setDraft((items?.length ? items : fallbackLines.map((l) => newActionItem(l))).map(toDraft));
-    setError(null);
-  };
-  const patch = (id: string, p: Partial<DraftRow>) => setDraft((d) => d && d.map((r) => (r.id === id ? { ...r, ...p } : r)));
-  const pickMetric = (r: DraftRow, metric: ActionMetricKey, scope: ActionScope) => {
-    const sug = suggestThreshold(metric, scope, ctx);
-    patch(r.id, { target: { metric, scope, op: r.target?.op ?? "gte", value: sug ?? r.target?.value ?? 0 }, thresholdText: sug != null ? thresholdInputText(metric, sug) : "" });
-  };
-  const save = async (rows: DraftRow[]) => {
-    const out: ActionItem[] = [];
-    for (const [i, r] of rows.entries()) {
-      if (!r.action.trim()) continue;
-      let target = null;
-      if (r.mode === "metric") {
-        const metric = r.target?.metric ?? "gmvPerHour";
-        const value = parseThreshold(r.thresholdText, kindOf(metric));
-        if (value == null) {
-          setError(`Việc ${i + 1}: chưa đọc được ngưỡng "${r.thresholdText}" — gõ số như 19.900.000, 19,9M hoặc 1,25.`);
-          return;
-        }
-        target = { metric, scope: r.target?.scope ?? "all", op: r.target?.op ?? "gte", value };
-      }
-      out.push({ id: r.id, action: r.action.trim(), basis: r.basis.trim(), target, trackText: target ? "" : r.trackText.trim(), manual: target ? null : r.manual });
-    }
-    setSaving(true);
-    setError(null);
-    try {
-      await onSave(out);
-      setDraft(null);
-    } catch (e) {
-      const msg = errorMessage(e, "Lưu action plan thất bại");
-      setError(/action_plan/.test(msg) ? "Chưa có cột action_plan — cần chạy migration 0182 trong SQL Editor." : msg);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  if (draft) {
-    return (
-      <Panel title={`Action plan ${nextMonthLabel}`} icon={<ListChecks className="w-4 h-4" />} sub="Mỗi việc: hành động · căn cứ (số tháng này) · chỉ tiêu theo dõi. Chỉ tiêu bằng số thì report tháng sau tự chấm.">
-        <div className="space-y-3">
-          {draft.map((r, i) => (
-            <div key={r.id} className="rounded-xl p-3 space-y-2" style={{ background: PAL.panel2, border: `1px solid ${PAL.line}` }}>
-              <div className="flex items-start gap-2">
-                <span className="text-xs font-black pt-2 w-5 shrink-0" style={{ color: PAL.gold }}>{i + 1}</span>
-                <label className="flex-1 min-w-0 space-y-1">
-                  <span className="text-[11px] font-semibold" style={{ color: PAL.muted }}>Hành động</span>
-                  <textarea value={r.action} onChange={(e) => patch(r.id, { action: e.target.value })} rows={2} className={FIELD} style={fieldStyle} />
-                </label>
-                <button
-                  onClick={() => setDraft((d) => d && d.filter((x) => x.id !== r.id))}
-                  className="mt-6 p-1.5 rounded-lg min-w-[28px] min-h-[28px]"
-                  style={{ color: PAL.muted, border: `1px solid ${PAL.line}` }}
-                  aria-label={`Xoá việc ${i + 1}`}
-                  title="Xoá việc này"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-              <div className="pl-7 space-y-2">
-                <label className="block space-y-1">
-                  <span className="text-[11px] font-semibold" style={{ color: PAL.muted }}>Căn cứ</span>
-                  <input value={r.basis} onChange={(e) => patch(r.id, { basis: e.target.value })} placeholder="Số của tháng này dẫn tới việc này" className={FIELD} style={fieldStyle} />
-                </label>
-                <div className="space-y-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[11px] font-semibold" style={{ color: PAL.muted }}>Chỉ tiêu theo dõi</span>
-                    {(["metric", "text"] as const).map((m) => (
-                      <button
-                        key={m}
-                        onClick={() => (m === "metric" && !r.target ? (patch(r.id, { mode: m }), pickMetric({ ...r, mode: m }, "gmvPerHour", "all")) : patch(r.id, { mode: m }))}
-                        className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold min-h-[26px] ${r.mode === m ? "seg-on" : ""}`}
-                        style={r.mode === m ? undefined : { color: PAL.muted, border: `1px solid ${PAL.line}` }}
-                      >
-                        {m === "metric" ? "App chấm bằng số" : "Ops tự chấm"}
-                      </button>
-                    ))}
-                  </div>
-                  {r.mode === "metric" ? (
-                    <div className="flex flex-wrap gap-2">
-                      <select
-                        value={r.target?.metric ?? "gmvPerHour"}
-                        onChange={(e) => pickMetric(r, e.target.value as ActionMetricKey, r.target?.scope ?? "all")}
-                        className={`${FIELD} flex-1 basis-40 min-w-0`}
-                        style={fieldStyle}
-                        aria-label="Chỉ số"
-                      >
-                        {ACTION_METRICS.map((m) => (
-                          <option key={m.key} value={m.key}>{m.label}</option>
-                        ))}
-                      </select>
-                      <select
-                        value={r.target?.scope ?? "all"}
-                        onChange={(e) => pickMetric(r, r.target?.metric ?? "gmvPerHour", e.target.value as ActionScope)}
-                        className={`${FIELD} w-32`}
-                        style={fieldStyle}
-                        aria-label="Phạm vi"
-                      >
-                        {ACTION_SCOPES.map((s) => (
-                          <option key={s} value={s}>{ACTION_SCOPE_LABEL[s]}</option>
-                        ))}
-                      </select>
-                      <select
-                        value={r.target?.op ?? "gte"}
-                        onChange={(e) => r.target && patch(r.id, { target: { ...r.target, op: e.target.value as "gte" | "lte" } })}
-                        className={`${FIELD} w-16`}
-                        style={fieldStyle}
-                        aria-label="So sánh"
-                      >
-                        <option value="gte">≥</option>
-                        <option value="lte">≤</option>
-                      </select>
-                      <input
-                        value={r.thresholdText}
-                        onChange={(e) => patch(r.id, { thresholdText: e.target.value })}
-                        className={`${FIELD} w-36 font-mono`}
-                        style={fieldStyle}
-                        aria-label="Ngưỡng"
-                      />
-                    </div>
-                  ) : (
-                    <input value={r.trackText} onChange={(e) => patch(r.id, { trackText: e.target.value })} placeholder="vd. Số creator hoạt động; tỷ trọng creator lớn nhất" className={FIELD} style={fieldStyle} />
-                  )}
-                  {r.mode === "metric" && r.target && (
-                    <p className="text-[11px]" style={{ color: PAL.muted }}>
-                      Tháng này: {(() => {
-                        const v = suggestThreshold(r.target.metric, r.target.scope, ctx);
-                        return r.target.metric === "pctTarget" || v == null ? "—" : thresholdInputText(r.target.metric, v);
-                      })()} · ô ngưỡng mặc định lấy số tháng này, sửa thành mức muốn đạt.
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
-          <button onClick={() => setDraft((d) => [...(d ?? []), toDraft(newActionItem())])} className="flex items-center gap-1.5 text-xs font-bold min-h-[28px]" style={{ color: PAL.gold }}>
-            <Plus className="w-3.5 h-3.5" /> Thêm việc
-          </button>
-          {error && <p className="text-xs font-semibold" style={{ color: PAL.red }}>{error}</p>}
-          <div className="flex flex-wrap gap-2 pt-1">
-            <button onClick={() => save(draft)} disabled={saving} className="px-4 py-2 rounded-lg text-xs font-bold disabled:opacity-60" style={{ background: PAL.gold, color: "#1a1500" }}>
-              {saving ? "Đang lưu…" : "Lưu action plan"}
-            </button>
-            <button onClick={() => setDraft(null)} disabled={saving} className="px-4 py-2 rounded-lg text-xs font-bold" style={{ background: PAL.panel2, border: `1px solid ${PAL.line}`, color: PAL.muted }}>
-              Huỷ
-            </button>
-            {items && items.length > 0 && (
-              <button onClick={() => save([])} disabled={saving} className="px-4 py-2 rounded-lg text-xs font-bold" style={{ color: PAL.muted }}>
-                Xoá action plan (dùng lại danh sách tự sinh)
-              </button>
-            )}
-          </div>
-        </div>
-      </Panel>
-    );
-  }
-
-  if (!items?.length) {
-    return (
-      <div className="rounded-xl p-4" style={{ background: PAL.panel, border: `1px solid ${PAL.gold}44` }}>
-        <div className="text-xs mb-2 font-bold" style={{ color: PAL.gold }}>Hành động {nextMonthLabel}</div>
-        <ol className="space-y-2 text-sm leading-relaxed list-decimal pl-5" style={{ color: PAL.cream }}>
-          {fallbackLines.map((l, i) => (
-            <li key={i}>{l}</li>
-          ))}
-        </ol>
-        {canManage && (
-          <div className="flex flex-wrap items-center gap-3 pt-3 mt-3 text-[11px]" style={{ borderTop: `1px solid ${PAL.line}`, color: PAL.muted }}>
-            <span>Bản tự sinh từ Insight — chưa có căn cứ và chỉ tiêu theo dõi, report tháng sau không chấm được.</span>
-            <button onClick={start} className={LINK_BTN} style={{ color: PAL.gold }}>
-              Lập action plan
-            </button>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <Panel title={`Action plan ${nextMonthLabel}`} icon={<ListChecks className="w-4 h-4" />} sub={`Report ${nextMonthLabel} tự chấm các chỉ tiêu bằng số khi đủ số cả tháng`}>
-      <ReportTable head={["#", "Hành động", "Căn cứ", "Chỉ tiêu theo dõi"]} leftCols={[1, 2, 3]}>
-        {items.map((it, idx) => (
-          <tr key={it.id} style={rowStyle(idx)}>
-            <td className="py-2 px-3 font-mono align-top" style={{ color: PAL.gold }}>{idx + 1}</td>
-            <td className="py-2 px-3 align-top text-left font-semibold w-[44%] min-w-[220px]" style={{ color: PAL.cream }}>{it.action}</td>
-            <td className="py-2 px-3 align-top text-left w-[28%] min-w-[160px]" style={{ color: PAL.muted }}>{it.basis || "—"}</td>
-            <td className="py-2 px-3 align-top text-left w-[28%] min-w-[160px]" style={{ color: PAL.cream }}>{trackLabel(it)}</td>
-          </tr>
-        ))}
-      </ReportTable>
-      {canManage && (
-        <div className="pt-3 text-[11px]">
-          <button onClick={start} className={LINK_BTN} style={{ color: PAL.gold }}>
-            Sửa action plan
-          </button>
-        </div>
-      )}
-    </Panel>
-  );
-};
-
-const STATUS_COLOR: Record<ActionGradeStatus, string> = { met: PAL.green, missed: PAL.red, tracking: PAL.blue, nodata: PAL.muted, awaiting: PAL.gold };
+const PILL: Record<ActionGradeStatus, string> = { met: "g", missed: "r", tracking: "y", nodata: "m", awaiting: "y" };
 
 export const ActionResultsPanel: React.FC<{
   planMonthLabel: string;
@@ -279,48 +40,181 @@ export const ActionResultsPanel: React.FC<{
     }
   };
   return (
-    <Panel
-      title={`Kết quả action plan ${planMonthLabel}`}
-      icon={<ClipboardCheck className="w-4 h-4" />}
-      sub={`Việc đặt ra ở report ${planMonthLabel} · chấm bằng số ${monthLabel}${throughNote ? ` (${throughNote})` : ""} · việc không đo bằng số do YFB chấm`}
-    >
-      <p className="text-sm font-black mb-3" style={{ color: PAL.cream }}>{gradeHeadline(monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1), grades, final)}</p>
-      <ReportTable head={["#", "Hành động", "Chỉ tiêu theo dõi", "Thực đạt", "Kết quả"]} leftCols={[1, 2]}>
-        {items.map((it, idx) => {
-          const g = grades[idx];
-          const showOnTrack = g.status === "tracking" && g.onTrack != null;
-          return (
-            <tr key={it.id} style={rowStyle(idx)}>
-              <td className="py-2 px-3 font-mono align-top" style={{ color: PAL.gold }}>{idx + 1}</td>
-              <td className="py-2 px-3 align-top text-left w-[42%] min-w-[220px]" style={{ color: PAL.cream }}>{it.action}</td>
-              <td className="py-2 px-3 align-top text-left min-w-[170px]" style={{ color: PAL.muted }}>{trackLabel(it)}</td>
-              <td className="py-2 px-3 align-top text-right font-mono" style={{ color: PAL.cream }}>{g.actualText}</td>
-              <td className="py-2 px-3 align-top text-right min-w-[120px]">
-                <span className="font-bold" style={{ color: STATUS_COLOR[g.status] }}>
-                  {ACTION_STATUS_LABEL[g.status]}
-                  {showOnTrack ? ` · ${g.onTrack ? "đang ở mức đạt" : "đang dưới mức"}` : ""}
-                </span>
-                {canManage && g.manual && final && (
-                  <div className="flex justify-end gap-2 mt-1 text-[11px]">
-                    {(["met", "missed"] as const).map((s) => (
-                      <button
-                        key={s}
-                        onClick={() => mark(it.id, it.manual?.status === s ? null : s)}
-                        disabled={busy === it.id}
-                        className={`px-2 py-0.5 rounded-md min-h-[24px] ${it.manual?.status === s ? "seg-on" : ""}`}
-                        style={it.manual?.status === s ? undefined : { color: PAL.muted, border: `1px solid ${PAL.line}` }}
-                      >
-                        {ACTION_STATUS_LABEL[s]}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </td>
-            </tr>
-          );
-        })}
-      </ReportTable>
-      {error && <p className="text-xs font-semibold mt-2" style={{ color: PAL.red }}>{error}</p>}
-    </Panel>
+    <div className="pn">
+      <div className="pnh">Đánh giá lại việc đề ra ở report {planMonthLabel}</div>
+      <div className="pns">Việc đặt ra ở report {planMonthLabel}, chấm bằng số {monthLabel}{throughNote ? ` (${throughNote})` : ""}. Việc không đo bằng số do YFB đánh giá.</div>
+      <div className="tw">
+        <table id="doneTbl">
+          <thead><tr><th className="w">Việc</th><th className="w">Chỉ tiêu</th><th className="w">Kết quả {monthLabel}</th><th>Trạng thái</th></tr></thead>
+          <tbody>
+            {items.map((it, idx) => {
+              const g = grades[idx];
+              const onTrack = g.status === "tracking" && g.onTrack != null ? ` · ${g.onTrack ? "đang ở mức đạt" : "đang dưới mức"}` : "";
+              return (
+                <tr key={it.id}>
+                  <td className="w">{it.action}</td>
+                  <td className="w">{trackLabel(it)}</td>
+                  <td className="w">{g.actualText}</td>
+                  <td>
+                    <span className={`pill ${PILL[g.status]}`}>{ACTION_STATUS_LABEL[g.status].toLowerCase()}{onTrack}</span>
+                    {canManage && g.manual && final && (
+                      <div style={{ display: "flex", gap: 6, marginTop: 6, justifyContent: "flex-end" }}>
+                        {(["met", "missed"] as const).map((s) => (
+                          <button key={s} type="button" className={`addbk ${it.manual?.status === s ? "seg-on" : ""}`} disabled={busy === it.id} onClick={() => mark(it.id, it.manual?.status === s ? null : s)}>
+                            {ACTION_STATUS_LABEL[s]}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {error && <div className="legend"><span className="dn">{error}</span></div>}
+    </div>
+  );
+};
+
+// ---------- Việc tháng sau ----------
+
+interface Row extends ActionItem {
+  deadline: string;
+  pic: string;
+  /** Chỉ tiêu bằng số gốc — giữ lại để chuyển "Ops đánh giá" rồi quay về "App đánh giá" không mất. */
+  origTarget: ActionItem["target"];
+}
+const toRow = (i: ActionItem, meta: TodoMetaMap): Row => ({ ...i, deadline: meta[i.id]?.deadline ?? "", pic: meta[i.id]?.pic ?? "", origTarget: i.target });
+const today = () => new Date().toISOString().slice(0, 10);
+
+/** Ô sửa tại chỗ: nội dung đặt một lần khi gắn vào DOM, gõ không làm React vẽ lại (giữ con trỏ). */
+const Ce: React.FC<{ init: string; ph: string; field: string; editable: boolean; onText: (v: string) => void }> = ({ init, ph, field, editable, onText }) => (
+  <div
+    className="ce"
+    contentEditable={editable}
+    suppressContentEditableWarning
+    role="textbox"
+    aria-label={ph}
+    data-f={field}
+    data-ph={ph}
+    ref={(el) => {
+      if (el && el.dataset.init !== "1") {
+        el.textContent = init;
+        el.dataset.init = "1";
+      }
+    }}
+    onInput={(e) => onText((e.currentTarget.innerText ?? "").replace(/ /g, " ").trim())}
+  />
+);
+
+export const ActionPlanPanel: React.FC<{
+  items: ActionItem[] | null;
+  /** Việc tự sinh từ Insight — hiện khi chưa có plan, và là bản gốc khi bấm Khôi phục. */
+  fallbackLines: string[];
+  nextMonthLabel: string;
+  canManage: boolean;
+  /** Deadline + PIC chính theo id việc — lưu ở section_notes (lib/report/nextMonthPlan.ts), không nằm trong action_plan. */
+  meta?: TodoMetaMap;
+  onSave: (items: ActionItem[], meta: TodoMetaMap) => Promise<void>;
+}> = ({ items, fallbackLines, nextMonthLabel, canManage, meta = {}, onSave }) => {
+  const fallbackKey = fallbackLines.join("\n");
+  const build = (): Row[] => (items?.length ? items : fallbackLines.map((l) => newActionItem(l))).map((i) => toRow(i, meta));
+  const [rows, setRows] = useState<Row[]>(build);
+  const rowsRef = useRef(rows);
+  rowsRef.current = rows;
+  const [status, setStatus] = useState("");
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const dirty = useRef(false);
+  // Nạp lại khi plan đã lưu đổi từ nơi khác (chưa có sửa dở).
+  useEffect(() => {
+    if (!dirty.current) setRows(build());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, fallbackKey]);
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  const persist = async (list: Row[]) => {
+    const out: ActionItem[] = list.filter((r) => r.action.trim()).map(({ deadline: _d, pic: _p, origTarget: _o, ...i }) => ({ ...i, action: i.action.trim(), basis: i.basis.trim(), trackText: i.target ? "" : i.trackText.trim() }));
+    const m: TodoMetaMap = Object.fromEntries(list.filter((r) => out.some((o) => o.id === r.id) && (r.deadline || r.pic.trim())).map((r) => [r.id, { deadline: r.deadline, pic: r.pic.trim() }]));
+    try {
+      await onSave(out, m);
+      dirty.current = false;
+      setStatus("Đã lưu");
+    } catch (e) {
+      const msg = errorMessage(e, "Lưu action plan thất bại");
+      setStatus(/action_plan/.test(msg) ? "Chưa có cột action_plan — cần chạy migration 0182 trong SQL Editor." : msg);
+    }
+  };
+  const queue = (list: Row[], now = false) => {
+    rowsRef.current = list;
+    dirty.current = true;
+    clearTimeout(timer.current);
+    setStatus("Đang lưu…");
+    if (now) void persist(list);
+    else timer.current = setTimeout(() => void persist(rowsRef.current), 700);
+  };
+  // Sửa chữ: đổi ref không vẽ lại, chỉ hẹn lưu.
+  const text = (id: string, f: "action" | "basis" | "trackText", v: string) => queue(rowsRef.current.map((r) => (r.id === id ? { ...r, [f]: v } : r)));
+  const patch = (id: string, p: Partial<Row>) => {
+    const list = rowsRef.current.map((r) => (r.id === id ? { ...r, ...p } : r));
+    setRows(list);
+    queue(list);
+  };
+  const withD = rows.filter((r) => r.deadline).length;
+  const withP = rows.filter((r) => r.pic.trim()).length;
+  const late = rows.filter((r) => r.deadline && r.deadline < today()).length;
+  const n = rows.length;
+  return (
+    <div className="pn">
+      <div className="pnh">Việc {nextMonthLabel}</div>
+      <div className="pns">
+        {canManage
+          ? `Việc và căn cứ là bản tự sinh của app khi chưa lưu; cột chỉ tiêu là đề xuất. Bấm vào ô để sửa nội dung, đặt Deadline và PIC chính, thêm hoặc xoá việc. Nội dung sửa được lưu vào report ${nextMonthLabel}.`
+          : "Việc, căn cứ và chỉ tiêu theo dõi cho tháng sau; report tháng sau tự đánh giá các chỉ tiêu đo bằng số."}
+      </div>
+      <div className="tw">
+        <table id="todoTbl">
+          <thead><tr><th className="w">Việc</th><th className="w">Căn cứ</th><th className="w">Chỉ tiêu đề xuất</th><th>Deadline</th><th>PIC chính</th><th>Đánh giá</th><th></th></tr></thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.id}>
+                <td className="w"><Ce init={r.action} ph="Việc cần làm" field="a" editable={canManage} onText={(v) => text(r.id, "action", v)} /></td>
+                <td className="w"><Ce init={r.basis} ph="Căn cứ" field="b" editable={canManage} onText={(v) => text(r.id, "basis", v)} /></td>
+                <td className="w">
+                  {r.target ? (
+                    <div className="ce" title="Chỉ tiêu bằng số — app tự chấm ở report tháng sau">{trackLabel(r)}</div>
+                  ) : (
+                    <Ce key="t" init={r.trackText} ph="Chỉ tiêu" field="t" editable={canManage} onText={(v) => text(r.id, "trackText", v)} />
+                  )}
+                </td>
+                <td><input className="rr" type="date" style={{ width: 118 }} value={r.deadline} disabled={!canManage} aria-label="Deadline" onChange={(e) => patch(r.id, { deadline: e.target.value })} /></td>
+                <td><input className="rr" style={{ width: 88 }} placeholder="tên PIC" value={r.pic} disabled={!canManage} aria-label="PIC chính" onChange={(e) => patch(r.id, { pic: e.target.value })} /></td>
+                <td>
+                  <select
+                    className="rr"
+                    style={{ width: 112 }}
+                    aria-label="Ai đánh giá"
+                    disabled={!canManage}
+                    value={r.target ? "app" : "ops"}
+                    onChange={(e) => (e.target.value === "app" ? r.origTarget && patch(r.id, { target: r.origTarget, trackText: "" }) : patch(r.id, { target: null, trackText: r.trackText || trackLabel(r) }))}
+                  >
+                    <option value="app" disabled={!r.origTarget}>App đánh giá</option>
+                    <option value="ops">Ops đánh giá</option>
+                  </select>
+                </td>
+                <td>{canManage && <button type="button" className="delbk" aria-label="Xoá việc" onClick={() => { const list = rowsRef.current.filter((x) => x.id !== r.id); setRows(list); queue(list, true); }}>×</button>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="legend">
+        {canManage && <button type="button" className="addbk" onClick={() => { const list = [...rowsRef.current, toRow(newActionItem(), {})]; setRows(list); queue(list); }}>+ Thêm việc</button>}
+        {canManage && items?.length ? <button type="button" className="addbk" style={{ color: "var(--muted)", borderColor: "var(--line)", background: "transparent" }} onClick={async () => { clearTimeout(timer.current); dirty.current = false; try { await onSave([], {}); setRows(fallbackLines.map((l) => toRow(newActionItem(l), {}))); setStatus("Đã khôi phục bản gốc"); } catch (e) { setStatus(errorMessage(e, "Khôi phục thất bại")); } }}>Khôi phục bản gốc</button> : null}
+        <span><b style={{ color: "var(--cream)" }}>{n} việc</b> · có Deadline {withD}/{n} · có PIC {withP}/{n}{late ? <> · <span className="dn">quá hạn {late}</span></> : null}</span>
+        <span className="st" aria-live="polite">{status}</span>
+      </div>
+    </div>
   );
 };

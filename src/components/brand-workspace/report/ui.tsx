@@ -1,12 +1,13 @@
 import React, { useState } from "react";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Cell } from "recharts";
-import { BarChart3, Lightbulb, ChevronDown, Loader2, Save } from "lucide-react";
+import { BarChart3, Lightbulb, ChevronDown, ChevronLeft, ChevronRight, Download, Loader2, Save } from "lucide-react";
 import { metricHint } from "../../../lib/metricGlossary";
 import { DRIVER_LABEL, DriverBreakdown } from "../../../lib/report/monthlyReportInsights";
 import { insightToText, parseInsightText, SectionInsight } from "../../../lib/report/sectionInsights";
 import { errorMessage } from "../../../lib/errorMessage";
 
 import { fmtFixed, fmtVndShort } from "../../../lib/format";
+import type { ReportSectionId } from "./theme";
 import { LINK_BTN, PAL, DRIVER_SHORT, chartTooltipStyle } from "./theme";
 import { chartNum } from "./format";
 import { STAT_LABEL_SHAPE } from "../../common/StatTile";
@@ -151,6 +152,133 @@ export const SectionHead: React.FC<{ no: string; title: string; sub?: string }> 
       <span className="text-[11px]" style={{ color: PAL.muted }}>
         {sub}
       </span>
+    )}
+  </div>
+);
+
+// ---------- Khung "mỗi trang một màn" (28/10/2026, demo Report Tháng đã chốt) ----------
+// PageHead = số trang + tiêu đề kết luận (action title) + hàng ≤4 ô chỉ số. Ô: nhãn cố định 2 dòng để số lớn thẳng hàng; số chính là
+// GMV/số tuyệt đối; % Target chỉ là huy hiệu cạnh số (xanh ≥100%, vàng 90–100%, đỏ <90%), chú thích nhỏ bên dưới.
+export interface PageMetric {
+  label: string;
+  value: string;
+  /** % Target (hoặc % KPI) — vẽ thành huy hiệu cạnh số; null/undefined = không có. */
+  badge?: number | null;
+  /** Thay chữ huy hiệu (mặc định "<pct>% Target"). */
+  badgeLabel?: string;
+  /** % đổi so với kỳ so sánh — dòng ▲/▼ nhỏ khi ô không có huy hiệu. */
+  change?: number | null;
+  note?: string;
+}
+
+export const badgeTone = (p: number) => (p >= 100 ? PAL.green : p >= 90 ? PAL.gold : PAL.red);
+
+export const PageMetricCard: React.FC<PageMetric> = ({ label, value, badge, badgeLabel, change, note }) => (
+  <div className="min-w-0 rounded-xl p-4" style={{ background: PAL.panel2, border: `1px solid ${PAL.line}` }}>
+    <div className="text-[11px] font-bold leading-snug line-clamp-2 min-h-[2.75em]" style={{ color: PAL.muted }} title={metricHint(label)}>
+      {label}
+    </div>
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
+      <span className="font-mono text-2xl font-bold" style={{ color: PAL.cream }}>
+        {value}
+      </span>
+      {badge != null && (
+        <span className="rounded-md px-1.5 py-0.5 text-[11px] font-bold whitespace-nowrap" style={{ color: badgeTone(badge), border: `1px solid ${badgeTone(badge)}`, background: `${badgeTone(badge)}1f` }}>
+          {badgeLabel ?? `${fmtFixed(badge, 0)}% Target`}
+        </span>
+      )}
+    </div>
+    {change != null && (
+      <div className="text-[11px] mt-1 font-bold" style={{ color: change >= 0 ? PAL.green : PAL.red }}>
+        {change >= 0 ? "▲" : "▼"} {fmtFixed(Math.abs(change), 1)}% cùng kỳ
+      </div>
+    )}
+    {note && (
+      <div className="text-[11px] mt-1" style={{ color: PAL.muted }}>
+        {note}
+      </div>
+    )}
+  </div>
+);
+
+export const PageHead: React.FC<{ no: string; title: string; sub?: string; headline?: string; metrics?: PageMetric[] }> = ({ no, title, headline, metrics }) => (
+  <>
+    <div className="ph">
+      <div className="pt">{no} · {title}</div>
+      <h2>{headline ?? title}</h2>
+    </div>
+    {metrics && metrics.length > 0 && (
+      <div className="kpis" data-testid="page-metrics">
+        {metrics.slice(0, 4).map((m, i) => (
+          <div key={i} className="kpi">
+            <div className="lab" title={metricHint(m.label)}>{m.label}</div>
+            <div className="val">{m.value}</div>
+            {(m.badge != null || m.change != null || m.note) && (
+              <div className="note">
+                {m.badge != null && <span className={`pc ${m.badge >= 100 ? "up" : m.badge >= 90 ? "am" : "dn"}`}>{m.badgeLabel ?? `${fmtFixed(m.badge, 0)}% Target`}</span>}
+                {m.change != null && <span className={m.change >= 0 ? "up" : "dn"}>{m.change >= 0 ? "▲" : "▼"} {fmtFixed(Math.abs(m.change), 1)}% cùng kỳ </span>}
+                {m.note}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    )}
+  </>
+);
+
+type RailItem = { id: ReportSectionId; label: string };
+
+// Thanh trang: hàng tab ngang cuộn được, dính mép trên (user bỏ cột bên trái 28/10 vì chiếm diện tích). `forExport` (file gửi brand) không dùng
+// thành phần này — file xuất hiện đủ 10 trang nên dùng mục lục cuộn cũ (nút data-sec, script của exportStandaloneHtml.ts).
+export const PageRail = React.forwardRef<HTMLElement, { items: RailItem[]; current: ReportSectionId; onSelect: (id: ReportSectionId) => void; onExcel: () => void }>(({ items, current, onSelect, onExcel }, ref) => (
+  <nav
+    ref={ref}
+    aria-label="Các trang của report"
+    className="flex items-center gap-1 px-3 py-2 overflow-x-auto sticky -top-3 sm:-top-6 z-20 rounded-t-2xl"
+    style={{ background: PAL.bg, borderBottom: `1px solid ${PAL.line}` }}
+  >
+    {items.map((it, i) => (
+      <button
+        key={it.id}
+        data-rail={it.id}
+        onClick={() => onSelect(it.id)}
+        aria-current={current === it.id ? "page" : undefined}
+        className="px-3 py-1.5 text-xs font-bold whitespace-nowrap rounded-lg text-left focus-visible:outline focus-visible:outline-2"
+        style={current === it.id ? { color: PAL.gold, background: PAL.panel2 } : { color: PAL.muted }}
+      >
+        <span className="font-mono mr-1.5">{i + 1}</span>
+        {it.label}
+      </button>
+    ))}
+    <button
+      onClick={onExcel}
+      data-export-hide
+      title="Xuất toàn bộ Report Tháng ra 1 file Excel nhiều sheet"
+      className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap shrink-0"
+      style={{ background: PAL.panel2, border: `1px solid ${PAL.line}`, color: PAL.gold }}
+    >
+      <Download className="w-3.5 h-3.5" /> Xuất Excel
+    </button>
+  </nav>
+));
+PageRail.displayName = "PageRail";
+
+export const PagePager: React.FC<{ prev: RailItem | null; next: RailItem | null; onSelect: (id: ReportSectionId) => void }> = ({ prev, next, onSelect }) => (
+  <div className="flex items-center justify-between gap-3 pt-4" style={{ borderTop: `1px solid ${PAL.line}` }} data-export-hide>
+    {prev ? (
+      <button onClick={() => onSelect(prev.id)} className={`${LINK_BTN} no-underline gap-1`} style={{ color: PAL.gold }}>
+        <ChevronLeft className="w-4 h-4" /> Trang trước · {prev.label}
+      </button>
+    ) : (
+      <span />
+    )}
+    {next ? (
+      <button onClick={() => onSelect(next.id)} className={`${LINK_BTN} no-underline gap-1`} style={{ color: PAL.gold }}>
+        Trang sau · {next.label} <ChevronRight className="w-4 h-4" />
+      </button>
+    ) : (
+      <span />
     )}
   </div>
 );
@@ -342,3 +470,7 @@ export const NarrativeEditor: React.FC<{
     </div>
   </div>
 );
+
+
+/** "Insight tổng hợp" cuối mỗi trang: markup demo (DemoShopWhy.tsx); bản sửa lưu ở section_notes. */
+export { DemoInsight as PageInsight } from "./DemoShopWhy";

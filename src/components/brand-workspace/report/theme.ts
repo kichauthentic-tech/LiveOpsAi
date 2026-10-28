@@ -37,17 +37,20 @@ export const chartTooltipStyle = { background: PAL.panel2, border: `1px solid ${
 // kèm lời nhắc tải file), số trang đánh lại theo các trang đang hiện. Công cụ nhập liệu nằm ở Nhập Ads / Affiliate / Kế Hoạch Tháng.
 
 export type ReportSectionId = "summary" | "shop" | "why" | "products" | "ads" | "nmv" | "people" | "affiliate" | "next" | "keymetrics";
+// Thứ tự trang (user chốt 28/10 theo demo Report Tháng): Tổng quan → Key Metrics (bảng tra cứu đứng ngay sau kết luận) → Hủy, hoàn & NMV
+// (tiền thật đặt sớm) → Toàn shop → Nguyên nhân → Sản phẩm → Host → Quảng cáo → Affiliate → Kế hoạch tháng sau.
+// MonthlyReportTabs dựng DOM theo thứ tự cũ và xếp lại bằng CSS `order` theo mảng này (secOrder) — đổi thứ tự chỉ cần sửa mảng.
 export const SECTIONS: { id: ReportSectionId; label: string; title: string }[] = [
   { id: "summary", label: "Tổng quan", title: "Tổng quan & KPI" },
-  { id: "shop", label: "Toàn shop", title: "Toàn shop & đóng góp của livestream" },
+  { id: "keymetrics", label: "Key Metrics", title: "Key Metrics" },
+  { id: "nmv", label: "NMV", title: "Hủy, hoàn & NMV" },
+  { id: "shop", label: "Toàn shop", title: "Toàn shop & đóng góp của livestream YFB" },
   { id: "why", label: "Nguyên nhân", title: "Phân tích nguyên nhân" },
   { id: "products", label: "Sản phẩm", title: "Sản phẩm & khuyến mãi" },
-  { id: "ads", label: "Ads", title: "Quảng cáo" },
-  { id: "nmv", label: "NMV", title: "Hủy, hoàn & NMV" },
   { id: "people", label: "Host", title: "Host & khung giờ" },
+  { id: "ads", label: "Ads", title: "Quảng cáo" },
   { id: "affiliate", label: "Affiliate", title: "Affiliate" },
-  { id: "next", label: "Tháng sau", title: "Kế hoạch tháng sau & hành động" },
-  { id: "keymetrics", label: "Key Metrics", title: "Key Metrics" }
+  { id: "next", label: "Tháng sau", title: "Kế hoạch tháng sau & hành động" }
 ];
 
 // 4 kênh — màu phân loại theo thứ tự cố định (blue/orange/aqua/yellow, bước tối của bảng màu đã kiểm

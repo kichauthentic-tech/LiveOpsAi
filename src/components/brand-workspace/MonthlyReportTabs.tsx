@@ -1,49 +1,61 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useMediaQuery } from "../../hooks/useMediaQuery";
-import { ResponsiveContainer, ComposedChart, LineChart, ReferenceLine, BarChart, Bar, Line, XAxis, YAxis, Tooltip, CartesianGrid, ScatterChart, Scatter } from "recharts";
-import { Flame, ListOrdered, ShoppingBag, Megaphone, AlertTriangle, CalendarClock, PieChart as PieChartIcon, Activity, Download, Scale } from "lucide-react";
+import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+import { Megaphone, AlertTriangle, Download } from "lucide-react";
 import { LiveSession, BrandMonthlyReport as BrandMonthlyReportType, BrandPlatformRate, ShiftSlot } from "../../types";
 import { planTargetOf } from "../../lib/performance/targetAllocation";
-import { METRIC, metricHint } from "../../lib/metricGlossary";
+import { METRIC } from "../../lib/metricGlossary";
 import { downloadSheetsAsXlsx } from "../../lib/exportXlsx";
 import { useToast } from "../../hooks/useToast";
-import { monthRunRate, monthRunRateFromPlan, pickLivePerfSource } from "../../lib/report/sessionsLivePerf";
-import { planRunRate, projectMonthEnd } from "../../lib/performance/planRunRate";
-import { monthOutlook } from "../../lib/performance/ceoBrief";
+import { pickLivePerfSource } from "../../lib/report/sessionsLivePerf";
+import { planRunRate } from "../../lib/performance/planRunRate";
 import { todayVn } from "../../lib/performance/brandCommitment";
+import { chooseNmvRate, compareRefundRates, refundMonthStatus, type RefundMonthStatus } from "../../lib/refundStatus";
 import { hydrateSnapshotSessions, MonthlyReportSnapshot, reportWindow, snapshotView } from "../../lib/report/monthlySnapshot";
 import { autoNextSteps, autoSummary, campCompare, channelMix, compareWindow, shopCompareWindow, DRIVER_LABEL, driverBreakdown, liveStatsFromRows, LiveStats, NarrativeInput, pctChange, planCampAllocation, RATE_FACTORS, shopKpiProgress, shopTotals, skuMoves } from "../../lib/report/monthlyReportInsights";
-import { controlGroup, liveGmvByDate, controlLabel, controlLine, controlVerdict, dailyGap, dailyGapLine, dayGroupStats, GIFT_MAX_PRICE, giftLine, giftStats, GiftStats, hostReliability, mixRateSplit, VERDICT_TEXT } from "../../lib/report/deepAnalysis";
+import { controlGroup, liveGmvByDate, controlLabel, controlLine, controlVerdict, dailyGap, dailyGapLine, dayGroupStats, GIFT_MAX_PRICE, giftLine, giftStats, GiftStats, hostReliability, isBorderline, mixRateSplit, reliabilityText, VERDICT_TEXT } from "../../lib/report/deepAnalysis";
 import { CreatorLivePerfRow, vnDateOf } from "../../lib/dataraw/creatorLivePerfSlice";
 import { fetchMonthPlan } from "../../lib/db/monthPlans";
 import type { BrandMonthPlan, BrandMonthPlanSlot } from "../../types";
-import { fetchMonthlyReport, saveMonthlyReportActionPlan, saveMonthlyReportNarrative, saveMonthlyReportSectionNote } from "../../lib/db/monthlyReports";
-import { gradeAction, type ActionGradeContext, type ActionItem } from "../../lib/report/actionPlan";
+import { fetchMonthlyReport, saveMonthlyReportActionPlan, saveMonthlyReportSectionNote } from "../../lib/db/monthlyReports";
+import { gradeAction, newActionItem, type ActionGradeContext, type ActionItem } from "../../lib/report/actionPlan";
+import { adsTypeRows } from "../../lib/report/adsSlide";
 import { ActionPlanPanel, ActionResultsPanel } from "./report/ActionPlan";
-import { contextInsight, HostInsightRow, hostVsPeer, InsightSection, insightToText, parseInsightText, peopleInsight, peopleOpsNote, productsInsight, sectionNextSteps, SectionInsight, shopInsight, shortSku, whyInsight } from "../../lib/report/sectionInsights";
+import { BookingPlanPanel, NextLivePlanPanel } from "./report/NextMonthPanels";
+import { REFUND_FINAL_KEY, applyFinalRate, bookingTotals, decodeRefundFinal, decodeTodoMeta, encodeRefundFinal, encodeTodoMeta, refundTrackRows, todoMetaKey } from "../../lib/report/nextMonthPlan";
+import { BLOCK_KEYS, BLOCK_LABEL, decodeEdits, shownBlocks, type InsightBlocks, adsBlocks, affiliateBlocks, keyMetricsBlocks, nextBlocks, nmvBlocks, pageNoteKey, peopleBlocks, productsBlocks, shopBlocks, summaryBlocks, whyBlocks, type InsightPage } from "../../lib/report/pageInsights";
+import { contextInsight, HostInsightRow, hostVsPeer, InsightSection, peopleInsight, peopleOpsNote, productsInsight, sectionNextSteps, SectionInsight, shopInsight, shortSku, whyInsight } from "../../lib/report/sectionInsights";
 import { CAMP_DAY_BUCKET_LABEL, CAMP_DAY_BUCKET_ORDER, effectiveCamp, resolveCampBucketType, type CampDayBucket, type CampOverrides } from "../../lib/campaignDays";
-import { dailyRhythm, liveFunnel, sessionSpread } from "../../lib/report/rhythm";
+import { liveFunnel, sessionSpread } from "../../lib/report/rhythm";
 import { adsMonthStats, adsPrevSameCut } from "../../lib/dataraw/adsCampaignOverview";
 import { errorMessage } from "../../lib/errorMessage";
 import { fmtKeyMetric, KEY_METRICS, keyMetricSheetColumns, keyMetricSheetLabel, keyMetricSheetValue, keyMetricValue, type KeyMetrics } from "../../lib/report/keyMetrics";
 import { byHost, byHostDayType, dayTypeTeamTotals, dayTypeMetrics, HOST_DAY_TYPE_ORDER, dataQuality, filterSessions, hostKey, splitUnassignedHost, DataQuality } from "../../lib/performance/hostPerformance";
 
 import { fmtDateVn, fmtFixed, fmtVndFull, fmtVndShort } from "../../lib/format";
-import { CHANNELS, DAY_TYPE_SHORT, LINK_BTN, PAL, SECTIONS, chartTooltipStyle, type ReportSectionId } from "./report/theme";
+import { CHANNELS, DAY_TYPE_SHORT, PAL, SECTIONS, chartTooltipStyle, type ReportSectionId } from "./report/theme";
 import { chartNum, fmtHours, fmtInt, fmtPct, fmtSessionStart, monthRangeLocal, nextMonthStrLocal, prevMonthStrLocal, promoStatusLabel } from "./report/format";
-import { ChartLegend, InsightBox, KpiTile, MethodNote, NarrativeEditor, Panel, ReportTable, SectionDetail, SectionHead, WaterfallPanel, toWaterfall } from "./report/ui";
-import { HostPerformancePanel } from "./report/HostPerformancePanel";
+import { ChartLegend, PageInsight, KpiTile, Panel, ReportTable, toWaterfall, PageHead, PagePager, PageRail, type PageMetric } from "./report/ui";
+import { keyMetricsHeadline, observeHeadline, summaryHeadline } from "../../lib/report/pageHeadlines";
+import { bridgePoints, planHourRows, skuImageKey, targetBridge, trafficBridge, type ScatterPoint } from "../../lib/report/reportVisuals";
+import "./report/demo.css";
 import { PLATFORM_PROFILES } from "../../lib/platforms/profiles";
 import { platformOf } from "../../lib/reportPlatform";
 import type { AffiliateActualEntry, AffiliatePlanMonth } from "../../types";
 import { fetchAffiliateActuals } from "../../lib/db/affiliateActuals";
 import { fetchAffiliatePlanMonth } from "../../lib/db/affiliatePlanMonths";
-import { DEFAULT_FX_RATE } from "../../lib/affiliate/plan";
-import { bucketStats, campSpanLabels, changeTone, creatorPlanRows, creatorSessionRows, creatorTotals, dayTypeFactorRows, noiseBand, scoreRows, type KeyMetricsMonth, type KeyMetricsTab } from "../../lib/report/brandReport";
+import { creatorRates, keyMetricsTable, bucketStats, campSpanLabels, changeTone, creatorPlanRows, creatorSessionRows, creatorTotals, dayTypeFactorRows, noiseBand, scoreRows, type KeyMetricsMonth, type KeyMetricsTab } from "../../lib/report/brandReport";
 import { AdsPlanPanel } from "./report/AdsPlanPanel";
+import { ProductsPageBody, productsKpis, type ProductsPageData } from "./report/ProductsPage";
+import { HostPageBody, hostKpis, type HostPageData } from "./report/HostPage";
+import { DemoInsight, DemoShopPage, DemoWhyPage } from "./report/DemoShopWhy";
 import { adsTrackingMonth, type AdsDayRow } from "../../lib/ads/adsTracking";
 import { fetchAdsDaily } from "../../lib/db/adsDaily";
-import { AffiliatePanel, CreatorPlanPanel, DayTypeHeatPanel, KeyMetricsPanel, NmvPanel, ScoreboardPanel, ToneLegend } from "./report/BrandPages";
+import { AffiliateTrackPanel } from "./report/AffiliateTrackPanel";
+import { KeyMetricsDemoPage, NmvDemoPage, SummaryDemoPage, type NmvMonth } from "./report/DemoSummaryPages";
+import { REFUND_FINAL_DATE_KEY, decodeRefundFinalDate, encodeRefundFinalDate } from "../../lib/report/refundFinalDate";
+import { affiliateTrackColumns, affiliateTrackTotals } from "../../lib/report/affiliateTrack";
+
+const INSIGHT_PAGES: [InsightPage, string][] = [["summary", "Tổng quan"], ["keymetrics", "Key Metrics"], ["nmv", "NMV"], ["shop", "Toàn shop"], ["why", "Nguyên nhân"], ["products", "Sản phẩm"], ["people", "Host"], ["ads", "Quảng cáo"], ["affiliate", "Affiliate"], ["next", "Kế hoạch tháng sau"]];
 
 // Report Tháng này là report của sàn TikTok (Shopee: ShopeeMonthlyReportTabs) — chỉ đọc ca TikTok.
 const REPORT_PLATFORM = PLATFORM_PROFILES.TikTok.id;
@@ -64,9 +76,11 @@ interface MonthlyReportTabsProps {
   canManage: boolean;
   /** Dựng bản gửi brand từ phiên của ops (xuất file HTML): RLS không lọc hộ như khi brand tự đăng nhập, nên tự lọc kế hoạch/lịch chưa chốt. */
   forBrand?: boolean;
+  /** Hiện đủ 10 trang cùng lúc + mục lục cuộn (file HTML gửi brand nhân bản DOM nên không được chỉ ra trang đang chọn). */
+  showAll?: boolean;
 }
 
-export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, brandName, month, snapshot, liveSessions, shiftSlots = [], canManage, forBrand = false }) => {
+export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, brandName, month, snapshot, liveSessions, shiftSlots = [], canManage, forBrand = false, showAll = false }) => {
 
   // Brand KHÔNG được thấy số của tháng chưa phát hành (quyết định 2026-09-22, 0107) — kể cả qua cột
   // "tháng trước"/biểu đồ xu hướng của report tháng này. Bản chụp do ops dựng nên có đủ số 4 tháng;
@@ -157,13 +171,6 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     const camp = effectiveCamp(p.plan.campRanges);
     return { rr: planRunRate(month, p.slots, shiftSlots, bs, todayVn(), camp), bs, camp };
   }, [plans, month, sessions, brandId, shiftSlots]);
-  const runRate = useMemo(() => {
-    if (planRR) {
-      const open = shiftSlots.filter((sl) => sl.brandId === brandId && sl.status === "open" && !sl.sessionId);
-      return monthRunRateFromPlan(planRR.rr, projectMonthEnd(planRR.rr, monthOutlook(month, todayVn(), planRR.bs, open, null, planRR.camp)));
-    }
-    return monthRunRate(sessions, brandId, start, end);
-  }, [planRR, month, sessions, brandId, start, end, shiftSlots]);
   // Tháng T−2 chỉ để lấy khung camp + target cho trang Key Metrics 3 tháng.
   const prev2Month = useMemo(() => prevMonthStrLocal(prevMonth), [prevMonth]);
   useEffect(() => {
@@ -405,7 +412,6 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     [shopWin, cmp, liveCurStats, liveCurrent]
   );
   // Ba khối chuyển từ "Phân tích sâu (nội bộ ops)" khi gộp vào report (2026-09-27) — cùng đầu vào bản chụp, cùng kỳ `cmp`.
-  const rhythm = useMemo(() => dailyRhythm(view.shopDays[month]?.days, liveCurrent?.rows ?? [], cmp.curStart, cmp.curEnd), [view, month, liveCurrent, cmp]);
   const funnel = useMemo(() => liveFunnel(livePrev?.rows ?? [], liveCurrent?.rows ?? [], cmp), [livePrev, liveCurrent, cmp]);
   const spread = useMemo(() => sessionSpread(liveCurrent?.rows ?? [], cmp.curStart, cmp.curEnd), [liveCurrent, cmp]);
   // Cơ cấu kênh cắt cùng kỳ với Xu hướng 4 tháng: đặt T8 trọn tháng cạnh T9 22 ngày từng ghi Affiliate LIVE −4,2 điểm
@@ -422,14 +428,6 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [last4Months, view, hiddenMonths, trendDay]
   );
-  const channelChartData = useMemo(
-    () =>
-      channelMixes
-        .map((c, idx) => (c ? { label: trendColLabel(last4Months[idx]), liveLinked: c.liveLinked, affiliate: c.affiliate, video: c.video, card: c.card ?? 0 } : null))
-        .filter((x): x is NonNullable<typeof x> => x !== null),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [channelMixes, last4Months, trendDay]
-  );
   const shopPiecesMissing = !Object.values(view.shopDays).some(Boolean) && !Object.values(view.cardGmv).some(Boolean);
 
   // Nhóm đối chứng: live tài khoản shop vs phần còn lại của shop, theo ngày thường / ngày camp.
@@ -445,8 +443,6 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [view, prevMonth, month, shopWin, bucketPrev, bucketCur, hiddenMonths, agencyLiveByDate]
   );
-  const controlAll = control.find((r) => r.key === "all");
-  const liveOutsideAgency = controlAll ? controlAll.shopLiveCur - controlAll.liveCur : null;
   const controlOps = control.find((r) => r.key !== "all" && controlVerdict(r) === "ops");
 
   // KPI GMV cả shop brand giao (Kế Hoạch Tháng, 0122) — mọi kênh, khác target live. Tháng chưa hết thì dự kiến theo
@@ -467,33 +463,31 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   // NMV: tỷ lệ hoàn ở Rate Card nếu đã nhập, không thì Refund rate thực của cả shop trong kỳ — ước tính, ghi rõ.
   const refundRateShop = shopCur && shopCur.gmv > 0 ? (shopCur.refunds / shopCur.gmv) * 100 : null;
   const tiktokReturnRate = brandPlatformRates.find((r) => r.brandId === brandId && r.platform === REPORT_PLATFORM)?.returnRate;
-  const nmvRate = hasReturnRateConfig ? tiktokReturnRate ?? null : refundRateShop;
-  const nmvSource = hasReturnRateConfig ? "tỷ lệ hoàn hủy ở CRM (Hợp đồng & giá)" : refundRateShop != null ? "Refund rate thực của cả shop trong kỳ" : null;
-
-  // Luỹ kế GMV live theo ngày — tháng report vs tháng trước (cùng trục ngày 1..31).
-  const cumulativeData = useMemo(() => {
-    const byDay = (rows: CreatorLivePerfRow[], m: string) => {
-      const arr = new Array(31).fill(0);
-      for (const r of rows) {
-        const d = vnDateOf(r.startTime);
-        if (d.startsWith(m)) arr[Number(d.slice(8, 10)) - 1] += r.gmv;
-      }
-      return arr;
-    };
-    const cur = byDay(liveCurrent?.rows ?? [], month);
-    const prev = byDay(livePrev?.rows ?? [], prevMonth);
-    const curLast = Number(cmp.curEnd.slice(8, 10));
-    const prevLast = Number(prevEnd.slice(8, 10));
-    const out: { day: number; cur: number | null; prev: number | null }[] = [];
-    let a = 0;
-    let b = 0;
-    for (let i = 0; i < 31; i++) {
-      a += cur[i];
-      b += prev[i];
-      out.push({ day: i + 1, cur: i + 1 <= curLast ? a : null, prev: i + 1 <= prevLast ? b : null });
-    }
-    return out;
-  }, [liveCurrent, livePrev, month, prevMonth, cmp, prevEnd]);
+  // Trạng thái hoàn/huỷ từng tháng dùng CHUNG luật với Kế Toán (lib/refundStatus.ts): chốt = qua cuối tháng + 15 ngày, file phủ
+  // hết tháng, mẫu file mới. Tháng chưa chốt thì NMV là ước tính theo tháng chốt gần nhất / % hoàn dự kiến trong hợp đồng.
+  const refundStatusOf = (m: string): RefundMonthStatus | null => {
+    if (hiddenMonths.has(m)) return null;
+    const sl = view.shopDays[m];
+    const r = monthRangeLocal(m);
+    const t = shopTotals(sl, r.start, r.end);
+    if (!t) return null;
+    return refundMonthStatus({ month: m, today: todayVn(), gmv: t.gmv, refunds: t.refunds, lastDate: t.through ?? "", template: sl?.template ?? "unknown", exportedAt: sl?.exportedAt });
+  };
+  const refundFinals = useMemo(() => decodeRefundFinal(monthlyReportRow?.sectionNotes?.[REFUND_FINAL_KEY]?.text), [monthlyReportRow]);
+  const refundStatusAdj = (m: string): RefundMonthStatus | null => {
+    const s0 = refundStatusOf(m);
+    return s0 ? applyFinalRate(s0, refundFinals) : null;
+  };
+  const refundStatusCur = refundStatusAdj(month);
+  const refundStatusPrev = refundStatusOf(prevMonth);
+  const refundCompare = refundStatusCur && refundStatusPrev ? compareRefundRates({ rate: refundRateShop, template: refundStatusCur.template }, { rate: refundStatusPrev.rate, template: refundStatusPrev.template }) : null;
+  const nmvChoice = chooseNmvRate(
+    refundStatusCur,
+    last4Months.map(refundStatusAdj).filter((x): x is RefundMonthStatus => x != null),
+    hasReturnRateConfig ? tiktokReturnRate ?? null : null
+  );
+  const nmvRate = nmvChoice.rate;
+  const nmvSource = nmvChoice.rate != null ? nmvChoice.label : null;
 
   // Khung giờ bắt đầu ca — GMV/giờ, cùng kỳ 2 tháng.
   const slotRows = useMemo(() => {
@@ -529,7 +523,6 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   );
 
   // ============ Phần mới của bố cục 10 trang (lib/report/brandReport.ts) ============
-  const campSpans = useMemo(() => campSpanLabels(month, campOverrides), [month, campOverrides]);
   // Trang 1 — bảng điểm: target từng loại ngày (Kế Hoạch Tháng đã chốt) + KPI toàn shop.
   const scoreboard = useMemo(
     () =>
@@ -576,10 +569,17 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   // Trang 8 + 9 — affiliate.
   const creatorRows = useMemo(() => creatorSessionRows(affiliate.cur), [affiliate.cur]);
   const creatorSum = useMemo(() => creatorTotals(creatorRows), [creatorRows]);
+  const trackCols = useMemo(() => affiliateTrackColumns(affiliate.cur), [affiliate.cur]);
+  const trackSum = useMemo(() => affiliateTrackTotals(trackCols), [trackCols]);
   const creatorPlan = useMemo(() => creatorPlanRows(affiliate.next, creatorRows), [affiliate.next, creatorRows]);
-  const shopAffiliateCur = channelMixes[3]?.affiliate ?? null;
+  const creatorBest = useMemo(() => {
+    const best: Record<string, number> = {};
+    for (const r of creatorRows) if (r.gmvPerHour != null) best[r.creator.trim().toLowerCase()] = Math.max(best[r.creator.trim().toLowerCase()] ?? 0, r.gmvPerHour);
+    return best;
+  }, [creatorRows]);
   // Trang 6 — Refund rate tháng trước cùng cửa sổ với tháng này.
-  const refundRateShopPrev = shopPrevSame && shopPrevSame.gmv > 0 ? (shopPrevSame.refunds / shopPrevSame.gmv) * 100 : null;
+  // Không so Refund rate giữa hai mẫu file Shop Analytics khác nhau (cột Hoàn tiền có thể định nghĩa khác).
+  const refundRateShopPrev = shopPrevSame && shopPrevSame.gmv > 0 && refundCompare?.comparable !== false ? (shopPrevSame.refunds / shopPrevSame.gmv) * 100 : null;
   const monthShort = (m: string) => `T${Number(m.slice(5))}`;
 
   // Top SKU: hạng tháng trước → tháng này + phễu. Tháng trước bị che với brand thì không có hạng/so sánh.
@@ -589,6 +589,29 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     [view, month, prevMonth, hiddenMonths]
   );
 
+  // GĐ2 — số cho biểu đồ mới (lib/report/reportVisuals.ts).
+  const bridgeTarget = useMemo(() => {
+    const b = targetBridge(scoreboard, (k) => DAY_TYPE_SHORT[k]);
+    return b ? bridgePoints(cmp.partial ? "Target tới nay" : "Target tháng", b.start, b.steps, `${METRIC.liveGmv} thực tế`, b.end) : null;
+  }, [scoreboard, cmp.partial]);
+  const planHours = useMemo(
+    () => (planRR ? planHourRows(planRR.rr.slots, planRR.rr.through, Object.fromEntries(campDetailRows.map((r) => [r.key, r.gmvPerHour != null && r.gmvPerHour > 0 ? r.gmvPerHour : null]))) : []),
+    [planRR, campDetailRows]
+  );
+  const trafficBr = useMemo(() => {
+    const row = control.find((r) => r.key === "all");
+    const b = row ? trafficBridge(row) : null;
+    if (!b) return null;
+    const lab = { visitors: "Lượt truy cập", cvr: "CVR shop", value: METRIC.aov } as const;
+    return { b, points: bridgePoints(cmp.partial ? `1–${Number(cmp.prevEnd.slice(8))}/${prevMonth.slice(5)}` : `T${Number(prevMonth.slice(5))}`, b.from, b.parts.map((p) => ({ label: lab[p.key === "aov" ? "value" : p.key], delta: p.value })), cmp.partial ? `1–${Number(cmp.curEnd.slice(8))}/${month.slice(5)}` : `T${Number(month.slice(5))}`, b.to) };
+  }, [control, cmp, month, prevMonth]);
+  const skuPoints = useMemo<ScatterPoint[]>(
+    () =>
+      (skuMoveData?.rows ?? [])
+        .filter((r) => r.ctr != null && r.ctor != null)
+        .map((r) => ({ key: r.name, label: shortSku(r.name), x: r.ctr!, y: r.ctor!, size: r.gmv, tone: r.prevRank == null ? "flat" : r.rank < r.prevRank ? "up" : r.rank > r.prevRank ? "down" : "flat" })),
+    [skuMoveData]
+  );
   // Phần 5 — so mặt bằng tháng này (cột phụ) theo loại ngày.
   const hostInsight = useMemo(() => {
     const tiktok = filterSessions(completedInPeriod.filter((s) => platformOf(s) === REPORT_PLATFORM), {});
@@ -628,6 +651,43 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     [completedInPeriod, campOverrides]
   );
   const hostDayTypeTeam = useMemo(() => dayTypeTeamTotals(hostDayType), [hostDayType]);
+  const hostShortName = (name: string) => {
+    const w = (n: string, k: number) => n.trim().split(/\s+/).slice(-k).join(" ");
+    return hostDayType.filter((r) => w(r.name, 1) === w(name, 1)).length > 1 ? w(name, 2) : w(name, 1);
+  };
+  const saveSkuImage = async (name: string, dataUrl: string | null) => setMonthlyReportRow(await saveMonthlyReportSectionNote(brandId, `${month}-01`, skuImageKey(name), dataUrl));
+  const productsData: ProductsPageData = {
+    sku: skuMoveData,
+    skuRank: skuRankCur,
+    gift: giftCur,
+    giftSlice: giftSliceCur,
+    giftByMonth,
+    giftMonthLabels: last4Months.map(trendColLabel),
+    giftPeriodLabel: trendDay ? `4 kỳ 1–${trendDay}` : "4 tháng",
+    giftMaxPriceLabel: fmtVndShort(GIFT_MAX_PRICE),
+    promo: topPromo,
+    prevMonthNo: Number(prevMonth.slice(5)),
+    points: skuPoints
+  };
+  const hostData: HostPageData = {
+    rows: hostDayType,
+    team: hostDayTypeTeam,
+    vsPeer: hostInsight.vsPeer,
+    reliability: reliabilityByKey,
+    relMonths,
+    shortName: hostShortName,
+    slots: slotRows.map((r) => {
+      const c = pctChange(r.prev.gmvPerHour, r.cur.gmvPerHour);
+      const band = noiseBand(r.prev.n, r.cur.n);
+      return { label: r.label, prevN: r.prev.n, curN: r.cur.n, prev: r.prev.gmvPerHour, cur: r.cur.gmvPerHour, change: c, band, tone: changeTone(c, band, true) as "up" | "down" | "flat" };
+    }),
+    spread,
+    top: topSessions,
+    prevPeriod: cmp.partial ? `1–${Number(cmp.prevEnd.slice(8))}/${prevMonth.slice(5)}` : `T${Number(prevMonth.slice(5))}`,
+    curPeriod: cmp.partial ? `1–${Number(cmp.curEnd.slice(8))}/${month.slice(5)}` : `T${Number(month.slice(5))}`,
+    prevMonthLabel: `T${Number(prevMonth.slice(5))}`,
+    curMonthLabel: `T${Number(month.slice(5))}`
+  };
   const campDaysLabel = useMemo(() => {
     const { start, end } = monthRangeLocal(month);
     const days: Record<CampDayBucket, number[]> = { daily: [], dday: [], midmonth: [], payday: [] };
@@ -669,23 +729,233 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   // Việc cần làm của từng phần gom về "Việc agency làm tháng sau" — khung Insight tự sinh không nói lại.
   const controlOpsGroup = controlOps ? (controlOps.key as "daily" | "camp") : null;
   const sectionSteps = sectionNextSteps(sectionInsightRaw, controlOpsGroup);
-  const sectionInsight = Object.fromEntries(
-    Object.entries(sectionInsightRaw).map(([k, v]) => [k, v ? { ...v, action: null } : null])
-  ) as Record<InsightSection, SectionInsight | null>;
-  const shownInsight = (key: InsightSection) => {
-    const note = monthlyReportRow?.sectionNotes?.[key];
-    return note ? parseInsightText(note.text) : sectionInsight[key];
-  };
-  const insightBox = (key: InsightSection) => (
-    <InsightBox
-      auto={sectionInsight[key]}
-      note={monthlyReportRow?.sectionNotes?.[key]}
+  // ===== Insight tổng hợp cuối mỗi trang (lib/report/pageInsights.ts) — câu mẫu có chỗ trống, đọc đúng số trang đang hiện =====
+  const pageAuto = (() => {
+    const lastKey = keyMonths.length - 1;
+    const keyTable = keyMetricsTable(keyMonths, "all");
+    const dayLabel = (k: CampDayBucket) => DAY_TYPE_SHORT[k];
+    const scoreAll = scoreboard.find((r) => r.key === "all");
+    const sigDays = dayTypeRows.filter((r) => r.significant && (r.change.gmvPerHour ?? 0) !== 0);
+    const worstSig = [...sigDays].filter((r) => (r.change.gmvPerHour ?? 0) < 0).sort((a, b) => a.change.gmvPerHour! - b.change.gmvPerHour!)[0];
+    const factorCands = worstSig ? (["viewsPerHour", "liveCtr", "ctor", "aov"] as const).filter((f) => worstSig.change[f] != null && worstSig.change[f]! < 0).sort((a, b) => worstSig.change[a]! - worstSig.change[b]!) : [];
+    const mixPrev = channelMixes[channelMixes.length - 2], mixCur = channelMixes[channelMixes.length - 1];
+    const chDelta = (label: string, k: "liveLinked" | "affiliate" | "video" | "card") =>
+      mixPrev && mixCur && mixPrev[k] != null && mixCur[k] != null ? { label, delta: (mixCur[k] as number) - (mixPrev[k] as number) } : null;
+    const chRows = [chDelta(CHANNELS[0]?.label ?? "Seller LIVE", "liveLinked"), chDelta("Affiliate LIVE", "affiliate"), chDelta("Video", "video"), chDelta("Product card", "card")].filter((x): x is NonNullable<typeof x> => x !== null);
+    const relByName = new Map(reliability.map((r) => [r.name, r]));
+    const liveHosts = hostInsight.rows.filter((h) => h.hours > 0 && h.gmv > 0);
+    const skuRows = skuMoveData?.rows ?? [];
+    const gain = (r: (typeof skuRows)[number]) => (r.prevRank == null ? 99 : r.prevRank) - r.rank;
+    const top10 = skuRows.reduce((a, r) => a + r.gmv, 0);
+    const lowestCreator = creatorRows.filter((r) => r.pctTarget != null).sort((a, b) => a.pctTarget! - b.pctTarget!)[0];
+    const cRates = creatorRates(creatorSum);
+    const grades = prevGrades ?? [];
+    const out: Record<InsightPage, InsightBlocks> = {
+      summary: summaryBlocks({
+        liveActual: liveCurStats.gmv,
+        liveTarget: scoreAll ? scoreAll.targetToDate ?? scoreAll.target : null,
+        days: scoreboard.filter((r) => r.key !== "all" && r.key !== "shop").map((r) => ({ label: dayLabel(r.key as CampDayBucket), target: r.targetToDate ?? r.target, actual: r.actual })),
+        worstFactor: worstSig && factorCands[0] ? { dayLabel: dayLabel(worstSig.key), factorLabel: DRIVER_LABEL[factorCands[0]], change: worstSig.change[factorCands[0]]! } : null,
+        shopKpi: shopKpi ? { target: shopKpi.target, projected: shopKpi.projected ?? null } : null
+      }),
+      keymetrics: keyMetricsBlocks({
+        rows: keyTable.rows.map((r) => ({ label: r.def.label, change: r.changes[lastKey], tone: r.tones[lastKey], result: r.def.group === "result" })),
+        band: keyTable.bands[lastKey] ?? null,
+        prevLabel: monthShort(prevMonth)
+      }),
+      nmv: nmvBlocks({ refundCur: refundRateShop, refundPrev: refundRateShopPrev, prevLabel: monthShort(prevMonth), nmvSource, usesCrmRate: hasReturnRateConfig }),
+      shop: shopBlocks({
+        totalChange: shopCur && shopPrevSame ? pctChange(shopPrevSame.gmv, shopCur.gmv) : null,
+        windowLabel: shopWin.label,
+        channels: chRows,
+        control: control.filter((r) => r.key !== "all").flatMap((r) => {
+          const v = controlVerdict(r);
+          return v && r.liveChg != null && r.restChg != null ? [{ label: controlLabel(r.key), liveChg: r.liveChg, restChg: r.restChg, verdict: v }] : [];
+        })
+      }),
+      why: whyBlocks({
+        gmvPerHourChange: pctChange(livePrevStats.gmvPerHour, liveCurStats.gmvPerHour),
+        parts: drivers ? drivers.parts.map((p) => ({ label: DRIVER_LABEL[p.key], value: p.value, change: p.change })) : [],
+        significantDays: sigDays.map((r) => ({ label: dayLabel(r.key), change: r.change.gmvPerHour! })),
+        band: sigDays[0]?.band ?? null,
+        mix: mixRate ? { mix: mixRate.mix, rate: mixRate.rate } : null
+      }),
+      products: productsBlocks({
+        topN: skuRows.length,
+        risers: skuRows.filter((r) => gain(r) >= 2).sort((a, b) => gain(b) - gain(a)).slice(0, 3).map((r) => ({ name: shortSku(r.name), from: r.prevRank, to: r.rank, ctor: r.ctor })),
+        fallers: skuRows.filter((r) => r.prevRank != null && r.rank - r.prevRank >= 2).sort((a, b) => b.rank - b.prevRank! - (a.rank - a.prevRank!)).slice(0, 3).map((r) => ({ name: shortSku(r.name), from: r.prevRank, to: r.rank, ctor: r.ctor, ctr: r.ctr })),
+        lead: skuRows[0] && top10 > 0 ? { name: shortSku(skuRows[0].name), share: (skuRows[0].gmv / top10) * 100 } : null,
+        promo: topPromo?.items?.[0] ? { name: topPromo.items[0].name, roi: null } : null
+      }),
+      people: peopleBlocks({
+        hosts: liveHosts.flatMap((h) => {
+          const r = relByName.get(h.name);
+          return r ? [{ name: h.name, verdict: r.verdict, ci: reliabilityText(r), sessions: r.sessions, borderline: isBorderline(r) }] : [];
+        }),
+        months: relMonths,
+        slots: slotRows.filter((s) => s.cur.gmvPerHour != null).map((s) => ({ label: s.label.toLowerCase(), gmvPerHour: s.cur.gmvPerHour!, n: s.cur.n }))
+      }),
+      ads: adsBlocks({
+        cost: adsPlan?.mtdActual ?? adsCur?.cost ?? 0,
+        target: adsPlan ? adsPlan.mtdTarget : null,
+        liveRoas: adsPlan?.liveRoas ?? null,
+        buckets: adsPlan
+          ? CAMP_DAY_BUCKET_ORDER.flatMap((b) => {
+              const x = adsPlan.buckets[b];
+              return x ? [{ label: DAY_TYPE_SHORT[b], cost: x.actual, target: x.target, roas: x.liveAds > 0 ? x.liveGmv / x.liveAds : null }] : [];
+            })
+          : [],
+        zeroOrderDays: adsCur?.zeroOrderDays.length ?? 0
+      }),
+      affiliate: affiliateBlocks({
+        sessions: creatorSum.sessions,
+        creators: creatorSum.creators,
+        gmv: creatorSum.gmv,
+        pctTarget: cRates.pctTarget,
+        top: creatorSum.top,
+        gmvPerHour: cRates.gmvPerHour,
+        lowest: lowestCreator ? { creator: lowestCreator.creator, date: lowestCreator.date ? `${Number(lowestCreator.date.slice(8, 10))}/${Number(lowestCreator.date.slice(5, 7))}` : "", pct: lowestCreator.pctTarget! } : null
+      }),
+      next: nextBlocks({
+        nextLabel: `Tháng ${Number(nextMonth.slice(5))}`,
+        hasLivePlan: !!nextPlan && nextPlan.targetGmv > 0 && nextPlan.slotCount > 0,
+        hasCreatorPlan: (affiliate.next?.length ?? 0) > 0,
+        actions: prevGrades ? { met: grades.filter((g) => g.status === "met").length, missed: grades.filter((g) => g.status === "missed").length, other: grades.filter((g) => g.status !== "met" && g.status !== "missed").length } : null
+      })
+    };
+    return out;
+  })();
+  const pageInsight = (page: InsightPage) => (
+    <PageInsight
+      auto={pageAuto[page]}
+      note={monthlyReportRow?.sectionNotes?.[pageNoteKey(page)]}
       computedAt={snapshot.computedAt}
       canManage={canManage}
-      onSave={async (text) => setMonthlyReportRow(await saveMonthlyReportSectionNote(brandId, `${month}-01`, key, text))}
+      onSave={async (text) => setMonthlyReportRow(await saveMonthlyReportSectionNote(brandId, `${month}-01`, pageNoteKey(page), text))}
     />
   );
-
+  // Số từng tháng cho trang Hủy, hoàn & NMV (cùng cửa sổ ngày với cơ cấu kênh).
+  const nmvDemoMonths: NmvMonth[] = last4Months.map((m, i) => {
+    const raw = refundStatusOf(m);
+    const mix = channelMixes[i];
+    return {
+      month: m,
+      short: monthShort(m),
+      win: `1–${Number(cutEndOf(m).slice(8))}/${m.slice(5)}`,
+      liveGmv: trendStats[i].stats.gmv,
+      nmvGmv: keyMonths.find((k) => k.month === m)?.stats.all.gmv ?? trendStats[i].stats.gmv,
+      windowRate: mix?.refundRate ?? null,
+      fileRate: raw?.rate ?? null,
+      template: raw?.template ?? "unknown",
+      exportedAt: raw?.exportedAt ?? null,
+      status: refundStatusAdj(m)?.status ?? "provisional",
+      shopGmv: mix?.shopGmv ?? 0,
+      affiliate: mix?.affiliate ?? 0,
+      video: mix?.video ?? 0,
+      card: mix?.card ?? null
+    };
+  });
+  const demoInsight = (page: InsightPage) => (
+    <DemoInsight
+      auto={pageAuto[page]}
+      note={monthlyReportRow?.sectionNotes?.[pageNoteKey(page)]}
+      computedAt={snapshot.computedAt}
+      canManage={canManage}
+      onSave={async (text) => setMonthlyReportRow(await saveMonthlyReportSectionNote(brandId, `${month}-01`, pageNoteKey(page), text))}
+    />
+  );
+  // Tiêu đề kết luận + hàng chỉ số đầu mỗi trang (tối đa 4 ô). Chỉ số lấy từ số đã tính cho phần thân trang; trang chưa đủ số thì bớt ô.
+  const head = (id: InsightPage): { headline: string; metrics: PageMetric[] } => {
+    const fb = `${SECTIONS.find((x) => x.id === id)!.label}: chưa đủ số liệu để nêu kết luận.`;
+    const scoreAll = scoreboard.find((r) => r.key === "all");
+    const keyTable = keyMetricsTable(keyMonths, "all");
+    const lastKey = keyMonths.length - 1;
+    const kmCell = (key: string) => keyTable.rows.find((r) => r.def.key === key);
+    const kmMetric = (key: string, label?: string): PageMetric => {
+      const r = kmCell(key)!;
+      return { label: label ?? r.def.label, value: r.values[lastKey] != null ? fmtKeyMetric(r.def, r.values[lastKey]) : "—", change: r.changes[lastKey] };
+    };
+    const liveShare = shopCur && shopCur.gmv > 0 ? (liveForShare / shopCur.gmv) * 100 : null;
+    const nmvValue = nmvRate != null ? fmtVndShort(liveCurStats.gmv * (1 - nmvRate / 100)) : "—";
+    const totalGmv: PageMetric = {
+      label: shopCur && shopWin !== cmp ? `Total GMV · 1–${shopWin.curEnd.slice(8)}/${month.slice(5)}` : "Total GMV",
+      value: shopCur ? fmtVndShort(shopCur.gmv) : "—",
+      badge: shopKpi ? shopKpi.pct : null,
+      badgeLabel: shopKpi ? `${fmtFixed(shopKpi.pct, 0)}% KPI tháng` : undefined,
+      change: shopCur && shopPrevSame ? pctChange(shopPrevSame.gmv, shopCur.gmv) : null,
+      note: shopKpi ? `KPI tháng ${fmtVndShort(shopKpi.target)}${shopKpi.partial ? ` · dự báo ${fmtPct(shopKpi.projectedPct)}` : ""}` : shopCur ? "Shop Analytics — mọi kênh" : canManage ? "chưa có file Shop Analytics" : "chưa có số liệu toàn shop"
+    };
+    const liveTargetNow = scoreAll ? scoreAll.targetToDate ?? scoreAll.target : null;
+    const liveGmv: PageMetric = {
+      label: cmp.partial ? `LIVE GMV (YFB) · 1–${cmp.curEnd.slice(8)}/${month.slice(5)}` : "LIVE GMV (YFB)",
+      value: fmtVndShort(liveCurStats.gmv),
+      // Cùng mẫu số với ô Total GMV: % target CẢ THÁNG (ô kia là KPI cả tháng); tiến độ so với target tới nay nằm ở ghi chú.
+      badge: scoreAll?.target ? (liveCurStats.gmv / scoreAll.target) * 100 : null,
+      badgeLabel: scoreAll?.target ? `${fmtFixed((liveCurStats.gmv / scoreAll.target) * 100, 0)}% Target tháng` : undefined,
+      change: pctChange(livePrevStats.gmv, liveCurStats.gmv),
+      note: [scoreAll?.target ? `Target tháng ${fmtVndShort(scoreAll.target)}` : null, liveTargetNow && scoreAll?.targetToDate != null ? `tới nay ${fmtVndShort(liveTargetNow)} (${fmtFixed((liveCurStats.gmv / liveTargetNow) * 100, 0)}%)` : null, liveShare != null ? `${fmtPct(liveShare)} tổng shop` : null, `${liveCurStats.sessions} phiên`].filter(Boolean).join(" · ")
+    };
+    const nmv: PageMetric = { label: nmvChoice.isEstimate ? "NMV (ước tính)" : "NMV (đã chốt)", value: nmvValue, note: nmvRate != null ? `trừ ${fmtPct(nmvRate)} — ${nmvSource}` : canManage ? "chưa có tỷ lệ hoàn hủy (CRM) / Refund rate (Shop Analytics)" : "chưa có Refund rate" };
+    const gmvPerHour: PageMetric = { label: "GMV/giờ", value: liveCurStats.gmvPerHour != null ? fmtVndShort(liveCurStats.gmvPerHour) : "—", change: pctChange(livePrevStats.gmvPerHour, liveCurStats.gmvPerHour), note: `${fmtHours(liveCurStats.hours)} giờ live · ${liveCurStats.sessions} phiên` };
+    const km = keyMonths[lastKey];
+    const kmTarget = km?.targets?.all ?? null;
+    const skuRows = skuMoveData?.rows ?? [];
+    const top10 = skuRows.reduce((a, r) => a + r.gmv, 0);
+    const hostsLive = hostInsight.rows.filter((h) => h.hours > 0 && h.gmv > 0);
+    const adsCost = adsPlan?.mtdActual ?? adsCur?.cost ?? null;
+    const gmvForecast: PageMetric[] = shopKpi?.partial
+      ? [{
+          label: "Dự báo Total GMV cuối tháng",
+          value: fmtVndShort(shopKpi.projected),
+          badge: shopKpi.projectedPct,
+          badgeLabel: `${fmtFixed(shopKpi.projectedPct, 0)}% KPI`,
+          note: `KPI ${fmtVndShort(shopKpi.target)} · ${shopKpi.projected >= shopKpi.target ? "vượt" : "thiếu"} ${fmtVndShort(Math.abs(shopKpi.projected - shopKpi.target))}`
+        }]
+      : [];
+    const adsCreatorRow = adsPlan && adsPlanRows ? adsTypeRows(adsPlanRows.rows, month).find((r) => r.key === "creator") : undefined;
+    const bookingSum = bookingTotals(creatorPlan);
+    const todoItems = monthlyReportRow?.actionPlan?.items?.length ? monthlyReportRow.actionPlan.items : nextLines.map((l) => newActionItem(l));
+    const metrics: Record<InsightPage, PageMetric[]> = {
+      summary: [totalGmv, liveGmv, nmv, gmvPerHour],
+      keymetrics: [
+        { ...kmMetric("gmv"), badge: kmTarget ? (km.gmvForTarget.all / kmTarget) * 100 : null, note: kmTarget ? `Target ${fmtVndShort(kmTarget)}` : undefined },
+        kmMetric("orders"),
+        kmMetric("gmvPerHour"),
+        { ...kmMetric("hours"), change: null, note: `${liveCurStats.sessions} phiên` }
+      ],
+      nmv: [{ ...totalGmv, badge: null, badgeLabel: undefined }, { label: "Refund rate", value: refundRateShop != null ? fmtPct(refundRateShop) : "—", note: refundRateShopPrev != null ? `${monthShort(prevMonth)}: ${fmtPct(refundRateShopPrev)}` : undefined }, nmv],
+      shop: [{ ...totalGmv, note: shopKpi ? `KPI tháng ${fmtVndShort(shopKpi.target)}` : totalGmv.note }, ...gmvForecast, { ...liveGmv, badge: null }, { label: "Tỷ trọng LIVE trong Total GMV", value: liveShare != null ? fmtPct(liveShare) : "—", note: shopWin.label }],
+      why: [gmvPerHour, kmMetric("viewsPerHour"), kmMetric("ctor"), kmMetric("aov")],
+      products: skuRows.length ? [{ label: `GMV top ${skuRows.length} SKU`, value: fmtVndShort(top10) }, { label: "SKU đứng đầu", value: top10 > 0 ? fmtPct((skuRows[0].gmv / top10) * 100) : "—", note: `${shortSku(skuRows[0].name)} · tỷ trọng trong top ${skuRows.length}` }] : [],
+      people: [{ label: "Host đã live", value: String(hostsLive.length), note: `${liveCurStats.sessions} phiên` }, { ...gmvPerHour, label: "GMV/giờ" }],
+      ads: adsPlan
+        ? [
+            { label: `Ads cost${adsPlan.lastActual ? ` · 1–${Number(adsPlan.lastActual.slice(8))}/${month.slice(5)}` : ""}`, value: fmtVndShort(adsPlan.mtdActual), note: [adsPlan.mtdTarget > 0 ? `${fmtFixed((adsPlan.mtdActual / adsPlan.mtdTarget) * 100, 1)}% Target cùng kỳ` : null, adsPlan.spentOfMonth != null ? `${fmtFixed(adsPlan.spentOfMonth, 1)}% Target tháng ${fmtVndShort(adsPlan.monthTarget)}` : null].filter(Boolean).join(" · ") || undefined },
+            ...(adsPlan.liveRoas != null ? [{ label: "ROAS Live", value: `${fmtFixed(adsPlan.liveRoas, 1)}x` }] : []),
+            ...(adsCreatorRow && adsCreatorRow.monthTarget > 0 ? [{ label: "Ads Creator · % Target", value: `${fmtFixed((adsCreatorRow.mtdActual / adsCreatorRow.monthTarget) * 100, 1)}%`, note: `${fmtVndShort(adsCreatorRow.mtdActual)} / ${fmtVndShort(adsCreatorRow.monthTarget)}` }] : []),
+            { label: "Ngày chi lệch Target từ 30%", value: String(adsPlan.offDays.length), note: adsPlan.offDays.map((d) => fmtDateVn(d.date, false)).join(", ") || undefined }
+          ]
+        : adsCost != null ? [{ label: "Ads cost", value: fmtVndShort(adsCost) }] : [],
+      affiliate: trackSum.sessions > 0 ? [{ label: `${METRIC.directGmv} · ${trackSum.sessions} phiên`, value: fmtVndShort(trackSum.directGmv) }, { label: `Target GMV · ${trackSum.sessions} phiên`, value: trackSum.targetGmv > 0 ? fmtVndShort(trackSum.targetGmv) : "—", badge: trackSum.pctTarget, badgeLabel: trackSum.pctTarget != null ? `${fmtFixed(trackSum.pctTarget, 1)}% ${METRIC.directGmv}` : undefined }, { label: `${METRIC.gmvPerHour} · ${trackSum.sessions} phiên`, value: trackSum.gmvPerHour != null ? fmtVndShort(trackSum.gmvPerHour) : "—", note: trackSum.hours > 0 ? `${fmtVndShort(trackSum.directGmv)} ÷ ${fmtFixed(trackSum.hours, 1)} giờ` : undefined }, { label: METRIC.roas, value: trackSum.roas != null ? `${fmtFixed(trackSum.roas, 1)}x` : "—", note: trackSum.adsCost > 0 ? `${METRIC.adsCost} ${fmtVndShort(trackSum.adsCost)}` : undefined }] : [],
+      next: [
+        { label: `Target Live tháng ${Number(nextMonth.slice(5))}`, value: nextPlan && nextPlan.targetGmv > 0 ? fmtVndShort(nextPlan.targetGmv) : "—", note: nextPlan && nextPlan.targetGmv > 0 ? `${nextPlan.slotCount} phiên trong Kế Hoạch Tháng` : "chưa nhập · bảng Kế hoạch Live" },
+        { label: `Target Creator tháng ${Number(nextMonth.slice(5))}`, value: bookingSum.target > 0 ? fmtVndShort(bookingSum.target) : "—", note: bookingSum.target > 0 ? "tổng Target lịch Booking" : "tổng Target lịch Booking, chưa nhập" },
+        { label: `Booking Creator tháng ${Number(nextMonth.slice(5))}`, value: `${bookingSum.sessions} phiên`, note: bookingSum.sessions > 0 ? `${fmtFixed(bookingSum.hours, 1)} giờ live` : `chưa có phiên nào trong tab Affiliate (T${Number(nextMonth.slice(5))})` },
+        { label: `Việc đề xuất cho tháng ${Number(nextMonth.slice(5))}`, value: String(todoItems.length), note: `${todoItems.filter((i) => i.target).length} app tự đánh giá · ${todoItems.filter((i) => !i.target).length} ops đánh giá` }
+      ]
+    };
+    const headline =
+      id === "summary"
+        ? summaryHeadline({
+            liveActual: liveCurStats.gmv,
+            liveTarget: liveTargetNow,
+            days: scoreboard.filter((r) => r.key !== "all" && r.key !== "shop").map((r) => ({ label: DAY_TYPE_SHORT[r.key as CampDayBucket], target: r.targetToDate ?? r.target, actual: r.actual }))
+          })
+        : id === "keymetrics"
+          ? keyMetricsHeadline({ rows: keyTable.rows.map((r) => ({ label: r.def.label, change: r.changes[lastKey], tone: r.tones[lastKey] })), prevLabel: monthShort(prevMonth) })
+          : observeHeadline(pageAuto[id], fb);
+    return { headline, metrics: metrics[id] };
+  };
   const narrativeInput: NarrativeInput = {
     month,
     window: cmp,
@@ -710,37 +980,6 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   const splitLines = (t?: string) => (t ?? "").split("\n").map((l) => l.replace(/^[-•\s]+/, "").trim()).filter(Boolean);
   const summaryLines = monthlyReportRow?.summaryText != null ? splitLines(monthlyReportRow.summaryText) : autoSummaryLines;
   const nextLines = monthlyReportRow?.nextStepsText != null ? splitLines(monthlyReportRow.nextStepsText) : autoNextLines;
-  const narrativeEdited = monthlyReportRow?.summaryText != null || monthlyReportRow?.nextStepsText != null;
-  // Đoạn đã sửa viết theo bộ số CŨ hơn lần cập nhật số liệu gần nhất ⇒ nhắc ops đọc lại trước khi phát hành.
-  const narrativeStale = narrativeEdited && !!monthlyReportRow?.summarySavedAt && monthlyReportRow.summarySavedAt < snapshot.computedAt;
-
-  const [editingNarrative, setEditingNarrative] = useState(false);
-  const [summaryDraft, setSummaryDraft] = useState("");
-  const [narrativeSaving, setNarrativeSaving] = useState(false);
-  const [narrativeError, setNarrativeError] = useState<string | null>(null);
-  const startEditNarrative = () => {
-    setSummaryDraft(summaryLines.join("\n"));
-    setNarrativeError(null);
-    setEditingNarrative(true);
-  };
-  const saveNarrative = async (reset: boolean) => {
-    setNarrativeSaving(true);
-    setNarrativeError(null);
-    try {
-      const row = await saveMonthlyReportNarrative(
-        brandId,
-        `${month}-01`,
-        // Việc tháng sau giờ nhập ở Action plan (0182) — giữ nguyên bản chữ cũ nếu có, "dùng lại bản tự sinh" bỏ cả hai.
-        reset ? { summaryText: null, nextStepsText: null } : { summaryText: summaryDraft.trim() || null, nextStepsText: monthlyReportRow?.nextStepsText ?? null }
-      );
-      setMonthlyReportRow(row);
-      setEditingNarrative(false);
-    } catch (e) {
-      setNarrativeError(errorMessage(e, "Lưu kết luận thất bại"));
-    } finally {
-      setNarrativeSaving(false);
-    }
-  };
 
 
   // Bảng xu hướng 4 tháng cùng số ngày (thay 8 ô xu hướng + bảng MoM + phễu + 2 biểu đồ 4 tháng — cùng số lặp 4 lần).
@@ -761,30 +1000,6 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
 
   // Điện thoại (audit UX 2026-09-26, P2c): dưới 768px phần 2–7 chỉ hiện tiêu đề + Insight (kết luận), biểu đồ/bảng mở
   // khi bấm; Kết luận luôn mở. Desktop không đổi.
-  const isNarrow = !useMediaQuery("(min-width: 768px)");
-  const [openDetails, setOpenDetails] = useState<Set<string>>(() => new Set());
-  const detailOpen = (id: string) => !isNarrow || openDetails.has(id);
-  const openDetail = (id: string) => setOpenDetails((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
-  // Bấm mục lục tới phần đang gập: mở ra rồi mới cuộn — phải chờ React vẽ xong phần vừa mở (effect dưới), cuộn ngay
-  // thì vị trí đích còn là của bản gập.
-  const pendingScrollRef = useRef<string | null>(null);
-  const scrollNow = (id: string) => document.getElementById(`mr-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
-  const scrollTo = (id: string) => {
-    if (id === "summary" || detailOpen(id)) return scrollNow(id);
-    pendingScrollRef.current = id;
-    openDetail(id);
-  };
-  useEffect(() => {
-    const id = pendingScrollRef.current;
-    if (!id || !openDetails.has(id)) return;
-    pendingScrollRef.current = null;
-    scrollNow(id);
-  }, [openDetails]);
-
-  // Phần đang đọc — tô trên mục lục (audit UX 2026-09-29, M1): phần CUỐI CÙNG có mép trên đã qua vạch 30% chiều cao màn;
-  // chưa phần nào qua thì là phần 1. Tính lại ở mỗi sự kiện cuộn (trình duyệt đã gộp theo frame; 7 lần đo vị trí là nhẹ).
-  // Nghe `scroll` ở pha capture của document vì vùng cuộn là <main> của App (sự kiện scroll không nổi bọt). Không dùng
-  // IntersectionObserver: nhảy thẳng từ phần 3 về đầu trang thì không phần nào cắt qua dải quan sát ⇒ dấu cũ kẹt lại.
   // Trang không có dữ liệu thì ẩn với brand; ops luôn thấy đủ 10 trang (kèm lời nhắc tải file). Số trang đánh theo trang đang hiện.
   // Toàn shop / Sản phẩm trước 27/10 luôn hiện với brand — tháng chưa tải file thì brand thấy hai trang trống kèm chữ "Dữ Liệu Gốc".
   const sectionShown: Record<ReportSectionId, boolean> = {
@@ -802,32 +1017,46 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   const visibleSections = SECTIONS.filter((s) => sectionShown[s.id]);
   const secNo = (id: ReportSectionId) => String(visibleSections.findIndex((s) => s.id === id) + 1);
   const secTitle = (id: ReportSectionId) => SECTIONS.find((s) => s.id === id)!.title;
+  /** Vị trí của trang trong SECTIONS — gán cho CSS `order` của <section> để đổi thứ tự hiển thị mà không phải dời khối JSX. */
+  const secOrder = (id: ReportSectionId) => SECTIONS.findIndex((x) => x.id === id) + 1;
 
-  const [activeSec, setActiveSec] = useState<string>(SECTIONS[0].id);
+  // Mỗi trang một màn (28/10): chỉ trang đang chọn hiện, nhớ qua hash `#mr-<id>` (replaceState — giữ nguyên state của router).
+  // showAll (xuất file gửi brand): hiện đủ trang, mục lục là nút cuộn (script của exportStandaloneHtml.ts).
+  const sectionIds = visibleSections.map((x) => x.id);
+  const hashPage = () => {
+    const m = /^#mr-(\w+)/.exec(window.location.hash);
+    return m && (sectionIds as string[]).includes(m[1]) ? (m[1] as ReportSectionId) : null;
+  };
+  const [pageState, setPageState] = useState<ReportSectionId>(() => (showAll ? SECTIONS[0].id : hashPage() ?? SECTIONS[0].id));
+  const curPage: ReportSectionId = sectionIds.includes(pageState) ? pageState : sectionIds[0];
+  const curIdx = sectionIds.indexOf(curPage);
+  const pageShown = (id: ReportSectionId) => showAll || id === curPage;
+  const secStyle = (id: ReportSectionId): React.CSSProperties => ({ order: secOrder(id), display: pageShown(id) ? undefined : "none" });
+  const reportTopRef = useRef<HTMLDivElement>(null);
+  const goPage = (id: ReportSectionId) => {
+    setPageState(id);
+    if (!showAll) window.history.replaceState(window.history.state, "", `${window.location.pathname}${window.location.search}#mr-${id}`);
+    requestAnimationFrame(() => reportTopRef.current?.scrollIntoView({ block: "start" }));
+  };
+  // Mở link có hash khi report đã hiện (đổi hash trên cùng trang, không tải lại) cũng vào đúng trang.
   useEffect(() => {
-    const pick = () => {
-      const line = window.innerHeight * 0.3;
-      let cur: string = SECTIONS[0].id;
-      for (const sec of SECTIONS) {
-        const el = document.getElementById(`mr-${sec.id}`);
-        if (el && el.getBoundingClientRect().top <= line) cur = sec.id;
-      }
-      setActiveSec(cur);
+    if (showAll) return;
+    const onHash = () => {
+      const id = hashPage();
+      if (id) setPageState(id);
     };
-    document.addEventListener("scroll", pick, { capture: true, passive: true });
-    return () => document.removeEventListener("scroll", pick, { capture: true });
-  }, []);
-  // Mục lục cuộn ngang (điện thoại chỉ thấy ~2 mục) — kéo mục đang đọc vào tầm nhìn, chỉ đổi scrollLeft của chính thanh
-  // mục lục (scrollIntoView sẽ kéo luôn cả trang theo chiều dọc).
-  const tocRef = useRef<HTMLDivElement>(null);
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  });
+  const railItems = visibleSections.map((x) => ({ id: x.id, label: x.label }));
+  const railRef = useRef<HTMLElement>(null);
+  // Hàng tab ngang (điện thoại) chỉ thấy ~2 mục — kéo trang đang chọn vào tầm nhìn bằng scrollLeft của chính thanh (scrollIntoView kéo luôn cả trang).
   useEffect(() => {
-    const bar = tocRef.current;
-    const btn = bar?.querySelector<HTMLElement>('[aria-current="true"]');
-    if (!bar || !btn) return;
-    if (btn.offsetLeft < bar.scrollLeft || btn.offsetLeft + btn.offsetWidth > bar.scrollLeft + bar.clientWidth) {
-      bar.scrollTo({ left: Math.max(0, btn.offsetLeft - 12), behavior: "smooth" });
-    }
-  }, [activeSec]);
+    const bar = railRef.current;
+    const btn = bar?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (!bar || !btn || bar.scrollWidth <= bar.clientWidth) return;
+    if (btn.offsetLeft < bar.scrollLeft || btn.offsetLeft + btn.offsetWidth > bar.scrollLeft + bar.clientWidth) bar.scrollTo({ left: Math.max(0, btn.offsetLeft - 12), behavior: "smooth" });
+  }, [curPage]);
 
   // Xuất Excel toàn bộ Report Tháng — 1 file, mỗi bảng đang hiện là 1 sheet (trừ Phân Tích Sâu, ops-only). Chỉ đọc
   // lại đúng các mảng đã tính cho phần hiển thị — không tính số mới.
@@ -841,17 +1070,9 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
           rows: [
             ...summaryLines.map((l) => ({ "Phần": "Kết luận", "Nội dung": l })),
             ...nextLines.map((l) => ({ "Phần": "Việc tháng sau", "Nội dung": l })),
-            ...(
-              [
-                ["shop", "Insight · Thị trường hay vận hành"],
-                ["why", "Insight · Vì sao"],
-                ["products", "Insight · Sản phẩm"],
-                ["people", "Insight · Host"],
-                ["context", "Insight · Campaign & khung giờ"]
-              ] as [InsightSection, string][]
-            ).flatMap(([key, label]) => {
-              const ins = shownInsight(key);
-              return ins ? insightToText(ins).split("\n").map((l) => ({ "Phần": label, "Nội dung": l })) : [];
+            ...INSIGHT_PAGES.flatMap(([page, label]) => {
+              const sb = shownBlocks(pageAuto[page], decodeEdits(monthlyReportRow?.sectionNotes?.[pageNoteKey(page)]?.text));
+              return ([...BLOCK_KEYS, "own"] as const).filter((k) => sb[k]).map((k) => ({ "Phần": `Insight · ${label} · ${BLOCK_LABEL[k]}`, "Nội dung": sb[k] }));
             })
           ]
         },
@@ -1053,15 +1274,6 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     ).catch((e) => showToast(`Không tải được file Excel: ${errorMessage(e)}`));
   };
 
-  const chgCell = (v: number | null, goodWhenUp: boolean | null = true, digits = 0) =>
-    v == null ? (
-      <span style={{ color: PAL.muted }}>—</span>
-    ) : (
-      <span style={{ color: goodWhenUp == null ? PAL.cream : (v >= 0) === goodWhenUp ? PAL.green : PAL.red }}>
-        {v >= 0 ? "+" : "−"}
-        {fmtFixed(Math.abs(v), digits)}%
-      </span>
-    );
   // Dấu trừ chuẩn "−" và làm tròn nghìn đồng cho số tiền nhỏ trong câu (fmtVndShort in "-").
   const rowStyle = (idx: number) => ({ borderBottom: `1px solid ${PAL.line}`, background: idx % 2 ? `${PAL.panel2}55` : "transparent" });
   const warnBox = (children: React.ReactNode) => (
@@ -1077,505 +1289,138 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     // đúng padding của <main> (p-3 sm:p-6) để mục lục dính sát mép, không chừa khe cho nội dung lọt qua phía trên.
     // Không viền khung ngoài (18/10 đợt 2): nền đen của report đã là "trang giấy"; viền thêm làm mọi Panel/ô bên trong thành
     // hộp lồng hộp (đo trước: 44/47 hộp nằm trong hộp, sâu 4 tầng).
-    <div className="rounded-2xl" style={{ background: PAL.bg }}>
-      {/* Mục lục các trang — trang cuộn (user chốt 2026-09-25): tab giấu nội dung, brand có thể không bao giờ mở tới.
-          z-20 (10/10): cột đầu của bảng report (report/ui.tsx) dính ngang với z-10, đứng sau trong DOM nên
-          cùng z-10 thì ô "NHÓM NGÀY"… vẽ đè lên mục lục khi cuộn qua. */}
-      <div ref={tocRef} id="mr-toc" className="flex items-center gap-1 px-3 py-2 overflow-x-auto sticky -top-3 sm:-top-6 z-20 rounded-t-2xl" style={{ background: PAL.bg, borderBottom: `1px solid ${PAL.line}` }}>
-        {visibleSections.map((sec) => (
+    <div className="rt rounded-2xl" style={{ background: PAL.bg }} ref={reportTopRef}>
+      <div>
+        {showAll ? (
+        <div id="mr-toc" className="flex items-center gap-1 px-3 py-2 overflow-x-auto sticky -top-3 sm:-top-6 z-20 rounded-t-2xl" style={{ background: PAL.bg, borderBottom: `1px solid ${PAL.line}` }}>
+          {visibleSections.map((sec) => (
+            <button
+              key={sec.id}
+              data-sec={sec.id}
+              onClick={() => document.getElementById(`mr-${sec.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" })}
+              aria-current={sec.id === SECTIONS[0].id ? "true" : undefined}
+              className="px-3 py-1.5 text-xs font-bold whitespace-nowrap rounded-lg hover:opacity-100 focus-visible:outline focus-visible:outline-2"
+              style={sec.id === SECTIONS[0].id ? { color: PAL.gold, background: PAL.panel2 } : { color: PAL.muted }}
+            >
+              {secNo(sec.id)} · {sec.label}
+            </button>
+          ))}
           <button
-            key={sec.id}
-            data-sec={sec.id}
-            onClick={() => scrollTo(sec.id)}
-            aria-current={activeSec === sec.id ? "true" : undefined}
-            className="px-3 py-1.5 text-xs font-bold whitespace-nowrap rounded-lg hover:opacity-100 focus-visible:outline focus-visible:outline-2"
-            style={activeSec === sec.id ? { color: PAL.gold, background: PAL.panel2 } : { color: PAL.muted }}
+            onClick={handleExportAll}
+            data-export-hide
+            title="Xuất toàn bộ Report Tháng ra 1 file Excel nhiều sheet"
+            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap shrink-0"
+            style={{ background: PAL.panel2, border: `1px solid ${PAL.line}`, color: PAL.gold }}
           >
-            {secNo(sec.id)} · {sec.label}
+            <Download className="w-3.5 h-3.5" /> Xuất Excel
           </button>
-        ))}
-        <button
-          onClick={handleExportAll}
-          data-export-hide
-          title="Xuất toàn bộ Report Tháng ra 1 file Excel nhiều sheet"
-          className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap shrink-0"
-          style={{ background: PAL.panel2, border: `1px solid ${PAL.line}`, color: PAL.gold }}
-        >
-          <Download className="w-3.5 h-3.5" /> Xuất Excel
-        </button>
-      </div>
-
-      <div className="p-5 space-y-8">
+        </div>
+        ) : (
+          <PageRail ref={railRef} items={railItems} current={curPage} onSelect={goPage} onExcel={handleExportAll} />
+        )}
+        <div className="min-w-0">
+      <div className="p-5 flex flex-col gap-8">
         {shopPiecesMissing && canManage && warnBox(<>Số liệu này chốt trước khi report có phần Shop Analytics — bấm "Cập nhật số liệu" ở trên để có đủ 7 phần.</>)}
         {giftsMissing && !shopPiecesMissing && warnBox(<>Số liệu này chốt trước khi report tách quà tặng khỏi UPT — bấm "Cập nhật số liệu" ở trên để có dòng quà tặng.</>)}
 
         {/* ===== 1. Kết luận ===== */}
-        <section id="mr-summary" className="space-y-4 scroll-mt-16">
-          <SectionHead no={secNo("summary")} title={secTitle("summary")} sub={cmp.partial ? `Số tính tới ${cmp.curEnd.slice(8)}/${month.slice(5)} · % là cùng kỳ ${cmp.label}` : `Tháng ${month.slice(5)}/${month.slice(0, 4)} · % là ${cmp.label}`} />
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-            <KpiTile
-              // File shop ngắn hơn số phiên (CROCS T9: shop 1–22, phiên 1–30) ⇒ nhãn ghi kỳ của chính ô này, và ô LIVE GMV
-              // nói phần live CÙNG kỳ đó — trước 27/10 hai ô cạnh nhau khác kỳ (5,21B shop < 5,22B live).
-              label={shopCur && shopWin !== cmp ? `Total GMV · 1–${shopWin.curEnd.slice(8)}/${month.slice(5)}` : "Total GMV"}
-              value={shopCur ? fmtVndShort(shopCur.gmv) : "—"}
-              change={shopCur && shopPrevSame ? pctChange(shopPrevSame.gmv, shopCur.gmv) : null}
-              note={
-                shopKpi
-                  ? `${fmtPct(shopKpi.pct)} KPI ${fmtVndShort(shopKpi.target)}${shopKpi.partial ? ` · dự báo ${fmtPct(shopKpi.projectedPct)}` : ""}`
-                  : shopCur
-                    ? shopWin !== cmp
-                      ? `Shop Analytics — file tới ${shopWin.curEnd.slice(8)}/${month.slice(5)}, % so ${shopWin.label.split(" so với ")[1] ?? "cùng kỳ"}`
-                      : "Shop Analytics — mọi kênh"
-                    : canManage
-                      ? "chưa có file Shop Analytics"
-                      : "chưa có số liệu toàn shop"
-              }
-            />
-            <KpiTile
-              label="LIVE GMV (YFB)"
-              value={fmtVndShort(liveCurStats.gmv)}
-              change={pctChange(livePrevStats.gmv, liveCurStats.gmv)}
-              note={
-                shopCur && shopCur.gmv > 0
-                  ? shopWin !== cmp
-                    ? `1–${shopWin.curEnd.slice(8)}/${month.slice(5)}: ${fmtVndShort(liveForShare)} = ${fmtPct((liveForShare / shopCur.gmv) * 100)} Total GMV cùng kỳ · cả tháng ${liveCurStats.sessions} phiên`
-                    : `${fmtPct((liveForShare / shopCur.gmv) * 100)} tổng shop · ${liveCurStats.sessions} phiên`
-                  : `${liveCurStats.sessions} phiên`
-              }
-            />
-            <KpiTile
-              label="NMV (ước tính)"
-              value={nmvRate != null ? fmtVndShort(liveCurStats.gmv * (1 - nmvRate / 100)) : "—"}
-              note={nmvRate != null ? `trừ ${fmtPct(nmvRate)} — ${nmvSource}` : canManage ? "chưa có tỷ lệ hoàn hủy (CRM) / Refund rate (Shop Analytics)" : "chưa có Refund rate"}
-            />
-            <KpiTile label="Giờ live" value={fmtHours(liveCurStats.hours)} change={pctChange(livePrevStats.hours, liveCurStats.hours)} note={`${liveCurStats.sessions} phiên có số liệu`} />
-            <KpiTile label="GMV/giờ" value={liveCurStats.gmvPerHour != null ? fmtVndShort(liveCurStats.gmvPerHour) : "—"} change={pctChange(livePrevStats.gmvPerHour, liveCurStats.gmvPerHour)} />
-          </div>
-
-          <div className="rounded-xl p-4 space-y-3" style={{ background: PAL.panel, border: `1px solid ${PAL.gold}44` }}>
-            {editingNarrative ? (
-              <NarrativeEditor
-                summaryDraft={summaryDraft}
-                onSummary={setSummaryDraft}
-                saving={narrativeSaving}
-                error={narrativeError}
-                onSave={() => saveNarrative(false)}
-                onCancel={() => setEditingNarrative(false)}
-              />
-            ) : (
-              <>
-                <ol className="space-y-2.5 text-[14px] leading-relaxed list-decimal pl-5" style={{ color: PAL.cream }}>
-                  {summaryLines.map((l, i) => (
-                    <li key={i} className={i === 0 ? "font-bold" : undefined}>
-                      {l}
-                    </li>
-                  ))}
-                </ol>
-                {canManage && (
-                  <div className="flex flex-wrap items-center gap-3 pt-2 text-[11px]" style={{ borderTop: `1px solid ${PAL.line}`, color: PAL.muted }}>
-                    <span>{narrativeEdited ? "Ops đã sửa kết luận." : "Bản tự sinh từ số liệu — sửa trước khi phát hành nếu cần."}</span>
-                    {narrativeStale && <span style={{ color: PAL.gold }}>Số liệu đã cập nhật sau lần sửa — đọc lại cho khớp số mới.</span>}
-                    <button onClick={startEditNarrative} className={LINK_BTN} style={{ color: PAL.gold }}>
-                      Sửa kết luận
-                    </button>
-                    {narrativeEdited && (
-                      <button onClick={() => saveNarrative(true)} disabled={narrativeSaving} className={LINK_BTN} style={{ color: PAL.muted }}>
-                        Dùng lại bản tự sinh
-                      </button>
-                    )}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-
-          <ScoreboardPanel
-            rows={scoreboard}
-            campSpans={campSpans}
-            footnote={
-              kpiTargetGmvCur
-                ? runRate && runRate.pendingCount > 0 && runRate.runRate != null
-                  ? `Run-rate ${fmtFixed(runRate.runRate * 100, 0)}% (${runRate.doneCount} phiên đã live · ${runRate.pendingCount} phiên còn lại) · dự báo cuối tháng ${fmtVndShort(runRate.projected)}, ${runRate.gap > 0 ? "thiếu" : "vượt"} ${fmtVndShort(Math.abs(runRate.gap))}.`
-                  : undefined
-                : canManage
-                  ? `Tháng ${month.slice(5)} chưa có target chốt / KPI GMV ở Kế Hoạch Tháng — khi có, bảng điểm hiện % Target từng loại ngày.`
-                  : undefined
-            }
+        <section id="mr-summary" className="space-y-4 scroll-mt-16" style={secStyle("summary")}>
+          <SummaryDemoPage
+            no={secNo("summary")}
+            title={secTitle("summary")}
+            headline={head("summary").headline}
+            month={month}
+            partial={cmp.partial}
+            curEndDay={Number(cmp.curEnd.slice(8))}
+            prevMonthShort={monthShort(prevMonth)}
+            prevEndDay={Number(cmp.prevEnd.slice(8))}
+            liveActual={liveCurStats.gmv}
+            liveTargetMonth={scoreboard.find((r) => r.key === "all")?.target ?? null}
+            liveTargetToDate={scoreboard.find((r) => r.key === "all")?.targetToDate ?? null}
+            liveProjected={planRR?.rr.total.keepPace ?? null}
+            shop={shopKpi ? { actual: shopKpi.actual, throughDay: shopCur?.through ? Number(shopCur.through.slice(8, 10)) : null, target: shopKpi.target, projected: shopKpi.partial ? shopKpi.projected : null, projectedPct: shopKpi.partial ? shopKpi.projectedPct : null } : null}
+            gmvPerHour={liveCurStats.gmvPerHour}
+            gmvPerHourChange={pctChange(livePrevStats.gmvPerHour, liveCurStats.gmvPerHour)}
+            hoursChange={pctChange(livePrevStats.hours, liveCurStats.hours)}
+            bridge={bridgeTarget}
+            score={scoreboard}
+            spans={keySpans[keySpans.length - 1] ?? {}}
+            planHours={planHours}
+            actualHours={Object.fromEntries(campDetailRows.map((r) => [r.key, r.hours]))}
+            insight={demoInsight("summary")}
           />
-          <Panel title="LIVE GMV luỹ kế theo ngày" icon={<Activity className="w-4 h-4" />} sub={`Tháng ${month.slice(5)} so với tháng ${prevMonth.slice(5)} — cùng trục ngày`}>
-            <div style={{ height: 240 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={cumulativeData} margin={{ right: 12 }}>
-                  <CartesianGrid stroke={PAL.line} vertical={false} />
-                  <XAxis dataKey="day" stroke={PAL.muted} fontSize={11} interval={3} />
-                  <YAxis stroke={PAL.muted} fontSize={11} tickFormatter={(v) => fmtVndShort(v)} width={70} />
-                  <Tooltip contentStyle={chartTooltipStyle} labelFormatter={(d) => `Ngày ${d}`} formatter={(v) => fmtVndShort(chartNum(v))} />
-                  {cmp.partial && <ReferenceLine x={Number(cmp.curEnd.slice(8))} stroke={PAL.muted} strokeDasharray="3 3" />}
-                  <Line type="monotone" dataKey="prev" name={`Tháng ${prevMonth.slice(5)}`} stroke={PAL.blue} strokeWidth={2} dot={false} connectNulls={false} />
-                  <Line type="monotone" dataKey="cur" name={`Tháng ${month.slice(5)}`} stroke={PAL.gold} strokeWidth={2} dot={false} connectNulls={false} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-            <ChartLegend items={[[`Tháng ${prevMonth.slice(5)}`, PAL.blue], [`Tháng ${month.slice(5)}`, PAL.gold]]} />
-          </Panel>
         </section>
 
         {/* ===== 2. Thị trường hay vận hành ===== */}
         {sectionShown.shop && (
-        <section id="mr-shop" className="space-y-4 scroll-mt-16">
-          <SectionHead no={secNo("shop")} title={secTitle("shop")} sub="So livestream YFB với các kênh còn lại của shop — cùng thị trường, cùng kỳ" />
-          {insightBox("shop")}
-          <SectionDetail open={detailOpen("shop")} onOpen={() => openDetail("shop")}>
-            {control.length > 0 && (
-              <Panel
-                title="Livestream YFB so với các kênh còn lại của shop"
-                icon={<Scale className="w-4 h-4" />}
-                sub={`${shopWin.label} · các kênh còn lại = Affiliate LIVE, Video, Product card (cùng thị trường, YFB không vận hành) · chênh lệch ≥ 10 điểm % mới xem là khác xu hướng thị trường`}
-              >
-                <ReportTable head={["Loại ngày", "Livestream YFB", "Các kênh còn lại", "Lượt truy cập shop", "CVR shop", "Đánh giá"]}>
-                  {control.map((r, idx) => {
-                    const v = controlVerdict(r);
-                    return (
-                      <tr key={r.key} style={rowStyle(idx)}>
-                        <td className={`py-2 px-3 ${r.key === "all" ? "font-black" : "font-semibold"}`} style={{ color: PAL.gold }}>
-                          {controlLabel(r.key)} <span className="font-normal text-[11px]" style={{ color: PAL.muted }}>· {r.days} ngày</span>
-                        </td>
-                        <td className="py-2 px-3 text-right font-mono" title={`${fmtVndShort(r.livePrev)} → ${fmtVndShort(r.liveCur)}`}>
-                          {chgCell(r.liveChg)}
-                        </td>
-                        <td className="py-2 px-3 text-right font-mono" title={`${fmtVndShort(r.restPrev)} → ${fmtVndShort(r.restCur)}`}>
-                          {chgCell(r.restChg)}
-                        </td>
-                        <td className="py-2 px-3 text-right font-mono">{chgCell(r.visitorsChg)}</td>
-                        <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
-                          {r.cvrPrev != null && r.cvrCur != null ? `${fmtPct(r.cvrPrev)} → ${fmtPct(r.cvrCur)}` : "—"}
-                        </td>
-                        <td className="py-2 px-3 text-right font-semibold whitespace-nowrap" style={{ color: v === "ops" ? PAL.red : v === "agency_better" ? PAL.green : PAL.cream }}>
-                          {v ? VERDICT_TEXT[v] : "—"}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </ReportTable>
-                <MethodNote>
-                  Livestream YFB = GMV các phiên YFB vận hành (cùng số với trang 1). Các kênh còn lại = {METRIC.totalGmv} − mọi live trên tài khoản shop
-                  ("Linked account LIVE-attributed GMV" của Shop Analytics).
-                  {liveOutsideAgency != null && Math.abs(liveOutsideAgency) >= 1_000_000 &&
-                    (liveOutsideAgency > 0
-                      ? ` Live trên tài khoản shop ngoài các phiên YFB kỳ này: ${fmtVndShort(liveOutsideAgency)} — không tính vào vế nào.`
-                      : ` Shop Analytics ghi live tài khoản shop thấp hơn các phiên YFB ${fmtVndShort(-liveOutsideAgency)} kỳ này.`)}{" "}
-                  Rê chuột lên % để xem số tiền. CVR shop = Orders ÷ lượt vào shop.
-                </MethodNote>
-              </Panel>
-            )}
-            {rhythm && (
-              <Panel
-                title="GMV theo ngày"
-                icon={<Activity className="w-4 h-4" />}
-                sub={`${METRIC.totalGmv} cả shop mỗi ngày (Shop Analytics) · đường vàng = trung bình 7 ngày · đường xanh = ${METRIC.liveGmv} YFB · ${rhythm.points.length} ngày có số liệu`}
-              >
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-3 mb-4">
-                  <KpiTile frame="plain" label="5 ngày cao nhất chiếm" value={rhythm.top5Pct != null ? fmtPct(rhythm.top5Pct) : "—"} note={`${METRIC.totalGmv} của kỳ`} />
-                  <KpiTile frame="plain" label="Số ngày tạo 80% GMV" value={rhythm.daysFor80 != null ? `${rhythm.daysFor80}/${rhythm.points.length}` : "—"} note="càng ít ngày càng tập trung vào campaign" />
-                  <KpiTile frame="plain" label="Ngày cao nhất" value={rhythm.best ? fmtVndShort(rhythm.best.gmv) : "—"} note={rhythm.best?.label} />
-                  <KpiTile frame="plain" label="Ngày thấp nhất" value={rhythm.worst ? fmtVndShort(rhythm.worst.gmv) : "—"} note={rhythm.worst?.label} />
-                </div>
-                <div style={{ height: 240 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={rhythm.points}>
-                      <CartesianGrid stroke={PAL.line} vertical={false} />
-                      <XAxis dataKey="label" stroke={PAL.muted} fontSize={11} interval={2} />
-                      <YAxis stroke={PAL.muted} fontSize={11} tickFormatter={(v) => fmtVndShort(v)} width={56} />
-                      <Tooltip contentStyle={chartTooltipStyle} formatter={(v) => fmtVndShort(chartNum(v))} />
-                      <Bar dataKey="gmv" name={METRIC.totalGmv} fill={`${PAL.goldDim}88`} radius={[3, 3, 0, 0]} />
-                      <Line type="monotone" dataKey="ma7" name="Trung bình 7 ngày" stroke={PAL.gold} strokeWidth={2} dot={false} connectNulls={false} />
-                      <Line type="monotone" dataKey="live" name={METRIC.liveGmv} stroke={PAL.blue} strokeWidth={2} dot={false} />
-                    </ComposedChart>
-                  </ResponsiveContainer>
-                </div>
-                <ChartLegend items={[[METRIC.totalGmv, PAL.goldDim], ["Trung bình 7 ngày", PAL.gold], [METRIC.liveGmv, PAL.blue]]} />
-                <div className="mt-3">
-                  <ReportTable head={["Thứ", ...rhythm.weekday.map((w) => w.label)]}>
-                    <tr style={rowStyle(0)}>
-                      <td className="py-2 px-3 font-semibold whitespace-nowrap" style={{ color: PAL.gold }}>Chỉ số (100 = ngày trung bình)</td>
-                      {rhythm.weekday.map((w) => (
-                        <td key={w.label} className="py-2 px-3 text-right font-mono" style={{ color: w.index == null ? PAL.muted : w.index >= 110 ? PAL.green : w.index <= 90 ? PAL.red : PAL.cream }} title={`${w.days} ngày · trung bình ${fmtVndShort(w.avgGmv)}/ngày`}>
-                          {w.index != null ? fmtInt(w.index) : "—"}
-                        </td>
-                      ))}
-                    </tr>
-                  </ReportTable>
-                  <p className="text-[11px] mt-2" style={{ color: PAL.muted }}>
-                    Chỉ số theo thứ gồm cả ngày campaign rơi vào thứ đó — tháng ngắn thì mỗi thứ chỉ có 3–4 ngày, đọc như gợi ý chứ không phải quy luật.
-                  </p>
-                </div>
-              </Panel>
-            )}
-            {channelMixes.every((c) => !c) ? (
-              <p className="text-sm py-4" style={{ color: PAL.muted }}>{canManage ? "Chưa có file Shop Analytics cho các tháng này ở Dữ Liệu Gốc." : "Chưa có số liệu toàn shop cho các tháng này."}</p>
-            ) : (
-              <Panel
-                title="Cơ cấu Total GMV theo kênh"
-                icon={<PieChartIcon className="w-4 h-4" />}
-                sub={`4 tháng gần nhất — tỷ trọng trên tổng shop${trendDay ? ` · mọi tháng cắt 1–${trendDay} để so cùng số ngày` : ""}`}
-              >
-                <div style={{ height: 200 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={channelChartData} layout="vertical" stackOffset="expand" margin={{ left: 4, right: 12 }}>
-                      <CartesianGrid stroke={PAL.line} horizontal={false} />
-                      <XAxis type="number" stroke={PAL.muted} fontSize={11} tickFormatter={(v) => `${Math.round(v * 100)}%`} />
-                      <YAxis type="category" dataKey="label" stroke={PAL.muted} fontSize={11} width={trendDay ? 64 : 52} />
-                      <Tooltip contentStyle={chartTooltipStyle} formatter={(v) => fmtVndShort(chartNum(v))} />
-                      {CHANNELS.map((c) => (
-                        <Bar key={c.key} dataKey={c.key} name={c.label} stackId="ch" fill={c.color} stroke={PAL.panel} strokeWidth={2} />
-                      ))}
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-                <ChartLegend items={CHANNELS.map((c) => [c.label, c.color])} />
-                <details className="mt-3">
-                  <summary className="cursor-pointer text-[11px] font-bold" style={{ color: PAL.gold }}>
-                    Chi tiết theo tháng{trendDay ? ` (mọi tháng cắt 1–${trendDay})` : ""}
-                  </summary>
-                  <div className="mt-2">
-                    <ReportTable head={[trendDay ? "Kỳ" : "Tháng", "Total GMV", "Tỷ trọng YFB", "Affiliate LIVE", "Video", "Product card", "Refund rate"]}>
-                      {channelMixes.map((c, idx) => {
-                        const m = last4Months[idx];
-                        const agencyLive = trendStats[idx].stats.gmv;
-                        return (
-                          <tr key={m} style={rowStyle(idx)}>
-                            <td className="py-2 px-3 font-semibold whitespace-nowrap" style={{ color: PAL.cream }}>{trendColLabel(m)}</td>
-                            <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>{c ? fmtVndShort(c.shopGmv) : "—"}</td>
-                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.gold }} title={agencyLive > 0 ? `${METRIC.liveGmv} YFB ${fmtVndShort(agencyLive)}` : undefined}>
-                              {c && agencyLive > 0 ? fmtPct((agencyLive / c.shopGmv) * 100) : "—"}
-                            </td>
-                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{c ? fmtVndShort(c.affiliate) : "—"}</td>
-                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{c ? fmtVndShort(c.video) : "—"}</td>
-                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{c?.card != null ? fmtVndShort(c.card) : "—"}</td>
-                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{c?.refundRate != null ? fmtPct(c.refundRate) : "—"}</td>
-                          </tr>
-                        );
-                      })}
-                    </ReportTable>
-                    <p className="text-[11px] mt-2" style={{ color: PAL.muted }}>
-                      Tỷ trọng YFB = LIVE GMV các phiên YFB vận hành ÷ Total GMV; Affiliate LIVE = GMV từ LIVE của
-                      creator affiliate (Shop Analytics). Refund rate = Refunds ÷ GMV của cả shop trong kỳ.
-                      {trendDay && " Product card chỉ có tổng cả tháng trong file Sản Phẩm nên khi cắt kỳ bằng Total GMV trừ 3 kênh Shop Analytics."}
-                      {canManage && channelMixes.some((c) => c?.coverage != null && Math.abs(c.coverage - 100) > 2) && " Có tháng 4 kênh lệch tổng shop quá 2% — kiểm lại file Sản Phẩm / Shop Analytics của tháng đó."}
-                    </p>
-                  </div>
-                </details>
-              </Panel>
-            )}
-          </SectionDetail>
+        <section id="mr-shop" className="pg on scroll-mt-16" style={secStyle("shop")}>
+          <DemoShopPage
+            no={secNo("shop")}
+            title={secTitle("shop")}
+            control={control}
+            mixes={channelMixes.map((c) => (c ? { liveLinked: c.liveLinked, affiliate: c.affiliate, video: c.video, card: c.card, shopGmv: c.shopGmv } : null))}
+            mixLabels={last4Months.map(trendColLabel)}
+            yfbGmv={trendStats.map((x) => x.stats.gmv)}
+            shopCur={shopCur}
+            shopPrev={shopPrevSame}
+            window={shopWin}
+            traffic={trafficBr?.b ?? null}
+            fallbackHeadline={head("shop").headline}
+            insight={demoInsight("shop")}
+          />
         </section>
         )}
 
         {/* ===== 3. Vì sao ===== */}
-        <section id="mr-why" className="space-y-4 scroll-mt-16">
-          <SectionHead no={secNo("why")} title={secTitle("why")} sub={`LIVE GMV = Giờ live × Views/giờ × LIVE CTR × CTOR × AOV · ${cmp.label}`} />
-          {insightBox("why")}
-          <SectionDetail open={detailOpen("why")} onOpen={() => openDetail("why")}>
-            {drivers ? (
-              <WaterfallPanel title="Đóng góp của từng yếu tố vào mức thay đổi" sub="5 phần cộng đúng mức thay đổi LIVE GMV (chia theo tỷ trọng log)" data={waterfallData} breakdown={drivers} />
-            ) : (
-              <p className="text-sm" style={{ color: PAL.muted }}>Chưa đủ số của cả 2 kỳ (Giờ live, Views, Product clicks, Orders) để tách nguyên nhân.</p>
-            )}
-            {dayTypeRows.length > 0 && <DayTypeHeatPanel rows={dayTypeRows} windowLabel={cmp.label} />}
-            {funnel && (
-              <Panel title="Phễu LIVE" icon={<Activity className="w-4 h-4" />} sub={`Số đếm cộng từ các phiên · ${cmp.label} · tỷ lệ là chuyển từ bậc trên xuống`}>
-                <ReportTable head={["Bậc", "Kỳ trước", "Kỳ này", "±", "Tỷ lệ", "Kỳ trước", "Kỳ này"]}>
-                  {funnel.map((s, idx) => (
-                    <tr key={s.label} style={rowStyle(idx)}>
-                      <td className="py-2 px-3 font-semibold whitespace-nowrap" style={{ color: PAL.cream }} title={metricHint(s.label)}>{s.label}</td>
-                      <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{fmtInt(s.prev)}</td>
-                      <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>{fmtInt(s.cur)}</td>
-                      <td className="py-2 px-3 text-right font-mono">{chgCell(pctChange(s.prev, s.cur))}</td>
-                      <td className="py-2 px-3 font-semibold" style={{ color: PAL.gold }} title={s.rateLabel ? metricHint(s.rateLabel) : undefined}>{s.rateLabel ?? ""}</td>
-                      <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{s.rateLabel ? fmtPct(s.ratePrev) : ""}</td>
-                      <td className="py-2 px-3 text-right font-mono" style={{ color: s.ratePrev != null && s.rateCur != null ? (s.rateCur >= s.ratePrev ? PAL.green : PAL.red) : PAL.cream }}>
-                        {s.rateLabel ? fmtPct(s.rateCur) : ""}
-                      </td>
-                    </tr>
-                  ))}
-                </ReportTable>
-                <MethodNote>
-                  {METRIC.productImpressions} là số LẦN sản phẩm hiện ra (một người xem thấy nhiều sản phẩm), nên không có tỷ lệ chuyển từ {METRIC.views}. {METRIC.ctor} = {METRIC.orders} ÷ {METRIC.productClicks}, cùng định nghĩa với bảng trên.
-                </MethodNote>
-              </Panel>
-            )}
-          </SectionDetail>
+        <section id="mr-why" className="pg on scroll-mt-16" style={secStyle("why")}>
+          <DemoWhyPage
+            no={secNo("why")}
+            title={secTitle("why")}
+            fallbackHeadline={head("why").headline}
+            windowLabel={cmp.label}
+            prevShort={`Tháng ${Number(prevMonth.slice(5))}`}
+            stats={{
+              prev: { gmvPerHour: livePrevStats.gmvPerHour, viewsPerHour: keyMetricValue(livePrevStats, "viewsPerHour"), err: keyMetricValue(livePrevStats, "err"), ctor: keyMetricValue(livePrevStats, "ctor") },
+              cur: { gmvPerHour: liveCurStats.gmvPerHour, viewsPerHour: keyMetricValue(liveCurStats, "viewsPerHour"), err: keyMetricValue(liveCurStats, "err"), ctor: keyMetricValue(liveCurStats, "ctor") }
+            }}
+            band={noiseBand(livePrevStats.sessions, liveCurStats.sessions)}
+            drivers={drivers}
+            driverLabels={{ from: waterfallData[0]?.label ?? "", to: waterfallData[waterfallData.length - 1]?.label ?? "" }}
+            funnel={funnel && funnel.length === 5 ? { impressions: funnel[0], views: funnel[1], productImpressions: funnel[2], productClicks: funnel[3], orders: funnel[4] } : null}
+            dayRows={dayTypeRows}
+            keyMonths={keyMonths}
+            monthShort={monthShort}
+            insight={demoInsight("why")}
+          />
         </section>
 
         {/* ===== 4. Sản phẩm ===== */}
         {sectionShown.products && (
-        <section id="mr-products" className="space-y-4 scroll-mt-16">
-          <SectionHead no={secNo("products")} title={secTitle("products")} sub="Top SKU theo GMV, phần bán qua Seller LIVE, quà tặng kèm, chương trình khuyến mãi" />
-          {insightBox("products")}
-          <SectionDetail open={detailOpen("products")} onOpen={() => openDetail("products")}>
-            <Panel
-              title="Top SKU theo GMV"
-              icon={<ShoppingBag className="w-4 h-4" />}
-              sub={
-                skuMoveData
-                  ? `Nguồn: file Sản Phẩm${skuMoveData.curDays ? ` (${skuMoveData.curDays} ngày)` : ""} · hạng so với tháng ${prevMonth.slice(5)}${skuMoveData.perDay ? ` (${skuMoveData.prevDays} ngày) — % GMV tính trên GMV mỗi ngày vì 2 file phủ số ngày khác nhau` : ""} · Product CTR/CTOR là phễu tổng của sản phẩm (mọi kênh)`
-                  : "Nguồn: file Sản Phẩm — Seller LIVE GMV = GMV bán qua LIVE của tài khoản shop"
-              }
-            >
-              {!topSku?.hasAnyBatch ? (
-                <p className="text-sm text-center py-6" style={{ color: PAL.muted }}>
-                  {canManage ? "Chưa có file \"Product List\" nào được import trong Dữ Liệu Gốc cho tháng này." : "Chưa có số liệu sản phẩm tháng này."}
-                </p>
-              ) : skuMoveData ? (
-                <ReportTable head={["Hạng", "Sản phẩm", "GMV", skuMoveData.perDay ? "± GMV/ngày" : "± GMV", "Tỷ trọng Seller LIVE", "Orders", "Items sold", "Product CTR", "CTOR"]}>
-                  {skuMoveData.rows.map((r, idx) => {
-                    const moved = r.prevRank == null ? null : r.prevRank - r.rank;
-                    return (
-                      <tr key={r.name} style={rowStyle(idx)}>
-                        <td className="py-2 px-3 font-mono whitespace-nowrap" style={{ color: PAL.gold }}>
-                          {r.rank}
-                          <span className="ml-1.5 text-[11px]" style={{ color: moved == null ? PAL.muted : moved > 0 ? PAL.green : moved < 0 ? PAL.red : PAL.muted }}>
-                            {r.prevRank == null ? (skuMoveData.prevLimit != null ? `(ngoài top ${skuMoveData.prevLimit})` : "") : moved === 0 ? "(=)" : `(${r.prevRank} ${moved! > 0 ? "▲" : "▼"})`}
-                          </span>
-                        </td>
-                        <td className="py-2 px-3" style={{ color: PAL.cream }}>{r.name}</td>
-                        <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>{fmtVndShort(r.gmv)}</td>
-                        <td className="py-2 px-3 text-right font-mono">{chgCell(r.gmvChange, true, 1)}</td>
-                        <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{r.gmv > 0 ? fmtPct((r.gmvLive / r.gmv) * 100) : "—"}</td>
-                        <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{fmtInt(r.orders)}</td>
-                        <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{r.itemsSold != null ? fmtInt(r.itemsSold) : "—"}</td>
-                        <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{fmtPct(r.ctr)}</td>
-                        <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{fmtPct(r.ctor)}</td>
-                      </tr>
-                    );
-                  })}
-                </ReportTable>
-              ) : (
-                <div className="space-y-2">
-                  {canManage && (
-                    <p className="text-[11px]" style={{ color: PAL.gold }}>
-                      Bấm "Cập nhật số liệu" để có hạng so với tháng trước và phễu từng SKU.
-                    </p>
-                  )}
-                  <ReportTable head={["#", "Sản phẩm", "GMV", "Seller LIVE GMV", "Tỷ trọng Seller LIVE", "Orders"]}>
-                    {(topSku.items ?? []).map((s, idx) => (
-                      <tr key={s.name} style={rowStyle(idx)}>
-                        <td className="py-2 px-3 font-mono" style={{ color: PAL.gold }}>{idx + 1}</td>
-                        <td className="py-2 px-3" style={{ color: PAL.cream }}>{s.name}</td>
-                        <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>{fmtVndShort(s.gmv)}</td>
-                        <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{fmtVndShort(s.gmvLive)}</td>
-                        <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{s.gmv > 0 ? fmtPct((s.gmvLive / s.gmv) * 100) : "—"}</td>
-                        <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{fmtInt(s.orders)}</td>
-                      </tr>
-                    ))}
-                  </ReportTable>
-                </div>
-              )}
-              {skuRankCur?.skusFor80Pct != null && (
-                <p className="text-[11px] mt-2" style={{ color: PAL.muted }}>
-                  Độ tập trung: {fmtInt(skuRankCur.sellingSkus)} SKU có doanh thu, {fmtInt(skuRankCur.skusFor80Pct)} SKU đầu bảng đã tạo 80% GMV
-                  {skuRankCur.sellingSkus > 0 ? ` (${fmtFixed((skuRankCur.skusFor80Pct / skuRankCur.sellingSkus) * 100, 0)}% số SKU)` : ""}.
-                </p>
-              )}
-              {giftSliceCur?.hasAnyBatch && giftSliceCur.giftItems > 0 && (
-                <p className="text-[11px] mt-2" style={{ color: PAL.muted }}>
-                  Quà tặng (hàng dưới {fmtVndShort(GIFT_MAX_PRICE)}/món) tháng này: {fmtInt(giftSliceCur.giftItems)} món ở {giftSliceCur.giftSkus} SKU —{" "}
-                  {giftSliceCur.top.map(([name, items, price]) => `${shortSku(name)} ${fmtInt(items)} món ~${fmtVndShort(price)}`).join("; ")}.
-                </p>
-              )}
-            </Panel>
-            {giftByMonth.some((g) => g && g.giftPerOrder != null) && (
-              <Panel title="Quà tặng kèm 4 tháng" icon={<ShoppingBag className="w-4 h-4" />} sub={`Sản phẩm giá dưới ${fmtVndShort(GIFT_MAX_PRICE)}/món trong file Sản Phẩm · ${METRIC.upt} không tính quà phản ánh cách bán`}>
-                <ReportTable head={["Chỉ số", ...last4Months.map((m) => trendColLabel(m))]}>
-                  {(
-                    [
-                      ["Quà tặng mỗi đơn (toàn shop)", (g: GiftStats | null) => g?.giftPerOrder ?? null],
-                      [`${METRIC.upt} toàn shop`, (g: GiftStats | null) => g?.uptShop ?? null],
-                      [`${METRIC.upt} không tính quà`, (g: GiftStats | null) => g?.uptExGift ?? null]
-                    ] as [string, (g: GiftStats | null) => number | null][]
-                  ).map(([label, get], idx) => (
-                    <tr key={label} style={rowStyle(idx)}>
-                      <td className="py-2 px-3 font-semibold whitespace-nowrap" style={{ color: PAL.cream }}>{label}</td>
-                      {giftByMonth.map((g, i) => (
-                        <td key={i} className={`py-2 px-3 text-right font-mono ${i === 3 ? "font-bold" : ""}`} style={{ color: i === 3 ? PAL.cream : PAL.muted }}>
-                          {get(g) != null ? fmtFixed(get(g)!, 2) : "—"}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </ReportTable>
-              </Panel>
-            )}
-            <Panel
-              title="Top Chương Trình Khuyến Mãi"
-              icon={<Megaphone className="w-4 h-4" />}
-              sub={`Nguồn: Shop Promotion List — chỉ xếp hạng chương trình chạy TRỌN trong tháng${topPromo?.excludedMultiMonth ? ` (đã loại ${topPromo.excludedMultiMonth} chương trình vắt qua tháng khác)` : ""}`}
-            >
-              {!topPromo?.hasAnyBatch ? (
-                <p className="text-sm text-center py-6" style={{ color: PAL.muted }}>
-                  {canManage ? "Chưa có file \"Shop Promotion List\" nào được import trong Dữ Liệu Gốc cho tháng này." : "Chưa có số liệu chương trình khuyến mãi tháng này."}
-                </p>
-              ) : topPromo.items.length === 0 ? (
-                <p className="text-sm text-center py-6" style={{ color: PAL.muted }}>
-                  Không có chương trình nào chạy trọn trong tháng này. Chương trình vắt qua nhiều tháng bị loại vì cột GMV trong file TikTok là luỹ kế cả chương trình.
-                </p>
-              ) : (
-                <>
-                <ReportTable head={["#", "Chương trình", "Trạng thái", "GMV", "Orders", "AOV", "Giảm giá", "ROI"]}>
-                  {(topPromo.items ?? []).map((p, idx) => (
-                    <tr key={p.name + idx} style={rowStyle(idx)}>
-                      <td className="py-2 px-3 font-mono" style={{ color: PAL.gold }}>{idx + 1}</td>
-                      <td className="py-2 px-3" style={{ color: PAL.cream }}>{p.name}</td>
-                      <td className="py-2 px-3 text-right">
-                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: `${promoStatusLabel(p.status).color}22`, color: promoStatusLabel(p.status).color }}>
-                          {promoStatusLabel(p.status).label}
-                        </span>
-                      </td>
-                      <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>{fmtVndShort(p.gmv)}</td>
-                      <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{fmtInt(p.orders)}</td>
-                      <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{fmtVndShort(p.aov)}</td>
-                      <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{p.discount != null ? fmtVndShort(p.discount) : "—"}</td>
-                      <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{p.roi != null && p.roi > 0 ? fmtFixed(p.roi, 2) : "—"}</td>
-                    </tr>
-                  ))}
-                </ReportTable>
-                <p className="text-[11px] mt-2" style={{ color: PAL.muted }}>
-                  {topPromo.totalDiscount != null && topPromo.totalDiscount > 0 && <>Tổng tiền giảm giá của các chương trình chạy trọn trong tháng: {fmtVndShort(topPromo.totalDiscount)}. </>}
-                  ROI = GMV ÷ tiền giảm giá (cột ROI của TikTok).
-                  {topPromo.items[0]?.discount === undefined && canManage && " Cột Giảm giá/ROI trống vì số liệu chốt trước khi report có 2 cột này — bấm \"Cập nhật số liệu\"."}
-                </p>
-                </>
-              )}
-              {(topPromo?.longTerm?.length ?? 0) > 0 && (
-                <details className="mt-3">
-                  <summary className="cursor-pointer text-[11px] font-bold" style={{ color: PAL.gold }}>
-                    Chương trình dài hạn (vắt qua nhiều tháng) — GMV luỹ kế, không xếp hạng cùng bảng trên
-                  </summary>
-                  <div className="mt-2">
-                    <ReportTable head={["Chương trình", "Kỳ chạy", "GMV luỹ kế", "Giảm giá luỹ kế"]}>
-                      {topPromo!.longTerm!.map((p, idx) => (
-                        <tr key={p.name + idx} style={rowStyle(idx)}>
-                          <td className="py-2 px-3" style={{ color: PAL.cream }}>{p.name}</td>
-                          <td className="py-2 px-3 font-mono whitespace-nowrap" style={{ color: PAL.muted }}>{p.period.replace(/ \d{2}:\d{2}/g, "")}</td>
-                          <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.cream }}>{fmtVndShort(p.gmv)}</td>
-                          <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{p.discount != null ? fmtVndShort(p.discount) : "—"}</td>
-                        </tr>
-                      ))}
-                    </ReportTable>
-                  </div>
-                </details>
-              )}
-            </Panel>
-          </SectionDetail>
+        <section id="mr-products" className="space-y-4 scroll-mt-16" style={secStyle("products")}>
+          <PageHead {...head("products")} metrics={productsKpis(productsData)} no={secNo("products")} title={secTitle("products")} />
+          <ProductsPageBody
+            data={productsData}
+            images={(name) => monthlyReportRow?.sectionNotes?.[skuImageKey(name)]?.text}
+            canManage={canManage}
+            onSaveImage={saveSkuImage}
+            curDaysLabel={skuMoveData?.curDays ? ` (${skuMoveData.curDays} ngày)` : ""}
+            prevMonthLabel={prevMonth.slice(5)}
+            empty={
+              <p className="text-sm text-center py-6" style={{ color: PAL.muted }}>
+                {canManage ? "Chưa có file \"Product List\" nào được import trong Dữ Liệu Gốc cho tháng này." : "Chưa có số liệu sản phẩm tháng này."}
+              </p>
+            }
+          />
+          {pageInsight("products")}
         </section>
         )}
 
         {/* ===== Quảng cáo ===== */}
         {sectionShown.ads && (
-        <section id="mr-ads" className="space-y-4 scroll-mt-16">
-          <SectionHead no={secNo("ads")} title={secTitle("ads")} sub="Ads cost toàn cửa hàng (LIVE GMV Max + Product GMV Max) · ROI theo loại ngày · ngày có chi phí nhưng 0 đơn" />
-            {adsPlan && <AdsPlanPanel s={adsPlan} month={month} />}
-            {adsCur ? (() => {
+        <section id="mr-ads" className="space-y-4 scroll-mt-16" style={secStyle("ads")}>
+          <PageHead {...head("ads")} no={secNo("ads")} title={secTitle("ads")} sub="Ads cost toàn cửa hàng (LIVE GMV Max + Product GMV Max) · ROI theo loại ngày · ngày có chi phí nhưng 0 đơn" />
+            {adsPlan && adsPlanRows && <AdsPlanPanel rows={adsPlanRows.rows} s={adsPlan} month={month} bucketOf={bucketCur} hasCampaignFile={!!adsCur} />}
+            {adsPlan ? null : adsCur ? (() => {
               const prevLabel = adsCur.lastDate && adsCur.lastDate < end ? `1–${Number(adsCur.lastDate.slice(8))}/${prevMonth.slice(5)}` : `Tháng ${prevMonth.slice(5)}`;
               const vsPrev = (cur: number | null, prev: number | null | undefined, fmt: (v: number) => string) => {
                 if (prev == null || cur == null) return undefined;
@@ -1654,163 +1499,109 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             })() : (
               canManage && warnBox(<>Chưa có file Ads tháng {month.slice(5)}/{month.slice(0, 4)} trong bản chụp này. Brand có chạy Ads: tải file &quot;Campaign overview data&quot; ở Nhập Ads rồi bấm Cập nhật số liệu. Không chạy Ads thì bỏ qua — brand không thấy dòng này.</>)
             )}
+          {pageInsight("ads")}
         </section>
         )}
 
         {/* ===== Hủy, hoàn & NMV ===== */}
         {sectionShown.nmv && (
-        <section id="mr-nmv" className="space-y-4 scroll-mt-16">
-          <SectionHead no={secNo("nmv")} title={secTitle("nmv")} sub="Từ GMV đến doanh thu thực nhận (NMV)" />
-          <NmvPanel
-            gmv={liveCurStats.gmv}
-            refundRate={refundRateShop}
-            refundRatePrev={refundRateShopPrev}
-            windowLabel={shopWin.label}
-            contractRate={hasReturnRateConfig ? tiktokReturnRate ?? null : null}
-            shopRefundOnly={refundRateShop != null}
+        <section id="mr-nmv" className="space-y-4 scroll-mt-16" style={secStyle("nmv")}>
+          <NmvDemoPage
+            no={secNo("nmv")}
+            title={secTitle("nmv")}
+            headline={head("nmv").headline}
+            months={nmvDemoMonths}
+            nmvRate={nmvRate}
+            curEndDay={Number(cutEndOf(month).slice(8))}
+            nmvEndDay={Number(cmp.curEnd.slice(8))}
+            track={refundTrackRows(last4Months.map(refundStatusOf).filter((x): x is RefundMonthStatus => x != null), refundFinals)}
+            finalDates={decodeRefundFinalDate(monthlyReportRow?.sectionNotes?.[REFUND_FINAL_DATE_KEY]?.text)}
+            canManage={canManage}
+            onSaveFinal={async (m, rate) => {
+              const next = { ...refundFinals };
+              if (rate == null) delete next[m];
+              else next[m] = rate;
+              setMonthlyReportRow(await saveMonthlyReportSectionNote(brandId, `${month}-01`, REFUND_FINAL_KEY, encodeRefundFinal(next)));
+            }}
+            onSaveDate={async (m, date) => {
+              const next = { ...decodeRefundFinalDate(monthlyReportRow?.sectionNotes?.[REFUND_FINAL_DATE_KEY]?.text) };
+              if (date == null) delete next[m];
+              else next[m] = date;
+              setMonthlyReportRow(await saveMonthlyReportSectionNote(brandId, `${month}-01`, REFUND_FINAL_DATE_KEY, encodeRefundFinalDate(next)));
+            }}
+            insight={demoInsight("nmv")}
           />
-          {canManage && refundRateShop == null && warnBox(<>Chưa có file Shop Analytics tháng {month.slice(5)} — tải ở Dữ Liệu Gốc rồi bấm Cập nhật số liệu để có Refund rate. Tỷ lệ hủy cần file Order (chưa có loại file này).</>)}
         </section>
         )}
 
         {/* ===== 5. Host ===== */}
-        <section id="mr-people" className="space-y-4 scroll-mt-16">
-          <SectionHead no={secNo("people")} title={secTitle("people")} sub={`So với trung bình các host cùng loại ngày, cùng buổi · gộp ${relMonths} tháng, có khoảng tin cậy · khung giờ bắt đầu phiên`} />
-          {insightBox("people")}
-          {canManage && hostOpsNote && warnBox(<>Chỉ ops thấy (không vào bản gửi brand): {hostOpsNote}</>)}
-          <SectionDetail open={detailOpen("people")} onOpen={() => openDetail("people")}>
-            <HostPerformancePanel rows={hostDayType} team={hostDayTypeTeam} campDaysLabel={campDaysLabel} vsPeer={hostInsight.vsPeer} reliability={reliabilityByKey} relMonths={relMonths}>
-              {canManage && hostQuality.reconciled < hostQuality.total && (
-                <div className="mb-3">
-                  {warnBox(
-                    <>
-                      {hostQuality.total} phiên: {hostQuality.reconciled} đã đối soát
-                      {hostQuality.snapshot > 0 ? `, ${hostQuality.snapshot} số lúc giao ca (chờ đối soát cuối kỳ)` : ""}
-                      {hostQuality.manual > 0 ? `, ${hostQuality.manual} talent tự khai (chưa được xác thực)` : ""}. Đối soát ở "Vận Hành Live → Đối Soát Số Liệu" trước khi phát hành report.
-                    </>
-                  )}
-                </div>
-              )}
-              {unassignedHost && !canManage && (
-                <p className="text-[11px] mb-3" style={{ color: PAL.muted }}>
-                  {unassignedHost.sessionCount} phiên ({fmtVndShort(unassignedHost.gmv)}) chưa ghi nhận host nên không nằm trong bảng.
-                </p>
-              )}
-              {unassignedHost && canManage && (
-                <div className="mb-3">
-                  {warnBox(
-                    <>
-                      {unassignedHost.sessionCount} ca chưa gán host ({fmtVndShort(unassignedHost.gmv)} · {fmtFixed(unassignedHost.hours, 1)}h) không nằm trong bảng này — gán host cho ca để số về đúng người.
-                    </>
-                  )}
-                </div>
-              )}
-              {snapshot.version < 3 && canManage && (
-                <div className="mb-3">{warnBox(<>Số liệu này chốt trước khi report lưu trợ live — dòng "Giờ trợ live" đang trống. Bấm "Cập nhật số liệu" ở trên để có.</>)}</div>
-              )}
-            </HostPerformancePanel>
-            <Panel title="Khung giờ bắt đầu phiên" icon={<CalendarClock className="w-4 h-4" />} sub={`${METRIC.gmvPerHour} · ${cmp.label} · chỉ tô màu khi vượt ngưỡng dao động`}>
-              <ReportTable head={["Khung giờ", "Số phiên (trước → nay)", `${METRIC.gmvPerHour} kỳ trước`, `${METRIC.gmvPerHour} kỳ này`, "Thay đổi", "Ngưỡng dao động"]}>
-                {slotRows.map((r, idx) => {
-                  const c = pctChange(r.prev.gmvPerHour, r.cur.gmvPerHour);
-                  const band = noiseBand(r.prev.n, r.cur.n);
-                  const tone = changeTone(c, band, true);
-                  return (
-                    <tr key={r.key} style={rowStyle(idx)}>
-                      <td className="py-2 px-3 font-semibold" style={{ color: PAL.gold }}>{r.label}</td>
-                      <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{r.prev.n} → {r.cur.n}</td>
-                      <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{r.prev.gmvPerHour != null ? fmtVndShort(r.prev.gmvPerHour) : "—"}</td>
-                      <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>{r.cur.gmvPerHour != null ? fmtVndShort(r.cur.gmvPerHour) : "—"}</td>
-                      <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: tone === "down" ? PAL.red : tone === "up" ? PAL.green : PAL.muted }}>
-                        {c == null ? "—" : `${c >= 0 ? "+" : "−"}${fmtFixed(Math.abs(c), 0)}%`}
-                      </td>
-                      <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{band == null ? "—" : `±${fmtFixed(band, 0)}%`}</td>
-                    </tr>
-                  );
-                })}
-              </ReportTable>
-              <ToneLegend />
-            </Panel>
-            {insightBox("context")}
-            {/* Gập không khung: trước là một hộp viền bọc 2 Panel, mỗi Panel lại có 5 ô viền (sâu 4 tầng). */}
-            <details>
-              <summary className="cursor-pointer min-h-6 py-1 text-xs font-bold w-fit" style={{ color: PAL.gold }}>
-                Phân bố GMV/giờ từng phiên & Top 10 phiên live
-              </summary>
-              <div className="pt-3 space-y-4">
-                {spread && (
-                  <Panel title="Phân bố GMV/giờ từng phiên" icon={<Activity className="w-4 h-4" />} sub={`${spread.count} phiên · ${cmp.label.split(" so với")[0]} · mỗi chấm là một phiên (bỏ phiên dưới 6 phút)`}>
-                    <div className="grid grid-cols-3 sm:grid-cols-5 gap-x-4 gap-y-3 mb-4">
-                      {([["Thấp nhất", spread.worst], ["Phân vị 25", spread.p25], ["Trung vị", spread.median], ["Phân vị 75", spread.p75], ["Cao nhất", spread.best]] as const).map(([label, v]) => (
-                        <KpiTile key={label} frame="plain" label={label} value={fmtVndShort(v)} />
-                      ))}
-                    </div>
-                    <div style={{ height: 240 }}>
-                      <ResponsiveContainer width="100%" height="100%">
-                        <ScatterChart margin={{ left: 4, right: 12 }}>
-                          <CartesianGrid stroke={PAL.line} />
-                          <XAxis type="number" dataKey="hours" name={METRIC.liveHours} stroke={PAL.muted} fontSize={11} tickFormatter={(v) => fmtHours(v)} />
-                          <YAxis type="number" dataKey="gmvPerHour" name={METRIC.gmvPerHour} stroke={PAL.muted} fontSize={11} tickFormatter={(v) => fmtVndShort(v)} width={56} />
-                          <ReferenceLine y={spread.median} stroke={PAL.gold} strokeDasharray="4 3" />
-                          <Tooltip
-                            contentStyle={chartTooltipStyle}
-                            formatter={(v, name) => (name === METRIC.liveHours ? fmtHours(chartNum(v)) : fmtVndShort(chartNum(v)))}
-                            labelFormatter={() => ""}
-                          />
-                          <Scatter data={spread.points} fill={PAL.blue} fillOpacity={0.75} />
-                        </ScatterChart>
-                      </ResponsiveContainer>
-                    </div>
-                    <p className="text-[11px] mt-2" style={{ color: PAL.muted }}>
-                      Đường vàng = trung vị. Nửa giữa các phiên nằm trong {fmtVndShort(spread.p25)}–{fmtVndShort(spread.p75)}/giờ; phiên dưới phân vị 25 là chỗ nên xem lại host, khung giờ hoặc hàng lên sóng.
-                    </p>
-                  </Panel>
+        <section id="mr-people" className="space-y-4 scroll-mt-16" style={secStyle("people")}>
+          <PageHead {...head("people")} metrics={hostKpis(hostData)} no={secNo("people")} title={secTitle("people")} />
+          <HostPageBody data={hostData}>
+            {canManage && hostOpsNote && warnBox(<>Chỉ ops thấy (không vào bản gửi brand): {hostOpsNote}</>)}
+            {canManage && hostQuality.reconciled < hostQuality.total && (
+              <div className="mb-3">
+                {warnBox(
+                  <>
+                    {hostQuality.total} phiên: {hostQuality.reconciled} đã đối soát
+                    {hostQuality.snapshot > 0 ? `, ${hostQuality.snapshot} số lúc giao ca (chờ đối soát cuối kỳ)` : ""}
+                    {hostQuality.manual > 0 ? `, ${hostQuality.manual} talent tự khai (chưa được xác thực)` : ""}. Đối soát ở "Vận Hành Live → Đối Soát Số Liệu" trước khi phát hành report.
+                  </>
                 )}
-                <Panel title="Top 10 phiên live theo GMV" icon={<ListOrdered className="w-4 h-4" />} sub={liveSource.source === "sessions" ? "Nguồn: các phiên YFB vận hành" : "Nguồn: file Creator Live Performance"}>
-                  <ReportTable head={["#", "Bắt đầu", "Giờ live", "GMV", "GMV/giờ", "Orders", "Items sold", "Views", "Product CTR", "CTOR"]}>
-                    {topSessions.map((s, idx) => (
-                      <tr key={s.roomId ?? idx} style={rowStyle(idx)}>
-                        <td className="py-2 px-3 font-mono" style={{ color: PAL.gold }}>{idx + 1}</td>
-                        <td className="py-2 px-3 font-mono" style={{ color: PAL.cream }}>{fmtSessionStart(s.startTime)}</td>
-                        <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{fmtHours(s.hours)}</td>
-                        <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>{fmtVndShort(s.gmv)}</td>
-                        <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{fmtVndShort(s.gmvPerHour)}</td>
-                        <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{fmtInt(s.orders)}</td>
-                        <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{fmtInt(s.itemsSold)}</td>
-                        <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{fmtInt(s.views)}</td>
-                        <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{fmtPct(s.ctr)}</td>
-                        <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{fmtPct(s.ctor)}</td>
-                      </tr>
-                    ))}
-                    {topSessions.length === 0 && (
-                      <tr>
-                        <td colSpan={10} className="py-6 text-center italic" style={{ color: PAL.muted }}>
-                          Chưa có phiên live nào trong tháng.
-                        </td>
-                      </tr>
-                    )}
-                  </ReportTable>
-                </Panel>
               </div>
-            </details>
-          </SectionDetail>
+            )}
+            {unassignedHost && canManage && (
+              <div className="mb-3">
+                {warnBox(
+                  <>
+                    {unassignedHost.sessionCount} ca chưa gán host ({fmtVndShort(unassignedHost.gmv)} · {fmtFixed(unassignedHost.hours, 1)}h) không nằm trong bảng này — gán host cho ca để số về đúng người.
+                  </>
+                )}
+              </div>
+            )}
+            {snapshot.version < 3 && canManage && (
+              <div className="mb-3">{warnBox(<>Số liệu này chốt trước khi report lưu trợ live — dòng "Giờ trợ live" đang trống. Bấm "Cập nhật số liệu" ở trên để có.</>)}</div>
+            )}
+          </HostPageBody>
+          {pageInsight("people")}
         </section>
 
         {/* ===== Affiliate ===== */}
         {sectionShown.affiliate && (
-        <section id="mr-affiliate" className="space-y-4 scroll-mt-16">
-          <SectionHead no={secNo("affiliate")} title={secTitle("affiliate")} sub="Phiên livestream của creator trong tháng · số liệu thực tế từ tab Affiliate" />
+        <section id="mr-affiliate" className="space-y-4 scroll-mt-16" style={secStyle("affiliate")}>
+          <PageHead {...head("affiliate")} no={secNo("affiliate")} title={secTitle("affiliate")} sub="Phiên livestream của creator trong tháng · số liệu thực tế từ tab Affiliate" />
           {creatorRows.length > 0 ? (
-            <AffiliatePanel rows={creatorRows} totals={creatorSum} shopAffiliate={shopAffiliateCur} agencyGmvPerHour={liveCurStats.gmvPerHour} />
+            <AffiliateTrackPanel cols={trackCols} monthLabel={month.slice(5)} />
           ) : (
             canManage && warnBox(<>Tháng {month.slice(5)} chưa có phiên creator nào có số liệu ở tab Affiliate (kế hoạch + Nạp Từ Dữ Liệu Gốc). Brand không dùng affiliate thì bỏ qua — brand không thấy trang này.</>)
           )}
+          {pageInsight("affiliate")}
         </section>
         )}
 
         {/* ===== 7. Tháng sau ===== */}
-        <section id="mr-next" className="space-y-4 scroll-mt-16">
-          <SectionHead no={secNo("next")} title={secTitle("next")} sub={`Hành động tháng ${Number(nextMonth.slice(5))} + kế hoạch từ Kế Hoạch Tháng và tab Affiliate`} />
+        <section id="mr-next" className="space-y-4 scroll-mt-16" style={secStyle("next")}>
+          <PageHead {...head("next")} no={secNo("next")} title={secTitle("next")} sub={`Hành động tháng ${Number(nextMonth.slice(5))} + kế hoạch từ Kế Hoạch Tháng và tab Affiliate`} />
+          <NextLivePlanPanel
+            nextMonth={nextMonth}
+            curLabel={String(Number(month.slice(5)))}
+            nextLabel={String(Number(nextMonth.slice(5)))}
+            rows={(["daily", "dday", "midmonth", "payday"] as const).map((key) => {
+              const a = nextAllocation?.find((x) => x.key === key);
+              const camp = campDetailRows.find((r) => r.key === key);
+              return { key, name: DAY_TYPE_SHORT[key], achieved: camp?.cur.gmvPerHour ?? null, sessionsCur: camp?.cur.sessions ?? 0, plan: a ? { hours: a.hours, target: a.target, slots: a.slots } : undefined };
+            })}
+            total={{ key: "all", name: "Cả tháng", achieved: liveCurStats.gmvPerHour, sessionsCur: liveCurStats.sessions }}
+          />
+          <BookingPlanPanel
+            nextMonth={nextMonth}
+            curLabel={String(Number(month.slice(5)))}
+            nextLabel={String(Number(nextMonth.slice(5)))}
+            planRows={creatorPlan.map((r) => ({ date: r.date, creator: r.creator, camp: r.campName, timeline: r.timeline, hours: r.hours, target: r.target, budgetAds: r.budgetAds, ref: r.bestGmvPerHour }))}
+            cur={{ sessions: creatorSum.sessions, hours: creatorSum.hours, gmv: creatorSum.gmv, gmvPerHour: creatorRates(creatorSum).gmvPerHour, roas: creatorRates(creatorSum).roas }}
+            refByCreator={creatorBest}
+            draftNote={canManage && creatorPlan.length > 0 && !affiliate.nextMeta?.publishedAt ? "Kế hoạch Affiliate tháng sau còn là nháp — brand chỉ thấy bảng này sau khi Chốt ở tab Affiliate." : undefined}
+          />
           {prevPlanItems && prevGrades && (
             <ActionResultsPanel
               planMonthLabel={`tháng ${Number(prevMonth.slice(5))}`}
@@ -1831,77 +1622,44 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             items={monthlyReportRow?.actionPlan?.items ?? null}
             fallbackLines={nextLines}
             nextMonthLabel={`tháng ${Number(nextMonth.slice(5))}`}
-            ctx={actionCtx}
             canManage={canManage}
-            onSave={async (items) => setMonthlyReportRow(await saveMonthlyReportActionPlan(brandId, `${month}-01`, items))}
+            meta={decodeTodoMeta(monthlyReportRow?.sectionNotes?.[todoMetaKey(month)]?.text)}
+            onSave={async (items, meta) => {
+              let row = await saveMonthlyReportActionPlan(brandId, `${month}-01`, items);
+              const keep = Object.fromEntries(Object.entries(meta).filter(([id]) => items.some((i) => i.id === id)));
+              row = await saveMonthlyReportSectionNote(brandId, `${month}-01`, todoMetaKey(month), encodeTodoMeta(keep));
+              setMonthlyReportRow(row);
+            }}
           />
-          <SectionDetail open={detailOpen("next")} onOpen={() => openDetail("next")}>
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-              <KpiTile label={`Target GMV tháng ${nextMonth.slice(5)}`} value={nextPlan && nextPlan.targetGmv > 0 ? fmtVndShort(nextPlan.targetGmv) : "—"} note={nextPlan ? (nextPlan.status === "locked" ? "đã chốt" : "đang lên lịch") : "chưa lập kế hoạch"} />
-              <KpiTile label="Số phiên kế hoạch" value={nextPlan ? String(nextPlan.slotCount) : "—"} note={nextPlan ? "trong Kế Hoạch Tháng" : ""} />
-              {nextPlanFull && nextPlanFull.plan.shopTargetGmv > 0 && (
-                <KpiTile
-                  label={`KPI GMV tháng ${nextMonth.slice(5)}`}
-                  value={fmtVndShort(nextPlanFull.plan.shopTargetGmv)}
-                  note={nextPlan && nextPlan.targetGmv > 0 ? `Target GMV live = ${fmtPct((nextPlan.targetGmv / nextPlanFull.plan.shopTargetGmv) * 100)} KPI GMV` : "brand giao · mọi kênh"}
-                />
-              )}
-            </div>
-            {nextAllocation && (
-              <Panel
-                title={`Phân bổ target tháng ${nextMonth.slice(5)} theo loại ngày`}
-                icon={<Flame className="w-4 h-4" />}
-                sub={`Cộng từ các phiên trong Kế Hoạch Tháng ${nextMonth.slice(5)} · so GMV/giờ mục tiêu với GMV/giờ thực đạt cùng loại ngày tháng ${month.slice(5)}`}
-              >
-                <ReportTable head={["Loại ngày", "Phân bổ (%)", "Target GMV", "Số phiên", "Giờ live", "GMV/giờ mục tiêu", `GMV/giờ T${Number(month.slice(5))}`, `Mục tiêu so với T${Number(month.slice(5))}`]}>
-                  {nextAllocation.map((a, idx) => {
-                    const actual = campDetailRows.find((r) => r.key === a.key)?.cur.gmvPerHour ?? null;
-                    const gap = a.requiredGmvPerHour != null && actual != null && actual > 0 ? ((a.requiredGmvPerHour - actual) / actual) * 100 : null;
-                    return (
-                      <tr key={a.key} style={rowStyle(idx)}>
-                        <td className="py-2 px-3 font-semibold" style={{ color: PAL.gold }}>{DAY_TYPE_SHORT[a.key]}</td>
-                        <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.cream }}>{fmtPct(a.share)}</td>
-                        <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>{a.target > 0 ? fmtVndShort(a.target) : "—"}</td>
-                        <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{a.slots}</td>
-                        <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{fmtHours(a.hours)}</td>
-                        <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.cream }}>{a.requiredGmvPerHour != null ? fmtVndShort(a.requiredGmvPerHour) : "—"}</td>
-                        <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{actual != null ? fmtVndShort(actual) : "—"}</td>
-                        <td className="py-2 px-3 text-right font-mono" style={{ color: gap == null ? PAL.muted : gap > 10 ? PAL.red : gap > 0 ? PAL.gold : PAL.green }}>
-                          {gap == null ? "—" : `${gap >= 0 ? "+" : "−"}${fmtFixed(Math.abs(gap), 0)}%`}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </ReportTable>
-                <p className="text-[11px] mt-2" style={{ color: PAL.muted }}>
-                  "Mục tiêu so với" = GMV/giờ mục tiêu so với GMV/giờ thực đạt cùng loại ngày tháng này{cmp.partial ? ` (tính tới ${Number(cmp.curEnd.slice(8))}/${month.slice(5)})` : ""}. Đỏ: cần tăng hơn 10%.
-                </p>
-              </Panel>
-            )}
-            {creatorPlan.length > 0 && (
-              <CreatorPlanPanel
-                rows={creatorPlan}
-                monthLabel={`tháng ${Number(nextMonth.slice(5))}`}
-                curLabel={monthShort(month)}
-                fxRate={affiliate.nextMeta?.fxRate ?? DEFAULT_FX_RATE}
-                draftNote={canManage && !affiliate.nextMeta?.publishedAt ? "Kế hoạch Affiliate tháng sau còn là nháp — brand chỉ thấy bảng này sau khi Chốt ở tab Affiliate." : undefined}
-              />
-            )}
-          </SectionDetail>
+          {pageInsight("next")}
         </section>
 
         {/* ===== Key Metrics ===== */}
-        <section id="mr-keymetrics" className="space-y-4 scroll-mt-16">
-          <SectionHead no={secNo("keymetrics")} title={secTitle("keymetrics")} sub="Bảng tra cứu: cả tháng, Daily và từng đợt campaign · 3 tháng gần nhất" />
-          <KeyMetricsPanel months={keyMonths} monthLabel={monthShort} spans={keySpans} windowNote={cmp.partial ? `1–${Number(cmp.curEnd.slice(8))}` : undefined} />
+        <section id="mr-keymetrics" className="space-y-4 scroll-mt-16" style={secStyle("keymetrics")}>
+          <KeyMetricsDemoPage
+            no={secNo("keymetrics")}
+            title={secTitle("keymetrics")}
+            headline={head("keymetrics").headline}
+            months={keyMonths}
+            monthLabel={monthShort}
+            windowNote={cmp.partial ? `1–${Number(cmp.curEnd.slice(8))}` : undefined}
+            insight={demoInsight("keymetrics")}
+          />
         </section>
 
         {/* Chỉ là chỉ đường cho ops — report gửi brand là 7 phần ở trên (Phân tích sâu đã gộp vào, 2026-09-27). */}
         {canManage && (
-          <p className="text-[11px] pt-3" style={{ color: PAL.muted, borderTop: `1px solid ${PAL.line}` }}>
+          <p className="text-[11px] pt-3" style={{ color: PAL.muted, borderTop: `1px solid ${PAL.line}`, order: 100 }}>
             Chỉ ops thấy: target, khung campaign và lịch tháng nhập ở <b>Kế Hoạch Tháng</b>; bảng creator affiliate theo tháng ở trang <b>Affiliate</b>.
           </p>
         )}
+        {!showAll && (
+          <div style={{ order: 99 }}>
+            <PagePager prev={curIdx > 0 ? railItems[curIdx - 1] : null} next={curIdx < railItems.length - 1 ? railItems[curIdx + 1] : null} onSelect={goPage} />
+          </div>
+        )}
+      </div>
+        </div>
       </div>
     </div>
   );

@@ -1,4 +1,5 @@
 import { supabase } from "../supabaseClient";
+import { detectShopFileTemplate, vnDateOfTimestamp, type ShopFileTemplate } from "../refundStatus";
 import { DataRawColumn, DataRawReportType } from "../../types";
 import { dedupeInFlight } from "../db/dedupeInFlight";
 import { fetchRowsPaged } from "./fetchRowsPaged";
@@ -17,6 +18,7 @@ interface DbImportLite {
   report_type: string;
   period_start: string | null;
   period_end: string | null;
+  imported_at?: string | null;
 }
 
 // Chọn batch "overlap nhiều nhất, không cộng dồn nhiều batch" cho report loại "tổng cả kỳ, không
@@ -36,7 +38,7 @@ async function fetchImportsLite(brandId: string, reportType: DataRawReportType):
   return dedupeInFlight(`brand_dataraw_imports.lite|${brandId}|${reportType}`, async () => {
     const { data, error } = await supabase
       .from("brand_dataraw_imports")
-      .select("id, report_type, period_start, period_end")
+      .select("id, report_type, period_start, period_end, imported_at")
       .eq("brand_id", brandId)
       .eq("report_type", reportType);
     if (error) throw error;
@@ -67,9 +69,9 @@ async function readBatch(batchId: string): Promise<{ rows: Record<string, unknow
 
 export async function fetchOverlappingBatchRows(brandId: string, reportType: DataRawReportType, monthStart: string, monthEnd: string) {
   const best = await pickOverlappingBatch(brandId, reportType, monthStart, monthEnd);
-  if (!best) return { rows: [] as Record<string, unknown>[], columns: [] as DataRawColumn[], hasAnyBatch: false };
+  if (!best) return { rows: [] as Record<string, unknown>[], columns: [] as DataRawColumn[], hasAnyBatch: false, importedAt: null as string | null };
   const { rows, columns } = await readBatch(best.id);
-  return { rows, columns, hasAnyBatch: true };
+  return { rows, columns, hasAnyBatch: true, importedAt: best.imported_at ?? null };
 }
 
 // product_list của tháng ở dạng ĐÃ TỔNG HỢP (xem productListAgg.ts). Đọc `summary.productAgg` của batch
@@ -318,10 +320,14 @@ export interface ShopDayLite {
 export interface ShopDaysMonthSlice {
   days: ShopDayLite[];
   hasAnyBatch: boolean;
+  /** Mẫu file Shop Analytics (nhận diện qua cột "Tổng doanh thu") — bản chụp cũ không có ⇒ coi là "unknown". */
+  template?: ShopFileTemplate;
+  /** Ngày VN nạp file (≈ ngày xuất). */
+  exportedAt?: string | null;
 }
 
 export async function fetchShopDaysMonthSlice(brandId: string, monthStart: string, monthEnd: string): Promise<ShopDaysMonthSlice> {
-  const { rows, columns, hasAnyBatch } = await fetchOverlappingBatchRows(brandId, "shop_analytics", monthStart, monthEnd);
+  const { rows, columns, hasAnyBatch, importedAt } = await fetchOverlappingBatchRows(brandId, "shop_analytics", monthStart, monthEnd);
   if (!hasAnyBatch) return { days: [], hasAnyBatch: false };
   const days = readShopDays(columns, rows, monthStart, monthEnd)
     .map((d) => ({
@@ -335,7 +341,7 @@ export async function fetchShopDaysMonthSlice(brandId: string, monthStart: strin
       video: d.creatorVideoAttr + d.linkedVideoAttr
     }))
     .sort((a, b) => a.date.localeCompare(b.date));
-  return { days, hasAnyBatch: true };
+  return { days, hasAnyBatch: true, template: detectShopFileTemplate(columns.map((c) => c.label)), exportedAt: vnDateOfTimestamp(importedAt) };
 }
 
 export interface AdsMonthSlice {

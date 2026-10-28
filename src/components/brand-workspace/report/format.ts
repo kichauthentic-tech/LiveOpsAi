@@ -62,3 +62,8 @@ export function fmtSessionStart(iso: string): string {
   const p = (n: number) => String(n).padStart(2, "0");
   return `${p(shifted.getUTCDate())}/${p(shifted.getUTCMonth() + 1)} ${p(shifted.getUTCHours())}:${p(shifted.getUTCMinutes())}`;
 }
+
+/** "+4,2%" / "−3,0%" — dấu trừ thật, dấu phẩy thập phân. */
+export function signedPctText(v: number, digits = 1): string {
+  return `${v >= 0 ? "+" : "−"}${fmtFixed(Math.abs(v), digits)}%`;
+}

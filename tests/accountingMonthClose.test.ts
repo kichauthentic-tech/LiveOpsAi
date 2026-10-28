@@ -41,7 +41,7 @@ describe("ngày chốt hoàn/huỷ", () => {
   });
 
   test("% hoàn thật chỉ dùng được khi đủ ngày chờ, file phủ hết tháng và GMV > 0", () => {
-    const shop = { gmv: 1_000, refunds: 80, lastDate: "2026-09-30" };
+    const shop = { gmv: 1_000, refunds: 80, lastDate: "2026-09-30", template: "new" as const, definitionVerified: true };
     expect(settledReturnRate("2026-09", "2026-10-15", shop)).toBeCloseTo(8);
     expect(settledReturnRate("2026-09", "2026-10-14", shop)).toBeUndefined();
     expect(settledReturnRate("2026-09", "2026-10-20", { ...shop, lastDate: "2026-09-27" })).toBeUndefined();
@@ -78,7 +78,7 @@ describe("buildMonthClose", () => {
     const m = buildMonthClose(
       base({
         sessions: [ca("s1", { brandId: "nm", brandName: "NM", actualGmv: 100_000_000 })],
-        shopRefunds: { nm: { gmv: 1_000, refunds: 200, lastDate: "2026-09-30" } }
+        shopRefunds: { nm: { gmv: 1_000, refunds: 200, lastDate: "2026-09-30", template: "new", definitionVerified: true } }
       })
     );
     const c = m.contracts[0];
@@ -86,17 +86,44 @@ describe("buildMonthClose", () => {
     expect(c.revenue).toBeCloseTo(100_000_000 * 0.8 * 0.1);
     expect(c.revenueEstimate).toBeCloseTo(100_000_000 * 0.95 * 0.1);
     expect(m.estimateNotes).toHaveLength(0);
+    // Mẫu mới chưa được user xác nhận định nghĩa cột Hoàn tiền ⇒ cảnh báo.
+    expect(m.definitionWarnings).toHaveLength(0);
+  });
+
+  test("chưa xác nhận định nghĩa mẫu mới: chỉ ước tính, CRM chưa nhập thì mặc định 40%", () => {
+    const m = buildMonthClose(
+      base({
+        sessions: [ca("s1", { brandId: "nm", brandName: "NM", actualGmv: 100_000_000 })],
+        brandPlatformRates: [rate("hr", { ratePerHour: 500_000 }), rate("nm", { commissionRate: 10, returnRate: 0 })],
+        shopRefunds: { nm: { gmv: 1_000, refunds: 373, lastDate: "2026-09-30", template: "new" } }
+      })
+    );
+    const c = m.contracts[0];
+    expect(c.basis).toMatchObject({ kind: "nmv_estimate", returnRate: 40 });
+    expect(c.revenue).toBeCloseTo(100_000_000 * 0.6 * 0.1);
+    expect(m.estimateNotes.join(" ")).toContain("mặc định 40%");
+  });
+
+  test("file mẫu cũ: không chốt dù đã qua ngày chờ và phủ hết tháng", () => {
+    const m = buildMonthClose(
+      base({
+        sessions: [ca("s1", { brandId: "nm", brandName: "NM", actualGmv: 100_000_000 })],
+        shopRefunds: { nm: { gmv: 1_000, refunds: 150, lastDate: "2026-09-30", template: "old" } }
+      })
+    );
+    expect(m.contracts[0].basis.kind).toBe("nmv_estimate");
+    expect(m.estimateNotes[0]).toContain("mẫu cũ");
   });
 
   test("file Shop Analytics chưa phủ hết tháng: giữ ước tính và nói lý do", () => {
     const m = buildMonthClose(
       base({
         sessions: [ca("s1", { brandId: "nm", brandName: "NM", actualGmv: 100_000_000 })],
-        shopRefunds: { nm: { gmv: 1_000, refunds: 200, lastDate: "2026-09-20" } }
+        shopRefunds: { nm: { gmv: 1_000, refunds: 200, lastDate: "2026-09-20", template: "new" } }
       })
     );
     expect(m.contracts[0].basis.kind).toBe("nmv_estimate");
-    expect(m.estimateNotes[0]).toContain("2026-09-20");
+    expect(m.estimateNotes[0]).toContain("chưa phủ hết tháng");
   });
 
   test("Shopee không có nguồn hoàn thật: luôn ước tính", () => {
@@ -105,7 +132,7 @@ describe("buildMonthClose", () => {
         sessions: [ca("s1", { brandId: "nm", brandName: "NM", platform: "Shopee", actualGmv: 10_000_000 })],
         contracts: [contract("C-NM-S", "nm", "Shopee")],
         brandPlatformRates: [rate("nm", { platform: "Shopee", commissionRate: 10, returnRate: 5 })],
-        shopRefunds: { nm: { gmv: 1_000, refunds: 200, lastDate: "2026-09-30" } }
+        shopRefunds: { nm: { gmv: 1_000, refunds: 200, lastDate: "2026-09-30", template: "new" } }
       })
     );
     expect(m.contracts[0].platform).toBe("Shopee");

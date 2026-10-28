@@ -21,10 +21,11 @@ import { sessionAdsCost } from "../metrics/adsCost";
 import { contractCovering, monthCommitmentOf } from "../performance/brandCommitment";
 import { isUnconfirmedPast } from "../sessionStatus";
 import { platformOf, type ReportPlatform } from "../reportPlatform";
+import { fmtFixed } from "../format";
 import { profileOf } from "../platforms/profiles";
+import { DEFAULT_RETURN_RATE_ESTIMATE, NMV_SETTLE_DAYS, refundMonthStatus, settleFromIso, monthEndIso, DEFINITION_WARNING, REFUND_REASON_LABEL, type RefundMonthStatus, type ShopFileTemplate } from "../refundStatus";
 
-/** Số ngày sau ngày cuối tháng mà sàn mới chốt hoàn/huỷ (user: ~15 ngày). */
-export const NMV_SETTLE_DAYS = 15;
+export { NMV_SETTLE_DAYS };
 
 /** Hoàn tiền + GMV của CẢ SHOP trong tháng (file Seller Center, `shop_analytics`), theo brand. */
 export interface ShopRefundMonth {
@@ -32,6 +33,10 @@ export interface ShopRefundMonth {
   refunds: number;
   /** Ngày cuối có dòng trong file ("YYYY-MM-DD"). */
   lastDate: string;
+  /** Mẫu file + ngày xuất — thiếu = "unknown" ⇒ chưa chốt (xem lib/refundStatus.ts). */
+  template?: ShopFileTemplate;
+  exportedAt?: string | null;
+  definitionVerified?: boolean;
 }
 
 export type RevenueBasis =
@@ -139,6 +144,8 @@ export interface MonthClose {
   backfillCount: number;
   /** Hợp đồng % NMV còn ở dạng ước tính + lý do (để ghi chú dưới bảng). */
   estimateNotes: string[];
+  /** NMV chốt đang dựa trên Refund rate của mẫu file chưa xác nhận định nghĩa (xem lib/refundStatus.ts) — hiện cảnh báo vàng. */
+  definitionWarnings: string[];
 }
 
 export interface MonthCloseInput {
@@ -159,29 +166,20 @@ export interface MonthCloseInput {
   shopRefunds: Record<string, ShopRefundMonth | undefined>;
 }
 
-export function monthEndOf(month: string): string {
-  const [y, m] = month.split("-").map(Number);
-  const d = new Date(Date.UTC(y, m, 0));
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
-}
-
-function addDays(date: string, n: number): string {
-  const [y, m, d] = date.split("-").map(Number);
-  const x = new Date(Date.UTC(y, m - 1, d + n));
-  return `${x.getUTCFullYear()}-${String(x.getUTCMonth() + 1).padStart(2, "0")}-${String(x.getUTCDate()).padStart(2, "0")}`;
-}
+export const monthEndOf = monthEndIso;
 
 /** Ngày đầu tiên được coi là đã chốt hoàn/huỷ của tháng (ngày cuối tháng + 15). */
-export function nmvSettledFrom(month: string): string {
-  return addDays(monthEndOf(month), NMV_SETTLE_DAYS);
+export const nmvSettledFrom = settleFromIso;
+
+export function shopRefundStatus(month: string, today: string, shop: ShopRefundMonth): RefundMonthStatus {
+  return refundMonthStatus({ month, today, gmv: shop.gmv, refunds: shop.refunds, lastDate: shop.lastDate, template: shop.template ?? "unknown", exportedAt: shop.exportedAt, definitionVerified: shop.definitionVerified });
 }
 
-/** % hoàn thật của cả shop (0–100), hoặc undefined khi chưa dùng được: chưa đủ ngày chờ, file chưa phủ hết tháng hoặc GMV = 0. */
+/** % hoàn thật của cả shop (0–100), hoặc undefined khi chưa chốt: chưa đủ ngày chờ, file chưa phủ hết tháng, mẫu file cũ/lạ hoặc GMV = 0. */
 export function settledReturnRate(month: string, today: string, shop: ShopRefundMonth | undefined): number | undefined {
-  if (!shop || shop.gmv <= 0) return undefined;
-  if (today < nmvSettledFrom(month)) return undefined;
-  if (shop.lastDate < monthEndOf(month)) return undefined;
-  return (shop.refunds / shop.gmv) * 100;
+  if (!shop) return undefined;
+  const st = shopRefundStatus(month, today, shop);
+  return st.status === "final" ? st.rate ?? undefined : undefined;
 }
 
 export function buildMonthClose(input: MonthCloseInput): MonthClose {
@@ -203,6 +201,7 @@ export function buildMonthClose(input: MonthCloseInput): MonthClose {
   // ---- doanh thu theo hợp đồng ----
   const byContract = new Map<string, ContractRevenueRow>();
   const estimateNotes: string[] = [];
+  const definitionWarnings: string[] = [];
   for (const r of rows) {
     const s = r.session;
     const platform = platformOf(s);
@@ -257,17 +256,29 @@ export function buildMonthClose(input: MonthCloseInput): MonthClose {
     if (e.basis.kind === "hourly") {
       e.basis = { kind: "hourly", ratePerHour: rate?.ratePerHour ?? 0 };
     } else {
-      const expected = rate?.returnRate ?? 0;
+      const crmExpected = rate?.returnRate ?? 0;
+      const usesDefault = !(crmExpected > 0);
+      const expected = usesDefault ? DEFAULT_RETURN_RATE_ESTIMATE : crmExpected;
       const commissionRate = e.basis.commissionRate;
       // Hoàn thật lấy từ file Shop Analytics: sàn nào không có loại file này (Shopee) thì luôn ước tính.
       const hasRefundFile = profileOf(e.platform).dataRawTypes.includes("shop_analytics");
       const settled = hasRefundFile ? settledReturnRate(month, today, input.shopRefunds[e.brandId]) : undefined;
       if (settled != null) {
         e.basis = { kind: "nmv_final", commissionRate, returnRate: settled };
+        const st = shopRefundStatus(month, today, input.shopRefunds[e.brandId]!);
+        if (st.definitionUnverified) {
+          definitionWarnings.push(`${e.brandName} · ${profileOf(e.platform).label}: NMV chốt đang dựa trên Refund rate ${fmtFixed(settled, 1)}% từ file Shop Analytics mẫu mới. ${DEFINITION_WARNING}`);
+        }
         // Tính lại từ GMV các ca đã tính: ca đã loại khỏi báo cáo đã có GMV 0 ở trên.
         e.revenue = (e.gmv * (1 - settled / 100) * commissionRate) / 100;
       } else {
         e.basis = { kind: "nmv_estimate", commissionRate, returnRate: expected };
+        // CRM chưa nhập % hoàn dự kiến: ca đã tính tiền với hoàn 0% ⇒ tính lại theo mặc định để NMV không bị phình.
+        if (usesDefault) {
+          e.revenue = (e.gmv * (1 - expected / 100) * commissionRate) / 100;
+          e.revenueEstimate = e.revenue;
+          estimateNotes.push(`${e.brandName} · ${profileOf(e.platform).label}: CRM chưa nhập % hoàn dự kiến nên NMV ước tính theo mặc định ${DEFAULT_RETURN_RATE_ESTIMATE}%.`);
+        }
         const sf = input.shopRefunds[e.brandId];
         const pName = profileOf(e.platform).label;
         if (!hasRefundFile) {
@@ -277,7 +288,8 @@ export function buildMonthClose(input: MonthCloseInput): MonthClose {
         } else if (!sf) {
           estimateNotes.push(`${e.brandName} · ${pName}: chưa có file Shop Analytics của tháng ở Dữ Liệu Gốc nên giữ ước tính (hoàn dự kiến ${expected}%).`);
         } else {
-          estimateNotes.push(`${e.brandName} · ${pName}: file Shop Analytics mới tới ${sf.lastDate}, chưa phủ hết tháng nên giữ ước tính (hoàn dự kiến ${expected}%).`);
+          const why = shopRefundStatus(month, today, sf).reasons.map((r) => REFUND_REASON_LABEL[r]).join("; ");
+          estimateNotes.push(`${e.brandName} · ${pName}: giữ ước tính (hoàn dự kiến ${expected}%) vì ${why}.`);
         }
       }
     }
@@ -384,6 +396,7 @@ export function buildMonthClose(input: MonthCloseInput): MonthClose {
     missing: { sessions: missingSessions, byKind: [...byKind.entries()] },
     unconfirmed: input.sessions.filter((s) => inMonth(s) && !s.isBackfill && isUnconfirmedPast(s)).sort((a, b) => (a.date < b.date ? -1 : 1)),
     backfillCount: input.sessions.filter((s) => isPnlSession(s, { includeBackfill: true }) && s.isBackfill && inMonth(s)).length,
-    estimateNotes
+    estimateNotes,
+    definitionWarnings
   };
 }

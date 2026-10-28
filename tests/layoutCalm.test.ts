@@ -165,10 +165,10 @@ test("Dashboard: mốc \"Dữ liệu đầy đủ đến\" nói MỘT chỗ (b�
 
 test("Report Tháng: khung ngoài không viền, ô số trong Panel không khung, khối gập không bọc hộp", () => {
   const src = read("components/brand-workspace/MonthlyReportTabs.tsx");
-  expect(src).toMatch(/<div className="rounded-2xl" style=\{\{ background: PAL\.bg \}\}>/);
+  expect(src).toMatch(/<div className="rt rounded-2xl" style=\{\{ background: PAL\.bg \}\} ref=\{reportTopRef\}>/);
   expect(src).not.toMatch(/<details className="rounded-xl"/);
-  // 4 ô Nhịp bán + 4 ô Ads + 5 ô Phân bố GMV/giờ nằm trong Panel ⇒ frame="plain".
-  expect(src.match(/<KpiTile (key=\{label\} )?frame="plain"/g)).toHaveLength(9);
+  // 28/10: các trang dựng lại theo demo — còn 4 ô KpiTile trong Panel ⇒ frame="plain".
+  expect(src.match(/<KpiTile (key=\{label\} )?frame="plain"/g)).toHaveLength(4);
   const ui = read("components/brand-workspace/report/ui.tsx");
   expect(ui).toMatch(/export const MethodNote: React\.FC/);
   expect(ui).toMatch(/className=\{STAT_LABEL_SHAPE\}/);

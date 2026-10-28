@@ -86,8 +86,8 @@ test("trang Quảng cáo của report vẽ được khối kế hoạch Ads (CRO
   const rows = parseAdsTrackingPaste(PASTE, 2026).rows;
   const live = new Map([["2026-10-23", 300e6], ["2026-10-24", 700e6], ["2026-10-25", 500e6]]);
   const s = adsTrackingMonth(rows, "2026-10", (d) => resolveCampBucketType(d), live);
-  const html = renderToStaticMarkup(React.createElement(AdsPlanPanel, { s, month: "2026-10" })).replace(/ title="[^"]*"/g, "");
+  const html = renderToStaticMarkup(React.createElement(AdsPlanPanel, { rows, s, month: "2026-10", bucketOf: (d: string) => resolveCampBucketType(d) })).replace(/ title="[^"]*"/g, "");
   expect(html).not.toMatch(/NaN|undefined|Infinity|\[object/);
-  for (const w of ["Ngân sách Ads theo kế hoạch", "Target Ads cả tháng", "tới 25/10", "Pay Day", "ROAS Live", "Live", "Creator"]) expect(html).toContain(w);
+  for (const w of ["Ads cost theo loại chi, 1–25/10", "TOTAL ADS", "Target cả tháng", "% Target tháng", "Ads cost theo giai đoạn", "% chi tháng", "Ads cost theo ngày", "chưa có số", "Pay Day", "ROAS Live theo loại ngày", "Creator"]) expect(html).toContain(w);
   for (const w of ["ca ", "agency", "Runrate"]) expect(html).not.toContain(w);
 });

@@ -170,7 +170,7 @@ test("Toàn shop — CROCS 1–22/09 vs cùng kỳ 1–22/08: tỷ trọng cùng
     cvrCur: null, cvrPrev: null, liveChg, restChg, visitorsChg: -4
   });
   const c = shopInsight({ ...input, control: [row("daily", -22.7, 1), row("camp", -13.6, -69), row("all", -18.4, -36)] })!;
-  expect(c.headline).toBe("Campaign: livestream YFB −14%, các kênh còn lại −69% ⇒ thị trường giảm mạnh hơn, livestream YFB giữ tốt hơn.");
+  expect(c.headline).toBe("Campaign: livestream YFB −14%, các kênh còn lại −69% ⇒ các kênh còn lại giảm mạnh hơn, livestream YFB giữ tốt hơn.");
   expect(c.headline).not.toMatch(/ngày thường/i);
   expect(c.points[0]).toMatch(/^Total GMV 5,21B/);
 });
@@ -207,7 +207,7 @@ test("Bối cảnh — câu Ads (file TikTok Ads): có ca thì thêm một đi�
 test("Việc cần làm của các phần gom về phần 7, bỏ việc autoNextSteps đã nói", () => {
   const ins = (action: string | null) => ({ headline: "x", points: [], action });
   const all = {
-    shop: ins("Ngày thường giảm do vận hành livestream, không phải do thị trường — xem trang Phân tích nguyên nhân để biết yếu tố nào giảm và điều chỉnh lịch tháng sau."),
+    shop: ins("Ngày thường giảm do vận hành livestream, không phải do các kênh còn lại — xem trang Phân tích nguyên nhân để biết yếu tố nào giảm và điều chỉnh lịch tháng sau."),
     why: ins("Điểm nghẽn ở traffic vào phòng — xem lại khung giờ, thumbnail, tiêu đề phiên và ngân sách Ads cho live."),
     products: ins("Kiểm tra Baya Platform - Winter White: tồn kho, giá và thời lượng giới thiệu trên live (GMV mỗi ngày −32%)."),
     people: ins(null),

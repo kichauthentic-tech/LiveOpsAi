@@ -186,7 +186,9 @@ export const Accounting: React.FC<AccountingProps> = ({
         const v: ShopRefundMonth = {
           gmv: slice.days.reduce((a, d) => a + d.gmv, 0),
           refunds: slice.days.reduce((a, d) => a + d.refunds, 0),
-          lastDate: slice.days[slice.days.length - 1].date
+          lastDate: slice.days[slice.days.length - 1].date,
+          template: slice.template,
+          exportedAt: slice.exportedAt
         };
         return [id, v] as const;
       })
@@ -317,6 +319,7 @@ export const Accounting: React.FC<AccountingProps> = ({
       });
     if (close.backfillCount > 0)
       notices.push({ tone: "slate", text: <>{close.backfillCount} ca nạp bù không tính (rate tháng đó không chuẩn).</> });
+    for (const t of close.definitionWarnings) notices.push({ tone: "amber", text: t });
     for (const t of close.estimateNotes) notices.push({ tone: "slate", text: t });
     if (close.contracts.some((c) => c.basis.kind === "nmv_final"))
       notices.push({ tone: "slate", text: "NMV chính thức suy từ % hoàn thật của cả shop (file Shop Analytics), không riêng live — là số xấp xỉ." });

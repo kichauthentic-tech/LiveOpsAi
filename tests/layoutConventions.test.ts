@@ -65,11 +65,13 @@ test("Report Tháng: mục lục dính được (khung ngoài không overflow-hi
   const src = readFileSync(join(SRC, "components/brand-workspace/MonthlyReportTabs.tsx"), "utf8");
   // Khung ngoài của report (nền PAL.bg) — overflow-hidden làm `sticky` của mục lục vô tác dụng (đo 2026-09-29).
   // 18/10 đợt 2: khung ngoài bỏ viền (tests/layoutCalm.test.ts) — vẫn là div nền PAL.bg.
-  const outer = src.split("\n").find((l) => /<div className="rounded-2xl[^"]*" style=\{\{ background: PAL\.bg[,} ]/.test(l)) ?? "";
+  const outer = src.split("\n").find((l) => /<div className="(rt )?rounded-2xl[^"]*" style=\{\{ background: PAL\.bg[,} ]/.test(l)) ?? "";
   expect(outer).not.toBe("");
   expect(outer).not.toMatch(/overflow-hidden/);
-  expect(src).toMatch(/sticky -top-3 sm:-top-6/);
-  expect(src).toMatch(/aria-current=\{activeSec === sec\.id/);
+  // 28/10: thanh trang (PageRail) nằm ở report/ui.tsx; trang đang chọn đánh dấu bằng aria-current="page".
+  const ui = readFileSync(join(SRC, "components/brand-workspace/report/ui.tsx"), "utf8");
+  expect(ui).toMatch(/sticky -top-3 sm:-top-6/);
+  expect(ui).toMatch(/aria-current=\{current === it\.id \? "page"/);
 });
 
 // M3 (29/09): bản đầu chỉ bắt dạng prop `fontSize={10}` của recharts, nên 6 chỗ `style={{ fontSize: 10 }}` trong

@@ -378,15 +378,23 @@ export const NmvPanel: React.FC<{
   windowLabel: string;
   contractRate: number | null;
   shopRefundOnly: boolean;
-}> = ({ gmv, refundRate, refundRatePrev, windowLabel, contractRate, shopRefundOnly }) => {
+  /** Trạng thái chốt của Refund rate tháng này (lib/refundStatus.ts). */
+  refundStatus?: { label: string; reasons: string[]; definitionWarning: string | null } | null;
+  /** Có chuỗi này ⇒ tháng trước khác mẫu file, không so sánh. */
+  refundNotComparable?: string | null;
+  nmvRate?: number | null;
+  nmvLabel?: string | null;
+  nmvIsEstimate?: boolean;
+}> = ({ gmv, refundRate, refundRatePrev, windowLabel, contractRate, shopRefundOnly, refundStatus, refundNotComparable, nmvRate, nmvLabel, nmvIsEstimate }) => {
   const bars: [string, number, string][] = [];
   if (contractRate != null) bars.push([`Theo tỷ lệ hoàn hủy trong hợp đồng (${fmtFixed(contractRate, 1)}%)`, gmv * (1 - contractRate / 100), PAL.gold]);
-  if (refundRate != null) bars.push([`Chỉ trừ ${METRIC.refundRate} thực tế (${fmtFixed(refundRate, 1)}%)`, gmv * (1 - refundRate / 100), PAL.blue]);
+  if (refundRate != null) bars.push([`Chỉ trừ ${METRIC.refundRate} thực tế (${fmtFixed(refundRate, 1)}%${refundStatus ? `, ${refundStatus.label}` : ""})`, gmv * (1 - refundRate / 100), PAL.blue]);
+  if (nmvRate != null && nmvRate !== contractRate && nmvRate !== refundRate) bars.push([`${METRIC.nmv}${nmvIsEstimate ? " ước tính" : ""} (${fmtFixed(nmvRate, 1)}%)`, gmv * (1 - nmvRate / 100), PAL.gold]);
   const max = Math.max(gmv, ...bars.map((b) => b[1]));
   return (
     <Panel title="Hủy, hoàn & NMV" icon={<Receipt className="w-4 h-4" />} sub={`${METRIC.nmv} = ${METRIC.liveGmv} × (1 − tỷ lệ hoàn hủy) · ${METRIC.refundRate} của Shop Analytics, ${windowLabel}`}>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3 mb-4">
-        <KpiTile frame="plain" label={`${METRIC.refundRate} toàn shop`} value={refundRate != null ? fmtPct(refundRate) : "—"} note={refundRatePrev != null ? `tháng trước ${fmtPct(refundRatePrev)}` : "Shop Analytics"} />
+        <KpiTile frame="plain" label={`${METRIC.refundRate} toàn shop`} value={refundRate != null ? fmtPct(refundRate) : "—"} note={refundRatePrev != null ? `tháng trước ${fmtPct(refundRatePrev)}` : refundNotComparable ?? "Shop Analytics"} />
         <KpiTile frame="plain" label="Tỷ lệ hủy" value="—" note="cần dữ liệu Order (chưa có trong report)" />
         <KpiTile frame="plain" label={`${METRIC.liveGmv} trước hoàn hủy`} value={fmtVndShort(gmv)} />
       </div>
@@ -401,6 +409,13 @@ export const NmvPanel: React.FC<{
           </div>
         ))}
       </div>
+      {(refundStatus?.reasons.length || refundStatus?.definitionWarning || nmvLabel) && (
+        <p className="text-[11px] mt-3" style={{ color: PAL.muted }}>
+          {refundStatus && refundStatus.reasons.length > 0 ? `${METRIC.refundRate} tạm tính — chưa chốt vì ${refundStatus.reasons.join("; ")}. ` : ""}
+          {refundStatus?.definitionWarning ? `${refundStatus.definitionWarning} ` : ""}
+          {nmvLabel ? `${METRIC.nmv}: ${nmvLabel}.` : ""}
+        </p>
+      )}
       <p className="text-[11px] mt-3" style={{ color: PAL.muted }}>
         {shopRefundOnly
           ? `${METRIC.refundRate} chỉ gồm giá trị hoàn tiền, chưa gồm đơn hủy — ${METRIC.nmv} thật sẽ thấp hơn. `

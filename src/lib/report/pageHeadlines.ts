@@ -1,0 +1,48 @@
+import { fmtVndShort } from "../format";
+import type { InsightBlocks } from "./pageInsights";
+
+// Tiêu đề kết luận (action title) đặt trên hàng chỉ số của mỗi trang Report Tháng. Câu mẫu có chỗ trống, điền từ cùng số
+// với khối Insight cuối trang (pageInsights.ts) — một câu, có số, và nói rõ khi tháng không có gì nổi bật.
+
+const pct = (v: number) => `${Math.round(v)}%`;
+
+export interface SummaryHeadlineInput {
+  liveActual: number;
+  /** Target LIVE GMV tới nay (tháng còn dở) hoặc cả tháng; null = chưa có Target. */
+  liveTarget: number | null;
+  days: { label: string; target: number | null; actual: number }[];
+}
+
+export function summaryHeadline(i: SummaryHeadlineInput): string {
+  if (i.liveTarget == null || i.liveTarget <= 0) return `LIVE GMV ${fmtVndShort(i.liveActual)}; tháng này chưa có Target LIVE nên chưa đánh giá được kết quả.`;
+  const p = (i.liveActual / i.liveTarget) * 100;
+  const head = `LIVE GMV đạt ${pct(p)} Target (${fmtVndShort(i.liveActual)} so với ${fmtVndShort(i.liveTarget)})`;
+  const withT = i.days.filter((d) => d.target != null && d.target > 0).map((d) => ({ label: d.label, p: (d.actual / d.target!) * 100 }));
+  if (withT.length === 0) return `${head}.`;
+  const worst = [...withT].sort((a, b) => a.p - b.p)[0];
+  return worst.p < 100 ? `${head}; ${worst.label} thấp nhất ở ${pct(worst.p)} Target.` : `${head}; mọi loại ngày đều đạt Target.`;
+}
+
+export interface KeyMetricsHeadlineInput {
+  rows: { label: string; change: number | null; tone: "up" | "down" | "shift" | "noise" }[];
+  prevLabel: string;
+}
+
+export function keyMetricsHeadline(i: KeyMetricsHeadlineInput): string {
+  const rows = i.rows.filter((r) => r.change != null);
+  if (rows.length === 0) return "Chưa có tháng trước để so sánh chỉ số.";
+  const down = rows.filter((r) => r.tone === "down");
+  const up = rows.filter((r) => r.tone === "up");
+  if (down.length === 0 && up.length === 0) return `Cả tháng so với ${i.prevLabel}: không chỉ số nào đổi vượt ngưỡng dao động, chưa có thay đổi nổi bật.`;
+  const parts: string[] = [];
+  if (down.length) parts.push(`${down.length} chỉ số suy giảm vượt ngưỡng (đầu tiên: ${down[0].label} ${Math.round(down[0].change!)}%)`);
+  if (up.length) parts.push(`${up.length} chỉ số cải thiện vượt ngưỡng`);
+  return `Cả tháng so với ${i.prevLabel}: ${parts.join(", ")}.`;
+}
+
+/** Trang khác: câu đầu của khối Quan sát (đã là câu có số); trang chưa đủ số thì nói thẳng. */
+export function observeHeadline(b: InsightBlocks, fallback: string): string {
+  const first = b.observe.split(/(?<=[.!?])\s+(?=[A-ZÀ-Ỵ0-9])/)[0]?.trim();
+  if (!first || /^Chưa đủ số liệu/.test(first)) return fallback;
+  return first;
+}

@@ -162,6 +162,6 @@ test("hai đường đọc đã đo được là trùng vẫn phải đi qua ded
   const ps = fs.readFileSync("src/lib/dataraw/monthlyProductSlice.ts", "utf8");
   expect(ps).toMatch(/dedupeInFlight\(`brand_dataraw_imports\.lite\|/);
   // Danh sách batch chỉ được đọc qua fetchImportsLite — thêm một truy vấn thô nữa là mở lại lỗ cũ.
-  const rawImportsList = ps.match(/\.select\("id, report_type, period_start, period_end"\)/g) ?? [];
+  const rawImportsList = ps.match(/\.select\("id, report_type, period_start, period_end, imported_at"\)/g) ?? [];
   expect(rawImportsList).toHaveLength(1);
 });

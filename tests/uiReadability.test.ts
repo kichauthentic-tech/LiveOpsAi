@@ -99,7 +99,8 @@ test("không dùng alert/confirm/prompt gốc của trình duyệt — dùng use
 });
 
 test("mọi var(--token) dùng trong src/ đều được khai báo (index.css hoặc class [--token:…])", () => {
-  const css = readFileSync(join(SRC, "index.css"), "utf8");
+  // demo.css (Report Tháng, tiền tố .rt) khai báo bảng màu của bản demo; markup của các trang demo dùng var(--…) của nó.
+  const css = readFileSync(join(SRC, "index.css"), "utf8") + readFileSync(join(SRC, "components/brand-workspace/report/demo.css"), "utf8");
   const declared = new Set([...css.matchAll(/(--[a-z0-9-]+)\s*:/g)].map((m) => m[1]));
   const used = new Map<string, string>();
   for (const file of sourceFiles(SRC)) {
@@ -118,6 +119,7 @@ test("mọi var(--token) dùng trong src/ đều được khai báo (index.css h
 // được giữ toFixed: toạ độ SVG, cột số file Excel, giá trị điền sẵn vào ô input (parseFloat đọc dấu chấm).
 const TOFIXED_ALLOWED: [string, RegExp][] = [
   ["lib/format.ts", /./],
+  ["components/brand-workspace/report/demoCharts.ts", /./], // hàm vẽ của demo: toFixed rồi đổi "." → ","
   ["components/dashboard/shared.tsx", /\bx\(|\by\(/],
   ["components/dashboard/RunRate.tsx", /\bx\(|\by\(/],
   ["components/SessionLedger.tsx", /row\["Giờ live"\]/],

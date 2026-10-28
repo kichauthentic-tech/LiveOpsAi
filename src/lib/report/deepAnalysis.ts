@@ -193,6 +193,8 @@ export interface ControlRow {
   liveChg: number | null;
   restChg: number | null;
   visitorsChg: number | null;
+  /** Tách `rest` theo từng kênh để bảng không gộp: Affiliate LIVE, Video, Product card (= phần còn lại sau 3 kênh kia). */
+  channelChg?: { affiliate: number | null; video: number | null; card: number | null };
 }
 
 export type ControlVerdict = "ops" | "agency_better" | "market";
@@ -225,12 +227,14 @@ export function controlGroup(
 ): ControlRow[] {
   if (!prevDays?.length || !curDays?.length) return [];
   const sum = (days: ShopDayLite[], s: string, e: string, keep: (d: string) => boolean, agency: Map<string, number> | undefined) => {
-    const x = { days: 0, gmv: 0, live: 0, shopLive: 0, visitors: 0, orders: 0 };
+    const x = { days: 0, gmv: 0, live: 0, shopLive: 0, affiliate: 0, video: 0, visitors: 0, orders: 0 };
     for (const d of days) {
       if (d.date < s || d.date > e || !keep(d.date)) continue;
       x.days++;
       x.gmv += d.gmv;
       x.shopLive += d.liveLinked;
+      x.affiliate += d.affiliate;
+      x.video += d.video;
       x.live += agency ? agency.get(d.date) ?? 0 : d.liveLinked;
       x.visitors += d.visitors;
       x.orders += d.orders;
@@ -261,7 +265,12 @@ export function controlGroup(
         cvrPrev: a.visitors > 0 ? (a.orders / a.visitors) * 100 : null,
         liveChg: pctChange(a.live, b.live),
         restChg: pctChange(a.gmv - a.shopLive, b.gmv - b.shopLive),
-        visitorsChg: pctChange(a.visitors, b.visitors)
+        visitorsChg: pctChange(a.visitors, b.visitors),
+        channelChg: {
+          affiliate: pctChange(a.affiliate, b.affiliate),
+          video: pctChange(a.video, b.video),
+          card: pctChange(a.gmv - a.shopLive - a.affiliate - a.video, b.gmv - b.shopLive - b.affiliate - b.video)
+        }
       };
     })
     .filter((r) => r.days > 0);
@@ -281,8 +290,8 @@ export function controlLabel(key: ControlRow["key"]): string {
 
 export const VERDICT_TEXT: Record<ControlVerdict, string> = {
   ops: "phần giảm nằm ở vận hành livestream",
-  agency_better: "thị trường giảm mạnh hơn, livestream YFB giữ tốt hơn",
-  market: "livestream đi cùng thị trường"
+  agency_better: "các kênh còn lại giảm mạnh hơn, livestream YFB giữ tốt hơn",
+  market: "livestream đi cùng các kênh còn lại"
 };
 
 /** Một câu cho phần Kết luận: ưu tiên nhóm ngày có kết luận "vận hành" (việc agency tự sửa được), rồi tới cả kỳ. */

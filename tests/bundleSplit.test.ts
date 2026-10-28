@@ -78,7 +78,10 @@ const RECHARTS_FILES = [
   "components/brand-workspace/MonthlyReportTabs.tsx",
   // Report Shopee (0139) cũng lazy (lazyNamed ở BrandMonthlyReport) — chunk riêng, chỉ tải khi chọn sàn Shopee.
   "components/brand-workspace/ShopeeMonthlyReportTabs.tsx",
-  "components/brand-workspace/report/ui.tsx"
+  "components/brand-workspace/report/ui.tsx",
+  // GĐ2 biểu đồ Report Tháng (cầu, scatter) — chỉ MonthlyReportTabs import nên cùng chunk lazy.
+  "components/brand-workspace/report/Visuals.tsx"
+  // Trang Quảng cáo dựng lại theo demo bằng SVG (demoCharts.ts) — không còn dùng recharts.
 ];
 
 test("recharts không rò ra ngoài nhánh Report Tháng", () => {
