@@ -143,7 +143,7 @@ export function shopInsight(i: ShopInsightInput): SectionInsight | null {
 
   const opsRow = control.find((r) => r.key !== "all" && controlVerdict(r) === "ops");
   const action = opsRow
-    ? `${controlLabel(opsRow.key)} giảm do vận hành livestream, không phải do các kênh còn lại — xem trang Phân tích nguyên nhân để biết yếu tố nào giảm và điều chỉnh lịch tháng sau.`
+    ? `${controlLabel(opsRow.key)} giảm mạnh hơn các kênh còn lại (nhóm đối chứng gần đúng) nên cần rà soát vận hành livestream — xem trang Phân tích nguyên nhân để biết yếu tố nào giảm và điều chỉnh lịch tháng sau.`
     : affiliateDelta != null && affiliateDelta <= -1
       ? "Tỷ trọng Affiliate LIVE giảm — rà lịch creator và gói hỗ trợ affiliate cho tháng sau."
       : refundDelta != null && refundDelta >= 2

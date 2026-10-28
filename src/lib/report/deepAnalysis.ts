@@ -199,8 +199,13 @@ export interface ControlRow {
 
 export type ControlVerdict = "ops" | "agency_better" | "market";
 
-/** Cách nhau ≥ 10 điểm % mới coi là khác thị trường. */
+/** Cách nhau ≥ 10 điểm % mới coi là khác thị trường (nhóm ≥ 7 ngày). */
 export const CONTROL_GAP = 10;
+
+/** Nhóm càng ít ngày càng nhiễu (đợt camp 3–5 ngày) ⇒ cần chênh lệch lớn hơn mới kết luận: ≥ 7 ngày 10 điểm, 4–6 ngày 15, ít hơn 20. */
+export function controlGap(days: number): number {
+  return days >= 7 ? CONTROL_GAP : days >= 4 ? CONTROL_GAP * 1.5 : CONTROL_GAP * 2;
+}
 
 /** GMV live theo ngày (giờ VN của lúc bắt đầu ca) — đầu vào `agencyLive` của controlGroup. */
 export function liveGmvByDate(rows: CreatorLivePerfRow[]): Map<string, number> {
@@ -279,7 +284,8 @@ export function controlGroup(
 export function controlVerdict(r: ControlRow | undefined): ControlVerdict | null {
   if (!r || r.liveChg == null || r.restChg == null) return null;
   const gap = r.liveChg - r.restChg;
-  return gap <= -CONTROL_GAP ? "ops" : gap >= CONTROL_GAP ? "agency_better" : "market";
+  const need = controlGap(r.days);
+  return gap <= -need ? "ops" : gap >= need ? "agency_better" : "market";
 }
 
 const GROUP_LABEL: Record<ControlRow["key"], string> = { daily: "Daily", camp: "Campaign", all: "Cả kỳ" };
@@ -289,7 +295,7 @@ export function controlLabel(key: ControlRow["key"]): string {
 }
 
 export const VERDICT_TEXT: Record<ControlVerdict, string> = {
-  ops: "phần giảm nằm ở vận hành livestream",
+  ops: "livestream YFB giảm mạnh hơn các kênh còn lại, cần rà soát vận hành livestream",
   agency_better: "các kênh còn lại giảm mạnh hơn, livestream YFB giữ tốt hơn",
   market: "livestream đi cùng các kênh còn lại"
 };

@@ -207,7 +207,7 @@ test("Bối cảnh — câu Ads (file TikTok Ads): có ca thì thêm một đi�
 test("Việc cần làm của các phần gom về phần 7, bỏ việc autoNextSteps đã nói", () => {
   const ins = (action: string | null) => ({ headline: "x", points: [], action });
   const all = {
-    shop: ins("Ngày thường giảm do vận hành livestream, không phải do các kênh còn lại — xem trang Phân tích nguyên nhân để biết yếu tố nào giảm và điều chỉnh lịch tháng sau."),
+    shop: ins("Ngày thường giảm mạnh hơn các kênh còn lại (nhóm đối chứng gần đúng) nên cần rà soát vận hành livestream — xem trang Phân tích nguyên nhân để biết yếu tố nào giảm và điều chỉnh lịch tháng sau."),
     why: ins("Điểm nghẽn ở traffic vào phòng — xem lại khung giờ, thumbnail, tiêu đề phiên và ngân sách Ads cho live."),
     products: ins("Kiểm tra Baya Platform - Winter White: tồn kho, giá và thời lượng giới thiệu trên live (GMV mỗi ngày −32%)."),
     people: ins(null),

@@ -18,7 +18,7 @@ test("bản ops sửa ghi đè đúng khối đã sửa, khối còn lại theo 
 test("Tổng quan: nêu loại ngày thấp nhất so với Target và yếu tố giảm; không vượt ngưỡng thì nói rõ", () => {
   const base = { liveActual: 4_430_000_000, liveTarget: 4_660_000_000, days: [{ label: "Daily", target: 1_800_000_000, actual: 1_890_000_000 }, { label: "Pay Day", target: 925_000_000, actual: 647_000_000 }], shopKpi: { target: 8_400_000_000, projected: 7_390_000_000 } };
   const a = summaryBlocks({ ...base, worstFactor: { dayLabel: "Pay Day", factorLabel: "LIVE CTR", change: -14 } });
-  expect(a.observe).toContain("Pay Day thấp hơn Target nhiều nhất");
+  expect(a.observe).toContain("Pay Day đạt % Target thấp nhất");
   expect(a.cause).toContain("LIVE CTR −14%");
   expect(a.impact).toContain("KPI GMV");
   expect(summaryBlocks({ ...base, worstFactor: null }).cause).toContain("Không loại ngày nào");
@@ -40,7 +40,7 @@ test("Nguyên nhân: chọn yếu tố có đóng góp tuyệt đối lớn nh�
     { label: "AOV", value: -199e6, change: -4 }
   ];
   const r = whyBlocks({ gmvPerHourChange: -7, parts, significantDays: [{ label: "Pay Day", change: -29 }], band: 22, mix: { mix: 482e3, rate: -1.9e6 } });
-  expect(r.cause).toContain("Views/giờ là yếu tố đóng góp tuyệt đối lớn nhất");
+  expect(r.cause).toContain("Views/giờ là yếu tố hiệu suất đóng góp tuyệt đối lớn nhất");
   expect(r.observe).toContain("Pay Day (−29%)");
   expect(r.impact).toContain("không ở lịch live");
   expect(whyBlocks({ gmvPerHourChange: -7, parts, significantDays: [], band: null, mix: null }).observe).toContain("Không loại ngày nào");

@@ -43,7 +43,7 @@ export type ReportSectionId = "summary" | "shop" | "why" | "products" | "ads" | 
 export const SECTIONS: { id: ReportSectionId; label: string; title: string }[] = [
   { id: "summary", label: "Tổng quan", title: "Tổng quan & KPI" },
   { id: "keymetrics", label: "Key Metrics", title: "Key Metrics" },
-  { id: "nmv", label: "NMV", title: "Hủy, hoàn & NMV" },
+  { id: "nmv", label: "NMV", title: "Hoàn & NMV ước tính" },
   { id: "shop", label: "Toàn shop", title: "Toàn shop & đóng góp của livestream YFB" },
   { id: "why", label: "Nguyên nhân", title: "Phân tích nguyên nhân" },
   { id: "products", label: "Sản phẩm", title: "Sản phẩm & khuyến mãi" },

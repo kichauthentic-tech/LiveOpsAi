@@ -105,11 +105,13 @@ test("nhóm đối chứng CROCS 1–22/09: ngày thường hụt do vận hành
   expect(Math.round(by.daily.liveChg!)).toBe(-19);
   expect(Math.round(by.daily.restChg!)).toBe(1);
   expect(Math.round(by.daily.visitorsChg!)).toBe(-4);
-  expect(controlVerdict(by.daily)).toBe("ops");
+  // Nhóm 1 ngày quá ngắn để kết luận (ngưỡng 20 điểm); đủ ngày thì chênh ~20 điểm là "ops".
+  expect(controlVerdict(by.daily)).toBe("market");
+  expect(controlVerdict({ ...by.daily, days: 9 })).toBe("ops");
   expect(controlVerdict(by.camp)).toBe("agency_better");
   expect(controlVerdict(by.all)).toBe("agency_better");
-  expect(controlLine(rows)).toBe(
-    "So với các kênh còn lại của shop (Daily): livestream YFB −19%, các kênh còn lại +1%, lượt truy cập shop −4% ⇒ phần giảm nằm ở vận hành livestream."
+  expect(controlLine(rows.map((r) => (r.key === "daily" ? { ...r, days: 9 } : r)))).toBe(
+    "So với các kênh còn lại của shop (Daily): livestream YFB −19%, các kênh còn lại +1%, lượt truy cập shop −4% ⇒ livestream YFB giảm mạnh hơn các kênh còn lại, cần rà soát vận hành livestream."
   );
   // Cùng chiều, lệch < 10 điểm ⇒ đi cùng thị trường; không có ngày nào ⇒ không có dòng.
   expect(controlVerdict({ ...by.all, liveChg: -12, restChg: -8 })).toBe("market");

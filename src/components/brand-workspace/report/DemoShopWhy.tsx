@@ -302,7 +302,7 @@ export const DemoShopPage: React.FC<DemoShopProps> = ({ no, title, control, mixe
       <div className="stk">
         <div className="pn">
           <div className="pnh">Tăng trưởng GMV: livestream YFB, các kênh còn lại và lượt truy cập shop</div>
-          <div className="pns">{curLbl} so với {prevLbl}. Các kênh còn lại (Affiliate LIVE, Video, Product card) là nhóm đối chứng, YFB không vận hành.</div>
+          <div className="pns">{curLbl} so với {prevLbl}. Các kênh còn lại (Affiliate LIVE, Video, Product card) là nhóm đối chứng gần đúng: YFB không vận hành trực tiếp nhưng có đặt lịch creator và chạy Ads cho Product, Creator.</div>
           <Html html={cmpHtml} />
           <div className="legend">
             <span><i style={{ background: "var(--gold)" }} />Livestream YFB</span>
@@ -338,7 +338,7 @@ export const DemoShopPage: React.FC<DemoShopProps> = ({ no, title, control, mixe
       )}
       <div className="pn">
         <div className="pnh">So sánh livestream YFB với các kênh còn lại</div>
-        <div className="pns">Chênh lệch từ 10 điểm phần trăm trở lên mới xem là khác xu hướng chung của shop.</div>
+        <div className="pns">Chênh lệch từ 10 điểm phần trăm trở lên mới xem là khác xu hướng chung của shop (15 điểm khi nhóm 4–6 ngày, 20 điểm khi dưới 4 ngày).</div>
         <Tbl html={tbl(mktHead, mktRows, [5])} />
       </div>
       {br3 && (
@@ -476,9 +476,9 @@ export const DemoWhyPage: React.FC<DemoWhyProps> = ({ no, title, fallbackHeadlin
     { label: METRIC.ctor, value: stats.cur.ctor != null ? pct1(stats.cur.ctor) : "—", note: `${sgn(ctor)} so với ${stats.prev.ctor != null ? pct1(stats.prev.ctor) : "—"}`, color: col(ctor) }
   ];
   // tiêu đề kết luận: bước nghẽn = yếu tố đóng góp âm lớn nhất
-  const worst = drivers ? [...drivers.parts].sort((x, y) => x.value - y.value)[0] : null;
+  const worst = drivers ? [...drivers.parts].filter((x) => x.key !== "hours").sort((x, y) => x.value - y.value)[0] : null;
   const headline = drivers && worst && worst.value < 0
-    ? `${METRIC.gmvPerHour} ${sgn(gph)}: yếu tố kéo giảm nhiều nhất là ${DRIVER_LABEL[worst.key]} (${fmtP(worst.change)}, ${M(worst.value)})`
+    ? `${METRIC.gmvPerHour} ${sgn(gph)}: yếu tố hiệu suất kéo giảm nhiều nhất là ${DRIVER_LABEL[worst.key]} (${fmtP(worst.change)}, ${M(worst.value)})`
     : fallbackHeadline;
 
   let bridge = "";

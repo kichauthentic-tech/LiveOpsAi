@@ -146,7 +146,7 @@ export function scoreRows(
   liveActual: number,
   camp: { key: CampDayBucket; target: number | null; actual: number }[],
   shop: { target: number; actual: number } | null,
-  toDate: Partial<Record<KeyMetricsTab, number>> | null = null
+  toDate: Partial<Record<KeyMetricsTab | "shop", number>> | null = null
 ): ScoreRow[] {
   const row = <K extends ScoreRow["key"]>(key: K, target: number | null, actual: number, td?: number): ScoreRow => {
     // Khung chưa tới (target tới nay = 0) ⇒ chưa có gì để chấm.
@@ -160,7 +160,7 @@ export function scoreRows(
       const c = camp.find((x) => x.key === k);
       return c ? [row(k, c.target, c.actual, toDate?.[k])] : [];
     }),
-    ...(shop ? [row("shop", shop.target, shop.actual)] : [])
+    ...(shop ? [row("shop", shop.target, shop.actual, toDate?.shop)] : [])
   ];
 }
 

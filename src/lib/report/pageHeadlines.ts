@@ -24,7 +24,7 @@ export function summaryHeadline(i: SummaryHeadlineInput): string {
 }
 
 export interface KeyMetricsHeadlineInput {
-  rows: { label: string; change: number | null; tone: "up" | "down" | "shift" | "noise" }[];
+  rows: { label: string; change: number | null; tone: "up" | "down" | "shift" | "noise"; /** Chỉ số kết quả (GMV, Orders…) — không làm "nguyên nhân đầu tiên". */ result?: boolean }[];
   prevLabel: string;
 }
 
@@ -34,8 +34,9 @@ export function keyMetricsHeadline(i: KeyMetricsHeadlineInput): string {
   const down = rows.filter((r) => r.tone === "down");
   const up = rows.filter((r) => r.tone === "up");
   if (down.length === 0 && up.length === 0) return `Cả tháng so với ${i.prevLabel}: không chỉ số nào đổi vượt ngưỡng dao động, chưa có thay đổi nổi bật.`;
+  const first = down.find((r) => !r.result) ?? down[0];
   const parts: string[] = [];
-  if (down.length) parts.push(`${down.length} chỉ số suy giảm vượt ngưỡng (đầu tiên: ${down[0].label} ${Math.round(down[0].change!)}%)`);
+  if (down.length) parts.push(`${down.length} chỉ số suy giảm vượt ngưỡng (đầu tiên trong phễu: ${first.label} ${Math.round(first.change!)}%)`);
   if (up.length) parts.push(`${up.length} chỉ số cải thiện vượt ngưỡng`);
   return `Cả tháng so với ${i.prevLabel}: ${parts.join(", ")}.`;
 }

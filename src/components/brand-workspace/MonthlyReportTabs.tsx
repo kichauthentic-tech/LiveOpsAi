@@ -36,7 +36,7 @@ import { CHANNELS, DAY_TYPE_SHORT, PAL, SECTIONS, chartTooltipStyle, type Report
 import { chartNum, fmtHours, fmtInt, fmtPct, fmtSessionStart, monthRangeLocal, nextMonthStrLocal, prevMonthStrLocal, promoStatusLabel } from "./report/format";
 import { ChartLegend, PageInsight, KpiTile, Panel, ReportTable, toWaterfall, PageHead, PagePager, PageRail, type PageMetric } from "./report/ui";
 import { keyMetricsHeadline, observeHeadline, summaryHeadline } from "../../lib/report/pageHeadlines";
-import { bridgePoints, planHourRows, skuImageKey, targetBridge, trafficBridge, type ScatterPoint } from "../../lib/report/reportVisuals";
+import { bridgePoints, cancelledPlanTarget, planHourRows, skuImageKey, targetBridge, trafficBridge, type ScatterPoint } from "../../lib/report/reportVisuals";
 import "./report/demo.css";
 import { PLATFORM_PROFILES } from "../../lib/platforms/profiles";
 import { platformOf } from "../../lib/reportPlatform";
@@ -534,7 +534,14 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
         campDetailRows.map((r) => ({ key: r.key, target: r.target, actual: r.cur.gmv })),
         shopKpi ? { target: shopKpi.target, actual: shopKpi.actual } : null,
         // Tháng còn dở ⇒ % theo target TỚI NAY (cùng số run-rate Dashboard); tháng đủ thì hai target trùng nhau.
-        cmp.partial && planRR ? { all: planRR.rr.total.targetToDate, ...Object.fromEntries(planRR.rr.buckets.map((b) => [b.bucket, b.targetToDate])) } : null
+        // KPI toàn shop cũng phải về target tới nay (target × tỷ lệ đã qua theo nhịp dự báo), không để một dòng chia cho target cả tháng.
+        cmp.partial && planRR
+          ? {
+              all: planRR.rr.total.targetToDate,
+              ...Object.fromEntries(planRR.rr.buckets.map((b) => [b.bucket, b.targetToDate])),
+              ...(shopKpi?.partial && shopKpi.projected > 0 ? { shop: (shopKpi.target * shopKpi.actual) / shopKpi.projected } : {})
+            }
+          : null
       ),
     [kpiTargetGmvCur, liveCurStats, campDetailRows, shopKpi, cmp.partial, planRR]
   );
@@ -799,7 +806,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
         liveActual: liveCurStats.gmv,
         liveTarget: scoreAll ? scoreAll.targetToDate ?? scoreAll.target : null,
         days: scoreboard.filter((r) => r.key !== "all" && r.key !== "shop").map((r) => ({ label: dayLabel(r.key as CampDayBucket), target: r.targetToDate ?? r.target, actual: r.actual })),
-        worstFactor: worstSig && factorCands[0] ? { dayLabel: dayLabel(worstSig.key), factorLabel: DRIVER_LABEL[factorCands[0]], change: worstSig.change[factorCands[0]]! } : null,
+        worstFactor: worstSig && factorCands[0] ? { dayLabel: dayLabel(worstSig.key), factorLabel: DRIVER_LABEL[factorCands[0]], change: worstSig.change[factorCands[0]]!, dayChange: worstSig.change.gmvPerHour ?? undefined, band: worstSig.band } : null,
         shopKpi: shopKpi ? { target: shopKpi.target, projected: shopKpi.projected ?? null } : null
       }),
       keymetrics: keyMetricsBlocks({
@@ -807,7 +814,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
         band: keyTable.bands[lastKey] ?? null,
         prevLabel: monthShort(prevMonth)
       }),
-      nmv: nmvBlocks({ refundCur: refundRateShop, refundPrev: refundRateShopPrev, prevLabel: monthShort(prevMonth), nmvSource, usesCrmRate: hasReturnRateConfig }),
+      nmv: nmvBlocks({ refundCur: refundRateShop, refundPrev: refundRateShopPrev, prevLabel: monthShort(prevMonth), nmvSource, usesCrmRate: hasReturnRateConfig, curProvisional: refundStatusCur ? refundStatusCur.status !== "final" : undefined, prevProvisional: refundStatusPrev ? refundStatusPrev.status !== "final" : undefined }),
       shop: shopBlocks({
         totalChange: shopCur && shopPrevSame ? pctChange(shopPrevSame.gmv, shopCur.gmv) : null,
         windowLabel: shopWin.label,
@@ -819,9 +826,10 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
       }),
       why: whyBlocks({
         gmvPerHourChange: pctChange(livePrevStats.gmvPerHour, liveCurStats.gmvPerHour),
-        parts: drivers ? drivers.parts.map((p) => ({ label: DRIVER_LABEL[p.key], value: p.value, change: p.change })) : [],
+        parts: drivers ? drivers.parts.map((p) => ({ key: p.key, label: DRIVER_LABEL[p.key], value: p.value, change: p.change })) : [],
         significantDays: sigDays.map((r) => ({ label: dayLabel(r.key), change: r.change.gmvPerHour! })),
         band: sigDays[0]?.band ?? null,
+        factorBand: keyTable.bands[lastKey] ?? null,
         mix: mixRate ? { mix: mixRate.mix, rate: mixRate.rate } : null
       }),
       products: productsBlocks({
@@ -887,7 +895,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
       short: monthShort(m),
       win: `1–${Number(cutEndOf(m).slice(8))}/${m.slice(5)}`,
       liveGmv: trendStats[i].stats.gmv,
-      nmvGmv: keyMonths.find((k) => k.month === m)?.stats.all.gmv ?? trendStats[i].stats.gmv,
+      nmvGmv: trendStats[i].stats.gmv, // cùng cửa sổ ngày với Refund rate (cắt theo file shop), không theo ngày cuối phiên của trang 1
       windowRate: mix?.refundRate ?? null,
       fileRate: raw?.rate ?? null,
       template: raw?.template ?? "unknown",
@@ -996,7 +1004,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             days: scoreboard.filter((r) => r.key !== "all" && r.key !== "shop").map((r) => ({ label: DAY_TYPE_SHORT[r.key as CampDayBucket], target: r.targetToDate ?? r.target, actual: r.actual }))
           })
         : id === "keymetrics"
-          ? keyMetricsHeadline({ rows: keyTable.rows.map((r) => ({ label: r.def.label, change: r.changes[lastKey], tone: r.tones[lastKey] })), prevLabel: monthShort(prevMonth) })
+          ? keyMetricsHeadline({ rows: keyTable.rows.map((r) => ({ label: r.def.label, change: r.changes[lastKey], tone: r.tones[lastKey], result: r.def.group === "result" })), prevLabel: monthShort(prevMonth) })
           : observeHeadline(pageAuto[id], fb);
     return { headline, metrics: metrics[id] };
   };
@@ -1359,11 +1367,13 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             shop={shopKpi ? { actual: shopKpi.actual, throughDay: shopCur?.through ? Number(shopCur.through.slice(8, 10)) : null, target: shopKpi.target, projected: shopKpi.partial ? shopKpi.projected : null, projectedPct: shopKpi.partial ? shopKpi.projectedPct : null } : null}
             gmvPerHour={liveCurStats.gmvPerHour}
             gmvPerHourChange={pctChange(livePrevStats.gmvPerHour, liveCurStats.gmvPerHour)}
+            gmvPerHourBand={keyMetricsTable(keyMonths, "all").bands[keyMonths.length - 1] ?? null}
             hoursChange={pctChange(livePrevStats.hours, liveCurStats.hours)}
             bridge={bridgeTarget}
             score={scoreboard}
             spans={keySpans[keySpans.length - 1] ?? {}}
             planHours={planHours}
+            cancelledTarget={planRR ? cancelledPlanTarget(planRR.rr.slots) : undefined}
             actualHours={Object.fromEntries(campDetailRows.map((r) => [r.key, r.hours]))}
             insight={demoInsight("summary")}
           />
@@ -1532,8 +1542,8 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             headline={head("nmv").headline}
             months={nmvDemoMonths}
             nmvRate={nmvRate}
+            nmvSource={nmvChoice.isEstimate ? nmvSource : null}
             curEndDay={Number(cutEndOf(month).slice(8))}
-            nmvEndDay={Number(cmp.curEnd.slice(8))}
             track={refundTrackRows(last4Months.map(refundStatusOf).filter((x): x is RefundMonthStatus => x != null), refundFinals)}
             finalDates={decodeRefundFinalDate(monthlyReportRow?.sectionNotes?.[REFUND_FINAL_DATE_KEY]?.text)}
             canManage={canManage}

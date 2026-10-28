@@ -71,6 +71,11 @@ const slotHours = (a: string, b: string) => {
 };
 
 /** GMV/giờ kế hoạch = Target tới nay ÷ Giờ live kế hoạch (cùng các ca tới nay), theo loại ngày. Ca đã huỷ không tính. */
+/** Target của ca kế hoạch đã huỷ: Kế Hoạch Tháng vẫn giữ target (không có giờ kế hoạch) nên Target tháng lớn hơn tổng bảng GMV/giờ theo loại ngày. */
+export function cancelledPlanTarget(slots: PlanRunRateSlot[]): number {
+  return slots.filter((s) => s.state === "cancelled").reduce((a, s) => a + s.target, 0);
+}
+
 export function planHourRows(slots: PlanRunRateSlot[], _through: string | null, actual: Partial<Record<CampDayBucket, number | null>>): PlanHourRow[] {
   const live = slots.filter((s) => s.state !== "cancelled");
   const total = live.reduce((a, s) => a + s.target, 0);
