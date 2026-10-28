@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { BLOCK_KEYS, BLOCK_LABEL, decodeEdits, encodeEdits, shownBlocks, type BlockKey, type InsightBlocks, type InsightEdits } from "../../../lib/report/pageInsights";
 import { errorMessage } from "../../../lib/errorMessage";
-import { METRIC } from "../../../lib/metricGlossary";
+import { DAY_TYPE, METRIC } from "../../../lib/metricGlossary";
 import type { ControlRow, ControlVerdict } from "../../../lib/report/deepAnalysis";
 import { controlLabel, controlVerdict } from "../../../lib/report/deepAnalysis";
 import type { DriverBreakdown } from "../../../lib/report/monthlyReportInsights";
@@ -13,6 +13,7 @@ import { dayAbsRows, DAY_ABS_METRICS } from "../../../lib/report/reportVisuals";
 import { KEY_METRICS, fmtKeyMetric } from "../../../lib/report/keyMetrics";
 import { fmtFixed } from "../../../lib/format";
 import { DAY_TYPE_SHORT } from "./theme";
+import { type AttributionByType, type AttributionMonth } from "../../../lib/report/liveAttribution";
 
 const BLUE = "#7fb0e0";
 import { W, ch, columns, fmtM, fmtP, heat, hbars, pill, stack100, tbl, waterfall } from "./demoCharts";
@@ -161,6 +162,10 @@ export interface DemoShopProps {
   /** 4 tháng gần nhất (cũ → mới), cắt cùng số ngày; null = chưa có file Shop Analytics. */
   mixes: (ShopMonthMix | null)[];
   mixLabels: string[];
+  /** Direct/Indirect Seller LIVE của 4 tháng (cùng thứ tự `mixes`); null = thiếu file hoặc bản chụp cũ. */
+  attribution: (AttributionMonth | null)[];
+  /** Cùng số liệu cắt theo loại ngày, mỗi phần tử một tháng (cùng thứ tự `attribution`). */
+  attributionTypes: AttributionByType[];
   /** LIVE GMV YFB của 4 tháng ở cùng kỳ cắt với mixes. */
   yfbGmv: number[];
   shopCur: { gmv: number } | null;
@@ -175,7 +180,7 @@ const VERDICT: Record<ControlVerdict, [string, string]> = {
   ops: ["kém hơn các kênh còn lại", "r"],
   market: ["tương đương các kênh còn lại", "m"]
 };
-export const DemoShopPage: React.FC<DemoShopProps> = ({ no, title, control, mixes, mixLabels, yfbGmv, shopCur, shopPrev, window: w, traffic, fallbackHeadline, insight }) => {
+export const DemoShopPage: React.FC<DemoShopProps> = ({ no, title, control, mixes, mixLabels, attribution, attributionTypes, yfbGmv, shopCur, shopPrev, window: w, traffic, fallbackHeadline, insight }) => {
   const rows = (["daily", "camp", "all"] as const).map((k) => control.find((r) => r.key === k)).filter((r): r is ControlRow => !!r);
   const all = control.find((r) => r.key === "all");
   const camp = control.find((r) => r.key === "camp");
@@ -222,6 +227,31 @@ export const DemoShopPage: React.FC<DemoShopProps> = ({ no, title, control, mixe
       r.cvrPrev != null && r.cvrCur != null ? `${fmtP(r.cvrPrev, 2, false)} → ${fmtP(r.cvrCur, 2, false)}` : "—",
       W(pill(t, k))
     ];
+  });
+
+  // Direct vs Indirect: brand đọc tỷ trọng Indirect cao thành "live không chốt được đơn". Chỉ liệt kê số, không kết luận.
+  // Chênh so tháng liền trước tô màu từ 5 điểm trở lên (ngưỡng chọn tay, chưa backtest; loại ngày chỉ ~3 ngày nên dưới mức này gần như là nhiễu).
+  const shift = (cur: AttributionMonth | null | undefined, before: AttributionMonth | null | undefined): any => {
+    if (!cur || !before) return "—";
+    const d = cur.indirectPct - before.indirectPct;
+    return { t: `${d < 0 ? "−" : "+"}${fmtFixed(Math.abs(d), 1)} điểm`, c: Math.abs(d) < 5 ? "nt" : d > 0 ? "dn" : "up" };
+  };
+  const attrHead = ["Tháng", "Direct GMV", "Indirect GMV", "Attributed GMV", "Indirect %", "So tháng trước"];
+  const attrRows = attribution.map((x, i) => [
+    mixLabels[i],
+    x ? fmtM(x.direct) : "—",
+    x ? fmtM(x.indirect) : "—",
+    x ? fmtM(x.attributed) : "—",
+    x ? fmtP(x.indirectPct, 1, false) : "—",
+    i > 0 ? shift(x, attribution[i - 1]) : "—"
+  ]);
+  // Chi tiết theo loại ngày của tháng gần nhất, đặt cạnh tháng trước.
+  const lastIdx = attributionTypes.length - 1;
+  const typeKeys = (["daily", "dday", "midmonth", "payday"] as const).filter((k) => attributionTypes[lastIdx]?.[k]);
+  const typeHead = ["Loại ngày", "Số ngày", "Direct GMV", "Indirect GMV", "Attributed GMV", "Indirect %", "So tháng trước"];
+  const typeRows = typeKeys.map((k) => {
+    const x = attributionTypes[lastIdx][k]!;
+    return [DAY_TYPE_SHORT[k], `${x.days}`, fmtM(x.direct), fmtM(x.indirect), fmtM(x.attributed), fmtP(x.indirectPct, 1, false), shift(x, attributionTypes[lastIdx - 1]?.[k])];
   });
 
   // cầu đóng góp từng kênh: YFB / Seller LIVE khác / Affiliate / Video / Product card (card = phần còn lại cho cộng đúng)
@@ -287,6 +317,25 @@ export const DemoShopPage: React.FC<DemoShopProps> = ({ no, title, control, mixe
           <div className="legend">{segs.map((s) => <span key={s.name}><i style={{ background: s.color }} />{s.name}</span>)}</div>
         </div>
       </div>
+      {attribution.some(Boolean) ? (
+        <div className="pn">
+          <div className="pnh">Direct GMV và Indirect GMV qua các tháng</div>
+          <div className="pns">Direct = đơn chốt ngay trong phiên; Indirect = đơn về sau từ người đã xem phiên. Số của mọi phiên trên tài khoản shop, cùng số ngày mỗi tháng. Tô màu khi Indirect đổi từ 5 điểm trở lên so với tháng trước.</div>
+          <Tbl html={tbl(attrHead, attrRows)} />
+          {typeRows.length > 0 && (
+            <>
+              <div className="pnh" style={{ marginTop: 14 }}>Chi tiết theo loại ngày · {mixLabels[lastIdx]}</div>
+              <div className="pns">{DAY_TYPE.daily} và từng loại ngày {DAY_TYPE.campaign} (D-Day, Mid-Month, Pay Day), khung Campaign theo từng tháng. Mỗi loại chỉ vài ngày nên số dao động mạnh.</div>
+              <Tbl html={tbl(typeHead, typeRows)} />
+            </>
+          )}
+        </div>
+      ) : (
+        <div className="pn">
+          <div className="pnh">Direct GMV và Indirect GMV qua các tháng</div>
+          <div className="pns">Chưa có số: thiếu file Shop Analytics hoặc bản chụp cũ chưa lưu cột Direct/Indirect. Bấm Cập nhật số liệu để tải lại.</div>
+        </div>
+      )}
       <div className="pn">
         <div className="pnh">So sánh livestream YFB với các kênh còn lại</div>
         <div className="pns">Chênh lệch từ 10 điểm phần trăm trở lên mới xem là khác xu hướng chung của shop.</div>

@@ -49,7 +49,8 @@ export const SNAPSHOT_VERSION = 3;
 // Piece v2 (2026-09-27, gộp Phân tích sâu vào Report Tháng): skuRank thêm skusFor80Pct; topPromo thêm
 // discount/ROI từng chương trình, tổng giảm giá, top chương trình dài hạn. Bản chụp piece v1 báo "công thức
 // đổi" ⇒ bấm Cập nhật số liệu là có; trước đó các cột mới hiện "—".
-const PIECE_VERSION = 2;
+// v3 (2026-10-28): ShopDayLite thêm liveDirect/liveIndirect/affDirect/affIndirect (khối Direct vs Indirect ở trang Toàn shop).
+const PIECE_VERSION = 3;
 
 export interface SnapshotPiece<T = unknown> {
   stamp: string;

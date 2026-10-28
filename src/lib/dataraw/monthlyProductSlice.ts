@@ -315,6 +315,10 @@ export interface ShopDayLite {
   affiliate: number;
   /** Video: creator + tài khoản kết nối, đều "attributed". */
   video: number;
+  /** Tách `liveLinked` thành Direct (đơn chốt trong phiên) + Indirect (đơn về sau từ người đã xem) — 2026-10-28.
+   *  Optional: bản chụp trước PIECE_VERSION 3 không có ⇒ khối Direct/Indirect hiện "bấm Cập nhật". */
+  liveDirect?: number;
+  liveIndirect?: number;
 }
 
 export interface ShopDaysMonthSlice {
@@ -338,7 +342,9 @@ export async function fetchShopDaysMonthSlice(brandId: string, monthStart: strin
       visitors: d.visitors,
       liveLinked: d.linkedLiveAttr,
       affiliate: d.creatorLiveAttr,
-      video: d.creatorVideoAttr + d.linkedVideoAttr
+      video: d.creatorVideoAttr + d.linkedVideoAttr,
+      liveDirect: d.sellerLiveDirect,
+      liveIndirect: d.sellerLiveIndirect
     }))
     .sort((a, b) => a.date.localeCompare(b.date));
   return { days, hasAnyBatch: true, template: detectShopFileTemplate(columns.map((c) => c.label)), exportedAt: vnDateOfTimestamp(importedAt) };

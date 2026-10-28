@@ -201,11 +201,13 @@ export const KeyMetricsDemoPage: React.FC<{
   title: string;
   headline: string;
   months: KeyMetricsMonth[];
+  /** Direct ÷ (Direct + Indirect) của Seller LIVE, điểm %, từng tab × từng tháng (cùng thứ tự `months`). */
+  directShare?: Record<KeyMetricsTab, (number | null)[]>;
   monthLabel: (m: string) => string;
   /** "1–26" khi tháng còn dở. */
   windowNote?: string;
   insight: React.ReactNode;
-}> = ({ no, title, headline, months, monthLabel, windowNote, insight }) => {
+}> = ({ no, title, headline, months, directShare, monthLabel, windowNote, insight }) => {
   const [tab, setTab] = useState<KeyMetricsTab>("all");
   const last = months.length - 1;
   const table = keyMetricsTable(months, tab);
@@ -222,6 +224,19 @@ export const KeyMetricsDemoPage: React.FC<{
         if (c == null) return "—";
         const neutral = o.key === "hours" || r.tones[i + 1] === "noise";
         return { t: fmtP(c, 0), c: neutral ? "nt" : c > 0 ? "up" : "dn" };
+      })
+    ]);
+  }
+  const share = directShare?.[tab];
+  if (share) {
+    rows.push({ grp: "Direct vs Indirect" });
+    rows.push([
+      `${METRIC.directGmv} % (Seller LIVE)`,
+      ...share.map((v) => (v == null ? "—" : fmtP(v, 1, false))),
+      // Chênh tính bằng điểm %, không tô xanh/đỏ: Direct giảm mà Attributed GMV tăng chưa phải xấu.
+      ...share.slice(1).map((v, i) => {
+        const a = share[i];
+        return v == null || a == null ? "—" : { t: `${v - a < 0 ? "−" : "+"}${fmtFixed(Math.abs(v - a), 1)} điểm`, c: "nt" };
       })
     ]);
   }

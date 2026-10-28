@@ -48,6 +48,7 @@ import { AdsPlanPanel } from "./report/AdsPlanPanel";
 import { ProductsPageBody, productsKpis, type ProductsPageData } from "./report/ProductsPage";
 import { HostPageBody, hostKpis, type HostPageData } from "./report/HostPage";
 import { DemoInsight, DemoShopPage, DemoWhyPage } from "./report/DemoShopWhy";
+import { attributionByType, attributionMonth } from "../../lib/report/liveAttribution";
 import { adsTrackingMonth, type AdsDayRow } from "../../lib/ads/adsTracking";
 import { fetchAdsDaily } from "../../lib/db/adsDaily";
 import { AffiliateTrackPanel } from "./report/AffiliateTrackPanel";
@@ -417,6 +418,18 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [last4Months, view, hiddenMonths, trendDay]
   );
+  // Direct vs Indirect của Seller LIVE (+ Affiliate đối chứng), cùng cửa sổ ngày với cơ cấu kênh.
+  const attribution = useMemo(
+    () => last4Months.map((m) => attributionMonth(shopDaysOf(m), monthRangeLocal(m).start, cutEndOf(m))),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [last4Months, view, hiddenMonths, trendDay]
+  );
+  // Cùng số liệu cắt theo loại ngày, khung camp của chính từng tháng.
+  const attributionTypes = useMemo(
+    () => last4Months.map((m) => attributionByType(shopDaysOf(m), monthRangeLocal(m).start, cutEndOf(m), bucketAny)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [last4Months, view, hiddenMonths, trendDay, bucketAny]
+  );
   const shopPiecesMissing = !Object.values(view.shopDays).some(Boolean) && !Object.values(view.cardGmv).some(Boolean);
 
   // Nhóm đối chứng: live tài khoản shop vs phần còn lại của shop, theo ngày thường / ngày camp.
@@ -551,6 +564,13 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prev2Month, prevMonth, month, campOverrides, prevCampOverrides, plans, liveCurrent, livePrev, sessions, brandId, liveOlderMonths, cmp]);
+  // Direct % (Seller LIVE) từng tab × từng tháng của Key Metrics; null = chưa có file shop hoặc bản chụp cũ.
+  const keyDirectShare = useMemo(() => {
+    const tabs: KeyMetricsTab[] = ["all", "daily", "dday", "midmonth", "payday"];
+    const per = keyMonths.map((k) => attributionByType(hiddenMonths.has(k.month) ? null : view.shopDays[k.month], monthRangeLocal(k.month).start, keyCutEnd(k.month), bucketAny));
+    return Object.fromEntries(tabs.map((t) => [t, per.map((x) => (x[t] ? 100 - x[t]!.indirectPct : null))])) as Record<KeyMetricsTab, (number | null)[]>;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [keyMonths, view, hiddenMonths, bucketAny]);
   const keySpans = useMemo(
     () => keyMonths.map((k) => campSpanLabels(k.month, k.month === month ? campOverrides : k.month === prevMonth ? prevCampOverrides : effectiveCamp(plans[k.month]?.plan.campRanges))),
     [keyMonths, month, prevMonth, campOverrides, prevCampOverrides, plans]
@@ -1358,6 +1378,8 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             control={control}
             mixes={channelMixes.map((c) => (c ? { liveLinked: c.liveLinked, affiliate: c.affiliate, video: c.video, card: c.card, shopGmv: c.shopGmv } : null))}
             mixLabels={last4Months.map(trendColLabel)}
+            attribution={attribution}
+            attributionTypes={attributionTypes}
             yfbGmv={trendStats.map((x) => x.stats.gmv)}
             shopCur={shopCur}
             shopPrev={shopPrevSame}
@@ -1629,6 +1651,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             title={secTitle("keymetrics")}
             headline={head("keymetrics").headline}
             months={keyMonths}
+            directShare={keyDirectShare}
             monthLabel={monthShort}
             windowNote={cmp.partial ? `1–${Number(cmp.curEnd.slice(8))}` : undefined}
             insight={demoInsight("keymetrics")}
