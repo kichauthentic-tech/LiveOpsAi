@@ -5,7 +5,7 @@ import { Panel, ReportTable } from "./ui";
 import { fmtFixed, fmtVndShort } from "../../../lib/format";
 import { errorMessage } from "../../../lib/errorMessage";
 import { noiseBand } from "../../../lib/report/brandReport";
-import { parseRatePct, type RefundTrackRow } from "../../../lib/report/nextMonthPlan";
+import { parseManualNum, parseRatePct, type ManualPlan, type RefundTrackRow, type TypedBooking } from "../../../lib/report/nextMonthPlan";
 
 // Các khối của trang "Kế hoạch tháng sau" theo bản demo Report Tháng (#p9) — markup/class nguyên từ demo.css (tiền tố .rt):
 // 1 · Target Live theo loại ngày, 2 · Booking Creator + Target Creator (đọc từ tab Affiliate → Kế hoạch). Chưa có kế hoạch thì vẫn hiện khung
@@ -14,35 +14,9 @@ import { parseRatePct, type RefundTrackRow } from "../../../lib/report/nextMonth
 
 const rowStyle = (idx: number) => ({ borderBottom: `1px solid ${PAL.line}`, background: idx % 2 ? `${PAL.panel2}55` : "transparent" });
 
-const parseNum = (v: unknown): number | null => {
-  const n = parseFloat(String(v ?? "").replace(/\./g, "").replace(",", "."));
-  return Number.isNaN(n) ? null : n;
-};
+const parseNum = parseManualNum;
 const sd = (d: number | null) => (d == null ? "—" : `${d >= 0 ? "+" : "−"}${fmtFixed(Math.abs(d), 0)}%`);
 const mvn = (v: number | null) => (v == null ? "—" : fmtVndShort(v));
-/** Lưu/đọc nháp nhập tay trong trình duyệt này; mọi lỗi lưu trữ (chế độ riêng tư, bị chặn) đều bỏ qua. */
-function useLocalDraft<T>(key: string, empty: T): [T, (v: T) => boolean] {
-  const [v, setV] = useState<T>(() => {
-    try {
-      return (JSON.parse(localStorage.getItem(key) || "null") as T | null) ?? empty;
-    } catch {
-      return empty;
-    }
-  });
-  const save = (next: T) => {
-    setV(next);
-    try {
-      localStorage.setItem(key, JSON.stringify(next));
-      return true;
-    } catch {
-      return false;
-    }
-  };
-  return [v, save];
-}
-const SAVED = "Đã lưu trong trình duyệt này";
-const NOT_SAVED = "Không lưu được (trình duyệt chặn lưu trữ)";
-
 // ---------- 1 · Target Live ----------
 
 export interface LivePlanRow {
@@ -61,9 +35,7 @@ function liveVerdict(d: number | null, band: number | null) {
   return d > 0 ? <span className="pill r">vượt ngưỡng: cần tăng hiệu suất</span> : <span className="pill y">thấp hơn đáng kể mức đã đạt</span>;
 }
 
-export const NextLivePlanPanel: React.FC<{ nextMonth: string; curLabel: string; nextLabel: string; rows: LivePlanRow[]; total: LivePlanRow }> = ({ nextMonth, curLabel, nextLabel, rows, total }) => {
-  const [typed, saveTyped] = useLocalDraft<Record<string, { h?: string; t?: string }>>(`liveops-report-live-plan-${nextMonth}`, {});
-  const [status, setStatus] = useState("");
+export const NextLivePlanPanel: React.FC<{ curLabel: string; nextLabel: string; rows: LivePlanRow[]; total: LivePlanRow; typed: ManualPlan["live"]; onTyped: (next: ManualPlan["live"]) => void; status: string; canManage: boolean }> = ({ curLabel, nextLabel, rows, total, typed, onTyped, status, canManage }) => {
   const fromApp = rows.some((r) => r.plan);
   const calc = (r: LivePlanRow, hours: number | null, target: number | null) => {
     const req = hours && target ? target / hours : null;
@@ -78,14 +50,14 @@ export const NextLivePlanPanel: React.FC<{ nextMonth: string; curLabel: string; 
   const sumT = filled.reduce((a, x) => a + (x.target ?? 0), 0);
   const totCalc = all ? calc(total, sumH, sumT) : null;
   const cls = (d: number | null, band: number | null) => (d == null || band == null || Math.abs(d) <= band ? "nt" : d > 0 ? "dn" : "up");
-  const set = (key: string, f: "h" | "t", v: string) => setStatus(saveTyped({ ...typed, [key]: { ...typed[key], [f]: v } }) ? SAVED : NOT_SAVED);
+  const set = (key: string, f: "h" | "t", v: string) => onTyped({ ...typed, [key]: { ...typed[key], [f]: v } });
   const bands = [...body.map((x) => `${x.r.name} ±${x.band != null ? fmtFixed(x.band, 0) : "—"}%`), `cả tháng ±${totCalc?.band != null ? fmtFixed(totCalc.band, 0) : (noiseBand(total.sessionsCur, total.sessionsCur) != null ? fmtFixed(noiseBand(total.sessionsCur, total.sessionsCur)!, 0) : "—")}%`];
   return (
     <div className="pn">
       <div className="pnh">1 · Kế hoạch Target Live (YFB vận hành)</div>
       <div className="pns">
         {fromApp ? `Giờ live và Target GMV cộng từ các phiên trong Kế Hoạch Tháng ${nextLabel}. ` : "Nhập Giờ live và Target GMV cho từng loại ngày. "}
-        Bảng tính GMV/giờ yêu cầu và so với GMV/giờ đã đạt tháng {curLabel}; đánh giá theo ngưỡng dao động của từng loại ngày.{fromApp ? "" : " Giá trị nhập lưu trong trình duyệt này."}
+        Bảng tính GMV/giờ yêu cầu và so với GMV/giờ đã đạt tháng {curLabel}; đánh giá theo ngưỡng dao động của từng loại ngày.{fromApp ? "" : " Giá trị nhập lưu vào report và cập nhật các ô chỉ số đầu trang."}
       </div>
       <div className="tw">
         <table id="t11Tbl">
@@ -95,8 +67,8 @@ export const NextLivePlanPanel: React.FC<{ nextMonth: string; curLabel: string; 
               <tr key={x.r.key}>
                 <td><b>{x.r.name}</b></td>
                 <td>{mvn(x.r.achieved)}</td>
-                <td>{x.r.plan ? fmtFixed(x.r.plan.hours, 1) : <input className="rr" inputMode="decimal" placeholder="giờ" value={typed[x.r.key]?.h ?? ""} onChange={(e) => set(x.r.key, "h", e.target.value)} aria-label={`Giờ live tháng ${nextLabel} ${x.r.name}`} />}</td>
-                <td>{x.r.plan ? fmtFixed(Math.round(x.r.plan.target / 1e6), 0) : <input className="rr" inputMode="decimal" placeholder="triệu đồng" value={typed[x.r.key]?.t ?? ""} onChange={(e) => set(x.r.key, "t", e.target.value)} aria-label={`Target GMV tháng ${nextLabel} ${x.r.name}`} />}</td>
+                <td>{x.r.plan ? fmtFixed(x.r.plan.hours, 1) : <input className="rr" inputMode="decimal" placeholder="giờ" disabled={!canManage} value={typed[x.r.key]?.h ?? ""} onChange={(e) => set(x.r.key, "h", e.target.value)} aria-label={`Giờ live tháng ${nextLabel} ${x.r.name}`} />}</td>
+                <td>{x.r.plan ? fmtFixed(Math.round(x.r.plan.target / 1e6), 0) : <input className="rr" inputMode="decimal" placeholder="triệu đồng" disabled={!canManage} value={typed[x.r.key]?.t ?? ""} onChange={(e) => set(x.r.key, "t", e.target.value)} aria-label={`Target GMV tháng ${nextLabel} ${x.r.name}`} />}</td>
                 <td>{mvn(x.req)}</td>
                 <td className={cls(x.d, x.band)}>{sd(x.d)}</td>
                 <td className="w">{liveVerdict(x.d, x.band)}</td>
@@ -135,11 +107,13 @@ export interface BookingRow {
   /** GMV/giờ tốt nhất của creator ở tháng report (VND). */
   ref: number | null;
 }
-interface TypedBooking { d?: string; c?: string; camp?: string; tl?: string; h?: string; t?: string; a?: string }
 const CAMPS = ["Daily", "D-Day", "Mid-Month", "Pay Day"];
 
 export const BookingPlanPanel: React.FC<{
-  nextMonth: string;
+  typed: TypedBooking[];
+  onTyped: (next: TypedBooking[]) => void;
+  status: string;
+  canManage: boolean;
   curLabel: string;
   nextLabel: string;
   planRows: BookingRow[];
@@ -148,11 +122,9 @@ export const BookingPlanPanel: React.FC<{
   /** Gợi ý GMV/giờ theo creator (khoá viết thường) cho ô nhập tay. */
   refByCreator: Record<string, number>;
   draftNote?: string;
-}> = ({ nextMonth, curLabel, nextLabel, planRows, cur, refByCreator, draftNote }) => {
+}> = ({ typed, onTyped, status, canManage, curLabel, nextLabel, planRows, cur, refByCreator, draftNote }) => {
   const fromApp = planRows.length > 0;
-  const [typed, saveTyped] = useLocalDraft<TypedBooking[]>(`liveops-report-booking-${nextMonth}`, [{}, {}, {}]);
-  const [status, setStatus] = useState("");
-  const commit = (next: TypedBooking[]) => setStatus(saveTyped(next.length ? next : [{}]) ? SAVED : NOT_SAVED);
+  const commit = (next: TypedBooking[]) => onTyped(next.length ? next : [{}]);
   const rows: (BookingRow & { idx: number })[] = fromApp
     ? planRows.map((r, idx) => ({ ...r, idx }))
     : typed.map((r, idx) => ({ idx, date: r.d || null, creator: r.c ?? "", camp: r.camp, timeline: r.tl, hours: parseNum(r.h), target: r.t ? (parseNum(r.t) ?? 0) * 1e6 || null : null, budgetAds: r.a ? (parseNum(r.a) ?? 0) * 1e6 || null : null, ref: refByCreator[(r.c ?? "").trim().toLowerCase()] ?? null }));
@@ -185,13 +157,13 @@ export const BookingPlanPanel: React.FC<{
               const t = fromApp ? null : typed[r.idx];
               return (
                 <tr key={r.idx}>
-                  <td>{fromApp ? dmy(r.date) : <input className="rr wd" type="date" value={t?.d ?? ""} onChange={(e) => patch(r.idx, { d: e.target.value })} aria-label="Ngày live" />}</td>
-                  <td>{fromApp ? r.creator : <input className="rr wd" inputMode="text" placeholder="creator" value={t?.c ?? ""} onChange={(e) => patch(r.idx, { c: e.target.value })} aria-label="Creator" />}</td>
-                  <td>{fromApp ? r.camp || "—" : <select className="rr" value={t?.camp ?? "Daily"} onChange={(e) => patch(r.idx, { camp: e.target.value })} aria-label="Loại ngày">{CAMPS.map((x) => <option key={x}>{x}</option>)}</select>}</td>
-                  <td>{fromApp ? r.timeline || "—" : <input className="rr" placeholder="19h–24h" value={t?.tl ?? ""} onChange={(e) => patch(r.idx, { tl: e.target.value })} aria-label="Khung giờ" />}</td>
-                  <td>{fromApp ? (r.hours != null ? fmtFixed(r.hours, 1) : "—") : <input className="rr" inputMode="decimal" placeholder="giờ" value={t?.h ?? ""} onChange={(e) => patch(r.idx, { h: e.target.value })} aria-label="Giờ live" />}</td>
-                  <td>{fromApp ? mvn(r.target) : <input className="rr" inputMode="decimal" placeholder="triệu" value={t?.t ?? ""} onChange={(e) => patch(r.idx, { t: e.target.value })} aria-label="Target GMV" />}</td>
-                  <td>{fromApp ? mvn(r.budgetAds) : <input className="rr" inputMode="decimal" placeholder="triệu" value={t?.a ?? ""} onChange={(e) => patch(r.idx, { a: e.target.value })} aria-label="Budget Ads" />}</td>
+                  <td>{fromApp ? dmy(r.date) : <input className="rr wd" disabled={!canManage} type="date" value={t?.d ?? ""} onChange={(e) => patch(r.idx, { d: e.target.value })} aria-label="Ngày live" />}</td>
+                  <td>{fromApp ? r.creator : <input className="rr wd" disabled={!canManage} inputMode="text" placeholder="creator" value={t?.c ?? ""} onChange={(e) => patch(r.idx, { c: e.target.value })} aria-label="Creator" />}</td>
+                  <td>{fromApp ? r.camp || "—" : <select className="rr" disabled={!canManage} value={t?.camp ?? "Daily"} onChange={(e) => patch(r.idx, { camp: e.target.value })} aria-label="Loại ngày">{CAMPS.map((x) => <option key={x}>{x}</option>)}</select>}</td>
+                  <td>{fromApp ? r.timeline || "—" : <input className="rr" disabled={!canManage} placeholder="19h–24h" value={t?.tl ?? ""} onChange={(e) => patch(r.idx, { tl: e.target.value })} aria-label="Khung giờ" />}</td>
+                  <td>{fromApp ? (r.hours != null ? fmtFixed(r.hours, 1) : "—") : <input className="rr" disabled={!canManage} inputMode="decimal" placeholder="giờ" value={t?.h ?? ""} onChange={(e) => patch(r.idx, { h: e.target.value })} aria-label="Giờ live" />}</td>
+                  <td>{fromApp ? mvn(r.target) : <input className="rr" disabled={!canManage} inputMode="decimal" placeholder="triệu" value={t?.t ?? ""} onChange={(e) => patch(r.idx, { t: e.target.value })} aria-label="Target GMV" />}</td>
+                  <td>{fromApp ? mvn(r.budgetAds) : <input className="rr" disabled={!canManage} inputMode="decimal" placeholder="triệu" value={t?.a ?? ""} onChange={(e) => patch(r.idx, { a: e.target.value })} aria-label="Budget Ads" />}</td>
                   <td>{mvn(g)}</td>
                   <td>{ro == null ? "—" : `${fmtFixed(ro, 1)}x`}</td>
                   <td className={g != null && r.ref ? (g / r.ref > 1 ? "dn" : "up") : "nt"}>{r.ref ? `${mvn(r.ref)}${d != null ? ` (${sd(d)})` : ""}` : "—"}</td>
@@ -203,7 +175,7 @@ export const BookingPlanPanel: React.FC<{
         </table>
       </div>
       <div className="legend">
-        {!fromApp && <button type="button" className="addbk" onClick={() => commit([...typed, {}])}>+ Thêm phiên</button>}
+        {!fromApp && canManage && <button type="button" className="addbk" onClick={() => commit([...typed, {}])}>+ Thêm phiên</button>}
         <span>
           {n ? (
             <>
