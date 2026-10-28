@@ -317,6 +317,17 @@ export function peopleOpsNote(hosts: HostInsightRow[], rel: HostReliability[] = 
 /** "Classic - Bone - 10001-2Y2" → "Classic - Bone" (mã hàng ở cuối chỉ làm câu dài). */
 export const shortSku = (name: string) => name.replace(/\s*-\s*[\w-]*\d[\w-]*$/, "").trim() || name;
 
+/** Nhãn ngắn cho điểm trên biểu đồ: tên dài (VERA, Misaki…) cắt còn ~max ký tự + mã sản phẩm (token có chữ+số như "M1016" hoặc ≥3 chữ số như "6323") để vẫn phân biệt được. Tên ngắn giữ nguyên. */
+export const chartSkuLabel = (name: string, max = 30) => {
+  const base = shortSku(name).replace(/ - /g, " ").replace(/\s+/g, " ").trim();
+  if (base.length <= max) return base;
+  const code = base.split(" ").find((t) => /^(?=.*\d)(?=.*[A-Za-z])[\w-]{3,}$/.test(t) || /^\d{3,}$/.test(t));
+  const room = code ? max - code.length - 3 : max - 1;
+  const head = base.slice(0, Math.max(room, 8));
+  const cut = (base[head.length] === " " ? head : head.replace(/\s+\S*$/, "")).trimEnd();
+  return `${cut}…${code && !cut.includes(code) ? ` · ${code}` : ""}`;
+};
+
 export function productsInsight(
   skus: SkuMoves | null,
   promo: { name: string; gmv: number; orders: number } | null,

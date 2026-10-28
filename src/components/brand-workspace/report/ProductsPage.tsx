@@ -4,7 +4,7 @@ import { METRIC } from "../../../lib/metricGlossary";
 import type { PromotionMonthSlice, SkuRankSlice } from "../../../lib/dataraw/monthlyProductSlice";
 import type { GiftStats } from "../../../lib/report/deepAnalysis";
 import type { SkuMoves } from "../../../lib/report/monthlyReportInsights";
-import { shortSku } from "../../../lib/report/sectionInsights";
+import { chartSkuLabel, shortSku } from "../../../lib/report/sectionInsights";
 import { rankBadge, type ScatterPoint } from "../../../lib/report/reportVisuals";
 import { fmtInt, fmtPct } from "./format";
 import { downscaleImage } from "./Visuals";
@@ -93,7 +93,7 @@ export function skuScatterHtml(points: ScatterPoint[]): string {
       const clash = placed.some((q) => Math.abs(q.x - px) < 70 && Math.abs(q.y - (py - r - 5)) < 13);
       placed.push({ x: px, y: clash ? py + r + 13 : py - r - 5 });
       const a = px > 520 ? "end" : px < 110 ? "start" : "middle";
-      return { x: p.x, y: p.y, r: Math.max(r, 3), color: TONE_VAR[p.tone], l: esc(disp(p.label)), dx: a === "end" ? -4 : a === "start" ? 4 : 0, dy: clash ? r + 13 : -r - 5, a };
+      return { x: p.x, y: p.y, r: Math.max(r, 3), color: TONE_VAR[p.tone], l: esc(chartSkuLabel(p.label)), dx: a === "end" ? -4 : a === "start" ? 4 : 0, dy: clash ? r + 13 : -r - 5, a };
     });
   return scatter(pts, { ...o, quad: [{ x: 56, y: 28, t: `${METRIC.productCtr} thấp · ${METRIC.ctor} cao` }, { x: 628, y: 292, t: `${METRIC.productCtr} cao · ${METRIC.ctor} thấp`, a: "end" }] });
 }
