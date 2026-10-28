@@ -33,7 +33,7 @@ import { fmtDateVn, fmtMonth } from "../../lib/format";
 import { profileOf } from "../../lib/platforms/profiles";
 import { prefetchable, type TabPrefetchCtx } from "../../lib/db/prefetch";
 import { lazyNamed } from "../../lib/lazyNamed";
-import { buildStandaloneHtml, captureChartTooltips, captureTabVariants, downloadHtml, waitForRender } from "../../lib/report/exportStandaloneHtml";
+import { buildStandaloneHtml, captureChartTooltips, captureTabVariants, downloadHtml, printStandaloneHtml, waitForRender } from "../../lib/report/exportStandaloneHtml";
 
 // 7 phần của Report Tháng kéo theo recharts + d3 + redux = 364 KB, chiếm 2/3 chunk của tab này (đo
 // 2026-10-01: chunk BrandMonthlyReport 534 KB, riêng thư viện biểu đồ 364 KB). Phần đó chỉ render khi
@@ -57,13 +57,16 @@ interface ReportViewProps {
   shiftSlots?: ShiftSlot[];
 }
 // Khung hiển thị report của từng sàn (cùng khoá với REPORT_ENGINES) — thêm sàn mà quên khung là lỗi compile.
-const REPORT_VIEWS: Record<ReportPlatform, { preload: () => void; Render: React.FC<ReportViewProps> }> = {
+// pdf: khung có các trang `section#mr-*` để file PDF tách từng trang (Shopee chưa có).
+const REPORT_VIEWS: Record<ReportPlatform, { preload: () => void; pdf: boolean; Render: React.FC<ReportViewProps> }> = {
   TikTok: {
     preload: () => void MonthlyReportTabs.preload(),
+    pdf: true,
     Render: (p) => <MonthlyReportTabs brandId={p.brandId} brandName={p.brandName} month={p.month} snapshot={p.snapshot as MonthlyReportSnapshot} liveSessions={p.liveSessions} shiftSlots={p.shiftSlots} canManage={p.canManage} forBrand={p.forBrand} showAll={p.forBrand} />
   },
   Shopee: {
     preload: () => void ShopeeMonthlyReportTabs.preload(),
+    pdf: false,
     Render: (p) => <ShopeeMonthlyReportTabs brandId={p.brandId} brandName={p.brandName} month={p.month} snapshot={p.snapshot as ShopeeReportSnapshot} report={p.report} canManage={p.canManage} onReportChange={p.onReportChange} />
   }
 };
@@ -139,6 +142,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
   const View = REPORT_VIEWS[platform];
   // Xuất file HTML gửi brand: dựng ẨN một bản report như brand thấy (canManage=false, forBrand) rồi đóng gói DOM thành 1 file.
   const [exportHost, setExportHost] = useState<HTMLDivElement | null>(null);
+  const [exportKind, setExportKind] = useState<"html" | "pdf">("html");
   // Mở THÁNG ĐÃ HẾT gần nhất có ca của brand — report chỉ phát hành được sau khi hết tháng (0133); mở tháng đang
   // chạy là gặp ngay "chưa tạo report" (audit người mới 2026-10-04). Xem tháng này: chọn ở bộ chọn tháng.
   const [month, setMonth] = useState(() => defaultReportMonth(`${getTodayMonth()}-01`, sessions.filter((s) => s.brandId === brandId)));
@@ -324,21 +328,28 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
     }
   };
 
-  const handleExportHtml = async () => {
+  // PDF: mỗi trang report = 1 trang PDF dài (không ngắt A4), in qua hộp thoại của trình duyệt — chỉ khung có `pdf` (REPORT_VIEWS).
+  const handleExport = async (kind: "html" | "pdf") => {
     if (exportHost || !stored) return;
     const host = document.createElement("div");
     host.setAttribute("aria-hidden", "true");
     host.style.cssText = "position:fixed;left:-10000px;top:0;width:1180px;pointer-events:none";
     document.body.appendChild(host);
+    setExportKind(kind);
     setExportHost(host);
     try {
       await waitForRender(host);
       const title = `Report Tháng ${Number(monthM)}/${monthY} · ${channelTitle(brandName, platform, false)}`;
-      const file = `${brandName}_${platform}_Report_T${Number(monthM)}-${monthY}.html`.replace(/[^\w.-]+/g, "_");
+      // Tên file mặc định: brand_sàn_Report-Thang_MM-YYYY (xếp theo brand rồi theo tháng trong thư mục tải về). PDF lấy tên này làm tên gợi ý trong hộp thoại in.
+      const base = `${brandName}_${platform}_Report-Thang_${monthM}-${monthY}`.replace(/[^\p{L}\p{N}.-]+/gu, "_");
       const tips = await captureChartTooltips(host);
       const variants = await captureTabVariants(host);
-      downloadHtml(file, buildStandaloneHtml(host, title, variants, tips));
-      showToast("Đã tải file HTML gửi brand.", "success");
+      if (kind === "pdf") {
+        await printStandaloneHtml(buildStandaloneHtml(host, title, variants, tips, true), base);
+      } else {
+        downloadHtml(`${base}.html`, buildStandaloneHtml(host, title, variants, tips));
+        showToast("Đã tải file HTML gửi brand.", "success");
+      }
     } catch (e) {
       showToast(errorMessage(e), "error");
     } finally {
@@ -434,14 +445,26 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
               </span>
             )}
             {canManage && stored && (
-              <button
-                onClick={handleExportHtml}
-                disabled={!!exportHost}
-                title="Tải report thành 1 file HTML độc lập để gửi brand (không dính link/giao diện app)"
-                className="px-3 py-2 rounded-xl text-xs font-bold border border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-elevated)] flex items-center gap-1.5 disabled:opacity-60"
-              >
-                {exportHost ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />} {exportHost ? "Đang đóng gói..." : "Tải bản gửi brand"}
-              </button>
+              <>
+                <button
+                  onClick={() => handleExport("html")}
+                  disabled={!!exportHost}
+                  title="Tải report thành 1 file HTML độc lập để gửi brand (không dính link/giao diện app, bấm được tab và chuyển trang)"
+                  className="px-3 py-2 rounded-xl text-xs font-bold border border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-elevated)] flex items-center gap-1.5 disabled:opacity-60"
+                >
+                  {exportHost && exportKind === "html" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />} {exportHost && exportKind === "html" ? "Đang đóng gói..." : "Tải HTML gửi brand"}
+                </button>
+                {View.pdf && (
+                  <button
+                    onClick={() => handleExport("pdf")}
+                    disabled={!!exportHost}
+                    title="Lưu report thành PDF gửi brand đọc trước họp: mỗi trang report là một trang PDF dài, không bị ngắt giữa biểu đồ hay bảng. Trong hộp thoại in chọn đích “Lưu dưới dạng PDF”."
+                    className="px-3 py-2 rounded-xl text-xs font-bold border border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-elevated)] flex items-center gap-1.5 disabled:opacity-60"
+                  >
+                    {exportHost && exportKind === "pdf" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />} {exportHost && exportKind === "pdf" ? "Đang dựng PDF..." : "Tải PDF gửi brand"}
+                  </button>
+                )}
+              </>
             )}
             {canManage &&
               (isPublished ? (

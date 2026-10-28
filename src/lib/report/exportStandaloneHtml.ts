@@ -135,7 +135,75 @@ const collectCss = (): string => {
 
 const escapeHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
 
-export function buildStandaloneHtml(root: HTMLElement, title: string, tabVariants: Map<string, string[]> = new Map(), chartTips: Map<string, ChartTip> = new Map()): string {
+/** Chiều rộng trang PDF — bằng khung đọc của report trên màn hình rộng. */
+export const PDF_PAGE_WIDTH = 1280;
+
+/**
+ * In ra PDF, Chrome tính @media theo khổ giấy mặc định (~816px) nên report tự co về bố cục điện thoại (KPI 2 cột, bảng cuộn ngang bị cắt).
+ * Ở đây tính sẵn các @media theo chiều rộng thật: khối đúng điều kiện thì mở ra áp thẳng, khối sai thì bỏ. Chỉ đụng các @media chỉ có điều kiện chiều rộng.
+ */
+export function flattenWidthMedia(css: string, width: number): string {
+  const re = /@media ([^{]*)\{/g;
+  let out = "";
+  let last = 0;
+  for (let m = re.exec(css); m; m = re.exec(css)) {
+    const cond = /^\s*(?:\(min-width: (\d+)px\)|\(max-width: (\d+)px\)|\(width >= ([\d.]+)rem\))\s*$/.exec(m[1]);
+    if (!cond) continue;
+    let depth = 1;
+    let j = re.lastIndex;
+    for (; depth && j < css.length; j++) depth += (css[j] === "{" ? 1 : 0) - (css[j] === "}" ? 1 : 0);
+    const ok = cond[1] ? width >= Number(cond[1]) : cond[2] ? width <= Number(cond[2]) : width >= Number(cond[3]) * 16;
+    out += css.slice(last, m.index) + (ok ? css.slice(re.lastIndex, j - 1) : "");
+    last = j;
+    re.lastIndex = j;
+  }
+  return out + css.slice(last);
+}
+
+// Bản in: mỗi trang report = đúng 1 trang PDF cao vừa nội dung (khổ giấy riêng theo trang, đặt ở __preparePdf) nên không có chỗ ngắt
+// cắt ngang biểu đồ/bảng/khung Insight. Mọi tab của bảng có tab in nối tiếp (mỗi bản tự có hàng tab đang sáng làm nhãn).
+const PDF_RULES = `html,body{-webkit-print-color-adjust:exact;print-color-adjust:exact;margin:0}
+nav[aria-label="Các trang của report"],[data-pager]{display:none!important}
+#report-root,.pdf-sections{padding:0!important;gap:0!important;max-width:none!important}
+section[id^=mr-]{display:block!important;margin:0 16px!important;padding-top:16px}
+[data-variant][hidden]{display:block!important}
+[data-variant]+[data-variant]{margin-top:12px}
+.rt .tw,.rt [style*="overflow"]{overflow:visible!important}`;
+const PDF_PAGE_SLACK = 48;
+
+/** In file xuất ra PDF qua hộp thoại in của trình duyệt (iframe ẩn). Tên file gợi ý trong hộp thoại lấy từ title của trang đang mở nên đổi tạm title. */
+export async function printStandaloneHtml(html: string, fileBase: string): Promise<void> {
+  const frame = document.createElement("iframe");
+  frame.setAttribute("aria-hidden", "true");
+  frame.style.cssText = `position:fixed;left:-10000px;top:0;width:${PDF_PAGE_WIDTH}px;height:900px;border:0;pointer-events:none`;
+  frame.srcdoc = html;
+  document.body.appendChild(frame);
+  await new Promise<void>((resolve) => {
+    frame.onload = () => resolve();
+  });
+  await new Promise((r) => setTimeout(r, 600));
+  const win = frame.contentWindow as (Window & { __preparePdf?: () => void }) | null;
+  if (!win?.__preparePdf) {
+    frame.remove();
+    throw new Error("Không dựng được bản in PDF");
+  }
+  win.__preparePdf();
+  const prevTitle = document.title;
+  document.title = fileBase;
+  let closed = false;
+  const cleanup = () => {
+    if (closed) return;
+    closed = true;
+    document.title = prevTitle;
+    frame.remove();
+  };
+  win.addEventListener("afterprint", cleanup, { once: true });
+  win.focus();
+  win.print();
+  setTimeout(cleanup, 60_000);
+}
+
+export function buildStandaloneHtml(root: HTMLElement, title: string, tabVariants: Map<string, string[]> = new Map(), chartTips: Map<string, ChartTip> = new Map(), pdf = false): string {
   const clone = root.cloneNode(true) as HTMLElement;
   // Khung ẩn ngoài màn hình (fixed, left −10000px) không được theo vào file.
   clone.removeAttribute("style");
@@ -165,6 +233,7 @@ export function buildStandaloneHtml(root: HTMLElement, title: string, tabVariant
     if (box) box.style.height = "auto";
   });
   clone.querySelectorAll(".recharts-tooltip-wrapper").forEach((el) => el.remove());
+  clone.querySelector("section[id^=mr-]")?.parentElement?.classList.add("pdf-sections");
 
   const tipData = JSON.stringify(Object.fromEntries(chartTips)).replace(/</g, "\\u003c");
   const script = `
@@ -187,7 +256,7 @@ document.querySelectorAll('[data-tabgroup]').forEach(function(g){g.addEventListe
 if(!secs.length||!rail.length)return;
 var ids=rail.map(function(b){return b.getAttribute('data-rail');});
 var pager=document.createElement('div');pager.style.cssText='display:flex;justify-content:space-between;gap:12px;padding:16px 20px 20px;margin-top:8px;border-top:1px solid ${PAL.line}';
-var host=secs[0].parentElement;host.appendChild(pager);pager.style.order=99;
+var host=secs[0].parentElement;host.appendChild(pager);pager.style.order=99;pager.setAttribute('data-pager','');
 var btn=function(label,id){var b=document.createElement('button');b.type='button';b.textContent=label;b.style.cssText='background:none;border:0;cursor:pointer;font:inherit;font-size:12px;font-weight:700;color:${PAL.gold};padding:0';b.onclick=function(){show(id,true);};return b;};
 function show(id,scroll){var i=ids.indexOf(id);if(i<0){id=ids[0];i=0;}
   secs.forEach(function(s){s.style.display=s.id==='mr-'+id?'':'none';});
@@ -202,6 +271,12 @@ rail.forEach(function(b){b.addEventListener('click',function(){show(b.getAttribu
 var m=/^#mr-(\\w+)/.exec(location.hash);show(m?m[1]:ids[0],false);
 })();`;
 
+  // Đo chiều cao từng trang bằng chính luật in (áp tạm không bọc @media print) rồi ghi @page riêng cho từng trang.
+  const pdfScript = `window.__preparePdf=function(){var st=document.createElement('style');st.textContent=${JSON.stringify(PDF_RULES).replace(/</g, "\\u003c")};document.head.appendChild(st);
+var css='@page{size:${PDF_PAGE_WIDTH}px 800px;margin:0}';
+document.querySelectorAll('section[id^=mr-]').forEach(function(s){var n=s.id.slice(3);var h=Math.ceil(s.getBoundingClientRect().height)+${PDF_PAGE_SLACK};css+='@page p_'+n+'{size:${PDF_PAGE_WIDTH}px '+h+'px;margin:0}#'+s.id+'{page:p_'+n+'}';});
+st.remove();var p=document.createElement('style');p.textContent=css;document.head.appendChild(p);};`;
+
   return `<!doctype html>
 <html lang="vi">
 <head>
@@ -210,18 +285,20 @@ var m=/^#mr-(\\w+)/.exec(location.hash);show(m?m[1]:ids[0],false);
 <meta name="robots" content="noindex">
 <title>${escapeHtml(title)}</title>
 <style>
-${collectCss()}
+${pdf ? flattenWidthMedia(collectCss(), PDF_PAGE_WIDTH) : collectCss()}
 html,body{margin:0;background:${PAL.bg};color:${PAL.cream};font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
 #report-root{max-width:1180px;margin:0 auto;padding:12px}
 nav[aria-label="Các trang của report"]{top:0!important}
 svg.recharts-surface{width:100%;height:auto;max-width:100%}
 @media print{nav[aria-label="Các trang của report"]{position:static!important}section[id^=mr-]{display:block!important}}
+@media print{${PDF_RULES}}
 </style>
 </head>
 <body>
 <div id="report-root">${clone.outerHTML}</div>
 <script type="application/json" id="tipdata">${tipData}</script>
 <script>${script}</script>
+${pdf ? `<script>${pdfScript}</script>` : ""}
 </body>
 </html>`;
 }
