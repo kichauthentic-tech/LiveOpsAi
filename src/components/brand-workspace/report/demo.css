@@ -197,3 +197,9 @@
 .rt footer ul{margin: 4px 0 0; padding-left: 18px;}
 .rt footer li{margin: 6px 0 0; max-width: 90ch;}
 .rt svg text{font-family: inherit;}
+
+.rt #doneTbl, .rt #todoTbl{font-size: 11px;}
+.rt #doneTbl td.w, .rt #doneTbl th.w, .rt #todoTbl td.w, .rt #todoTbl th.w{min-width: 120px; vertical-align: top;}
+.rt #doneTbl td, .rt #todoTbl td{vertical-align: top;}
+.rt #doneTbl th, .rt #doneTbl td, .rt #todoTbl th, .rt #todoTbl td{padding: 6px 4px;}
+.rt #doneTbl .ce, .rt #todoTbl .ce{min-width: 0; font-size: 11px;}

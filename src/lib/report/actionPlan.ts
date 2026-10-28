@@ -1,5 +1,5 @@
 import { CAMP_DAY_BUCKET_ORDER, type CampDayBucket } from "../campaignDays";
-import { fmtFixed, fmtVndFull } from "../format";
+import { fmtFixed, fmtVndFull, fmtVndShort } from "../format";
 import { DAY_TYPE, METRIC } from "../metricGlossary";
 import { KEY_METRICS, fmtKeyMetric, keyMetricValue, type KeyMetricDef, type KeyMetricKey } from "./keyMetrics";
 import type { LiveStats } from "./monthlyReportInsights";
@@ -43,10 +43,31 @@ export interface ActionManualResult {
   status: "met" | "missed";
   at: string;
 }
+/** Trạng thái triển khai ops tự đặt (khác "đạt/chưa đạt" do app chấm theo chỉ tiêu). */
+export type ActionStatus = "todo" | "following" | "done" | "late";
+export const ACTION_STATUSES: ActionStatus[] = ["todo", "following", "done", "late"];
+export const ACTION_STATUS_TEXT: Record<ActionStatus, string> = { todo: "Todo", following: "Following", done: "Done", late: "Late" };
+/** Số thực tế app tự điền ở cột Kết quả (thay cho ô trống) — mỗi khoá đọc một nguồn trong report. */
+export type ActionAutoKey = "adsBelow70" | "affPctTarget" | "affCreators" | "restGrowth" | "runrate";
+export const ACTION_AUTO_KEYS: ActionAutoKey[] = ["adsBelow70", "affPctTarget", "affCreators", "restGrowth", "runrate"];
+export const ACTION_AUTO_LABEL: Record<ActionAutoKey, string> = {
+  adsBelow70: "Ngày Ads dưới 70% Target",
+  affPctTarget: "% Target từng phiên Affiliate",
+  affCreators: "Số creator và tỷ trọng lớn nhất",
+  restGrowth: "Video và Product card so với cùng kỳ",
+  runrate: "Dự báo LIVE GMV cuối tháng"
+};
+
 export interface ActionItem {
   id: string;
   action: string;
   basis: string;
+  /** Hạn: ngày hoặc chữ ("Tuần 1–2 T10", "Hàng tuần"). */
+  deadline?: string;
+  status?: ActionStatus | null;
+  pic?: string;
+  note?: string;
+  autoKey?: ActionAutoKey | null;
   /** null = chỉ tiêu bằng chữ (`trackText`), ops tự chấm. */
   target: ActionTarget | null;
   trackText: string;
@@ -82,7 +103,9 @@ export function readActionPlan(raw: unknown): ActionPlan | null {
     }
     const m = o.manual as Record<string, unknown> | null | undefined;
     const manual: ActionManualResult | null = m && (m.status === "met" || m.status === "missed") ? { status: m.status, at: str(m.at) } : null;
-    items.push({ id: str(o.id) || `a${items.length + 1}`, action, basis: str(o.basis).trim(), target, trackText: str(o.trackText).trim(), manual: target ? null : manual });
+    const status = ACTION_STATUSES.includes(o.status as ActionStatus) ? (o.status as ActionStatus) : null;
+    const autoKey = ACTION_AUTO_KEYS.includes(o.autoKey as ActionAutoKey) ? (o.autoKey as ActionAutoKey) : null;
+    items.push({ id: str(o.id) || `a${items.length + 1}`, action, basis: str(o.basis).trim(), deadline: str(o.deadline).trim(), status, pic: str(o.pic).trim(), note: str(o.note).trim(), autoKey, target, trackText: str(o.trackText).trim(), manual: target ? null : manual });
   }
   return items.length ? { items, savedAt: str(r.savedAt) } : null;
 }
@@ -130,6 +153,44 @@ export interface ActionGradeContext {
   targets: Record<ActionScope, number | null>;
   /** true khi tháng được chấm đã hết và số phiên đủ tới ngày cuối. */
   final: boolean;
+  /** Số thực tế cho cột Kết quả của việc có `autoKey`; thiếu nguồn thì việc đó hiện "—". */
+  auto?: ActionAutoData;
+}
+
+export interface ActionAutoData {
+  /** Ngày có Ads thực tế dưới 70% Target ngày: "12/10 (69,9%)". */
+  adsBelow70?: string[] | null;
+  affPctTarget?: { label: string; pct: number | null }[] | null;
+  affCreators?: { count: number; topName: string; topShare: number | null } | null;
+  restGrowth?: { video: number | null; card: number | null; windowLabel: string } | null;
+  runrate?: { projected: number; target: number | null } | null;
+}
+
+const pc1 = (v: number) => `${fmtFixed(v, 1)}%`;
+const sgn = (v: number) => `${v >= 0 ? "+" : "−"}${fmtFixed(Math.abs(v), 0)}%`;
+
+/** Câu kết quả tự điền theo `autoKey`; null = chưa có số để điền. */
+export function autoResultText(key: ActionAutoKey | null | undefined, a: ActionAutoData | undefined): string | null {
+  if (!key || !a) return null;
+  switch (key) {
+    case "adsBelow70":
+      if (!a.adsBelow70) return null;
+      return a.adsBelow70.length ? `${a.adsBelow70.length} ngày dưới 70%: ${a.adsBelow70.join(", ")}` : "Không ngày nào dưới 70% Target Ads";
+    case "affPctTarget":
+      if (!a.affPctTarget?.length) return null;
+      return a.affPctTarget.map((x) => `${x.label} ${x.pct == null ? "—" : pc1(x.pct)}`).join(" · ");
+    case "affCreators":
+      if (!a.affCreators) return null;
+      return `${a.affCreators.count} creator${a.affCreators.topShare != null ? `; ${a.affCreators.topName} chiếm ${pc1(a.affCreators.topShare)} Direct GMV` : ""}`;
+    case "restGrowth": {
+      const g = a.restGrowth;
+      if (!g || (g.video == null && g.card == null)) return null;
+      return [g.video != null ? `Video ${sgn(g.video)}` : null, g.card != null ? `Product card ${sgn(g.card)}` : null].filter(Boolean).join(" · ") + ` so với cùng kỳ (${g.windowLabel})`;
+    }
+    case "runrate":
+      if (!a.runrate) return null;
+      return `Dự báo LIVE GMV cuối tháng ${fmtVndShort(a.runrate.projected)}${a.runrate.target ? ` (${fmtFixed((a.runrate.projected / a.runrate.target) * 100, 0)}% Target tháng)` : ""}`;
+  }
 }
 
 export type ActionGradeStatus = "met" | "missed" | "tracking" | "nodata" | "awaiting";
@@ -155,8 +216,9 @@ export function actualOf(t: ActionTarget, ctx: ActionGradeContext): number | nul
 
 export function gradeAction(item: ActionItem, ctx: ActionGradeContext): ActionGrade {
   if (!item.target) {
-    if (item.manual) return { status: item.manual.status, actual: null, actualText: "ops chấm", onTrack: null, manual: true };
-    return { status: ctx.final ? "awaiting" : "tracking", actual: null, actualText: "—", onTrack: null, manual: true };
+    const auto = autoResultText(item.autoKey, ctx.auto);
+    if (item.manual) return { status: item.manual.status, actual: null, actualText: auto ?? "ops chấm", onTrack: null, manual: true };
+    return { status: ctx.final ? "awaiting" : "tracking", actual: null, actualText: auto ?? "—", onTrack: null, manual: true };
   }
   const t = item.target;
   const actual = actualOf(t, ctx);
@@ -200,6 +262,11 @@ export const newActionItem = (action = ""): ActionItem => ({
   id: `a${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
   action,
   basis: "",
+  deadline: "",
+  status: null,
+  pic: "",
+  note: "",
+  autoKey: null,
   target: null,
   trackText: "",
   manual: null

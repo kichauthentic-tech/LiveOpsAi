@@ -17,11 +17,11 @@ import { CreatorLivePerfRow, vnDateOf } from "../../lib/dataraw/creatorLivePerfS
 import { fetchMonthPlan } from "../../lib/db/monthPlans";
 import type { BrandMonthPlan, BrandMonthPlanSlot } from "../../types";
 import { fetchMonthlyReport, saveMonthlyReportActionPlan, saveMonthlyReportSectionNote } from "../../lib/db/monthlyReports";
-import { gradeAction, newActionItem, type ActionGradeContext, type ActionItem } from "../../lib/report/actionPlan";
-import { adsTypeRows } from "../../lib/report/adsSlide";
+import { gradeAction, newActionItem, type ActionAutoData, type ActionGradeContext } from "../../lib/report/actionPlan";
+import { adsDayPoints, adsTypeRows } from "../../lib/report/adsSlide";
 import { ActionPlanPanel, ActionResultsPanel } from "./report/ActionPlan";
 import { BookingPlanPanel, NextLivePlanPanel } from "./report/NextMonthPanels";
-import { REFUND_FINAL_KEY, applyFinalRate, bookingTotals, decodeRefundFinal, decodeTodoMeta, encodeRefundFinal, encodeTodoMeta, refundTrackRows, todoMetaKey } from "../../lib/report/nextMonthPlan";
+import { REFUND_FINAL_KEY, applyFinalRate, bookingTotals, decodeRefundFinal, encodeRefundFinal, refundTrackRows } from "../../lib/report/nextMonthPlan";
 import { BLOCK_KEYS, BLOCK_LABEL, decodeEdits, shownBlocks, type InsightBlocks, adsBlocks, affiliateBlocks, keyMetricsBlocks, nextBlocks, nmvBlocks, pageNoteKey, peopleBlocks, productsBlocks, shopBlocks, summaryBlocks, whyBlocks, type InsightPage } from "../../lib/report/pageInsights";
 import { contextInsight, HostInsightRow, hostVsPeer, InsightSection, peopleInsight, peopleOpsNote, productsInsight, sectionNextSteps, SectionInsight, shopInsight, shortSku, whyInsight } from "../../lib/report/sectionInsights";
 import { CAMP_DAY_BUCKET_LABEL, CAMP_DAY_BUCKET_ORDER, effectiveCamp, resolveCampBucketType, type CampDayBucket, type CampOverrides } from "../../lib/campaignDays";
@@ -344,17 +344,6 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   const livePrevStats = useMemo(() => liveStatsFromRows(livePrev?.rows ?? [], cmp.prevStart, cmp.prevEnd), [livePrev, cmp]);
   // Bộ số để chấm action plan tháng trước + gợi ý ngưỡng cho plan tháng sau: cả tháng + từng loại ngày, target theo
   // Kế Hoạch Tháng đã chốt. Chỉ kết luận khi số phiên đủ tới cuối tháng (cmp.partial = còn dở).
-  const actionCtx = useMemo<ActionGradeContext>(() => {
-    const by = (k: CampDayBucket) => campDetailRows.find((r) => r.key === k);
-    const bucket = <T,>(f: (k: CampDayBucket) => T) => Object.fromEntries(CAMP_DAY_BUCKET_ORDER.map((k) => [k, f(k)])) as Record<CampDayBucket, T>;
-    return {
-      stats: { all: liveCurStats, ...bucket((k) => by(k)?.cur ?? null) },
-      targets: { all: kpiTargetGmvCur, ...bucket((k) => by(k)?.target ?? null) },
-      final: !cmp.partial
-    };
-  }, [liveCurStats, campDetailRows, kpiTargetGmvCur, cmp]);
-  const prevPlanItems = prevReportRow?.actionPlan?.items ?? null;
-  const prevGrades = useMemo(() => (prevPlanItems ? prevPlanItems.map((i) => gradeAction(i, actionCtx)) : null), [prevPlanItems, actionCtx]);
   const drivers = useMemo(() => driverBreakdown(livePrevStats, liveCurStats), [livePrevStats, liveCurStats]);
   const waterfallData = useMemo(() => toWaterfall(drivers, cmp, month, prevMonth), [drivers, cmp, month, prevMonth]);
 
@@ -571,6 +560,41 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   const creatorSum = useMemo(() => creatorTotals(creatorRows), [creatorRows]);
   const trackCols = useMemo(() => affiliateTrackColumns(affiliate.cur), [affiliate.cur]);
   const trackSum = useMemo(() => affiliateTrackTotals(trackCols), [trackCols]);
+  // Số thực tế điền sẵn cho cột Kết quả của bảng "Đánh giá lại" (việc có autoKey) — nối từ các khối đã tính ở dưới/trên cùng report.
+  const actionAuto = useMemo<ActionAutoData>(() => {
+    const dm = (d: string) => `${Number(d.slice(8))}/${Number(d.slice(5, 7))}`;
+    const adsRows = adsPlanRows?.key === `${brandId}|${month}` ? adsPlanRows.rows : [];
+    const adsBelow70 = adsRows.length
+      ? adsDayPoints(adsRows, month, bucketCur)
+          .filter((p) => p.hasActual && p.target && p.total != null && (p.total / p.target) * 100 < 70)
+          .map((p) => `${dm(p.date)} (${fmtFixed(((p.total ?? 0) / (p.target ?? 1)) * 100, 1)}%)`)
+      : null;
+    const byCreator = new Map<string, number>();
+    for (const c of trackCols) byCreator.set(c.creator, (byCreator.get(c.creator) ?? 0) + (c.directGmv ?? 0));
+    const totalDirect = [...byCreator.values()].reduce((a, b) => a + b, 0);
+    const top = [...byCreator.entries()].sort((a, b) => b[1] - a[1])[0];
+    const all = control.find((r) => r.key === "all");
+    return {
+      adsBelow70,
+      affPctTarget: trackCols.length ? trackCols.map((c) => ({ label: `${c.creator}${c.date ? ` ${dm(c.date)}` : ""}`, pct: c.pctTarget ?? null })) : null,
+      affCreators: byCreator.size ? { count: byCreator.size, topName: top[0], topShare: totalDirect > 0 ? (top[1] / totalDirect) * 100 : null } : null,
+      restGrowth: all?.channelChg ? { video: all.channelChg.video, card: all.channelChg.card, windowLabel: cmp.label } : null,
+      runrate: planRR?.rr.total.keepPace != null ? { projected: planRR.rr.total.keepPace, target: kpiTargetGmvCur } : null
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adsPlanRows, brandId, month, bucketCur, trackCols, control, cmp, planRR, kpiTargetGmvCur]);
+  const actionCtx = useMemo<ActionGradeContext>(() => {
+    const by = (k: CampDayBucket) => campDetailRows.find((r) => r.key === k);
+    const bucket = <T,>(f: (k: CampDayBucket) => T) => Object.fromEntries(CAMP_DAY_BUCKET_ORDER.map((k) => [k, f(k)])) as Record<CampDayBucket, T>;
+    return {
+      stats: { all: liveCurStats, ...bucket((k) => by(k)?.cur ?? null) },
+      targets: { all: kpiTargetGmvCur, ...bucket((k) => by(k)?.target ?? null) },
+      final: !cmp.partial,
+      auto: actionAuto
+    };
+  }, [liveCurStats, campDetailRows, kpiTargetGmvCur, cmp, actionAuto]);
+  const prevPlanItems = prevReportRow?.actionPlan?.items ?? null;
+  const prevGrades = useMemo(() => (prevPlanItems ? prevPlanItems.map((i) => gradeAction(i, actionCtx)) : null), [prevPlanItems, actionCtx]);
   const creatorPlan = useMemo(() => creatorPlanRows(affiliate.next, creatorRows), [affiliate.next, creatorRows]);
   const creatorBest = useMemo(() => {
     const best: Record<string, number> = {};
@@ -1611,11 +1635,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
               final={actionCtx.final}
               throughNote={cmp.partial ? `số tới ${Number(cmp.curEnd.slice(8))}/${Number(month.slice(5))}` : null}
               canManage={canManage}
-              onManual={async (id, status) => {
-                const at = new Date().toISOString();
-                const items: ActionItem[] = prevPlanItems.map((i) => (i.id === id ? { ...i, manual: status ? { status, at } : null } : i));
-                setPrevReportRow(await saveMonthlyReportActionPlan(brandId, `${prevMonth}-01`, items));
-              }}
+              onSave={async (items) => setPrevReportRow(await saveMonthlyReportActionPlan(brandId, `${prevMonth}-01`, items))}
             />
           )}
           <ActionPlanPanel
@@ -1623,13 +1643,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             fallbackLines={nextLines}
             nextMonthLabel={`tháng ${Number(nextMonth.slice(5))}`}
             canManage={canManage}
-            meta={decodeTodoMeta(monthlyReportRow?.sectionNotes?.[todoMetaKey(month)]?.text)}
-            onSave={async (items, meta) => {
-              let row = await saveMonthlyReportActionPlan(brandId, `${month}-01`, items);
-              const keep = Object.fromEntries(Object.entries(meta).filter(([id]) => items.some((i) => i.id === id)));
-              row = await saveMonthlyReportSectionNote(brandId, `${month}-01`, todoMetaKey(month), encodeTodoMeta(keep));
-              setMonthlyReportRow(row);
-            }}
+            onSave={async (items) => setMonthlyReportRow(await saveMonthlyReportActionPlan(brandId, `${month}-01`, items))}
           />
           {pageInsight("next")}
         </section>

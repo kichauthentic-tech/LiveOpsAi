@@ -11,6 +11,8 @@ export interface AffiliateTrackColumn {
   camp?: string;
   hasPlan: boolean;
   timeline?: string;
+  /** Khung giờ trong kế hoạch (dòng KẾ HOẠCH), vd "09:00 - 17:00". */
+  planTimeline?: string;
   targetGmv?: number;
   planHours?: number;
   directGmv?: number;
@@ -47,6 +49,7 @@ export function affiliateTrackColumns(entries: AffiliateActualEntry[]): Affiliat
       camp: e.campName,
       hasPlan: !!(e.planTimelineLabel || e.targetGmv != null || e.planBudgetAds != null),
       timeline: e.timelineLabel,
+      planTimeline: e.planTimelineLabel,
       targetGmv: target,
       planHours: planHours(e),
       directGmv: gmv,
@@ -135,8 +138,7 @@ export function affiliateTrackGroups(f: TrackFmt): TrackGroup[] {
       group: "Kế hoạch",
       rows: [
         { label: "Camp", cell: (c) => ({ text: c.camp || "—" }) },
-        { label: "Kế hoạch", cell: (c) => ({ text: c.hasPlan ? "Có kế hoạch" : "Ngoài kế hoạch", tone: c.hasPlan ? undefined : "warn" }) },
-        { label: "Timeline", cell: (c) => ({ text: c.timeline || "—" }) },
+        { label: "Kế hoạch", cell: (c) => ({ text: c.hasPlan ? c.planTimeline || "—" : "Ngoài kế hoạch", tone: c.hasPlan ? undefined : "warn" }) },
         { label: "Giờ kế hoạch", cell: (c) => opt(c.planHours, (v) => f.fixed(v, 1)) },
         { label: "Budget Ads", cell: (c) => opt(c.budgetAds, f.money) }
       ]
@@ -148,6 +150,7 @@ export function affiliateTrackGroups(f: TrackFmt): TrackGroup[] {
         { label: "Direct GMV", key: true, cell: (c) => opt(c.directGmv, f.money) },
         { label: "% Target", key: true, cell: (c) => (c.pctTarget == null ? dash : { text: `${f.fixed(c.pctTarget, 1)}%`, tone: pctTargetTone(c.pctTarget) }) },
         { label: "Giờ live", cell: (c) => opt(c.hours, (v) => f.fixed(v, 1)) },
+        { label: "Giờ live thực tế", cell: (c) => ({ text: c.timeline || "—" }) },
         { label: "GMV/giờ", key: true, cell: (c) => opt(c.gmvPerHour ?? undefined, f.money) }
       ]
     },
