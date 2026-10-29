@@ -118,6 +118,10 @@ export const NextLivePlanPanel: React.FC<{ nextMonth: string; curLabel: string; 
   const cell = (key: string, f: "h" | "t", ph: string, label: string) =>
     canEdit ? <input className="rr" inputMode="decimal" placeholder={ph} value={typed[key]?.[f] ?? ""} onChange={(e) => set(key, f, e.target.value)} onBlur={commit} aria-label={label} /> : <>{typed[key]?.[f] || "—"}</>;
   const bands = [...body.map((x) => `${x.r.name} ±${x.band != null ? fmtFixed(x.band, 0) : "—"}%`), `cả tháng ±${totCalc?.band != null ? fmtFixed(totCalc.band, 0) : (noiseBand(total.sessionsCur, total.sessionsCur) != null ? fmtFixed(noiseBand(total.sessionsCur, total.sessionsCur)!, 0) : "—")}%`];
+  // Brand chưa có kế hoạch Chốt và ops chưa lưu số tự điền nào ⇒ chỉ còn hàng "—" / "chưa nhập", không có gì để đọc.
+  if (!fromApp && !canEdit && filled.length === 0) return null;
+  // Chưa có kế hoạch tháng sau và ops chưa lưu số tự điền nào ⇒ chỉ còn hàng "—" / "chưa nhập", không có gì để đọc.
+  if (!fromApp && !canEdit && filled.length === 0) return null;
   return (
     <div className="pn">
       <div className="pnh">1 · Kế hoạch Target Live (YFB vận hành)</div>
@@ -186,7 +190,9 @@ export const BookingPlanPanel: React.FC<{
   /** Gợi ý GMV/giờ theo creator (khoá viết thường) cho ô nhập tay. */
   refByCreator: Record<string, number>;
   draftNote?: string;
-}> = ({ nextMonth, curLabel, nextLabel, planRows, cur, refByCreator, draftNote }) => {
+  /** false (brand / file xuất gửi brand): không có phiên nào trong tab Affiliate thì ẩn khối — bảng nhập tay chỉ để ops tính thử. */
+  canEdit: boolean;
+}> = ({ nextMonth, curLabel, nextLabel, planRows, cur, refByCreator, draftNote, canEdit }) => {
   const fromApp = planRows.length > 0;
   const [typed, saveTyped] = useLocalDraft<TypedBooking[]>(`liveops-report-booking-${nextMonth}`, [{}, {}, {}]);
   const [status, setStatus] = useState("");
@@ -204,6 +210,8 @@ export const BookingPlanPanel: React.FC<{
   const vs = (a: number | null, b: number | null) => (a != null && b ? (a / b - 1) * 100 : null);
   const patch = (i: number, p: TypedBooking) => commit(typed.map((r, k) => (k === i ? { ...r, ...p } : r)));
   const dmy = (d: string | null) => (d ? `${d.slice(8)}/${d.slice(5, 7)}` : "—");
+  if (!fromApp && !canEdit) return null;
+  if (!fromApp && !canEdit) return null;
   return (
     <div className="pn">
       <div className="pnh">2 · Kế hoạch Booking Creator và Target Creator</div>

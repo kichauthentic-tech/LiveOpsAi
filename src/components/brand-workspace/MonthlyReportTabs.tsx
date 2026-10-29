@@ -164,13 +164,14 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     let cancelled = false;
     const ms = [prev2Month, prevMonth, month, nextMonth];
     Promise.all(ms.map((m) => fetchMonthPlan(brandId, m).catch(() => null))).then((rs) => {
-      if (!cancelled) setPlans(Object.fromEntries(ms.map((m, i) => [m, forBrand && rs[i]?.plan.status !== "locked" ? null : rs[i]])));
+      if (!cancelled) setPlans(Object.fromEntries(ms.map((m, i) => [m, forBrand && m !== nextMonth && rs[i]?.plan.status !== "locked" ? null : rs[i]])));
     });
     return () => {
       cancelled = true;
     };
   }, [brandId, prev2Month, prevMonth, month, nextMonth, forBrand]);
 
+  // Kế hoạch THÁNG SAU (Target Live + lịch Booking Creator) cho brand xem cả khi ops chưa Chốt (user quyết 29/10) — file xuất gửi trước họp cần có; các tháng trước/hiện tại vẫn chỉ lấy khi đã Chốt.
   // Affiliate (tab Affiliate, 0102/0155): phiên creator tháng report (trang 8) + lịch creator tháng sau (trang 9). Bảng nhỏ, đọc
   // thẳng như Kế Hoạch Tháng, không vào bản chụp. Role brand chỉ thấy tháng ops đã Chốt (RLS 0155) ⇒ không có dòng thì khối ẩn.
   const [affiliate, setAffiliate] = useState<{ cur: AffiliateActualEntry[]; next: AffiliateActualEntry[]; nextMeta: AffiliatePlanMonth | null }>({ cur: [], next: [], nextMeta: null });
@@ -181,7 +182,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
       fetchAffiliateActuals(brandId, `${nextMonth}-01`).catch(() => []),
       fetchAffiliatePlanMonth(brandId, `${nextMonth}-01`).catch(() => null)
     ]).then(([cur, next, nextMeta]) => {
-      if (!cancelled) setAffiliate({ cur, next: forBrand && !nextMeta?.publishedAt ? [] : next, nextMeta });
+      if (!cancelled) setAffiliate({ cur, next, nextMeta });
     });
     return () => {
       cancelled = true;
@@ -1605,6 +1606,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             planRows={creatorPlan.map((r) => ({ date: r.date, creator: r.creator, camp: r.campName, timeline: r.timeline, hours: r.hours, target: r.target, budgetAds: r.budgetAds, ref: r.bestGmvPerHour }))}
             cur={{ sessions: creatorSum.sessions, hours: creatorSum.hours, gmv: creatorSum.gmv, gmvPerHour: creatorRates(creatorSum).gmvPerHour, roas: creatorRates(creatorSum).roas }}
             refByCreator={creatorBest}
+            canEdit={canManage}
             draftNote={canManage && creatorPlan.length > 0 && !affiliate.nextMeta?.publishedAt ? "Kế hoạch Affiliate tháng sau còn là nháp — brand chỉ thấy bảng này sau khi Chốt ở tab Affiliate." : undefined}
           />
           {pageInsight("next")}
