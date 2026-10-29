@@ -27,7 +27,10 @@ const SHOPEE = PLATFORM_PROFILES.Shopee.id;
 
 // Bản 3 (07/10): đổi tên chỉ số theo đúng cột file Shopee (Viewers, ABS, Sales (Confirmed Order)…) + thêm GPM/PCU/Avg. Viewing Duration/Engagement.
 // Bản 4 (27/10): khung camp theo Kế Hoạch Tháng + `campDays`; nhận xét/ghi chú tách bản brand và ghi chú chỉ ops.
-export const SHOPEE_SNAPSHOT_VERSION = 4;
+// Bản 5 (29/10, report Shopee theo khung trang của TikTok): phiên mang thêm ATC/Engaged/Comments/Items/Avg. Viewing Duration,
+// `history` = Live List 3 tháng trước (Key Metrics nhiều tháng + tách nguyên nhân), `planSlots` = ca Kế Hoạch Tháng có target.
+// Bản 6 (29/10 tối): `prevProducts` = Product List tháng trước (hạng + Sales) cho cột hạng của bảng Top sản phẩm như TikTok.
+export const SHOPEE_SNAPSHOT_VERSION = 6;
 
 export interface ShopeeHeadline {
   gmv: number; // doanh số đặt
@@ -91,9 +94,17 @@ export interface ShopeeReportSnapshot {
   prev: ShopeeHeadline | null;
   days: ShopeeDay[];
   noLiveDays: string[];
-  streams: { date: string; time: string; hours: number; gmv: number; confirmed: number; orders: number; viewers: number }[];
+  streams: ShopeeStreamRow[];
+  /** Live List các tháng TRƯỚC (cũ → mới, tối đa 3 tháng; bản 5) — mỗi tháng kèm khung camp của chính tháng đó. */
+  history?: ShopeeHistoryMonth[];
+  /** Ca của Kế Hoạch Tháng Shopee tháng này (bản 5) — target từng loại ngày. null = chưa có kế hoạch; thiếu = bản chụp cũ. */
+  planSlots?: { date: string; hours: number; target: number }[] | null;
+  /** Target tháng + trạng thái Kế Hoạch Tháng Shopee (bản 5). */
+  planTarget?: { total: number; locked: boolean } | null;
   overview: ShopeeOverview | null;
   products: { top: ShopeeProduct[]; count: number; withSales: number; totalSales: number; top3Share: number | null };
+  /** Product List tháng trước, xếp theo Sales(Placed Order) (bản 6; tối đa 50 dòng). null = tháng trước chưa có file; thiếu = bản chụp cũ. */
+  prevProducts?: { name: string; rank: number; sales: number }[] | null;
   slots: ShopeeSlotRow[];
   camps: ShopeeCampRow[];
   /** Ngày campaign của tháng → loại (bản 4; ngày Daily không có trong map). Thiếu = bản chụp cũ, đọc lịch cố định. */
@@ -112,6 +123,28 @@ export interface ShopeeReportSnapshot {
   appGmv: number;
   insights: Record<ShopeeSection, SectionInsight | null>;
   notes: string[];
+}
+
+/** Một phiên trong Live List (giờ VN). Trường từ `items` trở đi có từ bản 5 — bản chụp cũ thiếu ⇒ chỉ số đó không hiện. */
+export interface ShopeeStreamRow {
+  date: string;
+  time: string;
+  hours: number;
+  gmv: number;
+  confirmed: number;
+  orders: number;
+  viewers: number;
+  items?: number;
+  atc?: number;
+  engaged?: number;
+  comments?: number;
+  avgViewSec?: number;
+}
+
+export interface ShopeeHistoryMonth {
+  month: string;
+  campDays: Record<string, "dday" | "midmonth" | "payday">;
+  streams: ShopeeStreamRow[];
 }
 
 export type ShopeeSection = "summary" | "daily" | "funnel" | "schedule" | "people" | "products";
@@ -162,6 +195,12 @@ export interface ShopeeSnapshotInput {
   ads?: ShopeeAdsStats | null;
   /** Khung camp của Kế Hoạch Tháng Shopee (effectiveCamp) — thiếu/rỗng = lịch cố định. */
   campOverrides?: CampOverrides | null;
+  /** Live List các tháng trước (cũ → mới) + khung camp của từng tháng. */
+  history?: { month: string; streams: ShopeeStream[]; campOverrides?: CampOverrides | null }[];
+  /** Product List tháng trước (null = chưa có file). */
+  prevProducts?: ShopeeProduct[] | null;
+  /** Ca Kế Hoạch Tháng Shopee của tháng (null = chưa có kế hoạch). */
+  plan?: { targetGmv: number; locked: boolean; slots: { date: string; startTime: string; endTime: string; targetGmv: number }[] } | null;
   computedAt?: string;
 }
 type ShopeeSnapshot_Files = ShopeeReportSnapshot["files"];
@@ -192,6 +231,41 @@ export function shopeeHeadline(streams: ShopeeStream[], days: ShopeeDay[], overv
     lastDay: days.length ? days[days.length - 1].date : streams.length ? [...streams].sort((a, b) => a.date.localeCompare(b.date)).at(-1)!.date : null
   };
 }
+
+export function streamRow(s: ShopeeStream): ShopeeStreamRow {
+  return {
+    date: s.date,
+    time: s.time,
+    hours: hoursOf(s),
+    gmv: s.salesPlaced,
+    confirmed: s.salesConfirmed,
+    orders: s.ordersPlaced,
+    viewers: s.viewers,
+    items: s.itemsPlaced,
+    atc: s.atc,
+    engaged: s.engaged,
+    comments: s.comments,
+    avgViewSec: s.avgViewSec
+  };
+}
+
+/** Ngày campaign của tháng → loại, theo khung camp (thiếu khung = lịch cố định). Ngày Daily không có trong map. */
+export function campDaysOf(month: string, overrides?: CampOverrides | null): Record<string, "dday" | "midmonth" | "payday"> {
+  const out: Record<string, "dday" | "midmonth" | "payday"> = {};
+  for (const d of monthDays(month)) {
+    const b = resolveCampBucketType(d, overrides ?? undefined);
+    if (b !== "daily") out[d] = b;
+  }
+  return out;
+}
+
+const slotHoursOf = (startTime: string, endTime: string) => {
+  const [sh, sm] = startTime.split(":").map(Number);
+  const [eh, em] = endTime.split(":").map(Number);
+  let m = eh * 60 + em - (sh * 60 + sm);
+  if (m <= 0) m += 1440;
+  return m / 60;
+};
 
 const fmtM = (v: number) => fmtVndShort(v);
 const pct = (v: number, d = 1) => `${v.toLocaleString("vi-VN", { maximumFractionDigits: d })}%`;
@@ -238,11 +312,7 @@ export function buildShopeeSnapshot(input: ShopeeSnapshotInput): ShopeeReportSna
   // ---- loại ngày camp: khung của Kế Hoạch Tháng Shopee, không có thì lịch cố định (cùng hàm với report TikTok)
   const overrides = input.campOverrides ?? undefined;
   const bucketOf = (date: string): ShopeeCampRow["key"] => resolveCampBucketType(date, overrides);
-  const campDays: Record<string, "dday" | "midmonth" | "payday"> = {};
-  for (const d of monthDays(month)) {
-    const b = bucketOf(d);
-    if (b !== "daily") campDays[d] = b;
-  }
+  const campDays = campDaysOf(month, overrides);
   const campFromPlan = !!overrides && Object.values(overrides).some((r) => r?.start && r?.end);
   const campKeys: ShopeeCampRow["key"][] = ["daily", "dday", "midmonth", "payday"];
   const totalGmvForShare = streams.length > 0 ? sum(streams, (s) => s.salesPlaced) : headline.gmv;
@@ -292,9 +362,15 @@ export function buildShopeeSnapshot(input: ShopeeSnapshotInput): ShopeeReportSna
     prev,
     days,
     noLiveDays,
-    streams: streams.map((s) => ({ date: s.date, time: s.time, hours: hoursOf(s), gmv: s.salesPlaced, confirmed: s.salesConfirmed, orders: s.ordersPlaced, viewers: s.viewers })),
+    streams: streams.map(streamRow),
+    history: (input.history ?? []).map((h) => ({ month: h.month, campDays: campDaysOf(h.month, h.campOverrides), streams: h.streams.map(streamRow) })),
+    planSlots: input.plan ? input.plan.slots.map((x) => ({ date: x.date, hours: slotHoursOf(x.startTime, x.endTime), target: x.targetGmv || 0 })) : null,
+    planTarget: input.plan ? { total: input.plan.targetGmv, locked: input.plan.locked } : null,
     overview,
     products: productInfo,
+    prevProducts: input.prevProducts
+      ? [...input.prevProducts].filter((x) => x.salesPlaced > 0).sort((a, b) => b.salesPlaced - a.salesPlaced).slice(0, 50).map((x, i) => ({ name: x.name, rank: i + 1, sales: x.salesPlaced }))
+      : null,
     slots,
     camps,
     campDays,

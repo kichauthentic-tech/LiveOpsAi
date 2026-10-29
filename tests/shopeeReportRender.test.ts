@@ -13,11 +13,17 @@ const { buildShopeeSnapshot } = await import("../src/lib/report/shopeeSnapshot")
 const { parseDataRawExcel } = await import("../src/lib/dataraw/parseDataRawExcel");
 const { readShopeeDays, readShopeeOverview, readShopeeProducts, readShopeeStreams } = await import("../src/lib/dataraw/shopeeFiles");
 const { ShopeeMonthlyReportTabs } = await import("../src/components/brand-workspace/ShopeeMonthlyReportTabs");
+const { ToastProvider } = await import("../src/hooks/useToast");
 import type { LiveSession } from "../src/types";
 
-const render = (snapshot: ReturnType<typeof buildShopeeSnapshot>, canManage = true) =>
+// Khung trang (29/10): mọi trang đều có trong DOM (trang không chọn chỉ display:none) nên SSR thấy đủ.
+const render = (snapshot: ReturnType<typeof buildShopeeSnapshot>, canManage = true, liveSessions: LiveSession[] = [], ads = true) =>
   renderToStaticMarkup(
-    React.createElement(ShopeeMonthlyReportTabs, { brandId: "vera", brandName: "VERA", month: snapshot.month, snapshot, report: null, canManage, onReportChange: () => {} })
+    React.createElement(
+      ToastProvider,
+      null,
+      React.createElement(ShopeeMonthlyReportTabs, { brandId: "vera", brandName: "VERA", month: snapshot.month, snapshot, report: null, canManage, onReportChange: () => {}, liveSessions, scope: { ads, affiliate: false, inhouseLive: false } })
+    )
   );
 
 const noBadText = (html: string) => {
@@ -32,12 +38,18 @@ describe("Report Shopee — trạng thái rỗng", () => {
     });
     const html = render(s);
     noBadText(html);
-    expect(html).toContain("Chưa có file theo ngày");
-    expect(html).toContain("Chưa có file overview");
     expect(html).toContain("Chưa có file Live List");
+    expect(html).toContain("Chưa có file overview");
     expect(html).toContain("Chưa có file Product List");
-    expect(html).toContain("Cách tính");
-    expect(html).toContain("Chỉ ops thấy — cần xác nhận trước khi phát hành");
+    expect(html).toContain("Chỉ ops thấy");
+    // cùng khung trang với TikTok: thanh trang + trang section#mr-* (Đơn huỷ ở vị trí trang NMV)
+    for (const id of ["summary", "keymetrics", "nmv", "why", "products", "people", "ads", "next"]) expect(html).toContain(`id="mr-${id}"`);
+    // brand: trang không có số (Đơn huỷ, Sản phẩm, Ads) bị ẩn khỏi thanh trang; Host luôn có như TikTok
+    const brand = render(s, false);
+    for (const id of ["nmv", "products", "ads"]) expect(brand).not.toContain(`id="mr-${id}"`);
+    expect(brand).toContain(`id="mr-people"`);
+    // Ads ngoài phạm vi dịch vụ (0190) ⇒ không có trang Quảng cáo kể cả với ops
+    expect(render(s, true, [], false)).not.toContain(`id="mr-ads"`);
   });
 });
 
@@ -78,24 +90,29 @@ describe.skipIf(!haveReal)("Report Shopee — 4 file thật VERA T9", () => {
     expect(s.camps.map((c) => c.key)).toEqual(["daily", "dday", "midmonth", "payday"]);
     console.log(s.notes.join("\n"));
     expect(s.notes.join(" ")).toMatch(/29M so với/);
-    const html = render(s);
+    const html = render(s, true, sessions);
     noBadText(html);
-    for (const t of ["1", "2", "3", "4", "5", "6"]) expect(html).toContain(`>${t}</span>`);
+    for (const t of ["Tổng quan", "Key Metrics", "Đơn huỷ", "Nguyên nhân", "Sản phẩm", "Host", "Ads", "Tháng sau"]) expect(html).toContain(`</span>${t}</button>`);
     expect(html).toContain("Nguồn traffic của live");
+    expect(html).toContain("Phễu chuyển đổi của live");
     expect(html).toContain("Others");
-    expect(html).toContain("Theo khung giờ");
-    expect(html).toContain("Theo loại ngày");
+    expect(html).toContain("GMV/giờ theo khung giờ");
+    // Trang dùng chung của TikTok: bảng Kết quả so với Target; T9 chưa có kế hoạch tháng Shopee ⇒ không có bảng kế hoạch
+    expect(html).toContain("Kết quả so với Target");
+    expect(html).toContain("chưa có Target nên chưa đánh giá được kết quả");
+    expect(html).not.toContain("Kế hoạch tháng 9 theo loại ngày");
+    expect(html).toContain("Top phiên theo GMV".replace("Top", "Top 10"));
+    expect(html).toContain("Insight tổng hợp");
     expect(html).toContain("COMBO ƯU ĐÃI");
     expect(html).toContain("Mia");
-    expect(html).toContain("02/09");
     expect(html).toContain("2.232");
     // brand (canManage=false) không thấy nút Sửa Insight
-    expect(render(s, false)).not.toContain("Sửa Insight");
+    expect(render(s, false, sessions)).not.toContain("Sửa insight");
     // Audit 27/10: bản brand không có chữ nội bộ (ca trong app, số tạm, đối soát, Dữ Liệu Gốc).
     // Chữ hiển thị (bỏ tooltip title= của từ điển chỉ số, dùng chung toàn app).
-    const brandHtml = render(s, false).replace(/ title="[^"]*"/g, "");
+    const brandHtml = render(s, false, sessions).replace(/ title="[^"]*"/g, "");
     for (const w of ["ca trong app", "Lịch ca trong app", "số tạm", "đối soát", "Dữ Liệu Gốc", "Chỉ ops thấy", ">Ca<"]) expect(brandHtml).not.toContain(w);
     expect(brandHtml).toContain(">Phiên<");
-    expect(html).toContain("Sửa Insight");
+    expect(html).toContain("Sửa insight");
   });
 });

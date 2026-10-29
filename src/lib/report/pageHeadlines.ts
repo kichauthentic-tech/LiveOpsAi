@@ -11,12 +11,15 @@ export interface SummaryHeadlineInput {
   /** Target LIVE GMV tới nay (tháng còn dở) hoặc cả tháng; null = chưa có Target. */
   liveTarget: number | null;
   days: { label: string; target: number | null; actual: number }[];
+  /** Tên chỉ số trong câu — report Shopee dùng "GMV" (Sales(Placed Order)), không mượn tên TikTok. */
+  gmvLabel?: string;
 }
 
 export function summaryHeadline(i: SummaryHeadlineInput): string {
-  if (i.liveTarget == null || i.liveTarget <= 0) return `LIVE GMV ${fmtVndShort(i.liveActual)}; tháng này chưa có Target LIVE nên chưa đánh giá được kết quả.`;
+  const g = i.gmvLabel ?? "LIVE GMV";
+  if (i.liveTarget == null || i.liveTarget <= 0) return `${g} ${fmtVndShort(i.liveActual)}; tháng này chưa có Target${i.gmvLabel ? "" : " LIVE"} nên chưa đánh giá được kết quả.`;
   const p = (i.liveActual / i.liveTarget) * 100;
-  const head = `LIVE GMV đạt ${pct(p)} Target (${fmtVndShort(i.liveActual)} so với ${fmtVndShort(i.liveTarget)})`;
+  const head = `${g} đạt ${pct(p)} Target (${fmtVndShort(i.liveActual)} so với ${fmtVndShort(i.liveTarget)})`;
   const withT = i.days.filter((d) => d.target != null && d.target > 0).map((d) => ({ label: d.label, p: (d.actual / d.target!) * 100 }));
   if (withT.length === 0) return `${head}.`;
   const worst = [...withT].sort((a, b) => a.p - b.p)[0];

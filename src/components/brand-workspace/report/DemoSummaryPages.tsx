@@ -54,26 +54,29 @@ export interface SummaryDemoProps {
   actualHours: Partial<Record<CampDayBucket, number>>;
   /** Target của ca kế hoạch đã huỷ — nằm trong Target tháng nhưng không nằm trong bảng kế hoạch theo loại ngày. */
   cancelledTarget?: number;
+  /** Tên chỉ số doanh số — mặc định LIVE GMV (TikTok); report Shopee truyền "GMV" (Sales(Placed Order)). */
+  gmvLabel?: string;
   insight: React.ReactNode;
 }
 
 export const SummaryDemoPage: React.FC<SummaryDemoProps> = (p) => {
   const mm = p.month.slice(5);
+  const gl = p.gmvLabel ?? METRIC.liveGmv;
   const all = p.score.find((r) => r.key === "all");
   const base = all ? all.targetToDate ?? all.target : null;
   const liveTarget = p.partial ? "Target tới nay" : "Target tháng";
   const shopPct = p.shop && p.shop.target > 0 ? (p.shop.actual / p.shop.target) * 100 : null;
   const kpis: DemoKpi[] = [
     {
-      lab: p.partial ? `${METRIC.liveGmv} · tới ${p.curEndDay}/${mm}` : `${METRIC.liveGmv} · tháng ${Number(mm)}`,
+      lab: p.partial ? `${gl} · tới ${p.curEndDay}/${mm}` : `${gl} · tháng ${Number(mm)}`,
       val: amt(p.liveActual),
-      note: base ? <><span className={`pc ${pcTone((p.liveActual / base) * 100)}`}>{pct1((p.liveActual / base) * 100)}</span> {liveTarget} {amt(base)}</> : "chưa có Target LIVE"
+      note: base ? <><span className={`pc ${pcTone((p.liveActual / base) * 100)}`}>{pct1((p.liveActual / base) * 100)}</span> {liveTarget} {amt(base)}</> : (p.gmvLabel ? "chưa có Target" : "chưa có Target LIVE")
     }
   ];
   if (p.partial && p.liveProjected != null) {
     const tm = p.liveTargetMonth;
     kpis.push({
-      lab: `Dự báo cuối tháng · ${METRIC.liveGmv}`,
+      lab: `Dự báo cuối tháng · ${gl}`,
       val: amt(p.liveProjected),
       note: tm ? <><span className={`pc ${pcTone((p.liveProjected / tm) * 100)}`}>{pct1((p.liveProjected / tm) * 100)}</span> Target tháng {amt(tm)} · {p.liveProjected - tm >= 0 ? "+" : ""}{amt(p.liveProjected - tm)}</> : undefined
     });
@@ -118,7 +121,7 @@ export const SummaryDemoPage: React.FC<SummaryDemoProps> = (p) => {
   }
 
   // bảng Kết quả so với Target
-  const label = (k: ScoreRow["key"]) => (k === "all" ? `${METRIC.liveGmv} YFB` : k === "shop" ? `KPI ${METRIC.totalGmv}` : `${DAY_TYPE_SHORT[k as CampDayBucket]}${p.spans[k as CampDayBucket] ? ` · ${p.spans[k as CampDayBucket]}` : ""}`);
+  const label = (k: ScoreRow["key"]) => (k === "all" ? `${gl} YFB` : k === "shop" ? `KPI ${METRIC.totalGmv}` : `${DAY_TYPE_SHORT[k as CampDayBucket]}${p.spans[k as CampDayBucket] ? ` · ${p.spans[k as CampDayBucket]}` : ""}`);
   const scoreRows = p.score.map((r) => {
     const t = r.targetToDate ?? r.target;
     const d = t != null ? r.actual - t : null;
@@ -168,11 +171,11 @@ export const SummaryDemoPage: React.FC<SummaryDemoProps> = (p) => {
       <DemoKpis items={kpis} />
       <DemoStack>
         {bridgeHtml && base != null && (
-          <DemoPanel title={`Chênh lệch ${METRIC.liveGmv} so với ${liveTarget}, theo loại ngày`} sub={`Từ ${liveTarget} (${amt(base)}) đến thực tế (${amt(p.liveActual)}).`}>
+          <DemoPanel title={`Chênh lệch ${gl} so với ${liveTarget}, theo loại ngày`} sub={`Từ ${liveTarget} (${amt(base)}) đến thực tế (${amt(p.liveActual)}).`}>
             <Html html={bridgeHtml} />
           </DemoPanel>
         )}
-        <DemoPanel title="Kết quả so với Target" sub={`Target theo Kế Hoạch Tháng đã chốt; % tính trên Target ${p.partial ? "luỹ kế tới nay" : "tháng"}.${p.shop?.throughDay && p.shop.throughDay !== p.curEndDay ? ` ${METRIC.liveGmv} tính tới ${p.curEndDay}/${mm}, KPI ${METRIC.totalGmv} tính tới ${p.shop.throughDay}/${mm} (ngày cuối file Shop Analytics).` : ""}`}>
+        <DemoPanel title="Kết quả so với Target" sub={`Target theo Kế Hoạch Tháng đã chốt; % tính trên Target ${p.partial ? "luỹ kế tới nay" : "tháng"}.${p.shop?.throughDay && p.shop.throughDay !== p.curEndDay ? ` ${gl} tính tới ${p.curEndDay}/${mm}, KPI ${METRIC.totalGmv} tính tới ${p.shop.throughDay}/${mm} (ngày cuối file Shop Analytics).` : ""}`}>
           <DemoTable html={tbl(["", "Thực tế", p.partial ? "Target tới nay" : "Target", "Chênh lệch", "% Target"], scoreRows)} />
         </DemoPanel>
       </DemoStack>

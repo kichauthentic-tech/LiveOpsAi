@@ -59,7 +59,7 @@ interface ReportViewProps {
   scope: ReportScope;
 }
 // Khung hiển thị report của từng sàn (cùng khoá với REPORT_ENGINES) — thêm sàn mà quên khung là lỗi compile.
-// pdf: khung có các trang `section#mr-*` để file PDF tách từng trang (Shopee chưa có).
+// pdf: khung có các trang `section#mr-*` để file PDF tách từng trang (Shopee có từ 29/10, cùng khung trang với TikTok).
 const REPORT_VIEWS: Record<ReportPlatform, { preload: () => void; pdf: boolean; Render: React.FC<ReportViewProps> }> = {
   TikTok: {
     preload: () => void MonthlyReportTabs.preload(),
@@ -68,8 +68,8 @@ const REPORT_VIEWS: Record<ReportPlatform, { preload: () => void; pdf: boolean; 
   },
   Shopee: {
     preload: () => void ShopeeMonthlyReportTabs.preload(),
-    pdf: false,
-    Render: (p) => <ShopeeMonthlyReportTabs brandId={p.brandId} brandName={p.brandName} month={p.month} snapshot={p.snapshot as ShopeeReportSnapshot} report={p.report} canManage={p.canManage} onReportChange={p.onReportChange} />
+    pdf: true,
+    Render: (p) => <ShopeeMonthlyReportTabs brandId={p.brandId} brandName={p.brandName} month={p.month} snapshot={p.snapshot as ShopeeReportSnapshot} report={p.report} canManage={p.canManage} onReportChange={p.onReportChange} liveSessions={p.liveSessions} scope={p.scope} showAll={p.forBrand} />
   }
 };
 import { MonthPicker } from "../common/MonthPicker";

@@ -32,7 +32,11 @@ export interface ProductsPageData {
   promo: PromotionMonthSlice | null;
   prevMonthNo: number;
   points: ScatterPoint[];
+  /** Report Shopee: Product List không có Product Impressions/Seller LIVE ⇒ bảng dùng Orders/Product Clicks, biểu đồ = tỷ trọng Product Clicks × Orders/Product Clicks. */
+  variant?: "shopee";
 }
+
+const SHOPEE_CONV = `${METRIC.orders}/Product Clicks`;
 
 /** Bốn ô KPI đầu trang (đúng thứ tự demo): Top 1 SKU · Độ tập trung SKU · Quà tặng kèm · Tiền giảm giá khuyến mãi. */
 export function productsKpis(d: ProductsPageData): PageMetric[] {
@@ -62,7 +66,7 @@ const medianOf = (xs: number[]) => {
 };
 const pctAxis = (v: number) => dec(v, 1) + "%";
 
-export function skuScatterHtml(points: ScatterPoint[]): string {
+export function skuScatterHtml(points: ScatterPoint[], axes: { xl: string; yl: string } = { xl: METRIC.productCtr, yl: METRIC.ctor }): string {
   const xs = points.map((p) => p.x);
   const ys = points.map((p) => p.y);
   // Trục có đúng k khoảng chia tròn (bước là bội của 0,1) bao trùm dữ liệu.
@@ -79,7 +83,7 @@ export function skuScatterHtml(points: ScatterPoint[]): string {
   };
   const [x0, x1] = nice(xs, 6);
   const [y0, y1] = nice(ys, 4);
-  const o = { x0, x1, kx: 6, ky: 4, y0, y1, xf: pctAxis, yf: pctAxis, xl: METRIC.productCtr, yl: METRIC.ctor, vx: medianOf(xs), vy: medianOf(ys), h: 340 };
+  const o = { x0, x1, kx: 6, ky: 4, y0, y1, xf: pctAxis, yf: pctAxis, xl: axes.xl, yl: axes.yl, vx: medianOf(xs), vy: medianOf(ys), h: 340 };
   // Toạ độ trong SVG (khung 640×340, lề như hàm scatter) để nhãn điểm sát nhau chuyển xuống dưới.
   const sx = (v: number) => 48 + ((v - x0) / (x1 - x0)) * (640 - 48 - 14);
   const sy = (v: number) => 14 + ((y1 - v) / (y1 - y0)) * (340 - 14 - 42);
@@ -95,7 +99,7 @@ export function skuScatterHtml(points: ScatterPoint[]): string {
       const a = px > 520 ? "end" : px < 110 ? "start" : "middle";
       return { x: p.x, y: p.y, r: Math.max(r, 3), color: TONE_VAR[p.tone], l: esc(chartSkuLabel(p.label)), dx: a === "end" ? -4 : a === "start" ? 4 : 0, dy: clash ? r + 13 : -r - 5, a };
     });
-  return scatter(pts, { ...o, quad: [{ x: 56, y: 28, t: `${METRIC.productCtr} thấp · ${METRIC.ctor} cao` }, { x: 628, y: 292, t: `${METRIC.productCtr} cao · ${METRIC.ctor} thấp`, a: "end" }] });
+  return scatter(pts, { ...o, quad: [{ x: 56, y: 28, t: `${axes.xl} thấp · ${axes.yl} cao` }, { x: 628, y: 292, t: `${axes.xl} cao · ${axes.yl} thấp`, a: "end" }] });
 }
 
 // ---- Bảng Top SKU ----
@@ -116,8 +120,24 @@ const thumbCell = (name: string, src: string | undefined, editable: boolean) => 
   return { t: `<div class="thumb" data-n="${esc(name)}"${editable ? ' tabindex="0" role="button"' : ""} aria-label="${editable ? "Tải ảnh cho " : "Ảnh "}${esc(name)}">${inner}${editable ? '<input type="file" accept="image/*" hidden>' : ""}</div>`, c: "imgc" };
 };
 
-export function skuTableHtml(sku: SkuMoves, images: (name: string) => string | undefined, editable: boolean): string {
+export function skuTableHtml(sku: SkuMoves, images: (name: string) => string | undefined, editable: boolean, variant?: "shopee"): string {
   const prevLabel = "so với tháng trước";
+  if (variant === "shopee") {
+    return tbl(
+      ["Ảnh sản phẩm", `Hạng · ${prevLabel}`, "Sản phẩm", METRIC.gmv, sku.perDay ? "± GMV/ngày" : "± GMV", "Orders", METRIC.itemsSoldShopee, SHOPEE_CONV],
+      sku.rows.map((r) => [
+        thumbCell(r.name, images(r.name), editable),
+        { t: rankCell(r.rank, r.prevRank), c: "hm" },
+        { t: esc(disp(r.name)), c: "w" },
+        fmtVndShort(r.gmv),
+        r.gmvChange == null ? { t: "—", c: "hm" } : { t: signed(r.gmvChange), c: "hm", s: heat(r.gmvChange, 60) + (Math.abs(r.gmvChange) >= 30 ? ";font-weight:800" : "") },
+        fmtInt(r.orders),
+        r.itemsSold != null ? fmtInt(r.itemsSold) : "—",
+        r.ctor != null ? fmtPct(r.ctor) : "—"
+      ]),
+      [2]
+    );
+  }
   return tbl(
     ["Ảnh sản phẩm", `Hạng · ${prevLabel}`, "Sản phẩm", "GMV", sku.perDay ? "± GMV/ngày" : "± GMV", "Tỷ trọng Seller LIVE", "Orders", "Items sold", METRIC.productCtr, METRIC.ctor],
     sku.rows.map((r) => [
@@ -155,6 +175,7 @@ export const ProductsPageBody: React.FC<{
 }> = ({ data, images, canManage, onSaveImage, curDaysLabel, prevMonthLabel, empty }) => {
   const [status, setStatus] = useState("");
   const sku = data.sku;
+  const shopee = data.variant === "shopee";
   const giftHas = data.giftByMonth.some((g) => g && g.giftPerOrder != null);
   const put = async (name: string, file: File | undefined | null) => {
     if (!file || !file.type.startsWith("image/")) {
@@ -187,9 +208,9 @@ export const ProductsPageBody: React.FC<{
       <div className="stk">
         {data.points.length >= 3 && (
           <div className="pn">
-            <div className="pnh">{`${METRIC.productCtr} và ${METRIC.ctor} của Top ${data.points.length} SKU`}</div>
-            <div className="pns">{`Kích thước điểm = GMV · màu = thay đổi hạng so với tháng ${data.prevMonthNo} · đường nét đứt = trung vị Top ${data.points.length}.`}</div>
-            <div dangerouslySetInnerHTML={{ __html: skuScatterHtml(data.points) }} />
+            <div className="pnh">{shopee ? `Tỷ trọng Product Clicks và ${SHOPEE_CONV} của Top ${data.points.length} sản phẩm` : `${METRIC.productCtr} và ${METRIC.ctor} của Top ${data.points.length} SKU`}</div>
+            <div className="pns">{`${shopee ? "Tỷ trọng Product Clicks = Product Clicks của sản phẩm ÷ tổng của nhóm · " : ""}Kích thước điểm = GMV · màu = thay đổi hạng so với tháng ${data.prevMonthNo} · đường nét đứt = trung vị Top ${data.points.length}.`}</div>
+            <div dangerouslySetInnerHTML={{ __html: shopee ? skuScatterHtml(data.points, { xl: "Tỷ trọng Product Clicks", yl: SHOPEE_CONV }) : skuScatterHtml(data.points) }} />
             <div className="legend">
               <span><i style={{ background: "var(--green)" }} />tăng hạng</span>
               <span><i style={{ background: "var(--red)" }} />giảm hạng</span>
@@ -217,7 +238,7 @@ export const ProductsPageBody: React.FC<{
       {sku ? (
         <div className="pn">
           <div className="pnh">{`Top ${sku.rows.length} SKU theo GMV`}</div>
-          <div className="pns">{`Nguồn file Sản Phẩm${curDaysLabel} · hạng so với tháng ${data.prevMonthNo}${sku.perDay ? " · % tính trên GMV mỗi ngày" : ""}.`}</div>
+          <div className="pns">{`Nguồn file ${shopee ? "Product List của Shopee Live · GMV = Sales(Placed Order)" : "Sản Phẩm"}${curDaysLabel} · hạng so với tháng ${data.prevMonthNo}${sku.perDay ? " · % tính trên GMV mỗi ngày" : ""}.`}</div>
           <div
             className="tw"
             onClick={(e) => {
@@ -256,7 +277,7 @@ export const ProductsPageBody: React.FC<{
               }
             }}
           >
-            <table dangerouslySetInnerHTML={{ __html: skuTableHtml(sku, images, canManage) }} />
+            <table dangerouslySetInnerHTML={{ __html: skuTableHtml(sku, images, canManage, data.variant) }} />
           </div>
           {canManage && (
             <div className="legend">

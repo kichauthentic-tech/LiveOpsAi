@@ -156,7 +156,7 @@ describe("Ads + xu (bản chụp bản 2, 0142)", () => {
   const ads = { shopName: "VERA Official Store", shopId: "13346195", campaigns: [{ name: "LIVESTREAM ADS", id: "1", status: "Ongoing", objective: "", budget: 0, views: 81460, orders: 204, conversionPct: 0.25, gmv: 70_273_048, expense: 2_300_302, roas: 30.55 }], expense: 2_300_302, gmv: 70_273_048, orders: 204, views: 81460, roas: 70_273_048 / 2_300_302, costPerOrder: 2_300_302 / 204 };
   test("có file Ads: bản chụp giữ chi phí/ROAS/chi phí mỗi đơn, nhận xét phần 1 nói Ads", () => {
     const s2 = build({ ads, overview: overview({ coinsClaimed: 499_200, voucherClaimed: 12, specialVoucherClaimed: 7 }) });
-    expect(s2.version).toBe(4);
+    expect(s2.version).toBe(6);
     expect(s2.ads).toMatchObject({ expense: 2_300_302, gmv: 70_273_048, orders: 204, campaigns: 1, shopName: "VERA Official Store" });
     expect(s2.ads!.roas).toBeCloseTo(30.55, 1);
     expect(s2.promo).toEqual({ coins: 499_200, vouchers: 12, liveVouchers: 7 });
