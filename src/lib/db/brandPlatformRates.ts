@@ -8,6 +8,9 @@ interface DbBrandPlatformRate {
   rate_per_hour: number;
   return_rate: number;
   commission_rate?: number | null;
+  scope_ads?: boolean | null;
+  scope_affiliate?: boolean | null;
+  has_inhouse_live?: boolean | null;
 }
 
 function fromDb(row: DbBrandPlatformRate): BrandPlatformRate {
@@ -17,7 +20,10 @@ function fromDb(row: DbBrandPlatformRate): BrandPlatformRate {
     platform: row.platform,
     ratePerHour: row.rate_per_hour,
     returnRate: row.return_rate,
-    commissionRate: row.commission_rate ?? undefined
+    commissionRate: row.commission_rate ?? undefined,
+    scopeAds: row.scope_ads ?? undefined,
+    scopeAffiliate: row.scope_affiliate ?? undefined,
+    hasInhouseLive: row.has_inhouse_live ?? undefined
   };
 }
 
@@ -75,3 +81,24 @@ export async function upsertBrandPlatformCommissionRate(
   return fromDb(data as DbBrandPlatformRate);
 }
 
+
+export type ServiceScopePatch = Partial<Pick<BrandPlatformRate, "scopeAds" | "scopeAffiliate" | "hasInhouseLive">>;
+
+// Phạm vi dịch vụ (0190). Payload chỉ có cột được bật/tắt nên on-conflict-update không đụng giá/% hoàn đang có.
+export async function upsertBrandServiceScope(
+  brandId: string,
+  platform: BrandPlatformRate["platform"],
+  patch: ServiceScopePatch
+): Promise<BrandPlatformRate> {
+  const row: Record<string, unknown> = { brand_id: brandId, platform };
+  if (patch.scopeAds !== undefined) row.scope_ads = patch.scopeAds;
+  if (patch.scopeAffiliate !== undefined) row.scope_affiliate = patch.scopeAffiliate;
+  if (patch.hasInhouseLive !== undefined) row.has_inhouse_live = patch.hasInhouseLive;
+  const { data, error } = await supabase
+    .from("brand_platform_rates")
+    .upsert(row, { onConflict: "brand_id,platform" })
+    .select()
+    .single();
+  if (error) throw error;
+  return fromDb(data as DbBrandPlatformRate);
+}

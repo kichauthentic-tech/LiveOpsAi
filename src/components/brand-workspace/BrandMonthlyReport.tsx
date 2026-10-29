@@ -55,6 +55,8 @@ interface ReportViewProps {
   onReportChange: (r: BrandMonthlyReportType) => void;
   liveSessions: LiveSession[];
   shiftSlots?: ShiftSlot[];
+  /** Phạm vi dịch vụ (0190) đọc SỐNG từ CRM — không lưu vào bản chụp, đổi phạm vi không cần Cập nhật số liệu. */
+  scope: ReportScope;
 }
 // Khung hiển thị report của từng sàn (cùng khoá với REPORT_ENGINES) — thêm sàn mà quên khung là lỗi compile.
 // pdf: khung có các trang `section#mr-*` để file PDF tách từng trang (Shopee chưa có).
@@ -62,7 +64,7 @@ const REPORT_VIEWS: Record<ReportPlatform, { preload: () => void; pdf: boolean; 
   TikTok: {
     preload: () => void MonthlyReportTabs.preload(),
     pdf: true,
-    Render: (p) => <MonthlyReportTabs brandId={p.brandId} brandName={p.brandName} month={p.month} snapshot={p.snapshot as MonthlyReportSnapshot} liveSessions={p.liveSessions} shiftSlots={p.shiftSlots} canManage={p.canManage} forBrand={p.forBrand} showAll={p.forBrand} />
+    Render: (p) => <MonthlyReportTabs brandId={p.brandId} brandName={p.brandName} month={p.month} snapshot={p.snapshot as MonthlyReportSnapshot} liveSessions={p.liveSessions} shiftSlots={p.shiftSlots} canManage={p.canManage} forBrand={p.forBrand} showAll={p.forBrand} scope={p.scope} />
   },
   Shopee: {
     preload: () => void ShopeeMonthlyReportTabs.preload(),
@@ -73,6 +75,7 @@ const REPORT_VIEWS: Record<ReportPlatform, { preload: () => void; pdf: boolean; 
 import { MonthPicker } from "../common/MonthPicker";
 import { PageHeader } from "../common/PageHeader";
 import { dataSourceTier } from "../../lib/dataSource";
+import { reportScopeOf, type ReportScope } from "../../lib/report/reportScope";
 
 // Report Tuần không còn là tab riêng ở menu (2026-08-23) — gộp làm chế độ xem "Tuần" ngay trong
 // Report Tháng qua toggle bên dưới, tái dùng nguyên BrandWeeklyReport.tsx (đã tự chặn quyền qua
@@ -148,6 +151,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
   const [month, setMonth] = useState(() => defaultReportMonth(`${getTodayMonth()}-01`, sessions.filter((s) => s.brandId === brandId)));
   const monthNowVn = getTodayMonth();
   const [report, setReport] = useState<BrandMonthlyReportType | null>(null);
+  const reportScope = useMemo(() => reportScopeOf(brandPlatformRates, brandId, platform), [brandPlatformRates, brandId, platform]);
   const [loading, setLoading] = useState(true);
   const [publishing, setPublishing] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -607,6 +611,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
               onReportChange={setReport}
               liveSessions={sessions}
               shiftSlots={shiftSlots}
+              scope={reportScope}
             />
           </Suspense>
 
@@ -628,7 +633,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
       {exportHost && stored &&
         createPortal(
           <Suspense fallback={null}>
-            <View.Render brandId={brandId} brandName={brandName} month={month} snapshot={stored.snapshot as AnySnapshot} report={report} canManage={false} forBrand onReportChange={setReport} liveSessions={sessions} shiftSlots={shiftSlots} />
+            <View.Render brandId={brandId} brandName={brandName} month={month} snapshot={stored.snapshot as AnySnapshot} report={report} canManage={false} forBrand onReportChange={setReport} liveSessions={sessions} shiftSlots={shiftSlots} scope={reportScope} />
           </Suspense>,
           exportHost
         )}

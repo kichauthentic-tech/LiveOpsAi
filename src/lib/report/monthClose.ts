@@ -2,6 +2,7 @@ import type { BrandMonthlyReport, BrandMonthPlan, DataRawReportType, LiveSession
 import type { DataRawImportStamp } from "../db/brandDataRaw";
 import type { AffiliateTodoRow } from "../db/affiliateActuals";
 import { parseDayLabel } from "../affiliate/plan";
+import type { ReportScope } from "./reportScope";
 import { platformOf, type ReportPlatform } from "../reportPlatform";
 import { dataSourceTier } from "../dataSource";
 import { isUnconfirmedPast } from "../sessionStatus";
@@ -159,6 +160,8 @@ export interface CloseRowInput {
   affiliate: AffiliateTodoRow[] | null;
   nextPlan: BrandMonthPlan | null | undefined;
   report: BrandMonthlyReport | null | undefined;
+  /** Phạm vi dịch vụ (0190): mảng YFB không làm ⇒ ô "ngoài phạm vi", không đếm là việc thiếu. Vắng = đủ Ads + Affiliate. */
+  scope?: Pick<ReportScope, "ads" | "affiliate">;
 }
 
 export function closeRow(i: CloseRowInput): CloseCell[] {
@@ -167,6 +170,7 @@ export function closeRow(i: CloseRowInput): CloseCell[] {
   const due = Math.max(0, daysDue(i.month, i.today) - (from - 1));
   const done = mine.filter((s) => s.status === "Completed");
   return CLOSE_COLUMNS[i.platform].map((col): CloseCell => {
+    if ((col.key === "ads" && i.scope?.ads === false) || (col.key === "affiliate" && i.scope?.affiliate === false)) return { key: col.key, state: "na", text: "ngoài phạm vi" };
     switch (col.key) {
       case "sessions": {
         if (done.length === 0) return { key: col.key, state: "na", text: mine.length ? "chưa có ca đã live" : "không có ca" };

@@ -19,7 +19,7 @@ import { createAuditLog } from "./lib/db/auditLogs";
 import { updateRolePermissions } from "./lib/db/rolePermissions";
 import { upsertSessionFinance, setSessionFinanceApproval } from "./lib/db/finance";
 import { updateAiAgentPrompt } from "./lib/db/aiAgentPrompts";
-import { upsertBrandPlatformCommissionRate, upsertBrandPlatformRate, upsertBrandPlatformReturnRate } from "./lib/db/brandPlatformRates";
+import { upsertBrandPlatformCommissionRate, upsertBrandPlatformRate, upsertBrandPlatformReturnRate, upsertBrandServiceScope, type ServiceScopePatch } from "./lib/db/brandPlatformRates";
 import { setBrandStudio } from "./lib/db/brandStudios";
 import { fetchShiftSlots, createShiftSlot, deleteShiftSlot } from "./lib/db/shiftSlots";
 import { fetchShiftRegistrations, registerForSlot, unregisterFromSlot } from "./lib/db/shiftRegistrations";
@@ -1367,6 +1367,18 @@ export default function App() {
     }
   };
 
+  // Phạm vi dịch vụ (0190): không đụng giá ⇒ không đọc lại lịch sử giá.
+  const handleSaveBrandServiceScope = async (brandId: string, platform: "TikTok" | "Shopee", patch: ServiceScopePatch): Promise<boolean> => {
+    try {
+      const saved = await upsertBrandServiceScope(brandId, platform, patch);
+      setBrandPlatformRates((prev) => [...prev.filter((r) => !(r.brandId === brandId && r.platform === platform)), saved]);
+      return true;
+    } catch (e) {
+      showToast(`Không thể lưu phạm vi dịch vụ: ${errorMessage(e)}`);
+      return false;
+    }
+  };
+
   // Chốt lịch: RPC finalize_shift_slot (0133) tạo live_session + đánh dấu slot "finalized" trong một
   // transaction và từ chối nếu slot không còn mở (người khác vừa chốt/huỷ) — trước đó là 2 bước ghi từ
   // client kèm xoá bù khi bước 2 lỗi, và 2 người bấm cùng lúc sinh 2 ca. Target ghi 0: target đổ từ Kế
@@ -2390,6 +2402,7 @@ export default function App() {
                     onSaveRate={handleSaveBrandPlatformRate}
                     onSaveReturnRate={handleSaveBrandPlatformReturnRate}
                     onSaveCommissionRate={handleSaveBrandPlatformCommissionRate}
+                    onSaveServiceScope={handleSaveBrandServiceScope}
                     studios={activeStudios}
                     brandStudios={brandStudios}
                     onSetBrandStudio={handleSetBrandStudio}

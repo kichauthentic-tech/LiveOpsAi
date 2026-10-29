@@ -266,6 +266,7 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ platform, brands
         brandChannels={brandChannels}
         sessions={sessions}
         monthlyReports={monthlyReports}
+        brandPlatformRates={brandPlatformRates}
         onNavigate={onNavigate}
       />
 

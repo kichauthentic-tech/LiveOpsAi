@@ -168,6 +168,8 @@ export interface ShopInsightPageInput {
   channels: { label: string; delta: number }[];
   /** Nhóm đối chứng đã có kết luận: livestream YFB so với các kênh còn lại. */
   control: { label: string; liveChg: number; restChg: number; verdict: "ops" | "agency_better" | "market" }[];
+  /** Brand tự live cùng tài khoản (0190): Seller LIVE lẫn phiên inhouse ⇒ không so nhóm đối chứng. */
+  inhouseLive?: boolean;
 }
 
 export function shopBlocks(i: ShopInsightPageInput): InsightBlocks {
@@ -183,7 +185,9 @@ export function shopBlocks(i: ShopInsightPageInput): InsightBlocks {
     ? `${ops.label}: livestream YFB ${signed(ops.liveChg, 0)}, các kênh còn lại ${signed(ops.restChg, 0)} — livestream giảm mạnh hơn phần còn lại của shop (nhóm đối chứng gần đúng, YFB cũng tác động Affiliate và Ads) nên cần rà soát vận hành livestream.`
     : i.control.length
       ? `${i.control.map((c) => `${c.label}: livestream YFB ${signed(c.liveChg, 0)}, các kênh còn lại ${signed(c.restChg, 0)}`).join("; ")} — livestream không giảm mạnh hơn các kênh còn lại.`
-      : "Chưa có nhóm đối chứng (cần file Shop Analytics của hai tháng).";
+      : i.inhouseLive
+        ? "Không so livestream YFB với các kênh còn lại: brand có tự live trên cùng tài khoản shop nên Seller LIVE gồm cả phiên brand tự live."
+        : "Chưa có nhóm đối chứng (cần file Shop Analytics của hai tháng).";
   const neg = byAbs.filter((c) => c.delta < 0)[0];
   const impact = neg ? `${neg.label} là kênh giảm lớn nhất (${moneySigned(neg.delta)}).` : "Không kênh nào giảm so với kỳ trước.";
   // Kênh giảm lớn nhất (ngoài livestream) luôn có việc riêng, kể cả khi livestream cũng cần rà soát.
@@ -408,15 +412,19 @@ export interface NextInsightInput {
   nextLabel: string;
   hasLivePlan: boolean;
   hasCreatorPlan: boolean;
+  withCreator?: boolean;
 }
 
 export function nextBlocks(i: NextInsightInput): InsightBlocks {
-  const missing = [!i.hasLivePlan && "Target Live", !i.hasCreatorPlan && "lịch Booking Creator (Target Creator)"].filter(Boolean) as string[];
-  const observe = missing.length ? `${i.nextLabel} chưa có ${missing.join(" và ")}.` : `${i.nextLabel} đã có Target Live và lịch Booking Creator.`;
+  // withCreator = false: brand không có Affiliate trong phạm vi YFB (0190) ⇒ chỉ nói kế hoạch Live.
+  const withCreator = i.withCreator ?? true;
+  const missing = [!i.hasLivePlan && "Target Live", withCreator && !i.hasCreatorPlan && "lịch Booking Creator (Target Creator)"].filter(Boolean) as string[];
+  const have = withCreator ? "Target Live và lịch Booking Creator" : "Target Live";
+  const observe = missing.length ? `${i.nextLabel} chưa có ${missing.join(" và ")}.` : `${i.nextLabel} đã có ${have}.`;
   return {
     observe,
-    cause: missing.length ? `Thiếu ${missing.join(" và ")}.` : "Đã đủ Target Live và lịch Booking Creator.",
+    cause: missing.length ? `Thiếu ${missing.join(" và ")}.` : `Đã đủ ${have}.`,
     impact: missing.length ? "Thiếu kế hoạch thì Target tháng sau dễ đặt theo mục tiêu tổng thay vì GMV/giờ đã đạt." : "Kế hoạch đã đủ để chấm tiến độ ngay từ đầu tháng.",
-    advise: missing.length ? `Lập ${missing.join(" và ")} trước khi chốt report.` : "Theo dõi tiến độ theo Target Live và Booking từ đầu tháng."
+    advise: missing.length ? `Lập ${missing.join(" và ")} trước khi chốt report.` : withCreator ? "Theo dõi tiến độ theo Target Live và Booking từ đầu tháng." : "Theo dõi tiến độ theo Target Live từ đầu tháng."
   };
 }

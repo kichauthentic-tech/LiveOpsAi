@@ -492,6 +492,11 @@ export interface BrandPlatformRate {
   returnRate: number;
   // % hoa hồng agency trên NMV (0118). undefined = chưa đặt — khác 0% ("không thu hoa hồng").
   commissionRate?: number;
+  // Phạm vi dịch vụ (0190): YFB làm Ads toàn shop / creator affiliate cho brand × sàn này; brand có tự live cùng
+  // tài khoản. Report Tháng chọn trang theo đây (lib/report/reportScope.ts). Vắng (DB chưa chạy 0190) = hành vi cũ.
+  scopeAds?: boolean;
+  scopeAffiliate?: boolean;
+  hasInhouseLive?: boolean;
 }
 
 // KÊNH = một gian hàng của brand trên một sàn (0149, audit đa sàn 07/10). Nguồn DUY NHẤT trả lời "brand chạy sàn nào" —

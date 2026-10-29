@@ -37,6 +37,7 @@ import { keyMetricsHeadline, observeHeadline, summaryHeadline } from "../../lib/
 import { bridgePoints, cancelledPlanTarget, planHourRows, skuImageKey, targetBridge, trafficBridge, type ScatterPoint } from "../../lib/report/reportVisuals";
 import "./report/demo.css";
 import { PLATFORM_PROFILES } from "../../lib/platforms/profiles";
+import { DEFAULT_REPORT_SCOPE, outOfScopeLabel, type ReportScope } from "../../lib/report/reportScope";
 import { platformOf } from "../../lib/reportPlatform";
 import type { AffiliateActualEntry, AffiliatePlanMonth } from "../../types";
 import { fetchAffiliateActuals } from "../../lib/db/affiliateActuals";
@@ -77,9 +78,11 @@ interface MonthlyReportTabsProps {
   forBrand?: boolean;
   /** Hiện đủ 10 trang cùng lúc + mục lục cuộn (file HTML gửi brand nhân bản DOM nên không được chỉ ra trang đang chọn). */
   showAll?: boolean;
+  /** Phạm vi dịch vụ brand × sàn (0190, CRM → Hợp đồng & giá). Vắng = đủ Ads + Affiliate, không tự live. */
+  scope?: ReportScope;
 }
 
-export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, brandName, month, snapshot, liveSessions, shiftSlots = [], canManage, forBrand = false, showAll = false }) => {
+export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, brandName, month, snapshot, liveSessions, shiftSlots = [], canManage, forBrand = false, showAll = false, scope = DEFAULT_REPORT_SCOPE }) => {
 
   // Brand KHÔNG được thấy số của tháng chưa phát hành (quyết định 2026-09-22, 0107) — kể cả qua cột
   // "tháng trước"/biểu đồ xu hướng của report tháng này. Bản chụp do ops dựng nên có đủ số 4 tháng;
@@ -299,7 +302,8 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
       .reduce((sum, x) => sum + planTargetOf(x), 0);
   const scheduledTargetGmv = (s: string, e: string) => plannedMonthTarget(s, e) ?? sumSessionTargets(s, e);
 
-  const hasReturnRateConfig = brandPlatformRates.some((r) => r.brandId === brandId);
+  // Dòng giá có thể chỉ để khai phạm vi dịch vụ (0190) ⇒ 0% = chưa nhập (CRM cũng hiện "chưa nhập").
+  const hasReturnRateConfig = brandPlatformRates.some((r) => r.brandId === brandId && r.platform === REPORT_PLATFORM && r.returnRate > 0);
   const kpiTargetGmvCurRaw = scheduledTargetGmv(start, end);
   const kpiTargetGmvCur = kpiTargetGmvCurRaw > 0 ? kpiTargetGmvCurRaw : null;
 
@@ -432,7 +436,9 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [view, prevMonth, month, shopWin, bucketPrev, bucketCur, hiddenMonths, agencyLiveByDate]
   );
-  const controlOps = control.find((r) => r.key !== "all" && controlVerdict(r) === "ops");
+  // Brand tự live cùng tài khoản (0190): "LIVE tài khoản shop" lẫn phiên inhouse ⇒ không dùng nhóm đối chứng ở Insight/tóm tắt.
+  const controlUsed = scope.inhouseLive ? [] : control;
+  const controlOps = controlUsed.find((r) => r.key !== "all" && controlVerdict(r) === "ops");
 
   // KPI GMV cả shop brand giao (Kế Hoạch Tháng, 0122) — mọi kênh, khác target live. Tháng chưa hết thì dự kiến theo
   // nhịp cùng kỳ tháng trước (chỉ khi tháng trước có đủ số cả tháng).
@@ -742,7 +748,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
       shopCur,
       shopPrev: shopPrevSame,
       windowLabel: shopWin.label,
-      control
+      control: controlUsed
     }),
     why: whyInsight(livePrevStats, liveCurStats, { groups: dayGroups, mixRate }),
     people: peopleInsight(hostInsight.rows, reliability),
@@ -750,7 +756,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     context: contextInsight(
       campDetailRows,
       slotRows,
-      adsCur && { cost: adsCur.cost, roi: adsCur.roi, prevCost: adsPrev?.cost ?? null, prevRoi: adsPrev?.roi ?? null, zeroOrderDays: adsCur.zeroOrderDays.length }
+      scope.ads && adsCur ? { cost: adsCur.cost, roi: adsCur.roi, prevCost: adsPrev?.cost ?? null, prevRoi: adsPrev?.roi ?? null, zeroOrderDays: adsCur.zeroOrderDays.length } : null
     )
   };
   const hostOpsNote = peopleOpsNote(hostInsight.rows, reliability);
@@ -795,10 +801,11 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
         totalChange: shopCur && shopPrevSame ? pctChange(shopPrevSame.gmv, shopCur.gmv) : null,
         windowLabel: shopWin.label,
         channels: chRows,
-        control: control.filter((r) => r.key !== "all").flatMap((r) => {
+        control: controlUsed.filter((r) => r.key !== "all").flatMap((r) => {
           const v = controlVerdict(r);
           return v && r.liveChg != null && r.restChg != null ? [{ label: controlLabel(r.key), liveChg: r.liveChg, restChg: r.restChg, verdict: v }] : [];
-        })
+        }),
+        inhouseLive: scope.inhouseLive
       }),
       why: whyBlocks({
         gmvPerHourChange: pctChange(livePrevStats.gmvPerHour, liveCurStats.gmvPerHour),
@@ -847,7 +854,8 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
       next: nextBlocks({
         nextLabel: `Tháng ${Number(nextMonth.slice(5))}`,
         hasLivePlan: !!nextPlan && nextPlan.targetGmv > 0 && nextPlan.slotCount > 0,
-        hasCreatorPlan: (affiliate.next?.length ?? 0) > 0
+        hasCreatorPlan: (affiliate.next?.length ?? 0) > 0,
+        withCreator: scope.affiliate
       })
     };
     return out;
@@ -965,8 +973,8 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
       affiliate: trackSum.sessions > 0 ? [{ label: `${METRIC.directGmv} · ${trackSum.sessions} phiên`, value: fmtVndShort(trackSum.directGmv) }, { label: `Target GMV · ${trackSum.sessions} phiên`, value: trackSum.targetGmv > 0 ? fmtVndShort(trackSum.targetGmv) : "—", badge: trackSum.pctTarget, badgeLabel: trackSum.pctTarget != null ? `${fmtFixed(trackSum.pctTarget, 1)}% ${METRIC.directGmv}` : undefined }, { label: `${METRIC.gmvPerHour} · ${trackSum.sessions} phiên`, value: trackSum.gmvPerHour != null ? fmtVndShort(trackSum.gmvPerHour) : "—", note: trackSum.hours > 0 ? `${fmtVndShort(trackSum.directGmv)} ÷ ${fmtFixed(trackSum.hours, 1)} giờ` : undefined }, { label: METRIC.roas, value: trackSum.roas != null ? `${fmtFixed(trackSum.roas, 1)}x` : "—", note: trackSum.adsCost > 0 ? `${METRIC.adsCost} ${fmtVndShort(trackSum.adsCost)}` : undefined }] : [],
       next: [
         { label: `Target Live tháng ${Number(nextMonth.slice(5))}`, value: nextPlan && nextPlan.targetGmv > 0 ? fmtVndShort(nextPlan.targetGmv) : "—", note: nextPlan && nextPlan.targetGmv > 0 ? `${nextPlan.slotCount} phiên trong Kế Hoạch Tháng` : "chưa nhập · bảng Kế hoạch Live" },
-        { label: `Target Creator tháng ${Number(nextMonth.slice(5))}`, value: bookingSum.target > 0 ? fmtVndShort(bookingSum.target) : "—", note: bookingSum.target > 0 ? "tổng Target lịch Booking" : "tổng Target lịch Booking, chưa nhập" },
-        { label: `Booking Creator tháng ${Number(nextMonth.slice(5))}`, value: `${bookingSum.sessions} phiên`, note: bookingSum.sessions > 0 ? `${fmtFixed(bookingSum.hours, 1)} giờ live` : `chưa có phiên nào trong tab Affiliate (T${Number(nextMonth.slice(5))})` }
+        ...(scope.affiliate ? [{ label: `Target Creator tháng ${Number(nextMonth.slice(5))}`, value: bookingSum.target > 0 ? fmtVndShort(bookingSum.target) : "—", note: bookingSum.target > 0 ? "tổng Target lịch Booking" : "tổng Target lịch Booking, chưa nhập" },
+        { label: `Booking Creator tháng ${Number(nextMonth.slice(5))}`, value: `${bookingSum.sessions} phiên`, note: bookingSum.sessions > 0 ? `${fmtFixed(bookingSum.hours, 1)} giờ live` : `chưa có phiên nào trong tab Affiliate (T${Number(nextMonth.slice(5))})` }] : [])
       ]
     };
     const headline =
@@ -994,7 +1002,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     nextMonth,
     nextPlan,
     shopKpi,
-    controlLine: controlLine(control),
+    controlLine: controlLine(controlUsed),
     controlOpsGroup,
     dailyGap: dailyGapValue != null && dailyGapText ? { line: dailyGapText, value: dailyGapValue } : null,
     giftLine: giftLineText,
@@ -1032,10 +1040,10 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     shop: canManage || !!shopCur,
     why: true,
     products: canManage || !!topSku?.hasAnyBatch || !!topPromo?.hasAnyBatch,
-    ads: canManage || !!adsCur || !!adsPlan,
+    ads: scope.ads && (canManage || !!adsCur || !!adsPlan),
     nmv: canManage || refundRateShop != null || nmvRate != null,
     people: true,
-    affiliate: canManage || creatorRows.length > 0,
+    affiliate: scope.affiliate && (canManage || creatorRows.length > 0),
     next: true,
     keymetrics: true
   };
@@ -1320,6 +1328,11 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
         <div className="min-w-0">
       <div className="p-5 flex flex-col gap-8">
         {shopPiecesMissing && canManage && warnBox(<>Số liệu này chốt trước khi report có phần Shop Analytics — bấm "Cập nhật số liệu" ở trên để có đủ 7 phần.</>)}
+        {canManage && outOfScopeLabel(scope) && (
+          <p data-export-hide className="text-[11px]" style={{ color: PAL.muted }}>
+            Phạm vi dịch vụ (CRM → Hợp đồng & giá): {outOfScopeLabel(scope)}.
+          </p>
+        )}
         {giftsMissing && !shopPiecesMissing && warnBox(<>Số liệu này chốt trước khi report tách quà tặng khỏi UPT — bấm "Cập nhật số liệu" ở trên để có dòng quà tặng.</>)}
 
         {/* ===== 1. Kết luận ===== */}
@@ -1368,6 +1381,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             shopPrev={shopPrevSame}
             window={shopWin}
             traffic={trafficBr?.b ?? null}
+            inhouseLive={scope.inhouseLive}
             fallbackHeadline={head("shop").headline}
             insight={demoInsight("shop")}
           />
@@ -1584,7 +1598,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
 
         {/* ===== 7. Tháng sau ===== */}
         <section id="mr-next" className="space-y-4 scroll-mt-16" style={secStyle("next")}>
-          <PageHead {...head("next")} no={secNo("next")} title={secTitle("next")} sub={`Hành động tháng ${Number(nextMonth.slice(5))} + kế hoạch từ Kế Hoạch Tháng và tab Affiliate`} />
+          <PageHead {...head("next")} no={secNo("next")} title={secTitle("next")} sub={`Hành động tháng ${Number(nextMonth.slice(5))} + kế hoạch từ Kế Hoạch Tháng${scope.affiliate ? " và tab Affiliate" : ""}`} />
           <NextLivePlanPanel
             nextMonth={nextMonth}
             curLabel={String(Number(month.slice(5)))}
@@ -1599,7 +1613,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             canEdit={canManage}
             onSave={async (m) => setMonthlyReportRow(await saveMonthlyReportSectionNote(brandId, `${month}-01`, LIVE_TARGET_MANUAL_KEY, encodeLiveTarget(m)))}
           />
-          <BookingPlanPanel
+          {scope.affiliate && <BookingPlanPanel
             nextMonth={nextMonth}
             curLabel={String(Number(month.slice(5)))}
             nextLabel={String(Number(nextMonth.slice(5)))}
@@ -1608,7 +1622,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             refByCreator={creatorBest}
             canEdit={canManage}
             draftNote={canManage && creatorPlan.length > 0 && !affiliate.nextMeta?.publishedAt ? "Kế hoạch Affiliate tháng sau còn là nháp — brand chỉ thấy bảng này sau khi Chốt ở tab Affiliate." : undefined}
-          />
+          />}
           {pageInsight("next")}
         </section>
 

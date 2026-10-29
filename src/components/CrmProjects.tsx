@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import type { ServiceScopePatch } from "../lib/db/brandPlatformRates";
 import { Brand, BrandChannel, BrandContract, BrandMonthlyCommitment, BrandPlatformRate, BrandPlatformRateHistoryEntry, BrandStudio, Studio, SystemUser, UserRole } from "../types";
 import { Building2, Plus, Edit3, Trash2, X, FileSignature } from "lucide-react";
 import { BrandLogo } from "./ui/BrandLogo";
@@ -29,6 +30,7 @@ interface CrmProjectsProps {
   onSaveRate: (brandId: string, platform: "TikTok" | "Shopee", ratePerHour: number) => Promise<boolean>;
   onSaveReturnRate: (brandId: string, platform: "TikTok" | "Shopee", returnRate: number) => Promise<boolean>;
   onSaveCommissionRate: (brandId: string, platform: "TikTok" | "Shopee", commissionRate: number) => Promise<boolean>;
+  onSaveServiceScope?: (brandId: string, platform: "TikTok" | "Shopee", patch: ServiceScopePatch) => Promise<boolean>;
   studios: Studio[];
   brandStudios: BrandStudio[];
   onSetBrandStudio: (brandId: string, platform: "TikTok" | "Shopee", studioId: string) => Promise<boolean>;
@@ -63,6 +65,7 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
   onSaveRate,
   onSaveReturnRate,
   onSaveCommissionRate,
+  onSaveServiceScope,
   studios,
   brandStudios,
   onSetBrandStudio,
@@ -365,6 +368,7 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
               onSaveRate={onSaveRate}
               onSaveReturnRate={onSaveReturnRate}
               onSaveCommissionRate={onSaveCommissionRate}
+              onSaveServiceScope={onSaveServiceScope}
               onSetBrandStudio={onSetBrandStudio}
               onContractsChanged={reloadContracts}
               onOpenMonthPlan={onOpenMonthPlan && ((p) => onOpenMonthPlan(b.id, p))}

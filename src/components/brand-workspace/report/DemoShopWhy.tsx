@@ -158,6 +158,9 @@ export interface ShopMonthMix { liveLinked: number; affiliate: number; video: nu
 export interface DemoShopProps {
   no: string;
   title: string;
+  /** Brand tự live cùng tài khoản (0190): bỏ nhóm đối chứng, Direct/Indirect, cầu kênh/lượt truy cập — chỉ còn Total GMV, tỷ trọng
+   *  livestream YFB và cơ cấu kênh với nhãn "gồm cả brand tự live". */
+  inhouseLive?: boolean;
   control: ControlRow[];
   /** 4 tháng gần nhất (cũ → mới), cắt cùng số ngày; null = chưa có file Shop Analytics. */
   mixes: (ShopMonthMix | null)[];
@@ -180,7 +183,7 @@ const VERDICT: Record<ControlVerdict, [string, string]> = {
   ops: ["kém hơn các kênh còn lại", "r"],
   market: ["tương đương các kênh còn lại", "m"]
 };
-export const DemoShopPage: React.FC<DemoShopProps> = ({ no, title, control, mixes, mixLabels, attribution, attributionTypes, yfbGmv, shopCur, shopPrev, window: w, traffic, fallbackHeadline, insight }) => {
+export const DemoShopPage: React.FC<DemoShopProps> = ({ no, title, control, mixes, mixLabels, attribution, attributionTypes, yfbGmv, shopCur, shopPrev, window: w, traffic, inhouseLive = false, fallbackHeadline, insight }) => {
   const rows = (["daily", "camp", "all"] as const).map((k) => control.find((r) => r.key === k)).filter((r): r is ControlRow => !!r);
   const all = control.find((r) => r.key === "all");
   const camp = control.find((r) => r.key === "camp");
@@ -191,13 +194,16 @@ export const DemoShopPage: React.FC<DemoShopProps> = ({ no, title, control, mixe
   const aff = [mixes[2]?.affiliate ?? null, mixes[3]?.affiliate ?? null] as const;
   const affChg = pctOf(aff[0], aff[1]);
   const visRow = camp ?? all;
-  const kpis: DemoKpi[] = [
+  const kpisAll: DemoKpi[] = [
     { label: `Total GMV · ${curLbl}`, value: shopCur ? fmtM(shopCur.gmv) : "—", note: shopChg != null ? `${fmtP(shopChg, 1)} so với ${prevLbl}` : "chưa có số kỳ trước" },
     { label: "Tỷ trọng livestream YFB", value: shareCur != null ? fmtP(shareCur, 1, false) : "—", note: sharePrev != null && shareCur != null ? `${prevLbl}: ${fmtP(sharePrev, 1, false)} (${shareCur - sharePrev < 0 ? "−" : "+"}${fmtFixed(Math.abs(shareCur - sharePrev), 1)} điểm)` : "" },
     { label: `Lượt truy cập shop · ${visRow ? controlLabel(visRow.key) : ""}`, value: visRow?.visitorsChg != null ? fmtP(visRow.visitorsChg) : "—", note: visRow?.cvrPrev != null && visRow.cvrCur != null ? `CVR shop ${fmtP(visRow.cvrPrev, 2, false)} → ${fmtP(visRow.cvrCur, 2, false)}` : "", color: visRow?.visitorsChg != null ? (visRow.visitorsChg >= 0 ? "green" : "red") : undefined },
     { label: "Affiliate LIVE", value: affChg != null ? fmtP(affChg) : "—", note: aff[0] != null && aff[1] != null ? `${m1(aff[0])} → ${m1(aff[1])}` : "", color: affChg != null ? (affChg >= 0 ? "green" : "red") : undefined }
   ];
-  const headline = rows.length
+  const kpis = inhouseLive ? kpisAll.slice(0, 2) : kpisAll;
+  const headline = inhouseLive
+    ? shareCur != null ? `Livestream YFB chiếm ${fmtP(shareCur, 1, false)} Total GMV ${curLbl}${sharePrev != null ? ` (${prevLbl}: ${fmtP(sharePrev, 1, false)})` : ""}.` : fallbackHeadline
+    : rows.length
     ? rows
         .filter((r) => r.key !== "all" && r.liveChg != null && r.restChg != null)
         .map((r) => `${controlLabel(r.key)}: livestream YFB ${fmtP(r.liveChg!)}, các kênh còn lại ${fmtP(r.restChg!)}`)
@@ -300,7 +306,7 @@ export const DemoShopPage: React.FC<DemoShopProps> = ({ no, title, control, mixe
     <>
       <DemoHead no={no} title={title} headline={headline} kpis={kpis} />
       <div className="stk">
-        <div className="pn">
+        {!inhouseLive && <div className="pn">
           <div className="pnh">Tăng trưởng GMV: livestream YFB, các kênh còn lại và lượt truy cập shop</div>
           <div className="pns">{curLbl} so với {prevLbl}. Các kênh còn lại (Affiliate LIVE, Video, Product card) là nhóm đối chứng gần đúng: YFB không vận hành trực tiếp nhưng có đặt lịch creator và chạy Ads cho Product, Creator.</div>
           <Html html={cmpHtml} />
@@ -309,15 +315,15 @@ export const DemoShopPage: React.FC<DemoShopProps> = ({ no, title, control, mixe
             <span><i style={{ background: BLUE }} />Các kênh còn lại</span>
             <span><i style={{ background: "#8a8a94" }} />Lượt truy cập shop</span>
           </div>
-        </div>
+        </div>}
         <div className="pn">
           <div className="pnh">Cơ cấu Total GMV theo kênh</div>
-          <div className="pns">Tỷ trọng, {/^1–\d+\//.test(mixLabels[3] ?? "") ? `${mixLabels[3].replace(/\/\d+$/, "")} mỗi tháng` : "cả tháng"}. Seller LIVE gồm mọi phiên trên tài khoản shop.</div>
+          <div className="pns">Tỷ trọng, {/^1–\d+\//.test(mixLabels[3] ?? "") ? `${mixLabels[3].replace(/\/\d+$/, "")} mỗi tháng` : "cả tháng"}. Seller LIVE gồm mọi phiên trên tài khoản shop{inhouseLive ? ", gồm cả các phiên brand tự live" : ""}.</div>
           <Html html={mixHtml} />
           <div className="legend">{segs.map((s) => <span key={s.name}><i style={{ background: s.color }} />{s.name}</span>)}</div>
         </div>
       </div>
-      {attribution.some(Boolean) ? (
+      {inhouseLive ? null : attribution.some(Boolean) ? (
         <div className="pn">
           <div className="pnh">Direct GMV và Indirect GMV qua các tháng</div>
           <div className="pns">Direct = đơn chốt ngay trong phiên; Indirect = đơn về sau từ người đã xem phiên. Số của mọi phiên trên tài khoản shop, cùng số ngày mỗi tháng. Tô màu khi Indirect đổi từ 5 điểm trở lên so với tháng trước.</div>
@@ -336,19 +342,19 @@ export const DemoShopPage: React.FC<DemoShopProps> = ({ no, title, control, mixe
           <div className="pns">Chưa có số: thiếu file Shop Analytics hoặc bản chụp cũ chưa lưu cột Direct/Indirect. Bấm Cập nhật số liệu để tải lại.</div>
         </div>
       )}
-      <div className="pn">
+      {!inhouseLive && <div className="pn">
         <div className="pnh">So sánh livestream YFB với các kênh còn lại</div>
         <div className="pns">Chênh lệch từ 10 điểm phần trăm trở lên mới xem là khác xu hướng chung của shop (15 điểm khi nhóm 4–6 ngày, 20 điểm khi dưới 4 ngày).</div>
         <Tbl html={tbl(mktHead, mktRows, [5])} />
-      </div>
-      {br3 && (
+      </div>}
+      {br3 && !inhouseLive && (
         <div className="pn">
           <div className="pnh">Đóng góp của từng kênh vào thay đổi Total GMV</div>
           <div className="pns">{prevLbl} → {curLbl}. Seller LIVE khác = phần Seller LIVE của tài khoản shop ngoài các phiên YFB, Product card là số ước tính từ số làm tròn; hai cột này sai lệch vài chục triệu. Trục bắt đầu từ {fmtM(br3Axis!)}.</div>
           <Html html={br3} />
         </div>
       )}
-      {br4 && (
+      {br4 && !inhouseLive && (
         <div className="pn">
           <div className="pnh">Phân rã Total GMV: lượt truy cập shop × CVR shop × {METRIC.aov}</div>
           <div className="pns">Cả kỳ {curLbl} so với {prevLbl}. {METRIC.aov} được suy ra từ ba số còn lại nên là ước tính; lượt truy cập làm tròn đến 1% nên mỗi phần có thể lệch vài chục triệu. Trục bắt đầu từ {fmtM(br4Axis!)}.</div>

@@ -11,6 +11,8 @@ import { platformOf, type ReportPlatform } from "../lib/reportPlatform";
 import { useConfirm } from "../hooks/useConfirm";
 import { MonthPicker } from "./common/MonthPicker";
 import { profileOf } from "../lib/platforms/profiles";
+import { reportScopeOf } from "../lib/report/reportScope";
+import type { ServiceScopePatch } from "../lib/db/brandPlatformRates";
 
 // "Hợp đồng & giá" của MỘT brand — chỗ nhập DUY NHẤT cho mọi điều khoản thương mại (gộp cấu hình 06/10, user: "đưa
 // vào cấu hình đúng 1 chỗ ở CRM"). Trước đó: đơn giá/hoa hồng/hoàn huỷ ở nút Rate Card trong CRM, hợp đồng + giờ cam
@@ -40,6 +42,8 @@ interface Props {
   onSaveRate: (brandId: string, platform: ReportPlatform, ratePerHour: number) => Promise<boolean>;
   onSaveReturnRate: (brandId: string, platform: ReportPlatform, returnRate: number) => Promise<boolean>;
   onSaveCommissionRate: (brandId: string, platform: ReportPlatform, commissionRate: number) => Promise<boolean>;
+  /** Phạm vi dịch vụ (0190) — Report Tháng chọn trang theo đây. */
+  onSaveServiceScope?: (brandId: string, platform: ReportPlatform, patch: ServiceScopePatch) => Promise<boolean>;
   onSetBrandStudio: (brandId: string, platform: ReportPlatform, studioId: string) => Promise<boolean>;
   /** Đọc lại hợp đồng + cam kết sau khi ghi. */
   onContractsChanged: () => Promise<void>;
@@ -112,6 +116,38 @@ function NumberField({
 }
 
 // Thông tin KÊNH (0149): tên gian hàng, mã shop trên sàn, đang chạy / tạm dừng. Brand + sàn của kênh không đổi được.
+// Phạm vi dịch vụ (0190, 29/10): YFB làm gì cho brand × sàn này. Report Tháng chọn trang theo đây (CROCS: đủ; VERA/JOCKEY:
+// chỉ live, brand có tự live) — không theo "có file hay không".
+function ServiceScope({ platform, scope, canEdit, onSave }: { platform: ReportPlatform; scope: { ads: boolean; affiliate: boolean; inhouseLive: boolean }; canEdit: boolean; onSave: (patch: ServiceScopePatch) => Promise<boolean> }) {
+  const [busy, setBusy] = useState(false);
+  const items: { key: keyof ServiceScopePatch; on: boolean; label: string; hint: string }[] = [
+    { key: "scopeAds", on: scope.ads, label: "YFB chạy Ads toàn shop", hint: "tắt ⇒ Report Tháng ẩn trang Ads + kế hoạch Ads" },
+    { key: "scopeAffiliate", on: scope.affiliate, label: "YFB book creator affiliate", hint: "tắt ⇒ ẩn trang Affiliate + booking tháng sau" },
+    { key: "hasInhouseLive", on: scope.inhouseLive, label: "Brand có tự live cùng tài khoản", hint: "bật ⇒ trang Toàn shop rút gọn, bỏ nhóm đối chứng" }
+  ];
+  return (
+    <div className="space-y-1.5">
+      <p className="text-[11px] font-bold text-[var(--text-muted)]">Phạm vi dịch vụ {platform}</p>
+      <p className="text-[11px] text-[var(--text-faint)]">Livestream YFB luôn có. Report Tháng chọn trang theo các ô này.</p>
+      {items.map((it) => (
+        <label key={it.key} className="flex items-start gap-2 text-xs text-[var(--text)] cursor-pointer">
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            checked={it.on}
+            disabled={!canEdit || busy}
+            onChange={async (e) => {
+              setBusy(true);
+              try { await onSave({ [it.key]: e.target.checked }); } finally { setBusy(false); }
+            }}
+          />
+          <span>{it.label}<span className="block text-[11px] text-[var(--text-faint)]">{it.hint}</span></span>
+        </label>
+      ))}
+    </div>
+  );
+}
+
 function ChannelInfo({ channel, platform, canEdit, onSave }: { channel?: BrandChannel; platform: ReportPlatform; canEdit: boolean; onSave: (patch: Partial<Pick<BrandChannel, "shopName" | "shopRef" | "status">>) => void }) {
   const [shopName, setShopName] = useState(channel?.shopName ?? "");
   const [shopRef, setShopRef] = useState(channel?.shopRef ?? "");
@@ -172,6 +208,7 @@ export const BrandConfigPanel: React.FC<Props> = ({
   onSaveRate,
   onSaveReturnRate,
   onSaveCommissionRate,
+  onSaveServiceScope,
   onSetBrandStudio,
   onContractsChanged,
   onOpenMonthPlan
@@ -355,6 +392,13 @@ export const BrandConfigPanel: React.FC<Props> = ({
             canEdit={canEdit}
             hint="NMV ước tính = GMV × (1 − tỷ lệ). Chưa nhập thì NMV bằng GMV."
             onSave={(v) => onSaveReturnRate(brand.id, platform, v)}
+          />
+          <ServiceScope
+            key={`scope-${platform}`}
+            platform={platform}
+            scope={reportScopeOf(rates, brand.id, platform)}
+            canEdit={canEdit && !!onSaveServiceScope}
+            onSave={(patch) => onSaveServiceScope!(brand.id, platform, patch)}
           />
           {history.length > 0 && (
             <details className="text-[11px]">

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ClipboardCheck, Loader2 } from "lucide-react";
-import type { Brand, BrandChannel, BrandMonthlyReport, BrandMonthPlan, LiveSession } from "../types";
+import type { Brand, BrandChannel, BrandMonthlyReport, BrandMonthPlan, BrandPlatformRate, LiveSession } from "../types";
+import { reportScopeOf } from "../lib/report/reportScope";
 import { fetchDataRawImportStamps, type DataRawImportStamp } from "../lib/db/brandDataRaw";
 import { fetchAffiliateTodoData, type AffiliateTodoRow } from "../lib/db/affiliateActuals";
 import { fetchPlanStatuses } from "../lib/db/monthPlans";
@@ -37,10 +38,12 @@ interface Props {
   brandChannels: BrandChannel[];
   sessions: LiveSession[];
   monthlyReports: Map<string, BrandMonthlyReport>;
+  /** Phạm vi dịch vụ (0190) — cột Ads/Affiliate của brand không thuê YFB làm ghi "ngoài phạm vi". */
+  brandPlatformRates?: BrandPlatformRate[];
   onNavigate?: (tab: string, brandId?: string, platform?: ReportPlatform) => void;
 }
 
-export const MonthClosePanel: React.FC<Props> = ({ platform, month, today, brands, brandChannels, sessions, monthlyReports, onNavigate }) => {
+export const MonthClosePanel: React.FC<Props> = ({ platform, month, today, brands, brandChannels, sessions, monthlyReports, brandPlatformRates = [], onNavigate }) => {
   const channelBrands = useMemo(
     () =>
       brands
@@ -87,12 +90,13 @@ export const MonthClosePanel: React.FC<Props> = ({ platform, month, today, brand
           stamps: data.stamps.get(b.id) ?? [],
           affiliate: data.affiliate,
           nextPlan: data.nextPlans.get(brandPlatformKey(b.id, platform)),
-          report: monthlyReports.get(brandMonthKey(b.id, month, platform))
+          report: monthlyReports.get(brandMonthKey(b.id, month, platform)),
+          scope: reportScopeOf(brandPlatformRates, b.id, platform)
         });
         return { brand: b, cells, open: openCount(cells), multi: platformsOfBrand(brandChannels, b.id).length > 1 };
       })
       .sort((a, b) => b.open - a.open || a.brand.name.localeCompare(b.brand.name));
-  }, [ready, data, channelBrands, platform, month, today, sessions, monthlyReports, brandChannels]);
+  }, [ready, data, channelBrands, platform, month, today, sessions, monthlyReports, brandChannels, brandPlatformRates]);
 
   if (channelBrands.length === 0) return null;
   const deadline = closeDeadline(month);
