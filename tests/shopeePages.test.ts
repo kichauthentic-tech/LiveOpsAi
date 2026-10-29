@@ -1,7 +1,7 @@
 // Report Shopee theo khung trang TikTok (29/10): cùng kỳ, ngưỡng dao động, tách nguyên nhân, bảng điểm Target.
 import { describe, expect, test } from "vitest";
 import { buildShopeeSnapshot, type ShopeeReportSnapshot } from "../src/lib/report/shopeeSnapshot";
-import { shopeeCounts, shopeeDrivers, shopeeKmTable, shopeeMonths, shopeePageModel, shopeeScore, streamsOf } from "../src/lib/report/shopeePages";
+import { shopeeCounts, shopeeDrivers, shopeeOutsideYfb, shopeeKmTable, shopeeMonths, shopeePageModel, shopeeScore, streamsOf } from "../src/lib/report/shopeePages";
 import type { ShopeeStream } from "../src/lib/dataraw/shopeeFiles";
 
 const stream = (date: string, time: string, hours: number, gmv: number, viewers: number, atc: number, orders = Math.round(gmv / 300_000)): ShopeeStream => ({
@@ -88,5 +88,22 @@ describe("bảng điểm Target", () => {
     const all = shopeeScore(s, shopeeMonths(s)).find((r) => r.key === "all")!;
     expect(all.target).toBeNull();
     expect(all.pct).toBeNull();
+  });
+});
+
+describe("shopeeOutsideYfb — phiên Live List ngoài ca YFB", () => {
+  const row = (date: string, time: string, gmv: number) => ({ date, time, hours: 2, gmv, confirmed: gmv, orders: 1, viewers: 100 });
+  const ca = (date: string, startTime: string, endTime: string, status = "Completed") => ({ date, startTime, endTime, status }) as never;
+  test("phiên trong ca (nới 30 phút), qua nửa đêm, ca huỷ không tính", () => {
+    const r = shopeeOutsideYfb(
+      [row("2026-10-01", "19:40", 10), row("2026-10-02", "00:30", 10), row("2026-10-03", "13:00", 30), row("2026-10-04", "20:00", 50)],
+      [ca("2026-10-01", "20:00", "22:00"), ca("2026-10-01", "22:00", "01:00"), ca("2026-10-04", "20:00", "22:00", "Cancelled")]
+    );
+    expect(r.streams).toBe(2);
+    expect(r.gmv).toBe(80);
+    expect(r.share).toBeCloseTo(80);
+  });
+  test("không có Live List ⇒ share null", () => {
+    expect(shopeeOutsideYfb([], []).share).toBeNull();
   });
 });

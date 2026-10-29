@@ -1,3 +1,4 @@
+import type { LiveSession } from "../../types";
 import { fmtVndShort } from "../format";
 import { METRIC } from "../metricGlossary";
 import { vnDateOf } from "../dataraw/vnDate";
@@ -709,4 +710,41 @@ export function shopeeAdsBlocks(s: ShopeeReportSnapshot): InsightBlocks {
     impact: a.costPerOrder != null ? `Chi phí mỗi đơn từ Ads ${money(a.costPerOrder)} so với ${METRIC.abs} ${money(s.headline.abs ?? 0)}.` : "—",
     advise: "Shopee chỉ cho số Ads cả tháng theo chiến dịch — đề xuất tải file Ads theo từng tuần để so ROAS giữa ngày campaign và Daily."
   };
+}
+
+// ---------- phiên ngoài ca YFB (brand tự live cùng tài khoản, 30/10) ----------
+// Live List là MỌI phiên của tài khoản shop ⇒ số tổng có thể lẫn phiên brand tự live. Luật "không có ca trong lịch YFB = không
+// phải YFB": phiên Live List bắt đầu ngoài mọi ca YFB (nới 30 phút hai đầu cho lên sóng sớm/trễ) là phiên ngoài ca. Không tách
+// số, chỉ đo để đổi nhãn số tổng + dòng cho ops. Đo trên VERA T9/T10: 1/50 và 1/59 phiên (≤1% GMV live).
+
+/** Từ ngưỡng này (% GMV Live List) số tổng mới đổi nhãn "gồm cả phiên brand tự live" — dưới đó coi như nhiễu ghép ca. */
+export const OUTSIDE_YFB_LABEL_SHARE = 3;
+const SLACK_MS = 30 * 60_000;
+
+export interface OutsideYfb {
+  streams: number;
+  total: number;
+  gmv: number;
+  hours: number;
+  /** % GMV Live List của tháng; null khi Live List không có GMV. */
+  share: number | null;
+}
+
+export function shopeeOutsideYfb(streams: ShopeeStreamRow[], sessions: Pick<LiveSession, "date" | "startTime" | "endTime" | "status">[]): OutsideYfb {
+  const at = (date: string, hm: string) => new Date(`${date}T${hm.slice(0, 5)}:00+07:00`).getTime();
+  const spans = sessions
+    .filter((x) => x.status !== "Cancelled" && x.startTime && x.endTime)
+    .map((x) => {
+      const a = at(x.date, x.startTime);
+      let b = at(x.date, x.endTime);
+      if (b <= a) b += 86_400_000; // ca qua nửa đêm
+      return [a - SLACK_MS, b + SLACK_MS] as const;
+    });
+  const out = streams.filter((t) => {
+    const st = at(t.date, t.time);
+    return !spans.some(([a, b]) => st >= a && st < b);
+  });
+  const all = sum(streams, (t) => t.gmv);
+  const gmv = sum(out, (t) => t.gmv);
+  return { streams: out.length, total: streams.length, gmv, hours: sum(out, (t) => t.hours), share: all > 0 ? (gmv / all) * 100 : null };
 }

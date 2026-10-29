@@ -30,6 +30,7 @@ import type { ReportScope } from "../../lib/report/reportScope";
 import { pageNoteKey, type InsightBlocks } from "../../lib/report/pageInsights";
 import { shopeeNotes, type ShopeeReportSnapshot } from "../../lib/report/shopeeSnapshot";
 import {
+  OUTSIDE_YFB_LABEL_SHARE,
   SHOPEE_BUCKETS,
   SHOPEE_FACTOR_LABEL,
   SHOPEE_KM_GROUPS,
@@ -44,6 +45,7 @@ import {
   shopeeCounts,
   shopeeHeadlines,
   shopeeInsights,
+  shopeeOutsideYfb,
   shopeePageModel,
   shopeePlanHours,
   shopeeScoreRows,
@@ -178,7 +180,8 @@ interface Props {
   onReportChange: (r: BrandMonthlyReport) => void;
   /** Ca trong app (mọi sàn) — trang Host đọc ca Shopee trực tiếp như report TikTok đọc ca TikTok. */
   liveSessions: LiveSession[];
-  /** Phạm vi dịch vụ brand × Shopee (0190): Ads ngoài phạm vi ⇒ không có trang Quảng cáo. */
+  /** Phạm vi dịch vụ brand × Shopee (0190): Ads ngoài phạm vi ⇒ không có trang Quảng cáo; brand tự live ⇒ nhãn số tổng
+   *  "gồm phiên brand tự live" khi Live List có ≥3% GMV ngoài ca YFB. Shopee chưa có trang Affiliate nên công tắc đó chỉ hiện ở dòng phạm vi. */
   scope: ReportScope;
   /** Bản xuất gửi brand: hiện đủ trang trong một DOM (file HTML/PDF tách trang bằng `section#mr-*`). */
   showAll?: boolean;
@@ -233,6 +236,31 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
     return shopeeSessions.filter((x) => x.date >= `${month}-01` && x.date <= end);
   }, [shopeeSessions, month, cut]);
   const hostDayType = useMemo(() => byHostDayType(completed, bucketAny), [completed, bucketAny]);
+
+  // ---- Phiên Live List ngoài ca YFB (30/10): Live List là mọi phiên của tài khoản shop ⇒ đo phần không trùng ca YFB nào.
+  // Mọi ca Shopee của brand trừ ca huỷ (ca chưa bấm Hoàn thành vẫn là giờ YFB đứng live).
+  const outside = useMemo(
+    () => shopeeOutsideYfb(s.streams, liveSessions.filter((x) => x.brandId === brandId && platformOf(x) === SHOPEE)),
+    [s.streams, liveSessions, brandId]
+  );
+  const outsideBig = outside.share != null && outside.share >= OUTSIDE_YFB_LABEL_SHARE;
+  const gmvLabel = scope.inhouseLive && outsideBig ? `${METRIC.gmv} (gồm phiên brand tự live)` : METRIC.gmv;
+  const scopeLine = [
+    [!scope.ads && "Ads", !scope.affiliate && "Affiliate"].some(Boolean) ? `ngoài phạm vi YFB: ${[!scope.ads && "Ads", !scope.affiliate && "Affiliate"].filter(Boolean).join(", ")}` : null,
+    scope.inhouseLive ? "brand có tự live cùng tài khoản" : null
+  ].filter(Boolean).join(" · ");
+  const outsideLine =
+    outside.total > 0
+      ? `Live List tháng này: ${outside.streams}/${outside.total} phiên ngoài ca YFB${outside.gmv > 0 || outside.hours > 0 ? ` (${outside.hours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })} giờ, ${fmtM(outside.gmv)}${outside.share != null ? `, ${fmtP(outside.share, 1, false)} ${METRIC.gmv}` : ""})` : ""}${
+          scope.inhouseLive
+            ? outsideBig
+              ? ` — số tổng ghi "gồm phiên brand tự live".`
+              : ` — dưới ${OUTSIDE_YFB_LABEL_SHARE}% nên giữ nhãn ${METRIC.gmv}.`
+            : outsideBig
+              ? ` — nếu là brand tự live, bật "Brand có tự live cùng tài khoản" ở CRM → Hợp đồng & giá; nếu là ca YFB thiếu, thêm ca.`
+              : "."
+        }`
+      : null;
   const hostTeam = useMemo(() => dayTypeTeamTotals(hostDayType), [hostDayType]);
   const hostPeer = useMemo(() => {
     const rows = new Map<string, HostInsightRow>();
@@ -580,9 +608,11 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
       <PageRail ref={railRef} items={rail} current={curPage} onSelect={goPage} onExcel={handleExcel} />
       <div className="p-5 flex flex-col gap-8">
         {canManage && s.version < 6 && warnBox(<>Số liệu này chốt trước khi report Shopee dùng chung trang với TikTok (hạng sản phẩm so tháng trước) — bấm &quot;Cập nhật số liệu&quot; ở trên để có đủ các trang.</>)}
-        {canManage && !scope.ads && (
-          <p data-export-hide className="text-[11px]" style={{ color: PAL.muted }}>
-            Phạm vi dịch vụ (CRM → Hợp đồng & giá): ngoài phạm vi YFB: Ads.
+        {canManage && (scopeLine || outsideLine) && (
+          <p data-export-hide className="text-[11px]" style={{ color: outsideBig && !scope.inhouseLive ? PAL.gold : PAL.muted }}>
+            {scopeLine && <>Phạm vi dịch vụ (CRM → Hợp đồng & giá): {scopeLine}.</>}
+            {scopeLine && outsideLine && " "}
+            {outsideLine && <>Chỉ ops thấy · {outsideLine}</>}
           </p>
         )}
 
@@ -611,7 +641,7 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
             spans={shopeeSpans(s)}
             planHours={shopeePlanHours(s, pm)}
             actualHours={Object.fromEntries(pm.score.filter((r) => r.key !== "all").map((r) => [r.key, r.hours]))}
-            gmvLabel={METRIC.gmv}
+            gmvLabel={gmvLabel}
             insight={insight("summary")}
           />
           {opsNotes.length > 0 && warnBox(<ul style={{ paddingLeft: 16, listStyle: "disc", margin: 0 }}>{opsNotes.map((t, i) => <li key={i}>Chỉ ops thấy: {t}</li>)}</ul>)}
