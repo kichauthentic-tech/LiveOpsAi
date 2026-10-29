@@ -61,9 +61,42 @@ function liveVerdict(d: number | null, band: number | null) {
   return d > 0 ? <span className="pill r">vượt ngưỡng: cần tăng hiệu suất</span> : <span className="pill y">thấp hơn đáng kể mức đã đạt</span>;
 }
 
-export const NextLivePlanPanel: React.FC<{ nextMonth: string; curLabel: string; nextLabel: string; rows: LivePlanRow[]; total: LivePlanRow }> = ({ nextMonth, curLabel, nextLabel, rows, total }) => {
-  const [typed, saveTyped] = useLocalDraft<Record<string, { h?: string; t?: string }>>(`liveops-report-live-plan-${nextMonth}`, {});
+export type LiveTargetTyped = Record<string, { h?: string; t?: string }>;
+export const LIVE_TARGET_MANUAL_KEY = "next_live_target";
+export const encodeLiveTarget = (m: LiveTargetTyped): string | null => {
+  const clean = Object.fromEntries(Object.entries(m).filter(([, v]) => v && (v.h?.trim() || v.t?.trim())));
+  return Object.keys(clean).length ? JSON.stringify(clean) : null;
+};
+export function decodeLiveTarget(text: string | undefined | null): LiveTargetTyped {
+  try {
+    const raw = JSON.parse(text || "null") as unknown;
+    return raw && typeof raw === "object" ? (raw as LiveTargetTyped) : {};
+  } catch {
+    return {};
+  }
+}
+
+/** `saved`/`onSave`: số tự điền lưu vào dữ liệu report (brand thấy, bản xuất có); thiếu thì chỉ nháp trong trình duyệt. `canEdit`=false: chỉ hiện số đã lưu. */
+export const NextLivePlanPanel: React.FC<{ nextMonth: string; curLabel: string; nextLabel: string; rows: LivePlanRow[]; total: LivePlanRow; saved?: LiveTargetTyped; onSave?: (m: LiveTargetTyped) => Promise<void>; canEdit?: boolean }> = ({ nextMonth, curLabel, nextLabel, rows, total, saved, onSave, canEdit = true }) => {
+  const [localTyped, saveLocal] = useLocalDraft<LiveTargetTyped>(`liveops-report-live-plan-${nextMonth}`, {});
+  const [draft, setDraft] = useState<LiveTargetTyped | null>(null);
+  const typed = onSave ? draft ?? saved ?? {} : localTyped;
+  const saveTyped = (next: LiveTargetTyped) => {
+    if (!onSave) return saveLocal(next);
+    setDraft(next);
+    return true;
+  };
   const [status, setStatus] = useState("");
+  const commit = async () => {
+    if (!onSave || !draft) return;
+    try {
+      await onSave(draft);
+      setDraft(null);
+      setStatus("Đã lưu vào report");
+    } catch (e) {
+      setStatus(errorMessage(e, "Lưu target thất bại"));
+    }
+  };
   const fromApp = rows.some((r) => r.plan);
   const calc = (r: LivePlanRow, hours: number | null, target: number | null) => {
     const req = hours && target ? target / hours : null;
@@ -78,14 +111,19 @@ export const NextLivePlanPanel: React.FC<{ nextMonth: string; curLabel: string; 
   const sumT = filled.reduce((a, x) => a + (x.target ?? 0), 0);
   const totCalc = all ? calc(total, sumH, sumT) : null;
   const cls = (d: number | null, band: number | null) => (d == null || band == null || Math.abs(d) <= band ? "nt" : d > 0 ? "dn" : "up");
-  const set = (key: string, f: "h" | "t", v: string) => setStatus(saveTyped({ ...typed, [key]: { ...typed[key], [f]: v } }) ? SAVED : NOT_SAVED);
+  const set = (key: string, f: "h" | "t", v: string) => {
+    const ok = saveTyped({ ...typed, [key]: { ...typed[key], [f]: v } });
+    if (!onSave) setStatus(ok ? SAVED : NOT_SAVED);
+  };
+  const cell = (key: string, f: "h" | "t", ph: string, label: string) =>
+    canEdit ? <input className="rr" inputMode="decimal" placeholder={ph} value={typed[key]?.[f] ?? ""} onChange={(e) => set(key, f, e.target.value)} onBlur={commit} aria-label={label} /> : <>{typed[key]?.[f] || "—"}</>;
   const bands = [...body.map((x) => `${x.r.name} ±${x.band != null ? fmtFixed(x.band, 0) : "—"}%`), `cả tháng ±${totCalc?.band != null ? fmtFixed(totCalc.band, 0) : (noiseBand(total.sessionsCur, total.sessionsCur) != null ? fmtFixed(noiseBand(total.sessionsCur, total.sessionsCur)!, 0) : "—")}%`];
   return (
     <div className="pn">
       <div className="pnh">1 · Kế hoạch Target Live (YFB vận hành)</div>
       <div className="pns">
-        {fromApp ? `Giờ live và Target GMV cộng từ các phiên trong Kế Hoạch Tháng ${nextLabel}. ` : "Nhập Giờ live và Target GMV cho từng loại ngày. "}
-        Bảng tính GMV/giờ yêu cầu và so với GMV/giờ đã đạt tháng {curLabel}; đánh giá theo ngưỡng dao động của từng loại ngày.{fromApp ? "" : " Giá trị nhập lưu trong trình duyệt này."}
+        {fromApp ? `Giờ live và Target GMV cộng từ các phiên trong Kế Hoạch Tháng ${nextLabel}. ` : "Tự điền Giờ live và Target GMV cho từng loại ngày (chưa có Kế Hoạch Tháng chốt). "}
+        Bảng tính GMV/giờ yêu cầu và so với GMV/giờ đã đạt tháng {curLabel}; đánh giá theo ngưỡng dao động của từng loại ngày.{fromApp ? "" : onSave ? " Số tự điền lưu cùng report." : " Giá trị nhập lưu trong trình duyệt này."}
       </div>
       <div className="tw">
         <table id="t11Tbl">
@@ -95,8 +133,8 @@ export const NextLivePlanPanel: React.FC<{ nextMonth: string; curLabel: string; 
               <tr key={x.r.key}>
                 <td><b>{x.r.name}</b></td>
                 <td>{mvn(x.r.achieved)}</td>
-                <td>{x.r.plan ? fmtFixed(x.r.plan.hours, 1) : <input className="rr" inputMode="decimal" placeholder="giờ" value={typed[x.r.key]?.h ?? ""} onChange={(e) => set(x.r.key, "h", e.target.value)} aria-label={`Giờ live tháng ${nextLabel} ${x.r.name}`} />}</td>
-                <td>{x.r.plan ? fmtFixed(Math.round(x.r.plan.target / 1e6), 0) : <input className="rr" inputMode="decimal" placeholder="triệu đồng" value={typed[x.r.key]?.t ?? ""} onChange={(e) => set(x.r.key, "t", e.target.value)} aria-label={`Target GMV tháng ${nextLabel} ${x.r.name}`} />}</td>
+                <td>{x.r.plan ? fmtFixed(x.r.plan.hours, 1) : cell(x.r.key, "h", "giờ", `Giờ live tháng ${nextLabel} ${x.r.name}`)}</td>
+                <td>{x.r.plan ? fmtFixed(Math.round(x.r.plan.target / 1e6), 0) : cell(x.r.key, "t", "triệu đồng", `Target GMV tháng ${nextLabel} ${x.r.name}`)}</td>
                 <td>{mvn(x.req)}</td>
                 <td className={cls(x.d, x.band)}>{sd(x.d)}</td>
                 <td className="w">{liveVerdict(x.d, x.band)}</td>

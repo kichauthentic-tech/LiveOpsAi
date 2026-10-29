@@ -408,20 +408,15 @@ export interface NextInsightInput {
   nextLabel: string;
   hasLivePlan: boolean;
   hasCreatorPlan: boolean;
-  actions: { met: number; missed: number; other: number } | null;
 }
 
 export function nextBlocks(i: NextInsightInput): InsightBlocks {
   const missing = [!i.hasLivePlan && "Target Live", !i.hasCreatorPlan && "lịch Booking Creator (Target Creator)"].filter(Boolean) as string[];
-  const a = i.actions;
-  const observe = join(
-    missing.length ? `${i.nextLabel} chưa có ${missing.join(" và ")}.` : `${i.nextLabel} đã có Target Live và lịch Booking Creator.`,
-    a ? `Việc đề ra tháng trước: ${a.met} đạt, ${a.missed} chưa đạt, ${a.other} cần ops đánh giá.` : "Tháng trước chưa có Action plan để chấm."
-  );
+  const observe = missing.length ? `${i.nextLabel} chưa có ${missing.join(" và ")}.` : `${i.nextLabel} đã có Target Live và lịch Booking Creator.`;
   return {
     observe,
-    cause: a && a.missed > 0 ? `${a.missed} việc chưa đạt chỉ tiêu đo được của tháng trước.` : "Không có việc nào của tháng trước chưa đạt chỉ tiêu đo được.",
+    cause: missing.length ? `Thiếu ${missing.join(" và ")}.` : "Đã đủ Target Live và lịch Booking Creator.",
     impact: missing.length ? "Thiếu kế hoạch thì Target tháng sau dễ đặt theo mục tiêu tổng thay vì GMV/giờ đã đạt." : "Kế hoạch đã đủ để chấm tiến độ ngay từ đầu tháng.",
-    advise: missing.length ? `Lập ${missing.join(" và ")}, mỗi việc gắn chỉ tiêu đo được để app tự đánh giá ở report tháng sau.` : "Gắn mỗi việc của Action plan với chỉ tiêu đo được."
+    advise: missing.length ? `Lập ${missing.join(" và ")} trước khi chốt report.` : "Theo dõi tiến độ theo Target Live và Booking từ đầu tháng."
   };
 }

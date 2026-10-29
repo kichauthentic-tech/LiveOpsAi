@@ -16,11 +16,9 @@ import { controlGroup, liveGmvByDate, controlLabel, controlLine, controlVerdict,
 import { CreatorLivePerfRow, vnDateOf } from "../../lib/dataraw/creatorLivePerfSlice";
 import { fetchMonthPlan } from "../../lib/db/monthPlans";
 import type { BrandMonthPlan, BrandMonthPlanSlot } from "../../types";
-import { fetchMonthlyReport, saveMonthlyReportActionPlan, saveMonthlyReportSectionNote } from "../../lib/db/monthlyReports";
-import { gradeAction, newActionItem, type ActionAutoData, type ActionGradeContext } from "../../lib/report/actionPlan";
-import { adsDayPoints, adsTypeRows } from "../../lib/report/adsSlide";
-import { ActionPlanPanel, ActionResultsPanel } from "./report/ActionPlan";
-import { BookingPlanPanel, NextLivePlanPanel } from "./report/NextMonthPanels";
+import { fetchMonthlyReport, saveMonthlyReportSectionNote } from "../../lib/db/monthlyReports";
+import { adsTypeRows } from "../../lib/report/adsSlide";
+import { BookingPlanPanel, LIVE_TARGET_MANUAL_KEY, NextLivePlanPanel, decodeLiveTarget, encodeLiveTarget } from "./report/NextMonthPanels";
 import { REFUND_FINAL_KEY, applyFinalRate, bookingTotals, decodeRefundFinal, encodeRefundFinal, refundTrackRows } from "../../lib/report/nextMonthPlan";
 import { BLOCK_KEYS, BLOCK_LABEL, decodeEdits, shownBlocks, type InsightBlocks, adsBlocks, affiliateBlocks, keyMetricsBlocks, nextBlocks, nmvBlocks, pageNoteKey, peopleBlocks, productsBlocks, shopBlocks, summaryBlocks, whyBlocks, type InsightPage } from "../../lib/report/pageInsights";
 import { contextInsight, HostInsightRow, hostVsPeer, InsightSection, peopleInsight, peopleOpsNote, productsInsight, sectionNextSteps, SectionInsight, shopInsight, shortSku, whyInsight } from "../../lib/report/sectionInsights";
@@ -117,18 +115,6 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
 
   const { start, end } = useMemo(() => monthRangeLocal(month), [month]);
   const prevMonth = useMemo(() => prevMonthStrLocal(month), [month]);
-  // Dòng report tháng trước — chỉ để đọc action plan viết ở đó và chấm bằng số tháng này (0182). Brand chỉ đọc được
-  // khi tháng trước đã phát hành (RLS 0051).
-  const [prevReportRow, setPrevReportRow] = useState<BrandMonthlyReportType | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    fetchMonthlyReport(brandId, `${prevMonth}-01`)
-      .then((row) => !cancelled && setPrevReportRow(row))
-      .catch(() => !cancelled && setPrevReportRow(null));
-    return () => {
-      cancelled = true;
-    };
-  }, [brandId, prevMonth]);
   const { start: prevStart, end: prevEnd } = useMemo(() => monthRangeLocal(prevMonth), [prevMonth]);
   const last4Months = useMemo(() => {
     const out: string[] = [];
@@ -612,41 +598,6 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   const creatorSum = useMemo(() => creatorTotals(creatorRows), [creatorRows]);
   const trackCols = useMemo(() => affiliateTrackColumns(affiliate.cur), [affiliate.cur]);
   const trackSum = useMemo(() => affiliateTrackTotals(trackCols), [trackCols]);
-  // Số thực tế điền sẵn cho cột Kết quả của bảng "Đánh giá lại" (việc có autoKey) — nối từ các khối đã tính ở dưới/trên cùng report.
-  const actionAuto = useMemo<ActionAutoData>(() => {
-    const dm = (d: string) => `${Number(d.slice(8))}/${Number(d.slice(5, 7))}`;
-    const adsRows = adsPlanRows?.key === `${brandId}|${month}` ? adsPlanRows.rows : [];
-    const adsBelow70 = adsRows.length
-      ? adsDayPoints(adsRows, month, bucketCur)
-          .filter((p) => p.hasActual && p.target && p.total != null && (p.total / p.target) * 100 < 70)
-          .map((p) => `${dm(p.date)} (${fmtFixed(((p.total ?? 0) / (p.target ?? 1)) * 100, 1)}%)`)
-      : null;
-    const byCreator = new Map<string, number>();
-    for (const c of trackCols) byCreator.set(c.creator, (byCreator.get(c.creator) ?? 0) + (c.directGmv ?? 0));
-    const totalDirect = [...byCreator.values()].reduce((a, b) => a + b, 0);
-    const top = [...byCreator.entries()].sort((a, b) => b[1] - a[1])[0];
-    const all = control.find((r) => r.key === "all");
-    return {
-      adsBelow70,
-      affPctTarget: trackCols.length ? trackCols.map((c) => ({ label: `${c.creator}${c.date ? ` ${dm(c.date)}` : ""}`, pct: c.pctTarget ?? null })) : null,
-      affCreators: byCreator.size ? { count: byCreator.size, topName: top[0], topShare: totalDirect > 0 ? (top[1] / totalDirect) * 100 : null } : null,
-      restGrowth: all?.channelChg ? { video: all.channelChg.video, card: all.channelChg.card, windowLabel: cmp.label } : null,
-      runrate: planRR?.rr.total.keepPace != null ? { projected: planRR.rr.total.keepPace, target: kpiTargetGmvCur } : null
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adsPlanRows, brandId, month, bucketCur, trackCols, control, cmp, planRR, kpiTargetGmvCur]);
-  const actionCtx = useMemo<ActionGradeContext>(() => {
-    const by = (k: CampDayBucket) => campDetailRows.find((r) => r.key === k);
-    const bucket = <T,>(f: (k: CampDayBucket) => T) => Object.fromEntries(CAMP_DAY_BUCKET_ORDER.map((k) => [k, f(k)])) as Record<CampDayBucket, T>;
-    return {
-      stats: { all: liveCurStats, ...bucket((k) => by(k)?.cur ?? null) },
-      targets: { all: kpiTargetGmvCur, ...bucket((k) => by(k)?.target ?? null) },
-      final: !cmp.partial,
-      auto: actionAuto
-    };
-  }, [liveCurStats, campDetailRows, kpiTargetGmvCur, cmp, actionAuto]);
-  const prevPlanItems = prevReportRow?.actionPlan?.items ?? null;
-  const prevGrades = useMemo(() => (prevPlanItems ? prevPlanItems.map((i) => gradeAction(i, actionCtx)) : null), [prevPlanItems, actionCtx]);
   const creatorPlan = useMemo(() => creatorPlanRows(affiliate.next, creatorRows), [affiliate.next, creatorRows]);
   const creatorBest = useMemo(() => {
     const best: Record<string, number> = {};
@@ -825,7 +776,6 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     const top10 = skuRows.reduce((a, r) => a + r.gmv, 0);
     const lowestCreator = creatorRows.filter((r) => r.pctTarget != null).sort((a, b) => a.pctTarget! - b.pctTarget!)[0];
     const cRates = creatorRates(creatorSum);
-    const grades = prevGrades ?? [];
     const out: Record<InsightPage, InsightBlocks> = {
       summary: summaryBlocks({
         liveActual: liveCurStats.gmv,
@@ -896,8 +846,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
       next: nextBlocks({
         nextLabel: `Tháng ${Number(nextMonth.slice(5))}`,
         hasLivePlan: !!nextPlan && nextPlan.targetGmv > 0 && nextPlan.slotCount > 0,
-        hasCreatorPlan: (affiliate.next?.length ?? 0) > 0,
-        actions: prevGrades ? { met: grades.filter((g) => g.status === "met").length, missed: grades.filter((g) => g.status === "missed").length, other: grades.filter((g) => g.status !== "met" && g.status !== "missed").length } : null
+        hasCreatorPlan: (affiliate.next?.length ?? 0) > 0
       })
     };
     return out;
@@ -991,7 +940,6 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
       : [];
     const adsCreatorRow = adsPlan && adsPlanRows ? adsTypeRows(adsPlanRows.rows, month).find((r) => r.key === "creator") : undefined;
     const bookingSum = bookingTotals(creatorPlan);
-    const todoItems = monthlyReportRow?.actionPlan?.items?.length ? monthlyReportRow.actionPlan.items : nextLines.map((l) => newActionItem(l));
     const metrics: Record<InsightPage, PageMetric[]> = {
       summary: [totalGmv, liveGmv, nmv, gmvPerHour],
       keymetrics: [
@@ -1017,8 +965,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
       next: [
         { label: `Target Live tháng ${Number(nextMonth.slice(5))}`, value: nextPlan && nextPlan.targetGmv > 0 ? fmtVndShort(nextPlan.targetGmv) : "—", note: nextPlan && nextPlan.targetGmv > 0 ? `${nextPlan.slotCount} phiên trong Kế Hoạch Tháng` : "chưa nhập · bảng Kế hoạch Live" },
         { label: `Target Creator tháng ${Number(nextMonth.slice(5))}`, value: bookingSum.target > 0 ? fmtVndShort(bookingSum.target) : "—", note: bookingSum.target > 0 ? "tổng Target lịch Booking" : "tổng Target lịch Booking, chưa nhập" },
-        { label: `Booking Creator tháng ${Number(nextMonth.slice(5))}`, value: `${bookingSum.sessions} phiên`, note: bookingSum.sessions > 0 ? `${fmtFixed(bookingSum.hours, 1)} giờ live` : `chưa có phiên nào trong tab Affiliate (T${Number(nextMonth.slice(5))})` },
-        { label: `Việc đề xuất cho tháng ${Number(nextMonth.slice(5))}`, value: String(todoItems.length), note: `${todoItems.filter((i) => i.target).length} app tự đánh giá · ${todoItems.filter((i) => !i.target).length} ops đánh giá` }
+        { label: `Booking Creator tháng ${Number(nextMonth.slice(5))}`, value: `${bookingSum.sessions} phiên`, note: bookingSum.sessions > 0 ? `${fmtFixed(bookingSum.hours, 1)} giờ live` : `chưa có phiên nào trong tab Affiliate (T${Number(nextMonth.slice(5))})` }
       ]
     };
     const headline =
@@ -1647,6 +1594,9 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
               return { key, name: DAY_TYPE_SHORT[key], achieved: camp?.cur.gmvPerHour ?? null, sessionsCur: camp?.cur.sessions ?? 0, plan: a ? { hours: a.hours, target: a.target, slots: a.slots } : undefined };
             })}
             total={{ key: "all", name: "Cả tháng", achieved: liveCurStats.gmvPerHour, sessionsCur: liveCurStats.sessions }}
+            saved={decodeLiveTarget(monthlyReportRow?.sectionNotes?.[LIVE_TARGET_MANUAL_KEY]?.text)}
+            canEdit={canManage}
+            onSave={async (m) => setMonthlyReportRow(await saveMonthlyReportSectionNote(brandId, `${month}-01`, LIVE_TARGET_MANUAL_KEY, encodeLiveTarget(m)))}
           />
           <BookingPlanPanel
             nextMonth={nextMonth}
@@ -1656,25 +1606,6 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             cur={{ sessions: creatorSum.sessions, hours: creatorSum.hours, gmv: creatorSum.gmv, gmvPerHour: creatorRates(creatorSum).gmvPerHour, roas: creatorRates(creatorSum).roas }}
             refByCreator={creatorBest}
             draftNote={canManage && creatorPlan.length > 0 && !affiliate.nextMeta?.publishedAt ? "Kế hoạch Affiliate tháng sau còn là nháp — brand chỉ thấy bảng này sau khi Chốt ở tab Affiliate." : undefined}
-          />
-          {prevPlanItems && prevGrades && (
-            <ActionResultsPanel
-              planMonthLabel={`tháng ${Number(prevMonth.slice(5))}`}
-              monthLabel={`tháng ${Number(month.slice(5))}`}
-              items={prevPlanItems}
-              grades={prevGrades}
-              final={actionCtx.final}
-              throughNote={cmp.partial ? `số tới ${Number(cmp.curEnd.slice(8))}/${Number(month.slice(5))}` : null}
-              canManage={canManage}
-              onSave={async (items) => setPrevReportRow(await saveMonthlyReportActionPlan(brandId, `${prevMonth}-01`, items))}
-            />
-          )}
-          <ActionPlanPanel
-            items={monthlyReportRow?.actionPlan?.items ?? null}
-            fallbackLines={nextLines}
-            nextMonthLabel={`tháng ${Number(nextMonth.slice(5))}`}
-            canManage={canManage}
-            onSave={async (items) => setMonthlyReportRow(await saveMonthlyReportActionPlan(brandId, `${month}-01`, items))}
           />
           {pageInsight("next")}
         </section>

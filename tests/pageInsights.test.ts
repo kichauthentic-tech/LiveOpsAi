@@ -79,7 +79,7 @@ test("Shop / Ads / Affiliate / NMV / Kế hoạch: câu mẫu theo quy tắc, th
   expect(ads.impact).toContain("Không ngày nào");
   expect(affiliateBlocks({ sessions: 0, creators: 0, gmv: 0, pctTarget: null, top: null, gmvPerHour: null, lowest: null }).observe).toContain("Chưa đủ");
   expect(nmvBlocks({ refundCur: 37.7, refundPrev: 36.9, prevLabel: "T9", nmvSource: null, usesCrmRate: false }).observe).toContain("37,7%");
-  expect(nextBlocks({ nextLabel: "Tháng 11", hasLivePlan: false, hasCreatorPlan: true, actions: { met: 1, missed: 2, other: 3 } }).observe).toContain("chưa có Target Live");
+  expect(nextBlocks({ nextLabel: "Tháng 11", hasLivePlan: false, hasCreatorPlan: true }).observe).toContain("chưa có Target Live");
 });
 
 test("mọi hàm sinh trả đủ 4 khối không rỗng, kể cả khi thiếu dữ liệu", () => {
@@ -90,7 +90,7 @@ test("mọi hàm sinh trả đủ 4 khối không rỗng, kể cả khi thiếu 
     productsBlocks({ topN: 0, risers: [], fallers: [], lead: null, promo: null }),
     peopleBlocks({ hosts: [], months: 0, slots: [] }),
     adsBlocks({ cost: 0, target: null, liveRoas: null, buckets: [], zeroOrderDays: 0 }),
-    nextBlocks({ nextLabel: "Tháng 11", hasLivePlan: true, hasCreatorPlan: true, actions: null })
+    nextBlocks({ nextLabel: "Tháng 11", hasLivePlan: true, hasCreatorPlan: true })
   ];
   for (const b of empties) for (const k of BLOCK_KEYS) expect(b[k].length).toBeGreaterThan(0);
 });
