@@ -203,7 +203,7 @@ export async function printStandaloneHtml(html: string, fileBase: string): Promi
   setTimeout(cleanup, 60_000);
 }
 
-export function buildStandaloneHtml(root: HTMLElement, title: string, tabVariants: Map<string, string[]> = new Map(), chartTips: Map<string, ChartTip> = new Map(), pdf = false): string {
+export function buildStandaloneHtml(root: HTMLElement, title: string, tabVariants: Map<string, string[]> = new Map(), chartTips: Map<string, ChartTip> = new Map(), pdf = false, heading = ""): string {
   const clone = root.cloneNode(true) as HTMLElement;
   // Khung ẩn ngoài màn hình (fixed, left −10000px) không được theo vào file.
   clone.removeAttribute("style");
@@ -234,6 +234,16 @@ export function buildStandaloneHtml(root: HTMLElement, title: string, tabVariant
   });
   clone.querySelectorAll(".recharts-tooltip-wrapper").forEach((el) => el.remove());
   clone.querySelector("section[id^=mr-]")?.parentElement?.classList.add("pdf-sections");
+  // PDF: dòng mở đầu ở đầu trang 1 (nằm trong section nên được tính vào chiều cao trang khi đo @page).
+  if (pdf && heading) {
+    const first = clone.querySelector<HTMLElement>("section[id^=mr-]");
+    if (first) {
+      const h = document.createElement("div");
+      h.style.cssText = `padding:20px 20px 12px;margin-bottom:8px;border-bottom:2px solid ${PAL.gold};font-size:22px;font-weight:800;letter-spacing:.2px;color:${PAL.cream}`;
+      h.textContent = heading;
+      first.insertBefore(h, first.firstChild);
+    }
+  }
 
   const tipData = JSON.stringify(Object.fromEntries(chartTips)).replace(/</g, "\\u003c");
   const script = `

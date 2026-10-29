@@ -345,7 +345,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
       const tips = await captureChartTooltips(host);
       const variants = await captureTabVariants(host);
       if (kind === "pdf") {
-        await printStandaloneHtml(buildStandaloneHtml(host, title, variants, tips, true), base);
+        await printStandaloneHtml(buildStandaloneHtml(host, title, variants, tips, true, `Report YFB x ${brandName} · Tháng ${Number(monthM)}/${monthY}`), base);
       } else {
         downloadHtml(`${base}.html`, buildStandaloneHtml(host, title, variants, tips));
         showToast("Đã tải file HTML gửi brand.", "success");
