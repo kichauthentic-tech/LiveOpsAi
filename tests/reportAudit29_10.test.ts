@@ -179,15 +179,17 @@ describe("N1 · 'vượt ngưỡng' chỉ gắn cho GMV/giờ của loại ngày
   });
 });
 
-describe("N2 · tile GMV/giờ trang 1 chỉ đỏ khi vượt ngưỡng dao động", () => {
-  const render = (band: number | null) => renderToStaticMarkup(React.createElement(SummaryDemoPage, summaryProps({ gmvPerHour: 18.9e6, gmvPerHourChange: -7.2, hoursChange: 2.8, gmvPerHourBand: band })));
-  it("−7,2% trong ngưỡng ±8% ⇒ không đỏ, có ghi 'trong ngưỡng'", () => {
-    const h = render(8);
-    expect(h).not.toContain("var(--red)");
-    expect(h).toContain("trong ngưỡng ±8%");
+describe("N2 · trang 1 có 4 chip cam kết/tiến độ, không còn chip GMV/giờ", () => {
+  const h = renderToStaticMarkup(React.createElement(SummaryDemoPage, summaryProps({ liveTargetMonth: 5.15e9 })));
+  it("không còn chip GMV/giờ", () => {
+    expect(h).not.toContain("so với 1–");
   });
-  it("−7,2% với ngưỡng ±5% ⇒ đỏ", () => {
-    expect(render(5)).toContain("var(--red)");
+  it("có chip Giờ live và Tiến độ tháng", () => {
+    expect(h).toContain("Tiến độ tháng");
+    expect(h).toContain("kế hoạch tháng");
+  });
+  it("tối đa 4 chip", () => {
+    expect((h.match(/class="kpi"/g) ?? []).length).toBeLessThanOrEqual(4);
   });
 });
 

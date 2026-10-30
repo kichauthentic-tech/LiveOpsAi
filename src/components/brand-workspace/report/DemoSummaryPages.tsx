@@ -72,17 +72,38 @@ export const SummaryDemoPage: React.FC<SummaryDemoProps> = (p) => {
       note: base ? <><span className={`pc ${pcTone((p.liveActual / base) * 100)}`}>{pct1((p.liveActual / base) * 100)}</span> {liveTarget} {amt(base)}</> : (p.gmvLabel ? "chưa có Target" : "chưa có Target LIVE")
     }
   ];
-  if (p.partial && p.liveProjected != null) {
-    const tm = p.liveTargetMonth;
+  // Giờ live thực hiện so với giờ cam kết trong Kế Hoạch Tháng (cả tháng; ca đã huỷ không có giờ kế hoạch).
+  const planHoursMonth = p.planHours.reduce((a, r) => a + r.planHours, 0);
+  const doneHours = Object.values(p.actualHours).reduce((a: number, v) => a + (v ?? 0), 0);
+  const daysInMonth = new Date(Number(p.month.slice(0, 4)), Number(mm), 0).getDate();
+  const timePct = p.partial ? (p.curEndDay / daysInMonth) * 100 : 100;
+  if (planHoursMonth > 0) {
+    const hp = (doneHours / planHoursMonth) * 100;
     kpis.push({
-      lab: `Dự báo cuối tháng · ${gl}`,
-      val: amt(p.liveProjected),
-      note: tm ? <><span className={`pc ${pcTone((p.liveProjected / tm) * 100)}`}>{pct1((p.liveProjected / tm) * 100)}</span> Target tháng {amt(tm)} · {p.liveProjected - tm >= 0 ? "+" : ""}{amt(p.liveProjected - tm)}</> : undefined
+      lab: `${METRIC.liveHours} · ${p.partial ? `tới ${p.curEndDay}/${mm}` : `tháng ${Number(mm)}`}`,
+      val: `${fmtFixed(doneHours, 1)}h`,
+      note: <><span className={`pc ${pcTone(p.partial ? (hp / timePct) * 100 : hp)}`}>{pct1(hp)}</span> kế hoạch tháng {Math.round(planHoursMonth)}h{p.partial ? ` · đã qua ${pct1(timePct)} thời gian` : ""}</>
     });
+  } else {
+    kpis.push({ lab: `${METRIC.liveHours} · ${p.partial ? `tới ${p.curEndDay}/${mm}` : `tháng ${Number(mm)}`}`, val: `${fmtFixed(doneHours, 1)}h`, note: "chưa có giờ kế hoạch" });
+  }
+  // Tiến độ tháng: % Target tháng đã có so với % thời gian đã qua (+ dự báo cuối tháng nếu có).
+  const tm = p.liveTargetMonth;
+  if (tm) {
+    const done = (p.liveActual / tm) * 100;
+    kpis.push({
+      lab: `Tiến độ tháng · ${gl}`,
+      val: pct1(done),
+      tone: p.partial && done < timePct - 10 ? "red" : undefined,
+      note: p.partial
+        ? `Target tháng ${amt(tm)} · đã qua ${p.curEndDay}/${daysInMonth} ngày (${pct1(timePct)})${p.liveProjected != null ? ` · dự báo ${amt(p.liveProjected)} = ${pct1((p.liveProjected / tm) * 100)}` : ""}`
+        : `Target tháng ${amt(tm)} · ${p.liveActual - tm >= 0 ? "+" : "−"}${amt(Math.abs(p.liveActual - tm))}`
+    });
+  } else {
+    kpis.push({ lab: `Tiến độ tháng · ${gl}`, val: "—", note: "chưa có Target tháng" });
   }
   if (p.shop) {
-    // Cùng mẫu số với dòng KPI Total GMV của bảng Kết quả (KPI tới nay khi tháng còn dở) — trước 30/10 ô ghi % KPI cả tháng (77%)
-    // còn bảng ghi % KPI tới nay (88%), cạnh "dự báo 88%" nên đọc nhầm.
+    // Cùng mẫu số với dòng KPI Total GMV của bảng Kết quả (KPI tới nay khi tháng còn dở).
     const shopRow = p.score.find((r) => r.key === "shop");
     const shopBase = p.partial && shopRow?.targetToDate ? shopRow.targetToDate : p.shop.target;
     const shopPctNow = shopBase > 0 ? (p.shop.actual / shopBase) * 100 : null;
@@ -92,17 +113,18 @@ export const SummaryDemoPage: React.FC<SummaryDemoProps> = (p) => {
       note: (
         <>
           {shopPctNow != null && <span className={`pc ${pcTone(shopPctNow)}`}>{pct1(shopPctNow)}</span>} {shopBase !== p.shop.target ? `KPI tới nay ${amt(shopBase)}` : `KPI tháng ${amt(p.shop.target)}`}
-          {p.shop.projected != null && p.shop.projectedPct != null ? ` · dự báo ${amt(p.shop.projected)} = ${fmtP(p.shop.projectedPct, 0, false)} KPI tháng ${amt(p.shop.target)}` : ""}
+          {p.shop.projected != null && p.shop.projectedPct != null ? ` · dự báo ${amt(p.shop.projected)} = ${fmtP(p.shop.projectedPct, 0, false)} KPI tháng` : ""}
         </>
       )
     });
-  }
-  if (p.gmvPerHour != null) {
+  } else if (tm) {
+    const left = tm - p.liveActual;
+    const daysLeft = daysInMonth - (p.partial ? p.curEndDay : daysInMonth);
     kpis.push({
-      lab: `${METRIC.gmvPerHour} · so với ${p.partial ? `1–${p.prevEndDay}/${p.prevMonthShort.slice(1).padStart(2, "0")}` : p.prevMonthShort}`,
-      val: p.gmvPerHourChange != null ? fmtP(p.gmvPerHourChange, 1) : amt(p.gmvPerHour),
-      tone: p.gmvPerHourChange != null && p.gmvPerHourChange < 0 && (p.gmvPerHourBand == null || Math.abs(p.gmvPerHourChange) >= p.gmvPerHourBand) ? "red" : undefined,
-      note: `${amt(p.gmvPerHour)}${p.hoursChange != null ? ` · ${METRIC.liveHours} ${fmtP(p.hoursChange, 1)}` : ""}${p.gmvPerHourChange != null && p.gmvPerHourBand != null && Math.abs(p.gmvPerHourChange) < p.gmvPerHourBand ? ` · trong ngưỡng ±${Math.round(p.gmvPerHourBand)}%` : ""}`
+      lab: `Còn thiếu so Target tháng`,
+      val: left > 0 ? amt(left) : "Đã đạt",
+      tone: left > 0 ? undefined : "green",
+      note: left > 0 && daysLeft > 0 ? `≈ ${amt(left / daysLeft)}/ngày trong ${daysLeft} ngày còn lại` : left > 0 ? "hết tháng" : `vượt ${amt(-left)}`
     });
   }
 
