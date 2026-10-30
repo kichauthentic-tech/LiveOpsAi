@@ -165,8 +165,7 @@ describe("một thang nhãn, một chỗ tính (21/10)", () => {
       // Sa bàn: điểm % khi thêm ca (cùng engine, không chữ kết luận).
       "components/OpsMonthView.tsx",
       // Report Tháng / Tuần: bản chụp sau tháng.
-      "components/brand-workspace/MonthlyReportTabs.tsx",
-      "components/brand-workspace/BrandWeeklyReport.tsx"
+      "components/brand-workspace/MonthlyReportTabs.tsx"
     ]);
     const offenders = src
       .filter((f) => f.includes("/components/"))

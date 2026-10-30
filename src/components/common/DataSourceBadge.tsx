@@ -2,7 +2,7 @@ import React from "react";
 import { CheckCircle2, Clock, FileCheck2 } from "lucide-react";
 import { LiveSession } from "../../types";
 import { profileOf } from "../../lib/platforms/profiles";
-import { dataSourceTier } from "../../lib/dataSource";
+import { dataSourceTier, isHandoverFile } from "../../lib/dataSource";
 
 interface DataSourceBadgeProps {
   dataSource: LiveSession["dataSource"];
@@ -35,7 +35,7 @@ export const DataSourceBadge: React.FC<DataSourceBadgeProps> = ({ dataSource, pl
       <span
         className={`inline-flex items-center gap-1 whitespace-nowrap text-[11px] font-bold px-2 py-0.5 rounded-full border bg-sky-950 text-sky-300 border-sky-800 ${className}`}
         title={
-          dataSource === "live_snapshot"
+          isHandoverFile({ dataSource })
             ? `Số đọc từ file ${prof.reconciliationFile} trợ live tải lên lúc giao ca — chờ đối soát cuối kỳ`
             : `Số dashboard ${shop} trợ live gõ lúc giao ca (đã trừ ca nối) — thường thấp hơn số chốt, chờ đối soát bằng ${prof.reconciliationFile}`
         }

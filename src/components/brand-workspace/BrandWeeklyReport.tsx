@@ -14,8 +14,10 @@ import { filterSessions, sessionHours } from "../../lib/performance/hostPerforma
 import { metricSheetLabel, metricSheetValue, profileOf, type HostRankRow } from "../../lib/platforms/profiles";
 import { channelTitle, platformOf, type ReportPlatform } from "../../lib/reportPlatform";
 import { hasLiveNumbers, monthRunRate, monthRunRateFromPlan } from "../../lib/report/sessionsLivePerf";
-import { planRunRate, projectMonthEnd } from "../../lib/performance/planRunRate";
-import { lastDataDate, monthOutlook } from "../../lib/performance/ceoBrief";
+import { projectMonthEnd } from "../../lib/performance/planRunRate";
+import { planMonthOutlook } from "../../lib/performance/channelCard";
+import { DEFAULT_ENGINE_PARAMS, type EngineParams } from "../../lib/scheduling/engineParams";
+import { lastDataDate } from "../../lib/performance/ceoBrief";
 import { fetchMonthPlan } from "../../lib/db/monthPlans";
 import { effectiveCamp } from "../../lib/campaignDays";
 import { MissingStep, missingSteps } from "../../lib/sessionLedger";
@@ -31,6 +33,8 @@ interface BrandWeeklyReportProps {
   sessions: LiveSession[];
   currentRole: UserRole;
   shiftSlots?: ShiftSlot[]; // ca mở chưa có người tuần tới
+  /** Tham số engine admin đã vặn — cùng bộ với thẻ kênh; vắng thì mặc định. */
+  engineParams?: EngineParams;
   // Nút chuyển Tháng/Tuần của Report Tháng — đặt trong thẻ đầu trang này thay vì thành khối riêng phía trên (audit UX 2026-09-29).
   headerExtra?: React.ReactNode;
 }
@@ -62,7 +66,7 @@ const Kpi: React.FC<{ label: string; value: string; delta?: number | null; hint?
 // Tháng mới là bản giao brand). Nguồn: `live_sessions` (ca có số: đối soát/snapshot/nạp bù) + target
 // kế hoạch đã đổ xuống ca + shift_slots cho tuần tới. Dataraw (số TikTok toàn shop theo ngày) chỉ
 // đặt cạnh để ops thấy GMV live chiếm bao nhiêu trong shop — không còn là nguồn chính.
-export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, brandName, platform, sessions: allSessions, currentRole, shiftSlots: allShiftSlots = [], headerExtra }) => {
+export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, brandName, platform, sessions: allSessions, currentRole, shiftSlots: allShiftSlots = [], engineParams, headerExtra }) => {
   const today = getTodayDate();
   const prof = profileOf(platform);
   // TikTok và Shopee là hai báo cáo riêng (user chốt 07/10): ca/slot của brand này chỉ giữ ĐÚNG SÀN.
@@ -178,14 +182,14 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
       const bs = sessions.filter((s) => s.brandId === brandId);
       // Khung camp hiệu lực (effectiveCamp — cùng luật mọi màn): khung của Kế Hoạch Tháng.
       const camp = effectiveCamp(monthPlan.plan.campRanges);
-      const rr = planRunRate(monthKey, monthPlan.slots, shiftSlots ?? [], bs, getTodayDate(), camp);
-      const open = (shiftSlots ?? []).filter((sl) => sl.brandId === brandId && sl.status === "open" && !sl.sessionId);
-      return monthRunRateFromPlan(rr, projectMonthEnd(rr, monthOutlook(monthKey, getTodayDate(), bs, open, null, camp)));
+      // Cuối tháng đi qua đúng hàm của thẻ kênh (planMonthOutlook) — không tự nối lại monthOutlook.
+      const { rr, outlook } = planMonthOutlook({ brandId, platform, month: monthKey, today: getTodayDate(), sessions: bs, shiftSlots: shiftSlots ?? [], locked: true, planSlots: monthPlan.slots, camp, engineParams: engineParams ?? DEFAULT_ENGINE_PARAMS });
+      return monthRunRateFromPlan(rr!, projectMonthEnd(rr, outlook));
     }
     const [y, m] = monthKey.split("-").map(Number);
     const last = new Date(y, m, 0).getDate();
     return monthRunRate(sessions, brandId, `${monthKey}-01`, `${monthKey}-${String(last).padStart(2, "0")}`);
-  }, [monthPlan, sessions, brandId, monthKey, shiftSlots]);
+  }, [monthPlan, sessions, brandId, platform, monthKey, shiftSlots, engineParams]);
 
   const days = useMemo(() => eachDay(weekStart, weekEnd), [weekStart, weekEnd]);
   const dailyRows = useMemo(

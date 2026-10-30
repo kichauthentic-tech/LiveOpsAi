@@ -157,7 +157,14 @@ export const UNASSIGNED_HOST_KEY = "chua-gan-host";
 // khi host_name denormalized vẫn còn. Gom theo id rồi rơi về TÊN, chứ không dồn mọi ca thiếu id
 // vào chung một khoá — làm vậy sẽ trộn nhiều host thành một dòng và mượn nhầm tên của ca đầu tiên.
 export function hostKey(s: LiveSession): string {
-  return s.hostId || (s.hostName ? `ten:${s.hostName}` : UNASSIGNED_HOST_KEY);
+  return personKey(s.hostId, s.hostName) ?? UNASSIGNED_HOST_KEY;
+}
+
+/** Khoá MỘT người cho mọi màn xếp hạng/so kỳ: id nếu có, không thì `ten:` + tên đã cắt khoảng trắng ("A" và "A " là một người). */
+export function personKey(id: string | null | undefined, name: string | null | undefined): string | null {
+  if (id) return id;
+  const n = name?.trim();
+  return n ? `ten:${n}` : null;
 }
 
 // Ca chưa gán host (nạp bù từ file, host_id lẫn host_name đều rỗng) KHÔNG phải một host — để nó
@@ -249,9 +256,7 @@ const emptyBuckets = (): Record<CampDayBucket, DayTypePart> => ({
 });
 
 export function coHostKey(s: LiveSession): string | null {
-  if (s.coHostId) return s.coHostId;
-  const name = s.coHostName?.trim();
-  return name ? `ten:${name}` : null;
+  return personKey(s.coHostId, s.coHostName);
 }
 
 export function hostGmvTotal(r: HostDayTypeRow): number {

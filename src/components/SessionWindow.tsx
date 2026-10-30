@@ -30,6 +30,7 @@ import { handoverOwnerLabel, hasHandover, isHandoverPerson } from "../lib/handov
 import { useToast } from "../hooks/useToast";
 import { useConfirm } from "../hooks/useConfirm";
 import { SessionActionsContext } from "../lib/sessionActionsContext";
+import { CLOSED_MONTH_NOTICE } from "../lib/closedMonth";
 import { describeStaff, hasStaffSegments } from "../lib/staffSegments";
 import { HostChangeReports } from "./HostChangeReports";
 import { StaffSegmentsEditor } from "./StaffSegmentsEditor";
@@ -123,16 +124,18 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
   const sessionActions = useContext(SessionActionsContext);
   const [segOpen, setSegOpen] = useState(false);
   const isBrandView = viewer.role === "brand";
+  // Tháng đã phát hành Report = đóng sổ (0133): DB chặn mọi ghi — báo + khoá nút ngay, không đợi lỗi lúc Lưu.
+  const monthClosed = !isBrandView && !!sessionActions.isMonthClosed?.(s);
   const isOps = OPS_ROLES.includes(viewer.role);
   const isMine = !!viewer.myTalentId && (viewer.myTalentId === s.hostId || viewer.myTalentId === s.coHostId);
   // Up file / nộp report: ops, hoặc host/trợ của đúng ca (khớp guard can_edit_session_snapshot, 0082).
   // U6: ca nạp bù (tháng cũ) không có report — không hiện form.
   // Giao ca (0144): trợ live của ca, ca không trợ thì OPS (user chốt 06/10). Host xem được ai phải giao.
   const showHandover = !isBrandView && !s.isBackfill && s.status !== "Cancelled" && !!onSessionsUpdated;
-  const canHandover = showHandover && (isOps || isHandoverPerson(s, viewer.myTalentId));
+  const canHandover = showHandover && !monthClosed && (isOps || isHandoverPerson(s, viewer.myTalentId));
   // Trainer (0176) xếp/dời/huỷ ca như ops, nhưng không giao ca / up số / đối soát (các RPC đó vẫn ceo/admin/ops).
   const isScheduler = isOps || viewer.role === "trainer";
-  const canEdit = isScheduler && !!onUpdateSession && !!studios && !!talents;
+  const canEdit = !monthClosed && isScheduler && !!onUpdateSession && !!studios && !!talents;
   // 0133: DB không cho dời ngày/giờ ca đã có số (ranh giới snapshot/đối soát tính theo giờ ca).
   // 0138: ca đã chia người theo đoạn giờ cũng khoá giờ (offset phút của đoạn sẽ lệch) — bỏ chia đoạn trước khi dời.
   const scheduleLocked = hasSessionData(s) || hasStaffSegments(s);
@@ -279,9 +282,9 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
 
   // Gõ tay "Thực tế" (0152): ops, ca đã tới ngày (DB chặn theo giờ), chưa huỷ, chưa có số từ file/giao ca/đối soát — DB guard lại đúng các điều này.
   const canEnterActuals =
-    isOps && !!onSessionsUpdated && s.status !== "Cancelled" && dataSourceTier(s) === "manual" && !hasHandover(s) && s.date <= today;
+    isOps && !monthClosed && !!onSessionsUpdated && s.status !== "Cancelled" && dataSourceTier(s) === "manual" && !hasHandover(s) && s.date <= today;
   const hasData = dataSourceTier(s) !== "manual" || (s.actualGmv ?? 0) > 0 || (s.totalOrders ?? 0) > 0;
-  const canCancel = isScheduler && !!onCancelSession && s.status !== "Cancelled" && !hasData;
+  const canCancel = !monthClosed && isScheduler && !!onCancelSession && s.status !== "Cancelled" && !hasData;
   const doCancel = async (reopenSlot: boolean) => {
     if (!onCancelSession) return;
     setCancelling(true);
@@ -291,7 +294,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
   };
   // Loại khỏi báo cáo (Đ10/0114). Chỉ chào khi ca THẬT SỰ không huỷ/xoá được — còn huỷ được thì
   // huỷ đúng hơn (ca không diễn ra), tách sổ chỉ dành cho ca đã diễn ra mà số của nó là rác.
-  const canExclude = isOps && !!onSetSessionExcluded && (hasData || !!s.excludedFromReports);
+  const canExclude = !monthClosed && isOps && !!onSetSessionExcluded && (hasData || !!s.excludedFromReports);
   const doExclude = async (excluded: boolean) => {
     if (!onSetSessionExcluded) return;
     setExcluding(true);
@@ -373,6 +376,11 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
         </div>
 
         <div className="p-4 space-y-5">
+          {monthClosed && (
+            <div className="rounded-xl border border-amber-800 bg-amber-950/40 p-3 text-xs text-amber-200">
+              <span className="font-bold">Tháng đã đóng sổ.</span> {CLOSED_MONTH_NOTICE}
+            </div>
+          )}
           {s.status === "Cancelled" && (
             <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-base)] p-3 text-xs text-[var(--text-muted)]">
               Ca đã huỷ{s.cancelledAt ? ` lúc ${new Date(s.cancelledAt).toLocaleString("vi-VN")}` : ""}{s.cancelReason ? ` — lý do: ${s.cancelReason}` : ""}.
@@ -704,7 +712,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
             </div>
           )}
 
-          {isScheduler && (canCancel || canExclude || (isOps && onDeleteSession && !hasData)) && (
+          {isScheduler && (canCancel || canExclude || (isOps && !monthClosed && onDeleteSession && !hasData)) && (
             <div className="pt-3 border-t border-[var(--border)] space-y-2">
               {canCancel && !cancelOpen && (
                 <button onClick={() => setCancelOpen(true)} className="inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-300 hover:text-amber-200 transition-colors">
@@ -758,7 +766,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                   <RotateCcw className="w-3.5 h-3.5" /> {excluding ? "Đang đưa lại..." : "Đưa ca trở lại báo cáo"}
                 </button>
               )}
-              {isOps && onDeleteSession && !hasData && (
+              {isOps && !monthClosed && onDeleteSession && !hasData && (
                 <button
                   onClick={handleDelete}
                   disabled={deleting}

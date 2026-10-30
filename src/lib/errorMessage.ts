@@ -3,6 +3,16 @@
 // nhánh String() và hiện đúng chữ "[object Object]" trên màn hình, nuốt mất thông tin duy nhất
 // giúp chẩn đoán. Mọi chỗ bắt lỗi của tầng dữ liệu phải đi qua hàm này.
 export function errorMessage(e: unknown, fallback = "Đã có lỗi xảy ra."): string {
+  return withCurrentScreenNames(rawErrorMessage(e, fallback));
+}
+
+// Trigger DB (0133/0138/0139) còn nhắc màn "Điều Phối Phát Hành" — màn này đã gộp vào Toàn Cảnh Brand (23/10).
+// Sửa chữ ở đây thay vì viết lại thân hàm SQL dài; mọi lỗi từ tầng dữ liệu đều đi qua errorMessage.
+function withCurrentScreenNames(text: string): string {
+  return text.replace(/Điều Phối Phát Hành/g, "Toàn Cảnh Brand (cột Report Tháng)");
+}
+
+function rawErrorMessage(e: unknown, fallback: string): string {
   if (typeof e === "string") return e;
   if (e instanceof Error) return e.message;
   if (e && typeof e === "object") {

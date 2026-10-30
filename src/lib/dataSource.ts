@@ -14,5 +14,8 @@ export function dataSourceTier(s: Pick<LiveSession, "dataSource">): DataSourceTi
   return "manual";
 }
 
+/** Số giao ca đến từ FILE snapshot (khác số gõ tay lúc giao ca của ca Shopee cũ, `handover_typed`). */
+export const isHandoverFile = (s: Pick<LiveSession, "dataSource">) => s.dataSource === "live_snapshot";
+
 /** Ca có số từ giao ca trở lên (file hoặc gõ lúc giao ca, hoặc đối soát) — kể cả bán 0 đồng, đó là kết quả thật. */
 export const hasHandoverOrBetter = (s: Pick<LiveSession, "dataSource">) => dataSourceTier(s) !== "manual";

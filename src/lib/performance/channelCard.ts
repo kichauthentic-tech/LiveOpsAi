@@ -150,6 +150,31 @@ export interface ChannelCardInput {
 }
 
 
+/**
+ * MỘT phép nối kế hoạch đã chốt → run-rate → dự báo cuối tháng cho một kênh. Thẻ kênh và Report Tuần (brand) cùng gọi hàm này:
+ * trước đây Report Tuần tự gọi monthOutlook không tham số engine, không target, ca mở lẫn sàn ⇒ cuối tháng lệch thẻ kênh.
+ * `sessions` phải là ca của ĐÚNG kênh; `shiftSlots` có thể lẫn brand/sàn khác — lọc ở đây.
+ */
+export function planMonthOutlook(x: {
+  brandId: string;
+  platform: ReportPlatform;
+  month: string;
+  today: string;
+  sessions: LiveSession[];
+  shiftSlots: ShiftSlot[];
+  locked: boolean;
+  planSlots: BrandMonthPlanSlot[] | null;
+  camp: CampOverrides | undefined;
+  engineParams: EngineParams;
+}) {
+  const brandSlots = x.shiftSlots.filter((sl) => sl.brandId === x.brandId);
+  const openSlots = brandSlots.filter((sl) => platformOf(sl) === x.platform && sl.status === "open" && !sl.sessionId);
+  const rr = x.locked && x.planSlots && x.planSlots.length > 0 ? planRunRate(x.month, x.planSlots, brandSlots, x.sessions, x.today, x.camp) : null;
+  const target = rr ? { total: rr.total.target, byDate: rr.targetByDate } : null;
+  const outlook = monthOutlook(x.month, x.today, x.sessions, openSlots, target, x.camp, x.engineParams);
+  return { rr, target, outlook };
+}
+
 /** Ngày hiện ở "số đủ tới" = ngày đủ số, nhưng không vượt ngày cuối có số (ngày sau đó không có ca). */
 export function shownThroughOf(coverage: DataCoverage, sessions: LiveSession[]): string | null {
   const c = coverage.completeThrough;
@@ -195,15 +220,11 @@ export function buildChannelCard(x: ChannelCardInput): ChannelCard {
   const locked = x.plan?.status === "locked";
   const camp: CampOverrides | undefined = effectiveCamp(x.plan?.campRanges);
   const bucketOf = (d: string) => resolveCampBucketType(d, camp);
-  const brandSlots = x.shiftSlots.filter((sl) => sl.brandId === x.brandId);
-  const openSlots = brandSlots.filter((sl) => platformOf(sl) === platform && sl.status === "open" && !sl.sessionId);
 
   const coverage = dataCoverage(x.sessions, today, mStart, mEnd);
   const shownThrough = shownThroughOf(coverage, x.sessions.filter((s) => s.date >= mStart && s.date <= mEnd));
-  const rr = locked && x.planSlots && x.planSlots.length > 0 ? planRunRate(month, x.planSlots, brandSlots, x.sessions, today, camp) : null;
+  const { rr, target, outlook } = planMonthOutlook({ brandId: x.brandId, platform, month, today, sessions: x.sessions, shiftSlots: x.shiftSlots, locked, planSlots: x.planSlots, camp, engineParams: x.engineParams });
   const report = rr ? buildAccountRunRate(rr, resolveAsOf(month, rr.through, null, rr.through), coverage.completeThrough) : null;
-  const target = rr ? { total: rr.total.target, byDate: rr.targetByDate } : null;
-  const outlook = monthOutlook(month, today, x.sessions, openSlots, target, camp, x.engineParams);
   const newChannel = outlook.forecastModel !== "shape";
 
   const feasibility = rr && x.planSlots ? targetFeasibility(x.sessions, month, x.planSlots) : null;

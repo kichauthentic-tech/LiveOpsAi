@@ -12,6 +12,7 @@ import { createStudio, updateStudio, deleteStudio } from "./lib/db/studios";
 import { createEquipment, updateEquipment, deleteEquipment } from "./lib/db/equipments";
 import { fetchSessions, finalizeShiftSlot, updateSession, deleteSession, cancelSession, setSessionExcluded, setSessionStaffSegments } from "./lib/db/sessions";
 import { SessionActionsContext } from "./lib/sessionActionsContext";
+import { CLOSED_MONTH_NOTICE, isSessionMonthClosed } from "./lib/closedMonth";
 import { createBrand, updateBrand, deleteBrand } from "./lib/db/brands";
 import { fetchUsers, updateUserProfile, inviteUser, deleteUserAccount, InviteUserPayload, setUserEmail, resetUserPassword } from "./lib/db/users";
 import type { GrantResult } from "./lib/talentAccounts";
@@ -1129,6 +1130,10 @@ export default function App() {
   // `base` = bản ca lúc bắt đầu sửa (SessionWindow giữ lúc bấm "Sửa ca"); vắng thì lấy bản đang có trong state — kéo thẻ
   // đổi phòng/ngày dựng bản sửa từ đúng bản đó. Chỉ trường khác base được ghi (0178).
   const handleUpdateSession = async (updatedSession: LiveSession, base?: LiveSession): Promise<boolean> => {
+    if (isSessionMonthClosed(monthlyReports, updatedSession) || (base && isSessionMonthClosed(monthlyReports, base))) {
+      showToast(`Không thể cập nhật Live Session: ${CLOSED_MONTH_NOTICE}`);
+      return false;
+    }
     try {
       const saved = await updateSession(updatedSession, base ?? sessions.find((x) => x.id === updatedSession.id));
       setSessions(prev => prev.map(s => s.id === saved.id ? saved : s));
@@ -1140,6 +1145,10 @@ export default function App() {
   };
   // Đổi người giữa ca (0138): ghi đoạn giờ từng người, RPC tự đồng bộ người chính của ca → state lấy lại bản ca đầy đủ.
   const handleSetStaffSegments = async (session: LiveSession, segments: Parameters<typeof setSessionStaffSegments>[1], reason: string): Promise<boolean> => {
+    if (isSessionMonthClosed(monthlyReports, session)) {
+      showToast(`Không thể lưu người theo đoạn giờ: ${CLOSED_MONTH_NOTICE}`);
+      return false;
+    }
     try {
       const saved = await setSessionStaffSegments(session.id, segments);
       setSessions((prev) => prev.map((x) => (x.id === saved.id ? saved : x)));
@@ -1165,6 +1174,11 @@ export default function App() {
     setSessions(await fetchSessions());
   };
   const handleDeleteSession = async (id: string) => {
+    const target = sessions.find((x) => x.id === id);
+    if (target && isSessionMonthClosed(monthlyReports, target)) {
+      showToast(`Không thể xóa Live Session: ${CLOSED_MONTH_NOTICE}`);
+      return;
+    }
     try {
       await deleteSession(id);
       setSessions((prev) => prev.filter((s) => s.id !== id));
@@ -1176,6 +1190,11 @@ export default function App() {
   };
   // Huỷ ca (0097): RPC đổi ca + slot trong 1 transaction; trigger 0083 tự báo host/trợ nếu ca chưa diễn ra.
   const handleCancelSession = async (id: string, reason: string, reopenSlot = false): Promise<boolean> => {
+    const target = sessions.find((x) => x.id === id);
+    if (target && isSessionMonthClosed(monthlyReports, target)) {
+      showToast(`Không huỷ được ca: ${CLOSED_MONTH_NOTICE}`);
+      return false;
+    }
     try {
       const updated = await cancelSession(id, reason, reopenSlot);
       setSessions((prev) => prev.map((s) => (s.id === id ? updated : s)));
@@ -1200,6 +1219,11 @@ export default function App() {
   // Loại ca khỏi báo cáo / đưa trở lại (0114). Không sinh audit riêng: DB đã ghi excluded_by +
   // excluded_at + lý do trên chính dòng ca, đó là nơi người đọc report sẽ tìm.
   const handleSetSessionExcluded = async (id: string, excluded: boolean, reason: string): Promise<boolean> => {
+    const target = sessions.find((x) => x.id === id);
+    if (target && isSessionMonthClosed(monthlyReports, target)) {
+      showToast(`${excluded ? "Không loại được ca" : "Không đưa lại được ca"}: ${CLOSED_MONTH_NOTICE}`);
+      return false;
+    }
     try {
       const updated = await setSessionExcluded(id, excluded, reason);
       setSessions((prev) => prev.map((s) => (s.id === id ? updated : s)));
@@ -1637,7 +1661,7 @@ export default function App() {
   }
 
   return (
-    <SessionActionsContext.Provider value={{ setStaffSegments: handleSetStaffSegments }}>
+    <SessionActionsContext.Provider value={{ setStaffSegments: handleSetStaffSegments, isMonthClosed: (s) => isSessionMonthClosed(monthlyReports, s) }}>
     <div className="flex h-screen w-full bg-[var(--surface-base)] text-[var(--text)] overflow-hidden font-sans antialiased selection:bg-[var(--accent)] selection:text-white">
       {/* Left Sidebar Navigation */}
       <AppSidebar
@@ -2279,6 +2303,7 @@ export default function App() {
                     currentRole={currentRole}
                     brandPlatformRates={brandPlatformRates}
                     shiftSlots={platformSlots}
+                    engineParams={engineParams}
                     planMonthTotals={planMonthTotals}
                     onOpenAdsReport={() => setActiveTab("brand_ads_report")}
                   />

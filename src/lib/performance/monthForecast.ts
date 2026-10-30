@@ -6,6 +6,7 @@ import { AllocationModel, SlotLike, fitAllocationModel, glmWeights } from "./all
 import { normalCdf } from "./forecastCone";
 import { isCountable, sessionHours } from "./hostPerformance";
 import { assertOnePlatform } from "../platforms/perf";
+import { dataSourceTier } from "../dataSource";
 
 // ENGINE TARGET v3 (2026-10-10) — dự báo GMV tháng của MỘT kênh (brand × sàn), dùng chung cho Kế Hoạch Tháng (lúc lập) và
 // Dashboard / run-rate (trong tháng). Thay đường dự báo tổng của `estimateSlots` (suggestEngine), vốn học ô thứ × khung giờ từ
@@ -111,7 +112,7 @@ function coreFit(history: LiveSession[], month: string, params: ForecastParams) 
   const dayHoursP90 = Object.fromEntries(BUCKETS.map((b) => [b, p90([...dayHours.entries()].filter(([d]) => fixedBucket(d) === b).map(([, h]) => h))])) as Record<CampDayBucket, number>;
 
   const big = usable.length >= BIG_MONTHS && usable.slice(-BIG_MONTHS).every((p) => p.sessions >= BIG_SESSIONS);
-  const mostlyManual = hist.filter((s) => s.dataSource === "manual" || !s.dataSource).length > hist.length / 2;
+  const mostlyManual = hist.filter((s) => dataSourceTier(s) === "manual").length > hist.length / 2;
   return { hist, model, level, levelMonths, levelRecent, dayHoursP90, big, mostlyManual };
 }
 

@@ -6,6 +6,8 @@ import type { LiveSession, StaffSegment } from "../types";
 export interface SessionActions {
   /** Thay toàn bộ đoạn giờ người của ca (migration 0138); mảng rỗng = host/trợ làm cả ca. Trả true khi đã lưu. */
   setStaffSegments?: (session: LiveSession, segments: Pick<StaffSegment, "talentId" | "role" | "fromMin" | "toMin">[], reason: string) => Promise<boolean>;
+  /** Tháng của ca đã phát hành Report cho brand (đóng sổ, 0133) — DB chặn mọi ghi; cửa sổ ca báo và khoá nút trước khi ops bấm Lưu. */
+  isMonthClosed?: (session: LiveSession) => boolean;
 }
 
 export const SessionActionsContext = createContext<SessionActions>({});

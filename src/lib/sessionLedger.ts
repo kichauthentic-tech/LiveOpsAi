@@ -2,7 +2,7 @@ import { LiveSession, UserRole } from "../types";
 import { assertOnePlatform } from "./platforms/perf";
 import { SnapshotCounters, SnapshotRatios, computeSnapshotRatios } from "./liveSnapshot/metrics";
 import { dataQuality, DataQuality, isCountable, sessionHours } from "./performance/hostPerformance";
-import { dataSourceTier } from "./dataSource";
+import { dataSourceTier, isHandoverFile } from "./dataSource";
 import { EARLY_REASON_LABEL } from "./handover";
 
 // Sổ Ca (2026-09-19): nhìn theo TỪNG CA đã/đang chạy — số thật của ca, số đó tin được tới đâu,
@@ -24,7 +24,7 @@ export interface LedgerFilter {
 
 // Đã có số từ file: bậc live_snapshot/tiktok_reconciled, hoặc ca nạp bù (0086) mang sẵn room.
 export function hasSnapshot(s: LiveSession): boolean {
-  return s.dataSource === "live_snapshot" || dataSourceTier(s) === "reconciled" || (s.liveRoomIds?.length ?? 0) > 0;
+  return isHandoverFile(s) || dataSourceTier(s) === "reconciled" || (s.liveRoomIds?.length ?? 0) > 0;
 }
 
 export function hasReport(s: LiveSession): boolean {

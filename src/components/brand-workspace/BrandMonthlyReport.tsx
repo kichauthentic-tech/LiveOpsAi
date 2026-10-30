@@ -20,6 +20,7 @@ import { todayVn } from "../../lib/performance/brandCommitment";
 import { publishBlocker } from "../../lib/report/monthClose";
 import { monthlyReportRead, upsertMonthlyReport, publishMonthlyReport, unpublishMonthlyReport } from "../../lib/db/monthlyReports";
 import { BrandWeeklyReport } from "./BrandWeeklyReport";
+import type { EngineParams } from "../../lib/scheduling/engineParams";
 import { errorMessage } from "../../lib/errorMessage";
 import { useConfirm } from "../../hooks/useConfirm";
 import { useToast } from "../../hooks/useToast";
@@ -92,6 +93,8 @@ interface BrandMonthlyReportProps {
   currentRole: UserRole;
   brandPlatformRates: BrandPlatformRate[];
   shiftSlots?: ShiftSlot[]; // Report Tuần: ca mở chưa có người tuần tới
+  /** Tham số engine admin đã vặn — chỉ chuyển cho Report Tuần để cuối tháng khớp thẻ kênh. */
+  engineParams?: EngineParams;
   // "brandId|YYYY-MM" → tổng target Kế Hoạch Tháng đã chốt (Đ5) — chỉ chuyển tiếp xuống
   // MonthlyReportTabs, màn này không tự dùng.
   planMonthTotals?: Map<string, number>;
@@ -133,7 +136,7 @@ const fmtStamp = (iso: string) => {
 // đã tách sang tab riêng "Nhập Ads" (BrandAdsReport.tsx, 2026-09-21) — Report Tháng chỉ
 // còn tài liệu 6 tab + phát hành/thu hồi (tab 05 "Phân Tích Sâu" gộp vào 2026-09-23, ops-only).
 
-export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId, brandName, platform, sessions, currentRole, brandPlatformRates, shiftSlots, onOpenAdsReport, planMonthTotals }) => {
+export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId, brandName, platform, sessions, currentRole, brandPlatformRates, shiftSlots, engineParams, onOpenAdsReport, planMonthTotals }) => {
   const confirm = useConfirm();
   const { showToast } = useToast();
   const canManage = CAN_MANAGE_ROLES.includes(currentRole);
@@ -416,7 +419,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
   return (
     <div className="space-y-5">
       {viewMode === "week" ? (
-        <BrandWeeklyReport brandId={brandId} brandName={brandName} platform={platform} sessions={sessions} currentRole={currentRole} shiftSlots={shiftSlots} headerExtra={modeSwitch} />
+        <BrandWeeklyReport brandId={brandId} brandName={brandName} platform={platform} sessions={sessions} currentRole={currentRole} shiftSlots={shiftSlots} engineParams={engineParams} headerExtra={modeSwitch} />
       ) : (
         <>
       <PageHeader

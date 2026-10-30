@@ -3,7 +3,7 @@ import { addDays } from "../dateUtils";
 import { sessionWindowMs } from "../sessionStatus";
 import { segmentsOfRole } from "../staffSegments";
 import { brandPlatformKey, platformOf } from "../reportPlatform";
-import { hostPortions, isCountable, sessionHours } from "./hostPerformance";
+import { hostPortions, isCountable, personKey, sessionHours } from "./hostPerformance";
 import { assertOnePlatform } from "../platforms/perf";
 
 // So cùng kỳ cho Dashboard (demo duyệt 22/10/2026): MỘT bộ chọn kỳ trên thanh trên cùng, mọi con số tự so với kỳ so sánh.
@@ -214,7 +214,6 @@ export interface HostRow extends IndexCell {
   brandIds: string[];
 }
 
-const personKey = (id: string | undefined, name: string | undefined) => id || (name ? `ten:${name}` : null);
 
 /** Host — GMV chỉ ở ca người đó làm host; ca đổi host giữa chừng chia theo giờ đứng (hostPortions). */
 export function hostRows(ran: LiveSession[]): HostRow[] {
