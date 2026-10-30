@@ -87,45 +87,22 @@ export const SummaryDemoPage: React.FC<SummaryDemoProps> = (p) => {
   } else {
     kpis.push({ lab: `${METRIC.liveHours} · ${p.partial ? `tới ${p.curEndDay}/${mm}` : `tháng ${Number(mm)}`}`, val: `${fmtFixed(doneHours, 1)}h`, note: "chưa có giờ kế hoạch" });
   }
-  // Tiến độ tháng: % Target tháng đã có so với % thời gian đã qua (+ dự báo cuối tháng nếu có).
+  // Chip 3 = đích cuối tháng (một mẫu số duy nhất: Target tháng); chip 4 = nhịp mỗi ngày cần so với đang đạt — hai ý khác nhau, không lặp.
   const tm = p.liveTargetMonth;
+  const daysLeft = daysInMonth - (p.partial ? p.curEndDay : daysInMonth);
   if (tm) {
-    const done = (p.liveActual / tm) * 100;
-    kpis.push({
-      lab: `Tiến độ tháng · ${gl}`,
-      val: pct1(done),
-      tone: p.partial && done < timePct - 10 ? "red" : undefined,
-      note: p.partial
-        ? `Target tháng ${amt(tm)} · đã qua ${p.curEndDay}/${daysInMonth} ngày (${pct1(timePct)})${p.liveProjected != null ? ` · dự báo ${amt(p.liveProjected)} = ${pct1((p.liveProjected / tm) * 100)}` : ""}`
-        : `Target tháng ${amt(tm)} · ${p.liveActual - tm >= 0 ? "+" : "−"}${amt(Math.abs(p.liveActual - tm))}`
-    });
-  } else {
-    kpis.push({ lab: `Tiến độ tháng · ${gl}`, val: "—", note: "chưa có Target tháng" });
-  }
-  if (p.shop) {
-    // Cùng mẫu số với dòng KPI Total GMV của bảng Kết quả (KPI tới nay khi tháng còn dở).
-    const shopRow = p.score.find((r) => r.key === "shop");
-    const shopBase = p.partial && shopRow?.targetToDate ? shopRow.targetToDate : p.shop.target;
-    const shopPctNow = shopBase > 0 ? (p.shop.actual / shopBase) * 100 : null;
-    kpis.push({
-      lab: `${METRIC.totalGmv}${p.shop.throughDay ? ` · tới ${p.shop.throughDay}/${mm}` : ""}`,
-      val: amt(p.shop.actual),
-      note: (
-        <>
-          {shopPctNow != null && <span className={`pc ${pcTone(shopPctNow)}`}>{pct1(shopPctNow)}</span>} {shopBase !== p.shop.target ? `KPI tới nay ${amt(shopBase)}` : `KPI tháng ${amt(p.shop.target)}`}
-          {p.shop.projected != null && p.shop.projectedPct != null ? ` · dự báo ${amt(p.shop.projected)} = ${fmtP(p.shop.projectedPct, 0, false)} KPI tháng` : ""}
-        </>
-      )
-    });
-  } else if (tm) {
     const left = tm - p.liveActual;
-    const daysLeft = daysInMonth - (p.partial ? p.curEndDay : daysInMonth);
-    kpis.push({
-      lab: `Còn thiếu so Target tháng`,
-      val: left > 0 ? amt(left) : "Đã đạt",
-      tone: left > 0 ? undefined : "green",
-      note: left > 0 && daysLeft > 0 ? `≈ ${amt(left / daysLeft)}/ngày trong ${daysLeft} ngày còn lại` : left > 0 ? "hết tháng" : `vượt ${amt(-left)}`
-    });
+    if (p.partial && p.liveProjected != null) {
+      const pp = (p.liveProjected / tm) * 100;
+      kpis.push({ lab: `Dự báo cuối tháng · ${gl}`, val: amt(p.liveProjected), note: <><span className={`pc ${pcTone(pp)}`}>{pct1(pp)}</span> Target tháng {amt(tm)}</> });
+    } else if (p.partial) {
+      kpis.push({ lab: `Còn thiếu so Target tháng`, val: left > 0 ? amt(left) : "Đã đạt", tone: left > 0 ? undefined : "green", note: `Target tháng ${amt(tm)}` });
+    } else {
+      kpis.push({ lab: `Target tháng ${Number(mm)} · ${gl}`, val: pct1((p.liveActual / tm) * 100), note: `Target ${amt(tm)} · ${left <= 0 ? "vượt" : "thiếu"} ${amt(Math.abs(left))}` });
+    }
+    if (p.partial && daysLeft > 0 && left > 0) {
+      kpis.push({ lab: "Cần mỗi ngày còn lại", val: `${amt(left / daysLeft)}/ngày`, note: `${daysLeft} ngày còn lại · đang đạt ${amt(p.liveActual / p.curEndDay)}/ngày` });
+    }
   }
 
   // cầu Target → thực tế

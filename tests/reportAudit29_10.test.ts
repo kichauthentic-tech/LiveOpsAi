@@ -184,8 +184,8 @@ describe("N2 · trang 1 có 4 chip cam kết/tiến độ, không còn chip GMV/
   it("không còn chip GMV/giờ", () => {
     expect(h).not.toContain("so với 1–");
   });
-  it("có chip Giờ live và Tiến độ tháng", () => {
-    expect(h).toContain("Tiến độ tháng");
+  it("có chip Giờ live và chip đích cuối tháng", () => {
+    expect(h).toContain("Cần mỗi ngày còn lại");
     expect(h).toContain("kế hoạch tháng");
   });
   it("tối đa 4 chip", () => {
