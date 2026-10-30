@@ -15,6 +15,7 @@ import { profileOf } from "../../../lib/platforms/profiles";
 import type { ReportPlatform } from "../../../lib/reportPlatform";
 import { fmtVndShort } from "../../../lib/format";
 import { TreeCard } from "../TreeCard";
+import { LiveFunnel } from "../LiveFunnel";
 import { ChannelPlan } from "../ActionPlan";
 import { Card, ddmm, money, niceMax, pct } from "../shared";
 import type { ForecastSnapshot } from "../../../lib/db/forecastSnapshots";
@@ -45,6 +46,12 @@ export const WhySection: React.FC<{ card: ChannelCard; sessions: LiveSession[]; 
       <Sect title="Nguyên nhân và hành động đề xuất" sub="tháng đang chạy · cùng số với thẻ kênh" />
       <Card>
         <BlockHead title="Phân rã GMV/giờ · ngày Daily" />
+        {card.funnel && (
+          <div className="mb-4">
+            <p className="text-xs font-bold text-[var(--text-muted)] mb-1.5">Phễu LIVE · chỗ đang gãy</p>
+            <LiveFunnel funnel={card.funnel} />
+          </div>
+        )}
         <TreeCard tree={card.tree} platform={platform} />
         {!prof.hasShopAnalytics ? null : control.length > 0 ? (
           <ul className="text-xs text-[var(--text-muted)] space-y-1 mt-3">

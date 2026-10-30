@@ -18,7 +18,7 @@ import { CumulativeChart, CumulativeLegend, DayBars, DayBarsLegend, RunRateGauge
 import { SHIFT_STATE_LABEL } from "../../../lib/performance/runRateUpdate";
 import type { AccountVM } from "../../runrate/types";
 import { CampTable, CumChart } from "./PlatformTab";
-import { AdsSection, ShopSection, TeamSection } from "./brandBelow";
+import { TeamSection } from "./brandBelow";
 import { useBrandFiles } from "./useBrandFiles";
 import { ForecastHistory, WhySection } from "./brandExtras";
 import type { ForecastSnapshot } from "../../../lib/db/forecastSnapshots";
@@ -141,8 +141,6 @@ export const BrandTab: React.FC<{
 
       {lens === "month" && (
         <>
-          <ShopSection files={files} platform={platform} />
-          <AdsSection files={files} />
           <TeamSection s={teamScope} brands={brands} />
         </>
       )}

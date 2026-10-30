@@ -13,11 +13,13 @@ import {
   dataCoverage,
   gmvTree,
   likeForLike,
+  liveFunnelLite,
   nextWaveReadiness,
   targetFeasibility,
   type Cause,
   type DataCoverage,
   type GmvTree,
+  type LiveFunnelLite,
   type TargetFeasibility,
   type WaveReadiness
 } from "./channelHealth";
@@ -122,6 +124,8 @@ export interface ChannelCard {
   report: AccountRunRate | null;
   plan: HandlingPlan | null;
   tree: GmvTree | null;
+  /** Phễu LIVE (TikTok) cùng tập ca với `tree`; null khi ca chưa có impressions (Shopee không có số này). */
+  funnel: LiveFunnelLite | null;
   feasibility: TargetFeasibility | null;
   wave: WaveReadiness | null;
   camp: CampOverrides | undefined;
@@ -228,7 +232,9 @@ export function buildChannelCard(x: ChannelCardInput): ChannelCard {
   const newChannel = outlook.forecastModel !== "shape";
 
   const feasibility = rr && x.planSlots ? targetFeasibility(x.sessions, month, x.planSlots) : null;
-  const tree = gmvTree(profileOf(platform).metrics, likeForLike(x.sessions, month, coverage.completeThrough, bucketOf, undefined, (k) => k === "daily"));
+  const dailyPairs = likeForLike(x.sessions, month, coverage.completeThrough, bucketOf, undefined, (k) => k === "daily");
+  const tree = gmvTree(profileOf(platform).metrics, dailyPairs);
+  const funnel = liveFunnelLite(dailyPairs);
   const openByDate = new Map<string, number>();
   for (const p of outlook.pending) if (p.kind === "open_slot") openByDate.set(p.date, (openByDate.get(p.date) ?? 0) + p.hours);
   const wave = month === today.slice(0, 7) ? nextWaveReadiness(x.sessions, openByDate, month, today, bucketOf) : null;
@@ -296,6 +302,7 @@ export function buildChannelCard(x: ChannelCardInput): ChannelCard {
     report,
     plan,
     tree,
+    funnel,
     feasibility,
     wave,
     camp,

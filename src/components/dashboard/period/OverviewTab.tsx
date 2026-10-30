@@ -7,6 +7,7 @@ import { fmtVndShort } from "../../../lib/format";
 import type { ReportPlatform } from "../../../lib/reportPlatform";
 import { BrandLogo } from "../../ui/BrandLogo";
 import { PlatformChip } from "../../common/PlatformChip";
+import { LiveFunnel } from "../LiveFunnel";
 import { Card, ddmm, money, pct } from "../shared";
 
 // Tab "Tổng quan account" của Dashboard (demo duyệt 24/10/2026): mọi kênh brand × sàn của MỌI sàn trên một bảng, xếp theo rủi ro.
@@ -108,6 +109,12 @@ export const OverviewTab: React.FC<{
                 </button>
                 {isOpen && (
                   <div className="border-t border-[var(--border)] px-4 py-3 grid gap-3 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] xl:pl-[182px]">
+                    {r.funnel && (
+                      <div className="xl:col-span-2">
+                        <p className="text-xs font-bold text-[var(--text-muted)] mb-1.5">Phễu LIVE · ngày Daily so tháng trước — kênh đang gãy ở đâu</p>
+                        <LiveFunnel funnel={r.funnel} />
+                      </div>
+                    )}
                     <div>
                       <p className="text-xs font-bold text-[var(--text-muted)] mb-1.5">Hành động đề xuất</p>
                       {actions.length ? <ul className="list-disc pl-5 space-y-1 text-sm text-[var(--text)]">{actions.map((a) => <li key={a}>{a}</li>)}</ul> : <p className="text-sm text-[var(--text-muted)]">Chưa có việc cần làm.</p>}

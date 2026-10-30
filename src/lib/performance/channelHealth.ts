@@ -194,6 +194,45 @@ export interface GmvTree {
   curDays: number;
 }
 
+export interface FunnelStep { label: string; prev: number; cur: number }
+export interface FunnelRate { label: string; prev: number | null; cur: number | null; change: number | null }
+export interface LiveFunnelLite {
+  /** LIVE impressions → Views → Product clicks → Orders, tổng các ca like-for-like. */
+  steps: FunnelStep[];
+  /** ERR (Views ÷ impressions) · LIVE CTR (Product clicks ÷ Views) · CTOR (Orders ÷ Product clicks): tỷ lệ giữa các bậc. */
+  rates: FunnelRate[];
+  /** Tỷ lệ giảm nhiều nhất (null khi không tỷ lệ nào giảm quá 3%). */
+  worst: FunnelRate | null;
+}
+
+/** Phễu LIVE TikTok cùng tập ca với cây GMV/giờ. Thiếu impressions ở một vế (ca cũ chưa có số) ⇒ null. */
+export function liveFunnelLite(l: LikeForLike): LiveFunnelLite | null {
+  if (l.cur.length < MIN_COMPARE_SESSIONS || l.prev.length < MIN_COMPARE_SESSIONS) return null;
+  const sum = (xs: LiveSession[]) => xs.reduce((a, s) => ({ imp: a.imp + (s.impressions ?? 0), views: a.views + (s.totalViews ?? 0), clicks: a.clicks + (s.productClicks ?? 0), orders: a.orders + (s.totalOrders ?? 0) }), { imp: 0, views: 0, clicks: 0, orders: 0 });
+  const p = sum(l.prev), c = sum(l.cur);
+  if (p.imp <= 0 || c.imp <= 0 || p.views <= 0 || c.views <= 0) return null;
+  const rate = (label: string, pn: number, pd: number, cn: number, cd: number): FunnelRate => {
+    const a = pd > 0 ? (pn / pd) * 100 : null, b = cd > 0 ? (cn / cd) * 100 : null;
+    return { label, prev: a, cur: b, change: a && b != null ? b / a - 1 : null };
+  };
+  const rates = [
+    rate(METRIC.err, p.views, p.imp, c.views, c.imp),
+    rate(METRIC.liveCtr, p.clicks, p.views, c.clicks, c.views),
+    rate(METRIC.ctor, p.orders, p.clicks, c.orders, c.clicks)
+  ];
+  const worst = [...rates].filter((r) => r.change != null && r.change < -0.03).sort((a, b) => a.change! - b.change!)[0] ?? null;
+  return {
+    steps: [
+      { label: METRIC.liveImpressions, prev: p.imp, cur: c.imp },
+      { label: METRIC.views, prev: p.views, cur: c.views },
+      { label: METRIC.productClicks, prev: p.clicks, cur: c.clicks },
+      { label: METRIC.orders, prev: p.orders, cur: c.orders }
+    ],
+    rates,
+    worst
+  };
+}
+
 /** Cây GMV/giờ ngày thường, cùng loại ngày. Thiếu ca ở một vế (< 3 ca) ⇒ null — không kết luận trên 1–2 ca. */
 export function gmvTree(metrics: PlatformMetricSet, l: LikeForLike): GmvTree | null {
   if (l.cur.length < MIN_COMPARE_SESSIONS || l.prev.length < MIN_COMPARE_SESSIONS) return null;
@@ -217,6 +256,7 @@ export function gmvTree(metrics: PlatformMetricSet, l: LikeForLike): GmvTree | n
 export const LEVER_OWNER: Record<string, string> = {
   [METRIC.viewsPerHour]: "traffic — Ads (LIVE GMV Max), video dẫn traffic vào live, khung giờ live",
   [METRIC.viewersPerHour]: "traffic — Ads, video dẫn traffic vào live, khung giờ live",
+  [METRIC.err]: "traffic — tiêu đề, ảnh bìa và Ads kéo người xem vào phiên",
   [METRIC.liveCtr]: "host — thứ tự ghim sản phẩm, kịch bản mở đầu",
   [METRIC.ctor]: "host và brand — giá, voucher, tồn kho SKU ghim",
   [METRIC.aov]: "brand — combo, quà tặng kèm",

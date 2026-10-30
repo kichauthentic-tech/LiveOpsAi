@@ -98,15 +98,14 @@ test("ô KPI: một component chung StatTile, nhãn chữ thường (trước: ~
   // Các bản tự vẽ cũ đã bỏ — màn dùng StatTile (hoặc bọc mỏng quanh nó).
   const OLD: [string, RegExp][] = [
     ["components/SessionLedger.tsx", /const Stat: React\.FC/],
-    ["components/OpsBoard.tsx", /const Stat: React\.FC/],
-    ["components/dashboard/period/brandBelow.tsx", /const Stat: React\.FC/]
+    ["components/OpsBoard.tsx", /const Stat: React\.FC/]
   ];
   for (const [f, re] of OLD) {
     const src = read(f);
     expect(src, f).not.toMatch(re);
     expect(src, f).toMatch(/<StatTile\b/);
   }
-  for (const f of ["components/dashboard/period/PlatformTab.tsx", "components/dashboard/period/brandBelow.tsx", "components/brand-workspace/BrandWeeklyReport.tsx", "components/BrandRateCard.tsx", "components/brand-workspace/BrandCommitmentView.tsx", "components/brand-workspace/ShopeeAdsPanel.tsx", "components/ForecastTrainingCard.tsx"]) {
+  for (const f of ["components/dashboard/period/PlatformTab.tsx", "components/brand-workspace/BrandWeeklyReport.tsx", "components/BrandRateCard.tsx", "components/brand-workspace/BrandCommitmentView.tsx", "components/brand-workspace/ShopeeAdsPanel.tsx", "components/ForecastTrainingCard.tsx"]) {
     expect(read(f), f).toMatch(/<StatTile\b/);
   }
 });
