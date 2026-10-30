@@ -170,12 +170,14 @@ export function nmvBlocks(i: NmvInsightInput): InsightBlocks {
 export interface ShopInsightPageInput {
   totalChange: number | null;
   windowLabel: string;
-  /** Mỗi kênh: đổi GMV tuyệt đối so với kỳ trước (đồng). */
-  channels: { label: string; delta: number }[];
+  /** Mỗi kênh: đổi GMV tuyệt đối so với kỳ trước (đồng). `yfb` = kênh YFB vận hành (livestream YFB khi đã tách phiên brand tự live). */
+  channels: { label: string; delta: number; yfb?: boolean }[];
   /** Nhóm đối chứng đã có kết luận: livestream YFB so với các kênh còn lại. */
   control: { label: string; liveChg: number; restChg: number; verdict: "ops" | "agency_better" | "market" }[];
-  /** Brand tự live cùng tài khoản (0190): Seller LIVE lẫn phiên inhouse ⇒ không so nhóm đối chứng. */
+  /** Brand tự live cùng tài khoản (0190): nhóm đối chứng vẫn đúng (livestream = phiên YFB, phần còn lại đã trừ cả Seller LIVE). */
   inhouseLive?: boolean;
+  /** YFB chỉ nhận livestream (không Ads, không Affiliate) ⇒ các kênh còn lại là đối chứng sạch; việc của kênh khác là thông tin cho brand. */
+  liveOnly?: boolean;
 }
 
 export function shopBlocks(i: ShopInsightPageInput): InsightBlocks {
@@ -187,22 +189,25 @@ export function shopBlocks(i: ShopInsightPageInput): InsightBlocks {
     big ? `Kênh đổi nhiều nhất: ${big.label} ${moneySigned(big.delta)}.` : ""
   );
   const ops = i.control.find((c) => c.verdict === "ops");
+  const basis = i.liveOnly ? "YFB chỉ vận hành livestream nên các kênh còn lại là nhóm đối chứng" : "nhóm đối chứng gần đúng, YFB cũng tác động Affiliate và Ads";
+  const inhouseNote = i.inhouseLive && i.control.length ? " Phiên brand tự live không tính vào bên nào." : "";
   const cause = ops
-    ? `${ops.label}: livestream YFB ${signed(ops.liveChg, 0)}, các kênh còn lại ${signed(ops.restChg, 0)} — livestream giảm mạnh hơn phần còn lại của shop (nhóm đối chứng gần đúng, YFB cũng tác động Affiliate và Ads) nên cần rà soát vận hành livestream.`
+    ? `${ops.label}: livestream YFB ${signed(ops.liveChg, 0)}, các kênh còn lại ${signed(ops.restChg, 0)} — livestream giảm mạnh hơn phần còn lại của shop (${basis}) nên cần rà soát vận hành livestream.${inhouseNote}`
     : i.control.length
-      ? `${i.control.map((c) => `${c.label}: livestream YFB ${signed(c.liveChg, 0)}, các kênh còn lại ${signed(c.restChg, 0)}`).join("; ")} — livestream không giảm mạnh hơn các kênh còn lại.`
-      : i.inhouseLive
-        ? "Không so livestream YFB với các kênh còn lại: brand có tự live trên cùng tài khoản shop nên Seller LIVE gồm cả phiên brand tự live."
-        : "Chưa có nhóm đối chứng (cần file Shop Analytics của hai tháng).";
+      ? `${i.control.map((c) => `${c.label}: livestream YFB ${signed(c.liveChg, 0)}, các kênh còn lại ${signed(c.restChg, 0)}`).join("; ")} — livestream không giảm mạnh hơn các kênh còn lại.${inhouseNote}`
+      : "Chưa có nhóm đối chứng (cần file Shop Analytics của hai tháng).";
   const neg = byAbs.filter((c) => c.delta < 0)[0];
   const impact = neg ? `${neg.label} là kênh giảm lớn nhất (${moneySigned(neg.delta)}).` : "Không kênh nào giảm so với kỳ trước.";
   // Kênh giảm lớn nhất (ngoài livestream) luôn có việc riêng, kể cả khi livestream cũng cần rà soát.
-  const negAdvice = neg ? `Trao đổi với brand kế hoạch ${neg.label} cho tháng sau và theo dõi tỷ trọng kênh.` : "";
+  // Shop chỉ nhận livestream: kênh khác do brand vận hành ⇒ chỉ báo số cho brand, không nhận việc thay brand.
+  const negAdvice = !neg || neg.yfb
+    ? ""
+    : i.liveOnly
+      ? `Thông tin cho brand: ${neg.label} giảm ${money(Math.abs(neg.delta))} — kênh do brand vận hành, YFB không có việc ở kênh này.`
+      : `Trao đổi với brand kế hoạch ${neg.label} cho tháng sau và theo dõi tỷ trọng kênh.`;
   const advise = ops
     ? join(`Rà soát khung giờ, host và kịch bản livestream ở ${ops.label} trước khi kết luận.`, negAdvice)
-    : neg
-      ? negAdvice
-      : "Duy trì lịch livestream hiện tại.";
+    : negAdvice || "Duy trì lịch livestream hiện tại.";
   return { observe, cause, impact, advise };
 }
 

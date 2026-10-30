@@ -436,9 +436,10 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [view, prevMonth, month, shopWin, bucketPrev, bucketCur, hiddenMonths, agencyLiveByDate]
   );
-  // Brand tự live cùng tài khoản (0190): "LIVE tài khoản shop" lẫn phiên inhouse ⇒ không dùng nhóm đối chứng ở Insight/tóm tắt.
-  const controlUsed = scope.inhouseLive ? [] : control;
-  const controlOps = controlUsed.find((r) => r.key !== "all" && controlVerdict(r) === "ops");
+  // Nhóm đối chứng dùng cho MỌI phạm vi (30/10): phía livestream = phiên YFB, phía còn lại = Total GMV − toàn bộ Seller LIVE ⇒
+  // phiên brand tự live không nằm bên nào. Shop chỉ nhận livestream thì phần còn lại là đối chứng sạch (YFB không đụng kênh khác).
+  const liveOnly = !scope.ads && !scope.affiliate;
+  const controlOps = control.find((r) => r.key !== "all" && controlVerdict(r) === "ops");
 
   // KPI GMV cả shop brand giao (Kế Hoạch Tháng, 0122) — mọi kênh, khác target live. Tháng chưa hết thì dự kiến theo
   // nhịp cùng kỳ tháng trước (chỉ khi tháng trước có đủ số cả tháng).
@@ -748,7 +749,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
       shopCur,
       shopPrev: shopPrevSame,
       windowLabel: shopWin.label,
-      control: controlUsed
+      control
     }),
     why: whyInsight(livePrevStats, liveCurStats, { groups: dayGroups, mixRate }),
     people: peopleInsight(hostInsight.rows, reliability),
@@ -775,7 +776,16 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     const mixPrev = channelMixes[channelMixes.length - 2], mixCur = channelMixes[channelMixes.length - 1];
     const chDelta = (label: string, k: "liveLinked" | "affiliate" | "video" | "card") =>
       mixPrev && mixCur && mixPrev[k] != null && mixCur[k] != null ? { label, delta: (mixCur[k] as number) - (mixPrev[k] as number) } : null;
-    const chRows = [chDelta(CHANNELS[0]?.label ?? "Seller LIVE", "liveLinked"), chDelta("Affiliate LIVE", "affiliate"), chDelta("Video", "video"), chDelta("Product card", "card")].filter((x): x is NonNullable<typeof x> => x !== null);
+    // Brand tự live: Seller LIVE tách thành livestream YFB + brand tự live (cùng cách cầu kênh ở trang Toàn shop).
+    const yfbPrev = trendStats[trendStats.length - 2]?.stats.gmv, yfbCur = trendStats[trendStats.length - 1]?.stats.gmv;
+    const liveRows =
+      scope.inhouseLive && mixPrev && mixCur && yfbPrev != null && yfbCur != null
+        ? [
+            { label: "Livestream YFB", delta: yfbCur - yfbPrev, yfb: true },
+            { label: "Brand tự live", delta: Math.max(0, mixCur.liveLinked - yfbCur) - Math.max(0, mixPrev.liveLinked - yfbPrev) }
+          ]
+        : [chDelta(CHANNELS[0]?.label ?? "Seller LIVE", "liveLinked")];
+    const chRows = [...liveRows, chDelta("Affiliate LIVE", "affiliate"), chDelta("Video", "video"), chDelta("Product card", "card")].filter((x): x is NonNullable<typeof x> => x !== null);
     const relByName = new Map(reliability.map((r) => [r.name, r]));
     const liveHosts = hostInsight.rows.filter((h) => h.hours > 0 && h.gmv > 0);
     const skuRows = skuMoveData?.rows ?? [];
@@ -801,11 +811,12 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
         totalChange: shopCur && shopPrevSame ? pctChange(shopPrevSame.gmv, shopCur.gmv) : null,
         windowLabel: shopWin.label,
         channels: chRows,
-        control: controlUsed.filter((r) => r.key !== "all").flatMap((r) => {
+        control: control.filter((r) => r.key !== "all").flatMap((r) => {
           const v = controlVerdict(r);
           return v && r.liveChg != null && r.restChg != null ? [{ label: controlLabel(r.key), liveChg: r.liveChg, restChg: r.restChg, verdict: v }] : [];
         }),
-        inhouseLive: scope.inhouseLive
+        inhouseLive: scope.inhouseLive,
+        liveOnly
       }),
       why: whyBlocks({
         gmvPerHourChange: pctChange(livePrevStats.gmvPerHour, liveCurStats.gmvPerHour),
@@ -1002,7 +1013,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     nextMonth,
     nextPlan,
     shopKpi,
-    controlLine: controlLine(controlUsed),
+    controlLine: controlLine(control),
     controlOpsGroup,
     dailyGap: dailyGapValue != null && dailyGapText ? { line: dailyGapText, value: dailyGapValue } : null,
     giftLine: giftLineText,
@@ -1382,6 +1393,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             window={shopWin}
             traffic={trafficBr?.b ?? null}
             inhouseLive={scope.inhouseLive}
+            liveOnly={liveOnly}
             fallbackHeadline={head("shop").headline}
             insight={demoInsight("shop")}
           />
@@ -1633,7 +1645,8 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             title={secTitle("keymetrics")}
             headline={head("keymetrics").headline}
             months={keyMonths}
-            directShare={keyDirectShare}
+            // Direct % lấy Seller LIVE của cả tài khoản ⇒ lẫn phiên brand tự live, ẩn khi brand có tự live.
+            directShare={scope.inhouseLive ? undefined : keyDirectShare}
             cv={sessionCv}
             cvMeasured={!sessionCvIsDefault}
             monthLabel={monthShort}
