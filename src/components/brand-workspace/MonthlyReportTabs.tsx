@@ -776,13 +776,15 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     const mixPrev = channelMixes[channelMixes.length - 2], mixCur = channelMixes[channelMixes.length - 1];
     const chDelta = (label: string, k: "liveLinked" | "affiliate" | "video" | "card") =>
       mixPrev && mixCur && mixPrev[k] != null && mixCur[k] != null ? { label, delta: (mixCur[k] as number) - (mixPrev[k] as number) } : null;
-    // Brand tự live: Seller LIVE tách thành livestream YFB + brand tự live (cùng cách cầu kênh ở trang Toàn shop).
+    // Seller LIVE tách thành livestream YFB + phần còn lại của tài khoản (cùng cách cầu kênh ở trang Toàn shop): brand tự live
+    // gọi "Brand tự live", không thì "Seller LIVE khác". Audit 30/10: để Seller LIVE nguyên khối thì Insight coi kênh của
+    // chính YFB là kênh của brand ("Trao đổi với brand kế hoạch Seller LIVE" ở Franklin).
     const yfbPrev = trendStats[trendStats.length - 2]?.stats.gmv, yfbCur = trendStats[trendStats.length - 1]?.stats.gmv;
     const liveRows =
-      scope.inhouseLive && mixPrev && mixCur && yfbPrev != null && yfbCur != null
+      mixPrev && mixCur && yfbPrev != null && yfbCur != null
         ? [
             { label: "Livestream YFB", delta: yfbCur - yfbPrev, yfb: true },
-            { label: "Brand tự live", delta: Math.max(0, mixCur.liveLinked - yfbCur) - Math.max(0, mixPrev.liveLinked - yfbPrev) }
+            { label: scope.inhouseLive ? "Brand tự live" : "Seller LIVE khác", delta: Math.max(0, mixCur.liveLinked - yfbCur) - Math.max(0, mixPrev.liveLinked - yfbPrev) }
           ]
         : [chDelta(CHANNELS[0]?.label ?? "Seller LIVE", "liveLinked")];
     const chRows = [...liveRows, chDelta("Affiliate LIVE", "affiliate"), chDelta("Video", "video"), chDelta("Product card", "card")].filter((x): x is NonNullable<typeof x> => x !== null);
@@ -816,7 +818,8 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
         liveTarget: scoreAll ? scoreAll.targetToDate ?? scoreAll.target : null,
         days: scoreboard.filter((r) => r.key !== "all" && r.key !== "shop").map((r) => ({ label: dayLabel(r.key as CampDayBucket), target: r.targetToDate ?? r.target, actual: r.actual, ...planPctOf(r.key as CampDayBucket) })),
         worstFactor: worstSig && factorCands[0] ? { dayLabel: dayLabel(worstSig.key), factorLabel: DRIVER_LABEL[factorCands[0]], change: worstSig.change[factorCands[0]]!, dayChange: worstSig.change.gmvPerHour ?? undefined, band: worstSig.band } : null,
-        shopKpi: shopKpi ? { target: shopKpi.target, projected: shopKpi.projected ?? null } : null
+        shopKpi: shopKpi ? { target: shopKpi.target, projected: shopKpi.projected ?? null } : null,
+        withAds: scope.ads
       }),
       keymetrics: keyMetricsBlocks({
         rows: keyTable.rows.map((r) => ({ label: r.def.label, change: r.changes[lastKey], tone: r.tones[lastKey], result: r.def.group === "result" })),
@@ -850,7 +853,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
           return r ? [{ name: h.name, verdict: r.verdict, ci: reliabilityText(r), sessions: r.sessions, borderline: isBorderline(r) }] : [];
         }),
         months: relMonths,
-        slots: slotRows.filter((s) => s.cur.gmvPerHour != null).map((s) => ({ label: s.label.toLowerCase(), gmvPerHour: s.cur.gmvPerHour!, n: s.cur.n, index: s.cur.index ?? undefined }))
+        slots: slotRows.filter((s) => s.cur.gmvPerHour != null).map((s) => ({ label: s.label.toLowerCase(), gmvPerHour: s.cur.gmvPerHour!, n: s.cur.n, index: s.cur.index ?? undefined, change: pctChange(s.prev.gmvPerHour, s.cur.gmvPerHour), band: noiseBand(s.prev.n, s.cur.n, sessionCv) }))
       }),
       ads: adsBlocks({
         cost: adsPlan?.mtdActual ?? adsCur?.cost ?? 0,

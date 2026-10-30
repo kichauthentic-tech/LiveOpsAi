@@ -141,7 +141,7 @@ export interface NmvRateChoice {
   rate: number | null;
   /** NMV chỉ là số thật khi tháng đã chốt; còn lại luôn là ước tính. */
   isEstimate: boolean;
-  source: "settled_month" | "latest_settled_month" | "contract_expected" | "default_estimate";
+  source: "settled_month" | "latest_settled_month" | "contract_expected" | "provisional_month" | "default_estimate";
   /** Tháng cho tỷ lệ (nếu lấy từ file). */
   sourceMonth: string | null;
   /** Câu nêu nguồn để hiện cạnh số. */
@@ -168,7 +168,12 @@ export function chooseNmvRate(
     return { rate: latest.rate, isEstimate: true, source: "latest_settled_month", sourceMonth: latest.month, label: `ước tính — theo Refund rate đã chốt gần nhất (tháng ${latest.month})` };
   }
   if (contractExpected != null && contractExpected > 0) {
-    return { rate: contractExpected, isEstimate: true, source: "contract_expected", sourceMonth: null, label: "ước tính — theo % hoàn dự kiến trong hợp đồng (CRM)" };
+    return { rate: contractExpected, isEstimate: true, source: "contract_expected", sourceMonth: null, label: "ước tính — theo % hoàn dự kiến trong hợp đồng" };
   }
-  return { rate: DEFAULT_RETURN_RATE_ESTIMATE, isEstimate: true, source: "default_estimate", sourceMonth: null, label: `ước tính — % hoàn mặc định ${DEFAULT_RETURN_RATE_ESTIMATE}% (CRM chưa nhập % hoàn dự kiến)` };
+  // Chưa có tháng chốt và CRM chưa nhập % hoàn: dùng Refund rate tạm tính của chính tháng (audit 30/10 — mặc định 40% làm
+  // NMV của VERA T10 "sụt" 419,8M → 180,5M trong khi Refund rate thực chỉ 16,9%).
+  if (status && status.rate != null && status.rate > 0) {
+    return { rate: status.rate, isEstimate: true, source: "provisional_month", sourceMonth: status.month, label: "ước tính — theo Refund rate tạm tính của tháng (đơn còn trong thời gian hoàn trả)" };
+  }
+  return { rate: DEFAULT_RETURN_RATE_ESTIMATE, isEstimate: true, source: "default_estimate", sourceMonth: null, label: `ước tính — % hoàn mặc định ${DEFAULT_RETURN_RATE_ESTIMATE}%` };
 }

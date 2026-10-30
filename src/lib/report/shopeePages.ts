@@ -289,6 +289,8 @@ export interface ShopeeScoreRow {
   actual: number;
   pct: number | null;
   planHours: number | null;
+  /** Giờ kế hoạch của các ca tới ngày cuối có số (tháng còn dở) — mẫu số "% Giờ live kế hoạch" ở Insight trang 1. */
+  planHoursToDate: number | null;
   hours: number;
   sessions: number;
   requiredPerHour: number | null;
@@ -310,6 +312,7 @@ export function shopeeScore(s: ShopeeReportSnapshot, model: ShopeeMonthsModel): 
     // Target tới nay = target các ca kế hoạch tới ngày cuối có số (phần "all" lấy tổng ca, không theo số tổng nhập tay).
     const td = cutDate != null && target != null ? sum(sl.filter((x) => x.date <= cutDate), (x) => x.target) || null : null;
     const planHours = sl.length ? sum(sl, (x) => x.hours) : null;
+    const planHoursToDate = sl.length ? (cutDate != null ? sum(sl.filter((x) => x.date <= cutDate), (x) => x.hours) : planHours) : null;
     const actual = sum(rows, (x) => x.gmv);
     const hours = sum(rows, (x) => x.hours);
     if (key !== "all" && rows.length === 0 && target == null) return null;
@@ -321,6 +324,7 @@ export function shopeeScore(s: ShopeeReportSnapshot, model: ShopeeMonthsModel): 
       actual,
       pct: base ? (actual / base) * 100 : null,
       planHours,
+      planHoursToDate,
       hours,
       sessions: rows.length,
       requiredPerHour: target != null && planHours ? target / planHours : null,
@@ -579,6 +583,8 @@ export interface ShopeeInsightExtra {
   relMonths: number;
   nextLabel: string;
   hasNextPlan: boolean;
+  /** YFB chạy Ads Shopee cho brand (phạm vi 0190) — tắt thì Insight không khuyên chỉnh Ads. */
+  withAds?: boolean;
 }
 
 export function shopeeInsights(s: ShopeeReportSnapshot, p: ShopeePageModel, x: ShopeeInsightExtra): Record<ShopeeInsightPage, InsightBlocks> {
@@ -605,10 +611,16 @@ export function shopeeInsights(s: ShopeeReportSnapshot, p: ShopeePageModel, x: S
       gmvLabel: METRIC.gmv,
       liveActual: all?.actual ?? s.headline.gmv,
       liveTarget: all ? all.targetToDate ?? all.target : null,
-      days: days.map((r) => ({ label: SHOPEE_TAB_LABEL[r.key], target: r.targetToDate ?? r.target, actual: r.actual })),
+      // Cùng cách đọc của TikTok: thiếu do GMV/giờ hay Giờ live so với kế hoạch (tới ngày cuối có số).
+      days: days.map((r) => {
+        const tgt = r.targetToDate ?? r.target, ph = r.planHoursToDate;
+        const planGph = tgt != null && ph ? tgt / ph : null;
+        return { label: SHOPEE_TAB_LABEL[r.key], target: tgt, actual: r.actual, gphPct: planGph && r.gmvPerHour != null ? (r.gmvPerHour / planGph) * 100 : null, hoursPct: ph ? (r.hours / ph) * 100 : null };
+      }),
       worstFactor: worstSig && factorKeys[0] ? { dayLabel: SHOPEE_TAB_LABEL[worstSig.key], factorLabel: SHOPEE_FACTOR_LABEL[factorKeys[0]], change: worstSig.change[factorKeys[0]]!, dayChange: worstSig.change.gmvPerHour ?? undefined, band: worstSig.band } : null,
       shopKpi: null,
-      impact: cancelImpact
+      impact: cancelImpact,
+      withAds: x.withAds
     }),
     keymetrics: keyMetricsBlocks({
       rows: km.rows.map((r) => ({ label: r.def.label, change: r.changes[last], tone: kmTone(r.tones[last]), result: r.def.group === "result" })),
@@ -639,7 +651,7 @@ export function shopeeInsights(s: ShopeeReportSnapshot, p: ShopeePageModel, x: S
     people: peopleBlocks({
       hosts: x.hosts,
       months: x.relMonths,
-      slots: slots.filter((r) => r.cur.gmvPerHour != null).map((r) => ({ label: r.label.toLowerCase(), gmvPerHour: r.cur.gmvPerHour!, n: r.cur.n, index: r.cur.index ?? undefined }))
+      slots: slots.filter((r) => r.cur.gmvPerHour != null).map((r) => ({ label: r.label.toLowerCase(), gmvPerHour: r.cur.gmvPerHour!, n: r.cur.n, index: r.cur.index ?? undefined, change: r.prev.gmvPerHour && r.cur.gmvPerHour != null ? (r.cur.gmvPerHour / r.prev.gmvPerHour - 1) * 100 : null, band: noiseBand(r.prev.n, r.cur.n, p.cv.cv) }))
     }),
     ads: shopeeAdsBlocks(s),
     next: nextBlocks({ nextLabel: x.nextLabel, hasLivePlan: x.hasNextPlan, hasCreatorPlan: false, withCreator: false })
@@ -685,7 +697,7 @@ export function shopeeHeadlines(s: ShopeeReportSnapshot, p: ShopeePageModel, blo
 
 export function shopeeCancelBlocks(cancel: ShopeeCancelMonth[]): InsightBlocks {
   const c = lastOf(cancel);
-  if (!c || c.cancelRate == null) return { ...SHOPEE_EMPTY_BLOCKS, advise: "Tải Live List có cột Sales(Confirmed Order) để tính phần đơn huỷ." };
+  if (!c || c.cancelRate == null) return SHOPEE_EMPTY_BLOCKS;
   const p = cancel.length >= 2 ? cancel[cancel.length - 2] : null;
   const d = p?.cancelRate != null ? c.cancelRate - p.cancelRate : null;
   const worst = SHOPEE_BUCKETS.map((b) => ({ b, ...c.byBucket[b] })).filter((x) => x.gmv > 0 && x.confirmed > 0).map((x) => ({ ...x, rate: (1 - x.confirmed / x.gmv) * 100 })).sort((a, b) => b.rate - a.rate)[0];
@@ -693,7 +705,7 @@ export function shopeeCancelBlocks(cancel: ShopeeCancelMonth[]): InsightBlocks {
     observe: `Đơn huỷ chiếm ${pctTxt(c.cancelRate, 1)} ${METRIC.gmv} kỳ này${p?.cancelRate != null ? ` (${monthShortLabel(p.month)}: ${pctTxt(p.cancelRate, 1)}${d != null ? `, ${d >= 0 ? "+" : "−"}${Math.abs(d).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} điểm` : ""})` : ""}.`,
     cause: worst ? `Tỷ lệ huỷ cao nhất ở ${SHOPEE_TAB_LABEL[worst.b]} (${pctTxt(worst.rate, 1)}).` : "—",
     impact: `${METRIC.salesConfirmed} ${money(c.confirmed)} so với ${METRIC.gmv} ${money(c.gmv)}, chênh ${money(c.gmv - c.confirmed)}. Số xác nhận tính tới lúc tải Live List; đơn còn chờ thanh toán có thể thành đơn xác nhận sau.`,
-    advise: "Tải lại Live List sau khi hết thời gian thanh toán/huỷ để chốt Sales (Confirmed Order) của tháng; Shopee không cho lý do huỷ trong file live."
+    advise: "YFB cập nhật Sales (Confirmed Order) của tháng sau khi hết thời gian thanh toán/huỷ; file live của Shopee không có lý do huỷ, cần brand cung cấp file đơn hàng nếu muốn phân tích lý do."
   };
 }
 
@@ -703,7 +715,7 @@ export const shortName = (name: string, n = 56) => (name.length <= n ? name : `$
 export function shopeeAdsBlocks(s: ShopeeReportSnapshot): InsightBlocks {
   const a = s.ads;
   const g = s.headline.gmv;
-  if (!a) return { ...SHOPEE_EMPTY_BLOCKS, advise: "Tải file Shopee Live Ads của tháng (Nhập Ads, sàn Shopee) để có số Ads." };
+  if (!a) return SHOPEE_EMPTY_BLOCKS;
   return {
     observe: `${METRIC.expense} ${money(a.expense)} cho ${a.campaigns} chiến dịch Live Ads; GMV trong file Ads ${money(a.gmv)} (${METRIC.roas} ${a.roas != null ? a.roas.toLocaleString("vi-VN", { maximumFractionDigits: 1 }) : "—"}x).`,
     cause: g > 0 ? `GMV từ Ads chiếm ${pctTxt((a.gmv / g) * 100)} GMV live; phần còn lại đến từ traffic tự nhiên và người theo dõi.` : "—",

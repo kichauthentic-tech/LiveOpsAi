@@ -435,6 +435,8 @@ export const NmvDemoPage: React.FC<{
           </DemoPanel>
         )}
       </DemoStack>
+      {/* Bảng nhập Refund rate chốt là công cụ của ops — không vào file gửi brand (audit 30/10). */}
+      <div data-export-hide>
       <DemoPanel
         title={`Theo dõi ${METRIC.refundRate} chính xác theo tháng`}
         sub={`Nhập ${METRIC.refundRate} chốt sau khi tải lại file Shop Analytics khi hết thời gian hoàn trả. Trạng thái và chênh lệch so với số trong report tự cập nhật.${canManage ? " Giá trị nhập lưu cho cả team." : ""}`}
@@ -498,13 +500,16 @@ export const NmvDemoPage: React.FC<{
           <span>{METRIC.refundRate} chỉ gồm giá trị hoàn tiền, chưa gồm đơn hủy; tỷ lệ hủy cần file Order. Chênh lệch tính bằng điểm phần trăm.</span>
           <span className="st" aria-live="polite">{msg}</span>
         </DemoLegend>
+      </DemoPanel>
+      </div>
+      <div className="pn">
         <details>
           <summary>Phương pháp</summary>
           <p>
             NMV ước tính = {METRIC.liveGmv} YFB × (1 − {METRIC.refundRate} toàn shop), nguồn Shop Analytics. Tỷ lệ này tính trên mọi kênh của shop, chưa tách riêng livestream, nên chỉ là xấp xỉ. Với tháng đang chạy, {METRIC.refundRate} chưa chốt nên NMV chỉ là ước tính tạm. {METRIC.refundRate} chỉ gồm giá trị hoàn tiền, chưa gồm đơn hủy (cần file Order), nên NMV thực tế còn thấp hơn. {METRIC.totalGmv} và cơ cấu kênh ở trang Toàn shop.
           </p>
         </details>
-      </DemoPanel>
+      </div>
       {insight}
     </DemoPage>
   );

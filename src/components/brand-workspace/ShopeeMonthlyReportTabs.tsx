@@ -348,9 +348,10 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
           }),
         relMonths,
         nextLabel: `Tháng ${Number(nextMonth.slice(5))}`,
-        hasNextPlan: !!nextPlan && nextPlan.plan.targetGmv > 0 && nextPlan.slots.length > 0
+        hasNextPlan: !!nextPlan && nextPlan.plan.targetGmv > 0 && nextPlan.slots.length > 0,
+        withAds: scope.ads
       }),
-    [s, pm, hostPeer, relByName, relMonths, nextMonth, nextPlan]
+    [s, pm, hostPeer, relByName, relMonths, nextMonth, nextPlan, scope.ads]
   );
   const heads = useMemo(() => shopeeHeadlines(s, pm, auto, PAGE_LABEL), [s, pm, auto]);
   const insight = (page: ShopeePageId) => (

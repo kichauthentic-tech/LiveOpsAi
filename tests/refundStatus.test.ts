@@ -77,9 +77,10 @@ describe("chooseNmvRate", () => {
     expect(c.rate).toBeCloseTo(37.3);
     expect(c.label).toContain("2026-09");
   });
-  test("không có tháng chốt ⇒ % hoàn dự kiến trong hợp đồng; không có gì ⇒ null", () => {
+  test("không có tháng chốt ⇒ % hoàn dự kiến trong hợp đồng ⇒ Refund rate tạm tính của tháng ⇒ mặc định 40%", () => {
     expect(chooseNmvRate(prov10, [prov10], 12)).toMatchObject({ rate: 12, isEstimate: true, source: "contract_expected" });
-    expect(chooseNmvRate(prov10, [prov10], 0)).toMatchObject({ rate: 40, source: "default_estimate" });
+    // Audit 30/10: CRM chưa nhập % hoàn thì dùng số đo được của tháng, không phải 40% (VERA T10 thực 16,9%).
+    expect(chooseNmvRate(prov10, [prov10], 0)).toMatchObject({ rate: prov10.rate, source: "provisional_month", isEstimate: true });
     expect(chooseNmvRate(null, [], null)).toMatchObject({ rate: 40, source: "default_estimate" });
   });
 });

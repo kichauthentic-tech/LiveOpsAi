@@ -109,16 +109,16 @@ describe("B6/B7 · bảng GMV/giờ kế hoạch trang 1", () => {
   });
 });
 
-describe("B8 · tiêu đề và Insight trang 1 chọn cùng loại ngày yếu nhất", () => {
+describe("B8 (sửa 30/10) · tiêu đề và Insight trang 1 chọn cùng loại ngày thiếu nhiều tiền nhất", () => {
   const days = [
     { label: "Daily", target: 3e9, actual: 2.4e9 }, // −600M, 80%
     { label: "D-Day", target: 0.5e9, actual: 0.3e9 } // −200M, 60%
   ];
-  it("cùng chọn D-Day (60%) dù Daily chênh tuyệt đối lớn hơn", () => {
-    expect(summaryHeadline({ liveActual: 2.7e9, liveTarget: 3.5e9, days })).toContain("D-Day thấp nhất ở 60%");
+  it("cùng chọn Daily (−600M) dù D-Day có % Target thấp hơn", () => {
+    expect(summaryHeadline({ liveActual: 2.7e9, liveTarget: 3.5e9, days })).toContain("Daily thiếu nhiều nhất (−600M, đạt 80% Target)");
     const b = summaryBlocks({ liveActual: 2.7e9, liveTarget: 3.5e9, days, worstFactor: null, shopKpi: null });
-    expect(b.observe).toContain("D-Day chiếm");
-    expect(b.advise).toContain("D-Day");
+    expect(b.observe).toContain("Daily chiếm 75%");
+    expect(b.advise).toContain("Daily");
   });
 });
 
@@ -193,11 +193,11 @@ describe("N2 · tile GMV/giờ trang 1 chỉ đỏ khi vượt ngưỡng dao đ�
 
 describe("N3 · Insight NMV không viết 'ước tính theo ước tính'", () => {
   const b = nmvBlocks({ refundCur: 37.7, refundPrev: 36.9, prevLabel: "T9", nmvSource: "ước tính — % hoàn mặc định 40% (CRM chưa nhập % hoàn dự kiến)", usesCrmRate: false });
-  it("câu Tác động gọn và chỉ cách sửa khi dùng mặc định", () => {
+  it("câu Tác động gọn, không dặn việc nội bộ (gửi brand)", () => {
     expect(b.impact).not.toContain("ước tính theo ước tính");
     expect(b.impact).toContain("NMV là số ước tính theo % hoàn mặc định 40%");
     expect(b.impact).toContain("khác Refund rate thực 37,7%");
-    expect(b.impact).toContain("Hợp đồng & giá");
+    expect(b.impact).not.toContain("Hợp đồng & giá");
   });
   it("nguồn là số đã chốt ⇒ không nhắc mặc định", () => {
     const c = nmvBlocks({ ...base0(), nmvSource: "Refund rate đã chốt của tháng 2026-09" });

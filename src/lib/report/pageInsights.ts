@@ -72,19 +72,18 @@ export interface SummaryInsightInput {
   gmvLabel?: string;
   /** Khối Tác động thay cho câu KPI toàn shop (report Shopee không có KPI toàn shop: nói phần đơn huỷ). */
   impact?: string;
+  /** YFB chạy Ads cho brand × sàn này (phạm vi 0190) — tắt thì Đề xuất không nhắc Ads. Mặc định bật. */
+  withAds?: boolean;
 }
 
 export function summaryBlocks(i: SummaryInsightInput): InsightBlocks {
-  const T = i.gmvLabel ? "Target" : "Target LIVE";
-  if (i.liveTarget == null || i.liveTarget <= 0) {
-    return { ...EMPTY, observe: "", impact: i.impact ?? EMPTY.impact, advise: `Lập ${T} theo loại ngày trong Kế Hoạch Tháng để report đánh giá được tiến độ.` };
-  }
+  // Chưa có Target: tiêu đề trang đã nói "chưa đánh giá được"; việc lập Target là của ops (dòng "Chỉ ops thấy"), không ghi vào Insight gửi brand.
+  if (i.liveTarget == null || i.liveTarget <= 0) return { observe: "", cause: "", impact: i.impact ?? "", advise: "" };
   const gap = i.liveActual - i.liveTarget;
   const withT = i.days.filter((d) => d.target != null && d.target > 0).map((d) => ({ ...d, gap: d.actual - d.target! }));
-  // Cùng tiêu chí với tiêu đề trang (pageHeadlines.summaryHeadline): loại ngày đạt % Target thấp nhất.
-  const worst = [...withT].sort((a, b) => a.actual / a.target! - b.actual / b.target!)[0];
-  const behind = worst && worst.gap < 0 ? worst : null;
-  // Tiêu đề đã nói % Target và loại ngày thấp nhất ⇒ Quan sát chỉ nói số tiền chênh và loại ngày nào gánh phần thiếu.
+  // Cùng tiêu chí với tiêu đề trang (pageHeadlines.summaryHeadline): loại ngày thiếu nhiều tiền nhất so với Target
+  // (audit 30/10: chọn theo % thấp nhất làm VERA ra "Pay Day chiếm 18% phần thiếu" trong khi Daily gánh 47%).
+  const behind = [...withT].filter((d) => d.gap < 0).sort((a, b) => a.gap - b.gap)[0] ?? null;
   const shortfall = withT.filter((d) => d.gap < 0).reduce((a, d) => a + d.gap, 0);
   const observe = join(
     `${gap >= 0 ? "Cao hơn" : "Thiếu"} ${money(Math.abs(gap))} so với Target.`,
@@ -97,9 +96,24 @@ export function summaryBlocks(i: SummaryInsightInput): InsightBlocks {
   const wfBand = wf?.band != null ? `±${Math.round(wf.band)}%` : "";
   const wfSig = wf != null && wf.band != null && Math.abs(wf.change) >= wf.band;
   const dayPlan = (d: (typeof planDays)[number]) => `${d.label} ${pctTxt(d.gphPct!, 0)} GMV/giờ kế hoạch${d.hoursPct != null ? `, ${pctTxt(d.hoursPct, 0)} Giờ live kế hoạch` : ""}`;
+  // Hai vế cùng dưới 95% ⇒ nêu cả hai, vế có % thấp hơn là phần lớn hơn của phần thiếu (JOCKEY T10 Daily: 88% GMV/giờ, 64% Giờ live).
+  const driver = (d: (typeof planDays)[number]): "gph" | "hours" | "both" | "none" => {
+    const g = d.gphPct! < 95, h = d.hoursPct != null && d.hoursPct < 95;
+    return g && h ? "both" : g ? "gph" : h ? "hours" : "none";
+  };
+  const why = (d: (typeof planDays)[number]) => {
+    const k = driver(d);
+    return k === "gph"
+      ? "thiếu do GMV/giờ, Giờ live đạt kế hoạch"
+      : k === "hours"
+        ? "thiếu do Giờ live, GMV/giờ vẫn đạt kế hoạch"
+        : k === "both"
+          ? `thiếu do cả GMV/giờ và Giờ live, phần lớn hơn là ${d.hoursPct! < d.gphPct! ? "Giờ live" : "GMV/giờ"}`
+          : "GMV/giờ và Giờ live đều gần kế hoạch, phần thiếu nhỏ";
+  };
   const cause = planDays.length
     ? behind && behind.gphPct != null
-      ? `${dayPlan(behind)}: thiếu ${behind.gphPct < 95 ? "do GMV/giờ, không do Giờ live" : "do Giờ live, GMV/giờ vẫn đạt kế hoạch"}.${planDays.filter((d) => d !== behind).length ? ` Các loại ngày khác: ${planDays.filter((d) => d !== behind).map(dayPlan).join("; ")}.` : ""}`
+      ? `${dayPlan(behind)}: ${why(behind)}.${planDays.filter((d) => d !== behind).length ? ` Các loại ngày khác: ${planDays.filter((d) => d !== behind).map(dayPlan).join("; ")}.` : ""}`
       : `${planDays.map(dayPlan).join("; ")}.`
     : wf
       ? wf.dayChange != null
@@ -107,9 +121,14 @@ export function summaryBlocks(i: SummaryInsightInput): InsightBlocks {
         : `${wf.dayLabel}: ${wf.factorLabel} ${signed(wf.change, 0)} so với cùng loại ngày tháng trước.`
       : "Không loại ngày nào có GMV/giờ đổi vượt ngưỡng dao động so với tháng trước; chênh lệch so với Target chưa quy được cho một yếu tố cụ thể.";
   const k = i.shopKpi;
-  const impact = i.impact != null ? i.impact : k && k.projected != null ? `${METRIC.totalGmv} dự báo ${money(k.projected)}, ${pctTxt((k.projected / k.target) * 100, 0)} KPI GMV ${money(k.target)}.` : k ? `KPI GMV ${money(k.target)}; chưa đủ số liệu để dự báo cuối tháng.` : "Tháng này chưa có KPI GMV trong Kế Hoạch Tháng.";
+  // Không có KPI toàn shop ⇒ bỏ khối (câu "chưa có KPI GMV trong Kế Hoạch Tháng" là việc của ops, không phải tác động).
+  const impact = i.impact != null ? i.impact : k && k.projected != null ? `${METRIC.totalGmv} dự báo ${money(k.projected)}, ${pctTxt((k.projected / k.target) * 100, 0)} KPI GMV ${money(k.target)}.` : k ? `KPI GMV ${money(k.target)}; chưa đủ số liệu để dự báo cuối tháng.` : "";
+  const levers = `kịch bản, ưu đãi${i.withAds ?? true ? " và Ads" : ""}`;
+  const bk = behind && behind.gphPct != null ? driver(behind) : null;
   const advise = behind
-    ? `Đánh giá lại kịch bản, ưu đãi và Ads của ${behind.label} trước khi xây lịch tháng sau.`
+    ? bk === "hours" || (bk === "both" && behind.hoursPct! < behind.gphPct!)
+      ? `Giữ đủ Giờ live kế hoạch của ${behind.label} (mới đạt ${pctTxt(behind.hoursPct!, 0)}) và đánh giá lại ${levers} trước khi xây lịch tháng sau.`
+      : `Đánh giá lại ${levers} của ${behind.label} trước khi xây lịch tháng sau.`
     : "Giữ kế hoạch hiện tại; theo dõi GMV/giờ từng loại ngày so với kế hoạch.";
   return { observe, cause, impact, advise };
 }
@@ -165,7 +184,7 @@ export interface NmvInsightInput {
 }
 
 export function nmvBlocks(i: NmvInsightInput): InsightBlocks {
-  if (i.refundCur == null && i.nmvSource == null) return { ...EMPTY, advise: "Tải file Shop Analytics hoặc nhập tỷ lệ hoàn hủy ở Hợp đồng & giá để tính NMV." };
+  if (i.refundCur == null && i.nmvSource == null) return EMPTY;
   const maturityMismatch = i.curProvisional != null && i.prevProvisional != null && i.curProvisional !== i.prevProvisional;
   const delta = i.refundCur != null && i.refundPrev != null && !maturityMismatch ? i.refundCur - i.refundPrev : null;
   return {
@@ -174,7 +193,7 @@ export function nmvBlocks(i: NmvInsightInput): InsightBlocks {
         ? `Refund rate kỳ này ${pctTxt(i.refundCur)}${i.refundPrev != null ? ` (${i.prevLabel}: ${pctTxt(i.refundPrev)}${maturityMismatch ? `, chưa so sánh được vì ${i.curProvisional ? "tháng này chưa chốt, " + i.prevLabel + " đã chốt" : "tháng này đã chốt, " + i.prevLabel + " chưa chốt"}` : ""}${delta != null ? `, ${sgn(delta)}${Math.abs(delta).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} điểm` : ""})` : ""}.`
         : "Chưa có Refund rate của kỳ này.",
     cause: "Refund rate là số ghi nhận tại thời điểm xuất file; kỳ mới còn trong thời gian hoàn trả nên chưa đạt độ chín như kỳ cũ. File hiện chưa tách hoàn và hủy.",
-    impact: `NMV là số ước tính theo ${(i.nmvSource ?? "Refund rate thực của cả shop").replace(/^ước tính\s*[—-]\s*/, "")}${i.nmvSource && /mặc định/.test(i.nmvSource) && i.refundCur != null ? `, khác Refund rate thực ${pctTxt(i.refundCur)}; nhập % hoàn dự kiến ở Hợp đồng & giá để NMV bám số thật` : ""} và có thể đổi khi hết thời gian hoàn trả${maturityMismatch ? "; hai tháng khác mức chín nên không so chênh trực tiếp" : ""}.`,
+    impact: `NMV là số ước tính theo ${(i.nmvSource ?? "Refund rate thực của cả shop").replace(/^ước tính\s*[—-]\s*/, "").replace(/^theo\s+/, "")}${i.nmvSource && /mặc định/.test(i.nmvSource) && i.refundCur != null ? `, khác Refund rate thực ${pctTxt(i.refundCur)}` : ""} và có thể đổi khi hết thời gian hoàn trả${maturityMismatch ? "; hai tháng khác mức chín nên không so chênh trực tiếp" : ""}.`,
     advise: "Ghi ngày xuất file của từng tháng, cập nhật Refund rate sau khi hết thời gian hoàn trả, và bổ sung file Order để tách hoàn và hủy."
   };
 }
@@ -347,7 +366,7 @@ export interface PeopleInsightInput {
   hosts: { name: string; verdict: "above" | "below" | "unclear"; ci: string; sessions: number; borderline: boolean }[];
   months: number;
   /** `index` = GMV thực ÷ GMV kỳ vọng theo loại ngày (1 = trung bình); có thì xếp khung theo chỉ số này để khử hiệu ứng loại ngày. */
-  slots: { label: string; gmvPerHour: number; n: number; index?: number }[];
+  slots: { label: string; gmvPerHour: number; n: number; index?: number; /** GMV/giờ đổi so với tháng trước (%) + ngưỡng dao động — số của ô/bảng khung giờ trên trang. */ change?: number | null; band?: number | null }[];
   minSessions?: number;
 }
 
@@ -369,9 +388,22 @@ export function peopleBlocks(i: PeopleInsightInput): InsightBlocks {
     below.length ? `Thấp hơn: ${below.map(txt).join("; ")}.` : "",
     unclear > 0 ? `${unclear} host chưa khác biệt rõ so với trung bình.` : ""
   );
-  const cause = bestS && worstS && bestS !== worstS
-    ? `Khung giờ bắt đầu phiên${adjusted ? " (đã so với trung bình cùng loại ngày)" : ""}: ${slotNote(bestS)}; ${slotNote(worstS)} (${worstS.n} phiên).`
-    : "Chưa đủ phiên theo khung giờ để so sánh (cần từ 3 phiên mỗi khung).";
+  // Ô và bảng khung giờ so với tháng trước; Insight xếp theo chỉ số khử loại ngày. Khung đổi vượt ngưỡng mà Insight im lặng thì
+  // brand đọc thành mâu thuẫn (audit 30/10: VERA Tối −32% vượt ±18%, Insight "giữ khung giờ") ⇒ nói rõ đó là biến động chung hay riêng khung.
+  const sig = slots
+    .filter((s) => s.change != null && s.band != null && s.band > 0 && Math.abs(s.change) >= s.band)
+    .sort((a, b) => Math.abs(b.change!) / b.band! - Math.abs(a.change!) / a.band!)[0];
+  const sigNote = sig
+    ? adjusted && sig.index! >= 0.9
+      ? `Khung ${sig.label} ${signed(sig.change!, 0)} so với tháng trước (vượt ngưỡng ±${Math.round(sig.band!)}%) nhưng vẫn đạt ${Math.round(sig.index! * 100)}% mức trung bình cùng loại ngày tháng này: GMV/giờ ${sig.change! < 0 ? "giảm" : "tăng"} chung cả tháng, không riêng khung giờ này.`
+      : `Khung ${sig.label} ${signed(sig.change!, 0)} so với tháng trước, vượt ngưỡng ±${Math.round(sig.band!)}%${adjusted ? ` và ở mức ${Math.round(sig.index! * 100)}% trung bình cùng loại ngày` : ""}.`
+    : "";
+  const cause = join(
+    bestS && worstS && bestS !== worstS
+      ? `Khung giờ bắt đầu phiên${adjusted ? " (đã so với trung bình cùng loại ngày)" : ""}: ${slotNote(bestS)}; ${slotNote(worstS)} (${worstS.n} phiên).`
+      : "Chưa đủ phiên theo khung giờ để so sánh (cần từ 3 phiên mỗi khung).",
+    sigNote
+  );
   const small = i.hosts.filter((h) => h.sessions < min).length;
   const impact = join(
     above.some((h) => h.borderline) || below.some((h) => h.borderline) ? "Có host sát ngưỡng ý nghĩa thống kê, cần thêm dữ liệu tháng sau để kết luận." : "",
@@ -398,7 +430,7 @@ export interface AdsInsightPageInput {
 }
 
 export function adsBlocks(i: AdsInsightPageInput): InsightBlocks {
-  if (i.cost <= 0) return { ...EMPTY, advise: "Tải file TikTok Ads Campaign overview để có số Ads của tháng." };
+  if (i.cost <= 0) return EMPTY;
   const pct = i.target ? (i.cost / i.target) * 100 : null;
   const over = i.buckets.filter((b) => b.target > 0).map((b) => ({ ...b, pct: (b.cost / b.target) * 100 })).sort((a, b) => b.pct - a.pct)[0];
   const observe = join(
@@ -437,7 +469,7 @@ export interface AffiliateInsightInput {
 }
 
 export function affiliateBlocks(i: AffiliateInsightInput): InsightBlocks {
-  if (i.sessions === 0) return { ...EMPTY, advise: "Nhập kế hoạch và số thực tế ở tab Affiliate để có số của trang này." };
+  if (i.sessions === 0) return EMPTY;
   const observe = join(
     `${i.sessions} phiên của ${i.creators} creator, GMV phiên ${money(i.gmv)}`,
     i.pctTarget != null ? `(${pctTxt(i.pctTarget)} Target).` : "(chưa có Target phiên).",
@@ -468,8 +500,8 @@ export function nextBlocks(i: NextInsightInput): InsightBlocks {
   const observe = missing.length ? `${i.nextLabel} chưa có ${missing.join(" và ")}.` : `${i.nextLabel} đã có ${have}.`;
   return {
     observe,
-    cause: missing.length ? `Thiếu ${missing.join(" và ")}.` : `Đã đủ ${have}.`,
+    cause: missing.length ? `Kế hoạch ${i.nextLabel.toLowerCase()} đang lập, chưa chốt ${missing.join(" và ")}.` : `Đã đủ ${have}.`,
     impact: missing.length ? "Thiếu kế hoạch thì Target tháng sau dễ đặt theo mục tiêu tổng thay vì GMV/giờ đã đạt." : "Kế hoạch đã đủ để chấm tiến độ ngay từ đầu tháng.",
-    advise: missing.length ? `Lập ${missing.join(" và ")} trước khi chốt report.` : withCreator ? "Theo dõi tiến độ theo Target Live và Booking từ đầu tháng." : "Theo dõi tiến độ theo Target Live từ đầu tháng."
+    advise: missing.length ? `YFB gửi ${missing.join(" và ")} của ${i.nextLabel.toLowerCase()} kèm GMV/giờ yêu cầu theo loại ngày khi chốt kế hoạch.` : withCreator ? "Theo dõi tiến độ theo Target Live và Booking từ đầu tháng." : "Theo dõi tiến độ theo Target Live từ đầu tháng."
   };
 }

@@ -22,7 +22,8 @@ test("Tổng quan: nêu loại ngày thấp nhất so với Target và yếu t�
   expect(a.cause).toContain("LIVE CTR −14%");
   expect(a.impact).toContain("KPI GMV");
   expect(summaryBlocks({ ...base, worstFactor: null }).cause).toContain("Không loại ngày nào");
-  expect(summaryBlocks({ ...base, liveTarget: null, worstFactor: null }).advise).toContain("Lập Target LIVE");
+  // Chưa có Target: không ghi việc nội bộ ("Lập Target…") vào Insight gửi brand (audit 30/10).
+  expect(summaryBlocks({ ...base, liveTarget: null, worstFactor: null }).advise).toBe("");
 });
 
 test("Key Metrics: không chỉ số vượt ngưỡng thì câu nói rõ điều đó", () => {
@@ -93,9 +94,9 @@ test("mọi hàm sinh trả đủ 4 khối không rỗng, kể cả khi thiếu 
   ];
   for (const b of empties) for (const k of BLOCK_KEYS) expect(b[k].length).toBeGreaterThan(0);
   // Tổng quan chưa có Target: tiêu đề trang đã nói điều đó ⇒ Quan sát rỗng (khối bị ẩn), các khối khác vẫn có chữ.
+  // Audit 30/10: mọi khối rỗng (khung Insight bị ẩn ở bản gửi brand) — việc lập Target là dòng "Chỉ ops thấy".
   const noTarget = summaryBlocks({ liveActual: 0, liveTarget: null, days: [], worstFactor: null, shopKpi: null });
-  expect(noTarget.observe).toBe("");
-  expect(noTarget.advise.length).toBeGreaterThan(0);
+  for (const k of BLOCK_KEYS) expect(noTarget[k]).toBe("");
 });
 
 test("audit trùng lặp 30/10: trang 1 nói thiếu do GMV/giờ hay Giờ live, không phân tích yếu tố phễu khi có kế hoạch", () => {

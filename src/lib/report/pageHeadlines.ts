@@ -20,10 +20,11 @@ export function summaryHeadline(i: SummaryHeadlineInput): string {
   if (i.liveTarget == null || i.liveTarget <= 0) return `${g} ${fmtVndShort(i.liveActual)}; tháng này chưa có Target${i.gmvLabel ? "" : " LIVE"} nên chưa đánh giá được kết quả.`;
   const p = (i.liveActual / i.liveTarget) * 100;
   const head = `${g} đạt ${pct(p)} Target (${fmtVndShort(i.liveActual)} so với ${fmtVndShort(i.liveTarget)})`;
-  const withT = i.days.filter((d) => d.target != null && d.target > 0).map((d) => ({ label: d.label, p: (d.actual / d.target!) * 100 }));
+  const withT = i.days.filter((d) => d.target != null && d.target > 0).map((d) => ({ label: d.label, p: (d.actual / d.target!) * 100, gap: d.actual - d.target! }));
   if (withT.length === 0) return `${head}.`;
-  const worst = [...withT].sort((a, b) => a.p - b.p)[0];
-  return worst.p < 100 ? `${head}; ${worst.label} thấp nhất ở ${pct(worst.p)} Target.` : `${head}; mọi loại ngày đều đạt Target.`;
+  // Loại ngày thiếu nhiều tiền nhất (cùng tiêu chí Insight trang 1, audit 30/10) — không phải loại ngày % thấp nhất.
+  const worst = [...withT].filter((d) => d.gap < 0).sort((a, b) => a.gap - b.gap)[0];
+  return worst ? `${head}; ${worst.label} thiếu nhiều nhất (−${fmtVndShort(-worst.gap)}, đạt ${pct(worst.p)} Target).` : `${head}; mọi loại ngày đều đạt Target.`;
 }
 
 export interface KeyMetricsHeadlineInput {

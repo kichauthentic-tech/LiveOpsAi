@@ -97,6 +97,8 @@ export const DemoInsight: React.FC<{
     void save(encodeEdits(e));
   };
   const showOwn = editing || !!shown.own;
+  // Bản gửi brand: trang không có khối nào (vd chưa có Target) thì không vẽ khung Insight trống.
+  if (!canManage && !showOwn && BLOCK_KEYS.every((k) => !shown[k].trim() || shown[k].trim() === "—")) return null;
   return (
     <>
       <div className="insbar">

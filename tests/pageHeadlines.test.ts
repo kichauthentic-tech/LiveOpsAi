@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 import { dropHeadline, keyMetricsHeadline, observeHeadline, summaryHeadline } from "../src/lib/report/pageHeadlines";
 
 describe("pageHeadlines", () => {
-  it("tổng quan: nêu % Target và loại ngày thấp nhất", () => {
+  it("tổng quan: nêu % Target và loại ngày thiếu nhiều nhất", () => {
     const h = summaryHeadline({ liveActual: 90e6, liveTarget: 100e6, days: [{ label: "Daily", target: 50e6, actual: 30e6 }, { label: "Pay Day", target: 50e6, actual: 60e6 }] });
     expect(h).toContain("90% Target");
-    expect(h).toContain("Daily thấp nhất ở 60% Target");
+    expect(h).toContain("Daily thiếu nhiều nhất (−20M, đạt 60% Target)");
   });
   it("tổng quan: chưa có Target thì nói rõ", () => {
     expect(summaryHeadline({ liveActual: 1e6, liveTarget: null, days: [] })).toContain("chưa có Target LIVE");
