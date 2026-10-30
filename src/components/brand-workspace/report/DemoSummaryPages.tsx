@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { fmtFixed, fmtNum } from "../../../lib/format";
-import { METRIC } from "../../../lib/metricGlossary";
+import { CHANNEL, METRIC } from "../../../lib/metricGlossary";
 import { fmtKeyMetric, KEY_METRICS, type KeyMetricKey } from "../../../lib/report/keyMetrics";
 import { KEY_METRICS_TABS, keyMetricsTable, type KeyMetricsMonth, type KeyMetricsTab, type ScoreRow } from "../../../lib/report/brandReport";
 import type { BridgePoint, PlanHourRow } from "../../../lib/report/reportVisuals";
@@ -56,8 +56,40 @@ export interface SummaryDemoProps {
   cancelledTarget?: number;
   /** Tên chỉ số doanh số — mặc định LIVE GMV (TikTok); report Shopee truyền "GMV" (Sales(Placed Order)). */
   gmvLabel?: string;
+  /** Có thì trang dựng theo kiểu "Tổng quan cả shop" (4 ô + GMV theo kênh + target theo loại ngày); vắng (Shopee) thì giữ bố cục cũ. */
+  channels?: { throughDay: number; cur: ChannelSplit; prev: ChannelSplit | null };
   insight: React.ReactNode;
 }
+
+/** GMV cả shop và 4 kênh của một kỳ (cùng ngày trong tháng) — lib/report/monthlyReportInsights.ts ChannelMix. */
+export interface ChannelSplit {
+  shopGmv: number;
+  liveLinked: number;
+  affiliate: number;
+  video: number;
+  card: number | null;
+}
+
+const CH_COLOR = { sellerLive: "#e0b43c", affiliate: "#d95926", video: "#199e70", card: "#3987e5" };
+
+const ChannelDonut: React.FC<{ parts: { color: string; v: number }[]; total: number; center: string }> = ({ parts, total, center }) => {
+  const R = 62;
+  const C = 2 * Math.PI * R;
+  let acc = 0;
+  return (
+    <svg viewBox="0 0 160 160" width="160" height="160" role="img" aria-label="GMV cả shop theo kênh" style={{ flex: "none" }}>
+      <circle cx="80" cy="80" r={R} fill="none" stroke="var(--line)" strokeWidth="22" />
+      {parts.map((s, i) => {
+        const len = total > 0 ? (s.v / total) * C : 0;
+        const el = <circle key={i} cx="80" cy="80" r={R} fill="none" stroke={s.color} strokeWidth="22" strokeDasharray={`${len} ${C - len}`} strokeDashoffset={-acc} transform="rotate(-90 80 80)" />;
+        acc += len;
+        return el;
+      })}
+      <text x="80" y="76" textAnchor="middle" fontSize="11" fill="var(--muted)">{METRIC.totalGmv}</text>
+      <text x="80" y="96" textAnchor="middle" fontSize="18" fontWeight="900" fill="var(--cream)">{center}</text>
+    </svg>
+  );
+};
 
 export const SummaryDemoPage: React.FC<SummaryDemoProps> = (p) => {
   const mm = p.month.slice(5);
@@ -171,6 +203,129 @@ export const SummaryDemoPage: React.FC<SummaryDemoProps> = (p) => {
   const planRows: any[] = ph.map((r) => [DAY_TYPE_SHORT[r.key], fmtP(r.share * 100, 0, false), amt(r.planTarget), String(Math.round(r.planHours)), amt(r.planGmvPerHour!)]);
   if (tHours > 0) planRows.push({ hl: true, c: ["Cả tháng", "100%", amt(tTarget), String(Math.round(tHours)), amt(tTarget / tHours)] });
   const end = p.partial ? `tới ${p.curEndDay}/${mm}` : `tháng ${Number(mm)}`;
+
+  if (p.channels) {
+    const { cur, prev, throughDay } = p.channels;
+    const chg = (v: number | null | undefined) =>
+      v == null ? null : <span style={{ color: v >= 0 ? "var(--green)" : "var(--red)" }}>{v >= 0 ? "+" : "−"}{fmtNum(Math.abs(v), 1)}%</span>;
+    const growth = (a: number | null | undefined, b: number | null | undefined) => (a != null && b != null && a > 0 ? (b / a - 1) * 100 : null);
+    const vs = `so với ${p.prevMonthShort}`;
+    const planGph = tHours > 0 ? tTarget / tHours : null;
+    const shopActual = p.shop?.actual ?? cur.shopGmv;
+    const tiles: DemoKpi[] = [
+      {
+        lab: `${METRIC.totalGmv} · tới ${throughDay}/${mm}`,
+        val: amt(shopActual),
+        note: (
+          <>
+            {p.shop && <><span className={`pc ${pcTone((p.shop.actual / p.shop.target) * 100)}`}>{pct1((p.shop.actual / p.shop.target) * 100)} KPI {amt(p.shop.target)}</span>{p.shop.projected != null ? `dự báo ${amt(p.shop.projected)} · ` : ""}</>}
+            {chg(growth(prev?.shopGmv, cur.shopGmv))} {vs}
+          </>
+        )
+      },
+      {
+        lab: `${gl} · tới ${p.curEndDay}/${mm}`,
+        val: amt(p.liveActual),
+        note: (
+          <>
+            {base ? <span className={`pc ${pcTone((p.liveActual / base) * 100)}`}>{pct1((p.liveActual / base) * 100)} target tới nay</span> : null}
+            {p.liveTargetMonth ? `target tháng ${amt(p.liveTargetMonth)}${p.liveProjected != null ? ` · dự báo ${amt(p.liveProjected)}` : ""}` : "chưa có Target LIVE"}
+          </>
+        )
+      },
+      {
+        lab: `${METRIC.liveHours} · tới ${p.curEndDay}/${mm}`,
+        val: `${fmtFixed(doneHours, 1)}h`,
+        note: planHoursMonth > 0 ? (
+          <>
+            <span className={`pc ${pcTone(((doneHours / planHoursMonth) * 100) / (p.partial ? timePct / 100 : 1))}`}>{pct1((doneHours / planHoursMonth) * 100)} kế hoạch tháng {Math.round(planHoursMonth)}h</span>
+            {chg(p.hoursChange)} {vs}
+          </>
+        ) : <>chưa có giờ kế hoạch</>
+      },
+      {
+        lab: METRIC.gmvPerHour,
+        val: p.gmvPerHour != null ? amt(p.gmvPerHour) : "—",
+        note: (
+          <>
+            {planGph && p.gmvPerHour != null ? <span className={`pc ${pcTone((p.gmvPerHour / planGph / PLAN_OK) * 100)}`}>{pct1((p.gmvPerHour / planGph) * 100)} kế hoạch {amt(planGph)}</span> : null}
+            {chg(p.gmvPerHourChange)} {vs}
+          </>
+        )
+      }
+    ];
+
+    const liveSplit = cur.liveLinked + cur.affiliate;
+    const rows: { name: string; v: number | null; prevV: number | null; color: string; sub?: boolean }[] = [
+      { name: "LIVE", v: liveSplit, prevV: prev ? prev.liveLinked + prev.affiliate : null, color: CH_COLOR.sellerLive },
+      { name: CHANNEL.sellerLive, v: cur.liveLinked, prevV: prev?.liveLinked ?? null, color: CH_COLOR.sellerLive, sub: true },
+      { name: CHANNEL.affiliateLive, v: cur.affiliate, prevV: prev?.affiliate ?? null, color: CH_COLOR.affiliate, sub: true },
+      { name: CHANNEL.video, v: cur.video, prevV: prev?.video ?? null, color: CH_COLOR.video },
+      { name: CHANNEL.productCard, v: cur.card, prevV: prev?.card ?? null, color: CH_COLOR.card }
+    ];
+    const donut = [
+      { color: CH_COLOR.sellerLive, v: cur.liveLinked },
+      { color: CH_COLOR.affiliate, v: cur.affiliate },
+      { color: CH_COLOR.video, v: cur.video },
+      { color: CH_COLOR.card, v: cur.card ?? 0 }
+    ];
+    const dayRows = p.score.filter((r) => r.key !== "all" && r.key !== "shop");
+    const dayBars = dayRows
+      .map((r) => {
+        const t = r.targetToDate ?? r.target;
+        return t != null ? { name: DAY_TYPE_SHORT[r.key as CampDayBucket], sub: p.spans[r.key as CampDayBucket] ?? "", value: r.actual / 1e6, mark: t / 1e6, text: `${amt(r.actual)} / ${amt(t)} · ${fmtP((r.actual / t) * 100, 0, false)}`, cls: r.actual / t < 0.9 ? "red" : "" } : null;
+      })
+      .filter((r): r is NonNullable<typeof r> => r != null);
+    const dayMax = Math.ceil((Math.max(...dayBars.map((r) => Math.max(r.value, r.mark)), 0) * 1.1) / 100) * 100;
+
+    return (
+      <DemoPage>
+        <DemoHead no={p.no} title={p.title} headline={p.headline} />
+        <DemoKpis items={tiles} />
+        <DemoPanel title={`${METRIC.totalGmv} theo kênh`} sub={`Tới ${throughDay}/${mm}. % tăng giảm ${vs} cùng ngày.`}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 20, alignItems: "center" }}>
+            <ChannelDonut parts={donut} total={cur.shopGmv} center={amt(cur.shopGmv)} />
+            <div style={{ flex: "1 1 320px", minWidth: 0, overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, fontVariantNumeric: "tabular-nums" }}>
+                <thead>
+                  <tr style={{ color: "var(--muted)", fontSize: 12, borderBottom: "1px solid var(--line)" }}>
+                    <th style={{ textAlign: "left", fontWeight: 500, padding: "6px 8px" }}>Kênh</th>
+                    <th style={{ textAlign: "right", fontWeight: 500, padding: "6px 8px" }}>GMV</th>
+                    <th style={{ textAlign: "right", fontWeight: 500, padding: "6px 8px" }}>Tỷ trọng</th>
+                    <th style={{ textAlign: "right", fontWeight: 500, padding: "6px 8px" }}>So {p.prevMonthShort}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r) => (
+                    <tr key={r.name} style={{ borderBottom: "1px solid var(--line)", color: r.sub ? "var(--muted)" : undefined, fontWeight: r.sub ? 400 : 700 }}>
+                      <td style={{ padding: "9px 8px", paddingLeft: r.sub ? 26 : 8 }}>
+                        {!r.sub && <i style={{ display: "inline-block", width: 10, height: 10, borderRadius: 3, marginRight: 8, background: r.color }} />}
+                        {r.name}
+                      </td>
+                      <td style={{ padding: "9px 8px", textAlign: "right" }}>{r.v != null ? amt(r.v) : "—"}</td>
+                      <td style={{ padding: "9px 8px", textAlign: "right" }}>{r.v != null ? fmtP((r.v / cur.shopGmv) * 100, 1, false) : "—"}</td>
+                      <td style={{ padding: "9px 8px", textAlign: "right" }}>{chg(growth(r.prevV, r.v)) ?? "—"}</td>
+                    </tr>
+                  ))}
+                  <tr style={{ fontWeight: 800 }}>
+                    <td style={{ padding: "9px 8px" }}>{METRIC.totalGmv}</td>
+                    <td style={{ padding: "9px 8px", textAlign: "right" }}>{amt(cur.shopGmv)}</td>
+                    <td style={{ padding: "9px 8px", textAlign: "right" }}>100%</td>
+                    <td style={{ padding: "9px 8px", textAlign: "right" }}>{chg(growth(prev?.shopGmv, cur.shopGmv)) ?? "—"}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </DemoPanel>
+        {dayBars.length > 0 && (
+          <DemoPanel title={`${gl} so với target theo loại ngày`} sub={`Vạch trắng là ${liveTarget.toLowerCase()} của từng loại ngày.`}>
+            <Html className="hb" html={hbars(dayBars, dayMax)} />
+          </DemoPanel>
+        )}
+      </DemoPage>
+    );
+  }
 
   return (
     <DemoPage>

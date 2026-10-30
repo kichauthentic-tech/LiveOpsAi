@@ -1389,6 +1389,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             planHours={planHours}
             cancelledTarget={planRR ? cancelledPlanTarget(planRR.rr.slots) : undefined}
             actualHours={Object.fromEntries(campDetailRows.map((r) => [r.key, r.hours]))}
+            channels={channelMixes[channelMixes.length - 1] ? { throughDay: shopCur?.through ? Number(shopCur.through.slice(8, 10)) : Number(cmp.curEnd.slice(8)), cur: channelMixes[channelMixes.length - 1]!, prev: channelMixes[channelMixes.length - 2] ?? null } : undefined}
             insight={demoInsight("summary")}
           />
         </section>
