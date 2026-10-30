@@ -76,8 +76,9 @@ export function decodeLiveTarget(text: string | undefined | null): LiveTargetTyp
   }
 }
 
-/** `saved`/`onSave`: số tự điền lưu vào dữ liệu report (brand thấy, bản xuất có); thiếu thì chỉ nháp trong trình duyệt. `canEdit`=false: chỉ hiện số đã lưu. */
-export const NextLivePlanPanel: React.FC<{ nextMonth: string; curLabel: string; nextLabel: string; rows: LivePlanRow[]; total: LivePlanRow; saved?: LiveTargetTyped; onSave?: (m: LiveTargetTyped) => Promise<void>; canEdit?: boolean }> = ({ nextMonth, curLabel, nextLabel, rows, total, saved, onSave, canEdit = true }) => {
+/** `saved`/`onSave`: số tự điền lưu vào dữ liệu report (brand thấy, bản xuất có); thiếu thì chỉ nháp trong trình duyệt. `canEdit`=false: chỉ hiện số đã lưu.
+ *  `cv`: độ lệch GMV/giờ một phiên đo trên brand (estimateSessionCv) — cùng hệ số với ngưỡng ở trang Nguyên nhân và Key Metrics. */
+export const NextLivePlanPanel: React.FC<{ nextMonth: string; curLabel: string; nextLabel: string; rows: LivePlanRow[]; total: LivePlanRow; saved?: LiveTargetTyped; onSave?: (m: LiveTargetTyped) => Promise<void>; canEdit?: boolean; cv?: number }> = ({ nextMonth, curLabel, nextLabel, rows, total, saved, onSave, canEdit = true, cv }) => {
   const [localTyped, saveLocal] = useLocalDraft<LiveTargetTyped>(`liveops-report-live-plan-${nextMonth}`, {});
   const [draft, setDraft] = useState<LiveTargetTyped | null>(null);
   const typed = onSave ? draft ?? saved ?? {} : localTyped;
@@ -101,7 +102,7 @@ export const NextLivePlanPanel: React.FC<{ nextMonth: string; curLabel: string; 
   const calc = (r: LivePlanRow, hours: number | null, target: number | null) => {
     const req = hours && target ? target / hours : null;
     const d = req != null && r.achieved ? (req / r.achieved - 1) * 100 : null;
-    return { req, d, band: noiseBand(r.sessionsCur, r.plan?.slots ?? r.sessionsCur) };
+    return { req, d, band: noiseBand(r.sessionsCur, r.plan?.slots ?? r.sessionsCur, cv) };
   };
   const vals = (r: LivePlanRow) => (r.plan ? { hours: r.plan.hours, target: r.plan.target } : { hours: parseNum(typed[r.key]?.h), target: (parseNum(typed[r.key]?.t) ?? 0) * 1e6 || null });
   const body = rows.map((r) => ({ r, ...vals(r) })).map((x) => ({ ...x, ...calc(x.r, x.hours, x.target) }));
@@ -117,10 +118,8 @@ export const NextLivePlanPanel: React.FC<{ nextMonth: string; curLabel: string; 
   };
   const cell = (key: string, f: "h" | "t", ph: string, label: string) =>
     canEdit ? <input className="rr" inputMode="decimal" placeholder={ph} value={typed[key]?.[f] ?? ""} onChange={(e) => set(key, f, e.target.value)} onBlur={commit} aria-label={label} /> : <>{typed[key]?.[f] || "—"}</>;
-  const bands = [...body.map((x) => `${x.r.name} ±${x.band != null ? fmtFixed(x.band, 0) : "—"}%`), `cả tháng ±${totCalc?.band != null ? fmtFixed(totCalc.band, 0) : (noiseBand(total.sessionsCur, total.sessionsCur) != null ? fmtFixed(noiseBand(total.sessionsCur, total.sessionsCur)!, 0) : "—")}%`];
+  const bands = [...body.map((x) => `${x.r.name} ±${x.band != null ? fmtFixed(x.band, 0) : "—"}%`), `cả tháng ±${totCalc?.band != null ? fmtFixed(totCalc.band, 0) : (noiseBand(total.sessionsCur, total.sessionsCur, cv) != null ? fmtFixed(noiseBand(total.sessionsCur, total.sessionsCur, cv)!, 0) : "—")}%`];
   // Brand chưa có kế hoạch Chốt và ops chưa lưu số tự điền nào ⇒ chỉ còn hàng "—" / "chưa nhập", không có gì để đọc.
-  if (!fromApp && !canEdit && filled.length === 0) return null;
-  // Chưa có kế hoạch tháng sau và ops chưa lưu số tự điền nào ⇒ chỉ còn hàng "—" / "chưa nhập", không có gì để đọc.
   if (!fromApp && !canEdit && filled.length === 0) return null;
   return (
     <div className="pn">

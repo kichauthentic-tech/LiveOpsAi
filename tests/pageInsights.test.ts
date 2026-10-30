@@ -18,11 +18,11 @@ test("bản ops sửa ghi đè đúng khối đã sửa, khối còn lại theo 
 test("Tổng quan: nêu loại ngày thấp nhất so với Target và yếu tố giảm; không vượt ngưỡng thì nói rõ", () => {
   const base = { liveActual: 4_430_000_000, liveTarget: 4_660_000_000, days: [{ label: "Daily", target: 1_800_000_000, actual: 1_890_000_000 }, { label: "Pay Day", target: 925_000_000, actual: 647_000_000 }], shopKpi: { target: 8_400_000_000, projected: 7_390_000_000 } };
   const a = summaryBlocks({ ...base, worstFactor: { dayLabel: "Pay Day", factorLabel: "LIVE CTR", change: -14 } });
-  expect(a.observe).toContain("Pay Day đạt % Target thấp nhất");
+  expect(a.observe).toContain("Pay Day chiếm");
   expect(a.cause).toContain("LIVE CTR −14%");
   expect(a.impact).toContain("KPI GMV");
   expect(summaryBlocks({ ...base, worstFactor: null }).cause).toContain("Không loại ngày nào");
-  expect(summaryBlocks({ ...base, liveTarget: null, worstFactor: null }).observe).toContain("chưa có Target LIVE");
+  expect(summaryBlocks({ ...base, liveTarget: null, worstFactor: null }).advise).toContain("Lập Target LIVE");
 });
 
 test("Key Metrics: không chỉ số vượt ngưỡng thì câu nói rõ điều đó", () => {
@@ -84,7 +84,6 @@ test("Shop / Ads / Affiliate / NMV / Kế hoạch: câu mẫu theo quy tắc, th
 
 test("mọi hàm sinh trả đủ 4 khối không rỗng, kể cả khi thiếu dữ liệu", () => {
   const empties = [
-    summaryBlocks({ liveActual: 0, liveTarget: null, days: [], worstFactor: null, shopKpi: null }),
     keyMetricsBlocks({ rows: [], band: null, prevLabel: "T9" }),
     shopBlocks({ totalChange: null, windowLabel: "", channels: [], control: [] }),
     productsBlocks({ topN: 0, risers: [], fallers: [], lead: null, promo: null }),
@@ -93,4 +92,39 @@ test("mọi hàm sinh trả đủ 4 khối không rỗng, kể cả khi thiếu 
     nextBlocks({ nextLabel: "Tháng 11", hasLivePlan: true, hasCreatorPlan: true })
   ];
   for (const b of empties) for (const k of BLOCK_KEYS) expect(b[k].length).toBeGreaterThan(0);
+  // Tổng quan chưa có Target: tiêu đề trang đã nói điều đó ⇒ Quan sát rỗng (khối bị ẩn), các khối khác vẫn có chữ.
+  const noTarget = summaryBlocks({ liveActual: 0, liveTarget: null, days: [], worstFactor: null, shopKpi: null });
+  expect(noTarget.observe).toBe("");
+  expect(noTarget.advise.length).toBeGreaterThan(0);
+});
+
+test("audit trùng lặp 30/10: trang 1 nói thiếu do GMV/giờ hay Giờ live, không phân tích yếu tố phễu khi có kế hoạch", () => {
+  const b = summaryBlocks({
+    liveActual: 4.43e9,
+    liveTarget: 4.66e9,
+    days: [
+      { label: "Daily", target: 1.83e9, actual: 1.89e9, gphPct: 107, hoursPct: 77 },
+      { label: "Pay Day", target: 925e6, actual: 647e6, gphPct: 65, hoursPct: 108 }
+    ],
+    worstFactor: { dayLabel: "Pay Day", factorLabel: "LIVE CTR", change: -14 },
+    shopKpi: null
+  });
+  expect(b.observe).toContain("Thiếu 230M");
+  expect(b.cause).toContain("Pay Day 65% GMV/giờ kế hoạch");
+  expect(b.cause).toContain("do GMV/giờ");
+  expect(b.cause).not.toContain("LIVE CTR");
+});
+
+test("audit trùng lặp 30/10: Key Metrics đề xuất cùng chỉ số chính với trang Nguyên nhân", () => {
+  const rows = [{ label: "Product impressions", change: -13, tone: "down" as const }];
+  const b = keyMetricsBlocks({ rows, band: 12, prevLabel: "T8", mainMetric: "Views/giờ" });
+  expect(b.advise).toContain("Chỉ số theo dõi chính của tháng sau: Views/giờ");
+  expect(b.advise).toContain("Product impressions theo dõi kèm");
+});
+
+test("audit trùng lặp 30/10: whyMainMetric = yếu tố kéo giảm vượt ngưỡng, yếu thì null", async () => {
+  const { whyMainMetric } = await import("../src/lib/report/pageInsights");
+  const parts = [{ key: "hours", label: "Giờ live", value: 760e6, change: 15 }, { key: "viewsPerHour", label: "Views/giờ", value: -1.03e9, change: -17 }];
+  expect(whyMainMetric({ gmvPerHourChange: -23, parts, significantDays: [], band: null, factorBand: 12, mix: null })).toBe("Views/giờ");
+  expect(whyMainMetric({ gmvPerHourChange: -23, parts, significantDays: [], band: null, factorBand: 20, mix: null })).toBeNull();
 });

@@ -117,7 +117,7 @@ describe("B8 · tiêu đề và Insight trang 1 chọn cùng loại ngày yếu 
   it("cùng chọn D-Day (60%) dù Daily chênh tuyệt đối lớn hơn", () => {
     expect(summaryHeadline({ liveActual: 2.7e9, liveTarget: 3.5e9, days })).toContain("D-Day thấp nhất ở 60%");
     const b = summaryBlocks({ liveActual: 2.7e9, liveTarget: 3.5e9, days, worstFactor: null, shopKpi: null });
-    expect(b.observe).toContain("D-Day đạt % Target thấp nhất");
+    expect(b.observe).toContain("D-Day chiếm");
     expect(b.advise).toContain("D-Day");
   });
 });

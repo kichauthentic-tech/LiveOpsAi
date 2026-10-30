@@ -65,7 +65,6 @@ export const SummaryDemoPage: React.FC<SummaryDemoProps> = (p) => {
   const all = p.score.find((r) => r.key === "all");
   const base = all ? all.targetToDate ?? all.target : null;
   const liveTarget = p.partial ? "Target tới nay" : "Target tháng";
-  const shopPct = p.shop && p.shop.target > 0 ? (p.shop.actual / p.shop.target) * 100 : null;
   const kpis: DemoKpi[] = [
     {
       lab: p.partial ? `${gl} · tới ${p.curEndDay}/${mm}` : `${gl} · tháng ${Number(mm)}`,
@@ -82,13 +81,18 @@ export const SummaryDemoPage: React.FC<SummaryDemoProps> = (p) => {
     });
   }
   if (p.shop) {
+    // Cùng mẫu số với dòng KPI Total GMV của bảng Kết quả (KPI tới nay khi tháng còn dở) — trước 30/10 ô ghi % KPI cả tháng (77%)
+    // còn bảng ghi % KPI tới nay (88%), cạnh "dự báo 88%" nên đọc nhầm.
+    const shopRow = p.score.find((r) => r.key === "shop");
+    const shopBase = p.partial && shopRow?.targetToDate ? shopRow.targetToDate : p.shop.target;
+    const shopPctNow = shopBase > 0 ? (p.shop.actual / shopBase) * 100 : null;
     kpis.push({
       lab: `${METRIC.totalGmv}${p.shop.throughDay ? ` · tới ${p.shop.throughDay}/${mm}` : ""}`,
       val: amt(p.shop.actual),
       note: (
         <>
-          {shopPct != null && <span className={`pc ${pcTone(shopPct)}`}>{pct1(shopPct)}</span>} KPI tháng {amt(p.shop.target)}
-          {p.shop.projected != null && p.shop.projectedPct != null ? ` · dự báo ${amt(p.shop.projected)} (${fmtP(p.shop.projectedPct, 0, false)})` : ""}
+          {shopPctNow != null && <span className={`pc ${pcTone(shopPctNow)}`}>{pct1(shopPctNow)}</span>} {shopBase !== p.shop.target ? `KPI tới nay ${amt(shopBase)}` : `KPI tháng ${amt(p.shop.target)}`}
+          {p.shop.projected != null && p.shop.projectedPct != null ? ` · dự báo ${amt(p.shop.projected)} = ${fmtP(p.shop.projectedPct, 0, false)} KPI tháng ${amt(p.shop.target)}` : ""}
         </>
       )
     });
@@ -120,7 +124,9 @@ export const SummaryDemoPage: React.FC<SummaryDemoProps> = (p) => {
     bridgeHtml = waterfall(steps, { min: Math.floor((Math.min(...totals) * 0.93) / 1e8) * 1e8, max: Math.ceil((peak * 1.005) / 1e7) * 1e7 });
   }
 
-  // bảng Kết quả so với Target
+  // bảng Kết quả so với Target. Chênh lệch theo loại ngày đã ở biểu đồ cầu ngay trên ⇒ cột Chênh lệch chỉ giữ khi không có cầu
+  // (riêng dòng KPI Total GMV không nằm trong cầu nên ghi chênh ngay cạnh Target của dòng đó).
+  const showGapCol = !(bridgeHtml && base != null);
   const label = (k: ScoreRow["key"]) => (k === "all" ? `${gl} YFB` : k === "shop" ? `KPI ${METRIC.totalGmv}` : `${DAY_TYPE_SHORT[k as CampDayBucket]}${p.spans[k as CampDayBucket] ? ` · ${p.spans[k as CampDayBucket]}` : ""}`);
   const scoreRows = p.score.map((r) => {
     const t = r.targetToDate ?? r.target;
@@ -130,8 +136,8 @@ export const SummaryDemoPage: React.FC<SummaryDemoProps> = (p) => {
       c: [
         label(r.key),
         `<b>${amt(r.actual)}</b>`,
-        t != null ? amt(t) : "—",
-        d != null ? { t: sgnM(d), c: d >= 0 ? "up" : "dn" } : "—",
+        t != null ? amt(t) + (!showGapCol && r.key === "shop" && d != null ? ` (${sgnM(d)})` : "") : "—",
+        ...(showGapCol ? [d != null ? { t: sgnM(d), c: d >= 0 ? "up" : "dn" } : "—"] : []),
         { t: t ? pct1((r.actual / t) * 100) : "—", c: "nt" }
       ]
     };
@@ -142,27 +148,29 @@ export const SummaryDemoPage: React.FC<SummaryDemoProps> = (p) => {
   // Một ngưỡng duy nhất cho thanh đỏ, câu phụ đề và cột % kế hoạch: dưới 95% kế hoạch mới là "thấp hơn".
   const PLAN_OK = 0.95;
   const below = ph.filter((r) => r.actualGmvPerHour! / r.planGmvPerHour! < PLAN_OK).length;
-  const hbMax = Math.ceil((Math.max(...ph.map((r) => Math.max(r.planGmvPerHour!, r.actualGmvPerHour!)), 0) * 1.1) / 1e6) * 1e6;
-  const planBars = hbars(
-    ph.map((r) => ({
-      name: DAY_TYPE_SHORT[r.key],
-      sub: `${Math.round(r.planHours)} giờ kế hoạch${p.actualHours[r.key] != null ? ` · ${fmtFixed(p.actualHours[r.key] as number, 1)} giờ thực hiện` : ""}`,
-      value: r.actualGmvPerHour! / 1e6,
-      mark: r.planGmvPerHour! / 1e6,
-      text: `${amt(r.actualGmvPerHour!)} / ${amt(r.planGmvPerHour!)}`,
-      cls: r.actualGmvPerHour! / r.planGmvPerHour! < PLAN_OK ? "red" : ""
-    })),
-    hbMax / 1e6
-  );
   const tHours = ph.reduce((a, r) => a + r.planHours, 0);
   const tTarget = ph.reduce((a, r) => a + r.planTarget, 0);
   // GMV/giờ thực tế cả tháng = Σ GMV ÷ Σ giờ THỰC (trọng số giờ thực hiện, khớp bảng Key Metrics); loại ngày thiếu giờ thực thì dùng giờ kế hoạch.
   const actHours = (r: (typeof ph)[number]) => p.actualHours[r.key] ?? r.planHours;
   const tActualHours = ph.reduce((a, r) => a + actHours(r), 0);
   const tActual = ph.reduce((a, r) => a + r.actualGmvPerHour! * actHours(r), 0);
-  const planPct = (a: number, b: number) => ({ t: fmtP((a / b) * 100, 0, false), c: (a / b) >= PLAN_OK ? "nt" : "dn" });
-  const planRows: any[] = ph.map((r) => [DAY_TYPE_SHORT[r.key], fmtP(r.share * 100, 0, false), amt(r.planTarget), String(Math.round(r.planHours)), amt(r.planGmvPerHour!), amt(r.actualGmvPerHour!), planPct(r.actualGmvPerHour!, r.planGmvPerHour!)]);
-  if (tHours > 0) planRows.push({ hl: true, c: ["Cả tháng", "100%", amt(tTarget), String(Math.round(tHours)), amt(tTarget / tHours), amt(tActual / tActualHours), planPct(tActual / tActualHours, tTarget / tHours)] });
+  // Thực tế và % kế hoạch chỉ ở biểu đồ (gồm thanh Cả tháng); bảng bên dưới chỉ còn phần kế hoạch — audit trùng lặp 30/10.
+  const bars = ph.map((r) => ({ name: DAY_TYPE_SHORT[r.key], planH: r.planHours, actH: p.actualHours[r.key], act: r.actualGmvPerHour!, plan: r.planGmvPerHour! }));
+  if (tHours > 0 && ph.length > 1) bars.push({ name: "Cả tháng", planH: tHours, actH: tActualHours, act: tActual / tActualHours, plan: tTarget / tHours });
+  const hbMax = Math.ceil((Math.max(...bars.map((r) => Math.max(r.plan, r.act)), 0) * 1.1) / 1e6) * 1e6;
+  const planBars = hbars(
+    bars.map((r) => ({
+      name: r.name,
+      sub: `${Math.round(r.planH)} giờ kế hoạch${r.actH != null ? ` · ${fmtFixed(r.actH, 1)} giờ thực hiện` : ""}`,
+      value: r.act / 1e6,
+      mark: r.plan / 1e6,
+      text: `${amt(r.act)} / ${amt(r.plan)} · ${fmtP((r.act / r.plan) * 100, 0, false)}`,
+      cls: r.act / r.plan < PLAN_OK ? "red" : ""
+    })),
+    hbMax / 1e6
+  );
+  const planRows: any[] = ph.map((r) => [DAY_TYPE_SHORT[r.key], fmtP(r.share * 100, 0, false), amt(r.planTarget), String(Math.round(r.planHours)), amt(r.planGmvPerHour!)]);
+  if (tHours > 0) planRows.push({ hl: true, c: ["Cả tháng", "100%", amt(tTarget), String(Math.round(tHours)), amt(tTarget / tHours)] });
   const end = p.partial ? `tới ${p.curEndDay}/${mm}` : `tháng ${Number(mm)}`;
 
   return (
@@ -176,7 +184,7 @@ export const SummaryDemoPage: React.FC<SummaryDemoProps> = (p) => {
           </DemoPanel>
         )}
         <DemoPanel title="Kết quả so với Target" sub={`Target theo Kế Hoạch Tháng đã chốt; % tính trên Target ${p.partial ? "luỹ kế tới nay" : "tháng"}.${p.shop?.throughDay && p.shop.throughDay !== p.curEndDay ? ` ${gl} tính tới ${p.curEndDay}/${mm}, KPI ${METRIC.totalGmv} tính tới ${p.shop.throughDay}/${mm} (ngày cuối file Shop Analytics).` : ""}`}>
-          <DemoTable html={tbl(["", "Thực tế", p.partial ? "Target tới nay" : "Target", "Chênh lệch", "% Target"], scoreRows)} />
+          <DemoTable html={tbl(["", "Thực tế", p.partial ? "Target tới nay" : "Target", ...(showGapCol ? ["Chênh lệch"] : []), "% Target"], scoreRows)} />
         </DemoPanel>
       </DemoStack>
       {ph.length > 0 && (
@@ -188,7 +196,7 @@ export const SummaryDemoPage: React.FC<SummaryDemoProps> = (p) => {
             <Html className="hb" html={planBars} />
           </DemoPanel>
           <DemoPanel title={`Kế hoạch tháng ${Number(mm)} theo loại ngày`}>
-            <DemoTable html={tbl(["Loại ngày", "Phân bổ", "Target GMV", "Giờ kế hoạch", `${METRIC.gmvPerHour} kế hoạch`, "Thực tế", "% kế hoạch"], planRows)} />
+            <DemoTable html={tbl(["Loại ngày", "Phân bổ", "Target GMV", "Giờ kế hoạch", `${METRIC.gmvPerHour} kế hoạch`], planRows)} />
             {p.cancelledTarget != null && p.cancelledTarget > 0 && (
               <DemoLegend>
                 <span>Target tháng {p.liveTargetMonth != null ? amt(p.liveTargetMonth) : ""} gồm {amt(p.cancelledTarget)} của ca kế hoạch đã huỷ (giữ target, không có giờ kế hoạch) nên lớn hơn tổng bảng này {amt(tTarget)}.</span>
@@ -341,8 +349,6 @@ export const NmvDemoPage: React.FC<{
   if (!cur) return null;
   const old = (m: NmvMonth) => m.template === "old";
   const fileTag = (m: NmvMonth) => (m.exportedAt ? `file xuất ${dm(m.exportedAt)}` : "");
-  const prev = months[months.length - 2];
-  const prev2 = months[months.length - 3];
   const rateOf = (m: NmvMonth) => (m === cur && nmvRate != null ? nmvRate : m.windowRate);
   const curProv = cur.status !== "final";
   const nmv0 = rateOf(cur) != null ? cur.nmvGmv * (1 - rateOf(cur)! / 100) : null;
@@ -360,15 +366,7 @@ export const NmvDemoPage: React.FC<{
       note: curProv ? "chưa chốt: đơn còn trong thời gian hoàn trả" : "đã chốt"
     }
   ];
-  for (const m of [prev, prev2]) {
-    if (!m) continue;
-    kpis.push({
-      lab: `${METRIC.refundRate} tháng ${Number(m.month.slice(5))}${m.exportedAt ? ` · ${fileTag(m)}` : ""}`,
-      val: m.fileRate != null ? pct1(m.fileRate) : "—",
-      tone: old(m) ? "muted" : undefined,
-      note: `${m.win}${m.windowRate != null ? `: ${pct1(m.windowRate)}` : ""}${old(m) ? " · cần tải lại file để so sánh" : ""}`
-    });
-  }
+  // Refund rate các tháng trước chỉ ở biểu đồ "Refund rate toàn shop" và bảng theo dõi — không lặp thành ô (audit trùng lặp 30/10).
 
   // NMV tách phần hoàn (chưa có đơn hủy)
   const shown = months.slice(-3).filter((m) => rateOf(m) != null && m.nmvGmv > 0);
@@ -402,26 +400,6 @@ export const NmvDemoPage: React.FC<{
   }
   const fileNote = [...byFile.entries()].filter(([k]) => k).map(([k, ms]) => `${ms.join(", ")} từ file xuất ${k}`).join("; ");
   const anyOld = months.some(old);
-
-  // Total GMV và cơ cấu kênh
-  const mixRows = months
-    .filter((m) => m.shopGmv > 0)
-    .map((m) => {
-      const isCur = m === cur;
-      const r = m.windowRate;
-      return {
-        hl: isCur,
-        c: [
-          `${m.win}${m.exportedAt ? ` · ${fileTag(m)}` : ""}`,
-          amt(m.shopGmv),
-          fmtP((m.liveGmv / m.shopGmv) * 100, 2, false),
-          amt(m.affiliate),
-          amt(m.video),
-          m.card != null ? amt(m.card) : "—",
-          r == null ? "—" : old(m) ? { t: fmtP(r, 2, false), c: "nt" } : `${fmtP(r, 2, false)}${isCur && curProv ? " (tạm tính)" : ""}`
-        ]
-      };
-    });
 
   const save = async (fn: () => Promise<void>) => {
     setMsg("");
@@ -520,13 +498,10 @@ export const NmvDemoPage: React.FC<{
           <span>{METRIC.refundRate} chỉ gồm giá trị hoàn tiền, chưa gồm đơn hủy; tỷ lệ hủy cần file Order. Chênh lệch tính bằng điểm phần trăm.</span>
           <span className="st" aria-live="polite">{msg}</span>
         </DemoLegend>
-      </DemoPanel>
-      <DemoPanel title={`${METRIC.totalGmv} và cơ cấu kênh, 1–${curEndDay} mỗi tháng`}>
-        <DemoTable html={tbl(["Kỳ", METRIC.totalGmv, "Tỷ trọng YFB", "Affiliate LIVE", "Video", "Product card", METRIC.refundRate], mixRows)} />
         <details>
           <summary>Phương pháp</summary>
           <p>
-            NMV ước tính = {METRIC.liveGmv} YFB × (1 − {METRIC.refundRate} toàn shop), nguồn Shop Analytics. Tỷ lệ này tính trên mọi kênh của shop, chưa tách riêng livestream, nên chỉ là xấp xỉ. Với tháng đang chạy, {METRIC.refundRate} chưa chốt nên NMV chỉ là ước tính tạm. {METRIC.refundRate} chỉ gồm giá trị hoàn tiền, chưa gồm đơn hủy (cần file Order), nên NMV thực tế còn thấp hơn.
+            NMV ước tính = {METRIC.liveGmv} YFB × (1 − {METRIC.refundRate} toàn shop), nguồn Shop Analytics. Tỷ lệ này tính trên mọi kênh của shop, chưa tách riêng livestream, nên chỉ là xấp xỉ. Với tháng đang chạy, {METRIC.refundRate} chưa chốt nên NMV chỉ là ước tính tạm. {METRIC.refundRate} chỉ gồm giá trị hoàn tiền, chưa gồm đơn hủy (cần file Order), nên NMV thực tế còn thấp hơn. {METRIC.totalGmv} và cơ cấu kênh ở trang Toàn shop.
           </p>
         </details>
       </DemoPanel>

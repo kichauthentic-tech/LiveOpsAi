@@ -20,7 +20,7 @@ import { fetchMonthlyReport, saveMonthlyReportSectionNote } from "../../lib/db/m
 import { adsTypeRows } from "../../lib/report/adsSlide";
 import { BookingPlanPanel, LIVE_TARGET_MANUAL_KEY, NextLivePlanPanel, decodeLiveTarget, encodeLiveTarget } from "./report/NextMonthPanels";
 import { REFUND_FINAL_KEY, applyFinalRate, bookingTotals, decodeRefundFinal, encodeRefundFinal, refundTrackRows } from "../../lib/report/nextMonthPlan";
-import { BLOCK_KEYS, BLOCK_LABEL, decodeEdits, shownBlocks, type InsightBlocks, adsBlocks, affiliateBlocks, keyMetricsBlocks, nextBlocks, nmvBlocks, pageNoteKey, peopleBlocks, productsBlocks, shopBlocks, summaryBlocks, whyBlocks, type InsightPage } from "../../lib/report/pageInsights";
+import { BLOCK_KEYS, BLOCK_LABEL, decodeEdits, shownBlocks, type InsightBlocks, adsBlocks, affiliateBlocks, keyMetricsBlocks, nextBlocks, nmvBlocks, pageNoteKey, peopleBlocks, productsBlocks, shopBlocks, summaryBlocks, whyBlocks, whyMainMetric, type InsightPage, type WhyInsightInput } from "../../lib/report/pageInsights";
 import { contextInsight, HostInsightRow, hostVsPeer, InsightSection, peopleInsight, peopleOpsNote, productsInsight, sectionNextSteps, SectionInsight, shopInsight, shortSku, whyInsight } from "../../lib/report/sectionInsights";
 import { CAMP_DAY_BUCKET_LABEL, CAMP_DAY_BUCKET_ORDER, effectiveCamp, resolveCampBucketType, type CampDayBucket, type CampOverrides } from "../../lib/campaignDays";
 import { liveFunnel, sessionSpread } from "../../lib/report/rhythm";
@@ -33,7 +33,7 @@ import { fmtDateVn, fmtFixed, fmtVndFull, fmtVndShort } from "../../lib/format";
 import { CHANNELS, DAY_TYPE_SHORT, PAL, SECTIONS, chartTooltipStyle, type ReportSectionId } from "./report/theme";
 import { chartNum, fmtHours, fmtInt, fmtPct, fmtSessionStart, monthRangeLocal, nextMonthStrLocal, prevMonthStrLocal, promoStatusLabel } from "./report/format";
 import { ChartLegend, PageInsight, KpiTile, Panel, ReportTable, toWaterfall, PageHead, PagePager, PageRail, type PageMetric } from "./report/ui";
-import { keyMetricsHeadline, observeHeadline, summaryHeadline } from "../../lib/report/pageHeadlines";
+import { dropHeadline, keyMetricsHeadline, observeHeadline, summaryHeadline } from "../../lib/report/pageHeadlines";
 import { bridgePoints, cancelledPlanTarget, planHourRows, skuImageKey, targetBridge, trafficBridge, type ScatterPoint } from "../../lib/report/reportVisuals";
 import "./report/demo.css";
 import { PLATFORM_PROFILES } from "../../lib/platforms/profiles";
@@ -375,6 +375,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
       : null;
 
   // Ngày thường vs ngày camp, cơ cấu lịch vs hiệu suất.
+  const funnel = useMemo(() => liveFunnel(livePrev?.rows ?? [], liveCurrent?.rows ?? [], cmp), [livePrev, liveCurrent, cmp]);
   const dayGroups = useMemo(() => dayGroupStats(livePrev?.rows ?? [], liveCurrent?.rows ?? [], cmp, bucketPrev, bucketCur), [livePrev, liveCurrent, cmp, bucketPrev, bucketCur]);
   const mixRate = useMemo(() => mixRateSplit(livePrev?.rows ?? [], liveCurrent?.rows ?? [], cmp, bucketPrev, bucketCur), [livePrev, liveCurrent, cmp, bucketPrev, bucketCur]);
   const dailyGroup = dayGroups.find((g) => g.key === "daily");
@@ -393,7 +394,6 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     [shopWin, cmp, liveCurStats, liveCurrent]
   );
   // Ba khối chuyển từ "Phân tích sâu (nội bộ ops)" khi gộp vào report (2026-09-27) — cùng đầu vào bản chụp, cùng kỳ `cmp`.
-  const funnel = useMemo(() => liveFunnel(livePrev?.rows ?? [], liveCurrent?.rows ?? [], cmp), [livePrev, liveCurrent, cmp]);
   const spread = useMemo(() => sessionSpread(liveCurrent?.rows ?? [], cmp.curStart, cmp.curEnd), [liveCurrent, cmp]);
   // Cơ cấu kênh cắt cùng kỳ với Xu hướng 4 tháng: đặt T8 trọn tháng cạnh T9 22 ngày từng ghi Affiliate LIVE −4,2 điểm
   // (cùng kỳ: −6,0) và Total GMV 9,1B cạnh 5,21B. Product card chỉ có tổng cả tháng (file Sản Phẩm) ⇒ khi cắt thì
@@ -793,18 +793,36 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     const top10 = skuRows.reduce((a, r) => a + r.gmv, 0);
     const lowestCreator = creatorRows.filter((r) => r.pctTarget != null).sort((a, b) => a.pctTarget! - b.pctTarget!)[0];
     const cRates = creatorRates(creatorSum);
+    const whyInput: WhyInsightInput = {
+      gmvPerHourChange: pctChange(livePrevStats.gmvPerHour, liveCurStats.gmvPerHour),
+      parts: drivers ? drivers.parts.map((p) => ({ key: p.key, label: DRIVER_LABEL[p.key], value: p.value, change: p.change })) : [],
+      significantDays: sigDays.map((r) => ({ label: dayLabel(r.key), change: r.change.gmvPerHour! })),
+      band: sigDays[0]?.band ?? null,
+      factorBand: keyTable.bands[lastKey] ?? null,
+      mix: mixRate ? { mix: mixRate.mix, rate: mixRate.rate } : null
+    };
+    // % kế hoạch của GMV/giờ và Giờ live theo loại ngày — cùng số với biểu đồ/bảng kế hoạch ở trang 1.
+    const planPctOf = (k: CampDayBucket) => {
+      const ph = planHours.find((r) => r.key === k);
+      const act = campDetailRows.find((r) => r.key === k)?.hours;
+      return {
+        gphPct: ph?.planGmvPerHour && ph.actualGmvPerHour != null ? (ph.actualGmvPerHour / ph.planGmvPerHour) * 100 : null,
+        hoursPct: ph && ph.planHours > 0 && act != null ? (act / ph.planHours) * 100 : null
+      };
+    };
     const out: Record<InsightPage, InsightBlocks> = {
       summary: summaryBlocks({
         liveActual: liveCurStats.gmv,
         liveTarget: scoreAll ? scoreAll.targetToDate ?? scoreAll.target : null,
-        days: scoreboard.filter((r) => r.key !== "all" && r.key !== "shop").map((r) => ({ label: dayLabel(r.key as CampDayBucket), target: r.targetToDate ?? r.target, actual: r.actual })),
+        days: scoreboard.filter((r) => r.key !== "all" && r.key !== "shop").map((r) => ({ label: dayLabel(r.key as CampDayBucket), target: r.targetToDate ?? r.target, actual: r.actual, ...planPctOf(r.key as CampDayBucket) })),
         worstFactor: worstSig && factorCands[0] ? { dayLabel: dayLabel(worstSig.key), factorLabel: DRIVER_LABEL[factorCands[0]], change: worstSig.change[factorCands[0]]!, dayChange: worstSig.change.gmvPerHour ?? undefined, band: worstSig.band } : null,
         shopKpi: shopKpi ? { target: shopKpi.target, projected: shopKpi.projected ?? null } : null
       }),
       keymetrics: keyMetricsBlocks({
         rows: keyTable.rows.map((r) => ({ label: r.def.label, change: r.changes[lastKey], tone: r.tones[lastKey], result: r.def.group === "result" })),
         band: keyTable.bands[lastKey] ?? null,
-        prevLabel: monthShort(prevMonth)
+        prevLabel: monthShort(prevMonth),
+        mainMetric: whyMainMetric(whyInput)
       }),
       nmv: nmvBlocks({ refundCur: refundRateShop, refundPrev: refundRateShopPrev, prevLabel: monthShort(prevMonth), nmvSource, usesCrmRate: hasReturnRateConfig, curProvisional: refundStatusCur ? refundStatusCur.status !== "final" : undefined, prevProvisional: refundStatusPrev ? refundStatusPrev.status !== "final" : undefined }),
       shop: shopBlocks({
@@ -818,14 +836,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
         inhouseLive: scope.inhouseLive,
         liveOnly
       }),
-      why: whyBlocks({
-        gmvPerHourChange: pctChange(livePrevStats.gmvPerHour, liveCurStats.gmvPerHour),
-        parts: drivers ? drivers.parts.map((p) => ({ key: p.key, label: DRIVER_LABEL[p.key], value: p.value, change: p.change })) : [],
-        significantDays: sigDays.map((r) => ({ label: dayLabel(r.key), change: r.change.gmvPerHour! })),
-        band: sigDays[0]?.band ?? null,
-        factorBand: keyTable.bands[lastKey] ?? null,
-        mix: mixRate ? { mix: mixRate.mix, rate: mixRate.rate } : null
-      }),
+      why: whyBlocks(whyInput),
       products: productsBlocks({
         topN: skuRows.length,
         risers: skuRows.filter((r) => gain(r) >= 2).sort((a, b) => gain(b) - gain(a)).slice(0, 3).map((r) => ({ name: shortSku(r.name), from: r.prevRank, to: r.rank, ctor: r.ctor })),
@@ -871,9 +882,12 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     };
     return out;
   })();
+  // Quan sát không nhắc lại câu đã làm tiêu đề trang (tiêu đề của các trang này = câu đầu Quan sát).
+  // Trang 5 (Nguyên nhân) và 7 (Host) giữ nguyên bản cũ theo user 30/10.
+  const insightAuto = (page: InsightPage) => (page === "summary" || page === "keymetrics" || page === "shop" || page === "why" || page === "people" ? pageAuto[page] : dropHeadline(pageAuto[page], head(page).headline));
   const pageInsight = (page: InsightPage) => (
     <PageInsight
-      auto={pageAuto[page]}
+      auto={insightAuto(page)}
       note={monthlyReportRow?.sectionNotes?.[pageNoteKey(page)]}
       computedAt={snapshot.computedAt}
       canManage={canManage}
@@ -903,7 +917,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   });
   const demoInsight = (page: InsightPage) => (
     <DemoInsight
-      auto={pageAuto[page]}
+      auto={insightAuto(page)}
       note={monthlyReportRow?.sectionNotes?.[pageNoteKey(page)]}
       computedAt={snapshot.computedAt}
       canManage={canManage}
@@ -978,10 +992,10 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             { label: `Ads cost${adsPlan.lastActual ? ` · 1–${Number(adsPlan.lastActual.slice(8))}/${month.slice(5)}` : ""}`, value: fmtVndShort(adsPlan.mtdActual), note: [adsPlan.mtdTarget > 0 ? `${fmtFixed((adsPlan.mtdActual / adsPlan.mtdTarget) * 100, 1)}% Target cùng kỳ` : null, adsPlan.spentOfMonth != null ? `${fmtFixed(adsPlan.spentOfMonth, 1)}% Target tháng ${fmtVndShort(adsPlan.monthTarget)}` : null].filter(Boolean).join(" · ") || undefined },
             ...(adsPlan.liveRoas != null ? [{ label: "ROAS Live", value: `${fmtFixed(adsPlan.liveRoas, 1)}x` }] : []),
             ...(adsCreatorRow && adsCreatorRow.monthTarget > 0 ? [{ label: "Ads Creator · % Target", value: `${fmtFixed((adsCreatorRow.mtdActual / adsCreatorRow.monthTarget) * 100, 1)}%`, note: `${fmtVndShort(adsCreatorRow.mtdActual)} / ${fmtVndShort(adsCreatorRow.monthTarget)}` }] : []),
-            { label: "Ngày chi lệch Target từ 30%", value: String(adsPlan.offDays.length), note: adsPlan.offDays.map((d) => fmtDateVn(d.date, false)).join(", ") || undefined }
+            { label: "Ngày chi lệch Target từ 30%", value: String(adsPlan.offDays.length), note: adsPlan.offDays.length ? "ngày và mức lệch ở dưới biểu đồ theo ngày" : undefined }
           ]
         : adsCost != null ? [{ label: "Ads cost", value: fmtVndShort(adsCost) }] : [],
-      affiliate: trackSum.sessions > 0 ? [{ label: `${METRIC.directGmv} · ${trackSum.sessions} phiên`, value: fmtVndShort(trackSum.directGmv) }, { label: `Target GMV · ${trackSum.sessions} phiên`, value: trackSum.targetGmv > 0 ? fmtVndShort(trackSum.targetGmv) : "—", badge: trackSum.pctTarget, badgeLabel: trackSum.pctTarget != null ? `${fmtFixed(trackSum.pctTarget, 1)}% ${METRIC.directGmv}` : undefined }, { label: `${METRIC.gmvPerHour} · ${trackSum.sessions} phiên`, value: trackSum.gmvPerHour != null ? fmtVndShort(trackSum.gmvPerHour) : "—", note: trackSum.hours > 0 ? `${fmtVndShort(trackSum.directGmv)} ÷ ${fmtFixed(trackSum.hours, 1)} giờ` : undefined }, { label: METRIC.roas, value: trackSum.roas != null ? `${fmtFixed(trackSum.roas, 1)}x` : "—", note: trackSum.adsCost > 0 ? `${METRIC.adsCost} ${fmtVndShort(trackSum.adsCost)}` : undefined }] : [],
+      affiliate: trackSum.sessions > 0 ? [{ label: `GMV phiên · ${trackSum.sessions} phiên`, value: fmtVndShort(trackSum.directGmv) }, { label: `Target GMV · ${creatorRows.filter((r) => r.pctTarget != null).length}/${trackSum.sessions} phiên có Target`, value: trackSum.targetGmv > 0 ? fmtVndShort(trackSum.targetGmv) : "—", badge: trackSum.pctTarget, badgeLabel: trackSum.pctTarget != null ? `${fmtFixed(trackSum.pctTarget, 1)}% Target (phiên có Target)` : undefined }, { label: `${METRIC.gmvPerHour} · ${trackSum.sessions} phiên`, value: trackSum.gmvPerHour != null ? fmtVndShort(trackSum.gmvPerHour) : "—", note: trackSum.hours > 0 ? `${fmtVndShort(trackSum.directGmv)} ÷ ${fmtFixed(trackSum.hours, 1)} giờ` : undefined }, { label: METRIC.roas, value: trackSum.roas != null ? `${fmtFixed(trackSum.roas, 1)}x` : "—", note: trackSum.adsCost > 0 ? `${METRIC.adsCost} ${fmtVndShort(trackSum.adsCost)}` : undefined }] : [],
       next: [
         { label: `Target Live tháng ${Number(nextMonth.slice(5))}`, value: nextPlan && nextPlan.targetGmv > 0 ? fmtVndShort(nextPlan.targetGmv) : "—", note: nextPlan && nextPlan.targetGmv > 0 ? `${nextPlan.slotCount} phiên trong Kế Hoạch Tháng` : "chưa nhập · bảng Kế hoạch Live" },
         ...(scope.affiliate ? [{ label: `Target Creator tháng ${Number(nextMonth.slice(5))}`, value: bookingSum.target > 0 ? fmtVndShort(bookingSum.target) : "—", note: bookingSum.target > 0 ? "tổng Target lịch Booking" : "tổng Target lịch Booking, chưa nhập" },
@@ -1624,6 +1638,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             saved={decodeLiveTarget(monthlyReportRow?.sectionNotes?.[LIVE_TARGET_MANUAL_KEY]?.text)}
             canEdit={canManage}
             onSave={async (m) => setMonthlyReportRow(await saveMonthlyReportSectionNote(brandId, `${month}-01`, LIVE_TARGET_MANUAL_KEY, encodeLiveTarget(m)))}
+            cv={sessionCv}
           />
           {scope.affiliate && <BookingPlanPanel
             nextMonth={nextMonth}

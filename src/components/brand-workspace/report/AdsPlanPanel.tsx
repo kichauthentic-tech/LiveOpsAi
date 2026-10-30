@@ -115,7 +115,11 @@ export const AdsPlanPanel: React.FC<{ rows: AdsDayRow[]; s: AdsMonthSummary; mon
           <div className="pnh">ROAS Live theo loại ngày</div>
           <div className="pns">{METRIC.liveGmv} YFB ÷ Ads Live cùng ngày{s.liveRoas != null ? ` · đường nét đứt = ROAS Live cả kỳ (${roasX(s.liveRoas)})` : ""}. Ads Live của shop có thể chạy cho cả phiên ngoài YFB nên đây là ước tính.</div>
           <div id="c_roas" role="img" aria-label={`ROAS Live theo loại ngày: ${roas.map((r) => `${DAY_TYPE_SHORT[r.bucket]} ${roasX(r.roas)}`).join(", ")}`} dangerouslySetInnerHTML={{ __html: roasChart }} />
-          <div className="tw" style={{ marginTop: 10 }}><table id="roasTbl" dangerouslySetInnerHTML={{ __html: roasTbl }} /></div>
+          {/* Bảng số tính ROAS gập lại: ROAS từng loại ngày đã ghi trên biểu đồ (audit trùng lặp 30/10). */}
+          <details>
+            <summary>Ads Live và LIVE GMV từng loại ngày</summary>
+            <div className="tw" style={{ marginTop: 10 }}><table id="roasTbl" dangerouslySetInnerHTML={{ __html: roasTbl }} /></div>
+          </details>
         </div>
       )}
       <div className="pn">

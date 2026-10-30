@@ -41,16 +41,9 @@ const SHOPEE_CONV = `${METRIC.orders}/Product Clicks`;
 /** Bốn ô KPI đầu trang (đúng thứ tự demo): Top 1 SKU · Độ tập trung SKU · Quà tặng kèm · Tiền giảm giá khuyến mãi. */
 export function productsKpis(d: ProductsPageData): PageMetric[] {
   const out: PageMetric[] = [];
-  const top = d.sku?.rows[0];
-  if (top) {
-    const parts = [top.gmvChange != null ? `${signed(top.gmvChange)} GMV${d.sku!.perDay ? " mỗi ngày" : ""}` : null, top.prevRank != null ? `hạng ${top.prevRank} → ${top.rank}` : `hạng ${top.rank}`].filter(Boolean);
-    out.push({ label: `Top 1 · ${disp(top.name)}`, value: fmtVndShort(top.gmv), note: parts.join(" · ") });
-  }
+  // Top 1 SKU (dòng 1 bảng Top 10) và quà tặng/đơn (dòng của bảng Quà tặng kèm và UPT) không lặp thành ô — audit trùng lặp 30/10.
   if (d.skuRank?.skusFor80Pct != null && d.skuRank.sellingSkus > 0) {
     out.push({ label: "Độ tập trung SKU", value: `${fmtInt(d.skuRank.skusFor80Pct)} / ${fmtInt(d.skuRank.sellingSkus)}`, note: `SKU đầu bảng tạo 80% GMV (${fmtFixed((d.skuRank.skusFor80Pct / d.skuRank.sellingSkus) * 100, 0)}%)` });
-  }
-  if (d.gift) {
-    out.push({ label: "Quà tặng kèm", value: dec(d.gift.giftPerOrder, 2), note: `món/đơn toàn shop · ${fmtInt(d.gift.giftItems)} món` });
   }
   if (d.promo?.totalDiscount != null && d.promo.totalDiscount > 0) {
     out.push({ label: "Tiền giảm giá khuyến mãi", value: fmtVndShort(d.promo.totalDiscount), note: `${d.promo.items.length} chương trình chạy trọn tháng` });

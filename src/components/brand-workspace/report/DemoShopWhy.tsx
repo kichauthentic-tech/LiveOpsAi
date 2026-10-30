@@ -111,7 +111,8 @@ export const DemoInsight: React.FC<{
         )}
       </div>
       <div className={`ins4${editing ? " editing" : ""}`}>
-        {BLOCK_KEYS.map((k) => (
+        {/* Khối rỗng (vd Quan sát chỉ lặp lại tiêu đề trang, đã bỏ ở dropHeadline) hoặc "—" thì không vẽ — ops vẫn sửa được khi bấm Sửa. */}
+        {BLOCK_KEYS.filter((k) => editing || (shown[k].trim() && shown[k].trim() !== "—")).map((k) => (
           <div key={k} className={`ic ${IC_CLASS[k]}`}>
             <h4>{BLOCK_LABEL[k]}</h4>
             {editing ? (

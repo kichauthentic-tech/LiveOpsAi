@@ -50,3 +50,12 @@ export function observeHeadline(b: InsightBlocks, fallback: string): string {
   if (!first || /^Chưa đủ số liệu/.test(first)) return fallback;
   return first;
 }
+
+/** Quan sát bỏ câu đã làm tiêu đề trang (audit trùng lặp 30/10: 8/10 trang in câu tiêu đề lần thứ hai ở đầu Insight).
+ *  Chỉ bỏ khi câu đầu trùng đúng tiêu đề; còn lại giữ nguyên. Quan sát rỗng thì khối bị ẩn ở giao diện. */
+export function dropHeadline(b: InsightBlocks, headline: string): InsightBlocks {
+  const norm = (t: string) => t.trim().replace(/[.!?]+$/, "");
+  const parts = b.observe.split(/(?<=[.!?])\s+(?=[A-ZÀ-Ỵ0-9])/);
+  if (!parts[0] || norm(parts[0]) !== norm(headline)) return b;
+  return { ...b, observe: parts.slice(1).join(" ").trim() };
+}
