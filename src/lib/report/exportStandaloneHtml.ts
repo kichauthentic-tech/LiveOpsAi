@@ -209,10 +209,12 @@ export function buildStandaloneHtml(root: HTMLElement, title: string, tabVariant
   clone.removeAttribute("style");
   clone.removeAttribute("aria-hidden");
   // Mỗi tab một bản chụp (data-variant = số thứ tự tab); script bật bản được chọn. Tab không bấm được (chưa có phiên) bỏ qua.
+  // PDF: không gắn `hidden` — preflight Tailwind v4 có `[hidden]{display:none!important}` trong @layer base, mà !important trong layer
+  // thắng !important ngoài layer, nên luật "in mọi tab" của PDF_RULES không mở lại được (30/10: PDF chỉ ra tab đầu của Key Metrics/Host PFM).
   tabVariants.forEach((variants, id) => {
     const panel = clone.querySelector<HTMLElement>(`[data-tabgroup="${id}"]`);
     if (!panel) return;
-    panel.innerHTML = variants.map((html, i) => (html ? `<div data-variant="${i}"${i === 0 ? "" : " hidden"}>${html}</div>` : "")).join("");
+    panel.innerHTML = variants.map((html, i) => (html ? `<div data-variant="${i}"${i === 0 || pdf ? "" : " hidden"}>${html}</div>` : "")).join("");
   });
 
   clone.querySelectorAll("[data-export-hide], script, input, textarea").forEach((el) => el.remove());
