@@ -7,7 +7,8 @@ import { lensScope, waveRows, weekRows, type Lens, type LensPick, type LensRow, 
 import { ranIn, type ResolvedPeriod } from "../../../lib/performance/periodCompare";
 import { isCountable, sessionHours } from "../../../lib/performance/hostPerformance";
 import { profileOf, type MetricDefView } from "../../../lib/platforms/profiles";
-import { WAVE_NAME } from "../../../lib/performance/channelHealth";
+import { estimateFunnelCv, MIN_COMPARE_SESSIONS, WAVE_NAME, type FunnelView } from "../../../lib/performance/channelHealth";
+import { LiveFunnel } from "../LiveFunnel";
 import type { ReportPlatform } from "../../../lib/reportPlatform";
 import { BrandLogo } from "../../ui/BrandLogo";
 import { PlatformChip } from "../../common/PlatformChip";
@@ -135,6 +136,7 @@ export const BrandTab: React.FC<{
       )}
 
       <KeyMetrics platform={platform} scope={scope} />
+      <ScopeFunnel platform={platform} scope={scope} sessions={sessions} />
 
       {live && lens === "month" && card && ledger && <ForecastHistory card={card} rows={ledger} />}
       {live && lens === "month" && card && <WhySection card={card} sessions={sessions} platform={platform} files={files} today={today} onNavigate={onNavigate} />}
@@ -345,6 +347,22 @@ const ShiftPicker: React.FC<{ r: NonNullable<AccountVM["report"]>; day: string; 
 // ---------------------------------------------------------------------------
 
 const VOLUME = new Set(["gmv", "itemsSold", "orders", "productImpressions", "productClicks", "views", "impressions", "hours", "items", "viewers", "atc", "skuOrders"]);
+
+/** Phễu LIVE theo ĐÚNG phạm vi đang chọn ở trang (tháng/tuần/ngày/đợt/ca/7 ngày + kỳ so sánh); ngưỡng báo tính theo số ca của hai vế. Cùng hàm và cùng cách đọc với phễu trên thẻ kênh. */
+const ScopeFunnel: React.FC<{ platform: ReportPlatform; scope: LensScope; sessions: LiveSession[] }> = ({ platform, scope, sessions }) => {
+  const views = useMemo((): FunnelView[] => {
+    const l = { pairs: new Map<string, string>(), cur: scope.cur.filter(isCountable), prev: scope.base.filter(isCountable) };
+    const funnel = profileOf(platform).liveFunnel(l, estimateFunnelCv(sessions));
+    const empty = `Mới ${l.cur.length} ca kỳ này và ${l.prev.length} ca kỳ so — cần ≥ ${MIN_COMPARE_SESSIONS} ca có số ở mỗi kỳ.`;
+    return [{ key: "mtd", tab: scope.by, sub: `${scope.label} so với ${scope.baseLabel}`, funnel: funnel ? { ...funnel, windowTab: scope.label } : null, empty: funnel ? null : empty, note: null }];
+  }, [platform, scope, sessions]);
+  return (
+    <Card>
+      <BlockHead title="Phễu LIVE" />
+      <LiveFunnel views={views} />
+    </Card>
+  );
+};
 
 const KeyMetrics: React.FC<{ platform: ReportPlatform; scope: LensScope }> = ({ platform, scope }) => {
   const prof = profileOf(platform);

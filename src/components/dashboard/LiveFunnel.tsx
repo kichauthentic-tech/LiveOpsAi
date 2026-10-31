@@ -24,16 +24,16 @@ export const LiveFunnel: React.FC<{ views: FunnelView[]; showAction?: boolean }>
   return (
     <div className="space-y-3">
       <div className="flex gap-2 flex-wrap items-center">
-        {views.map((v) => <button key={v.key} type="button" className={pill(v.key === view.key)} onClick={() => setPick(v.key)}>{v.tab}</button>)}
-        <span className="text-[11px] text-[var(--text-faint)]">{view.sub}{f ? ` · ${f.curSessions} ca so ${f.prevSessions} ca` : ""}</span>
+        {views.length > 1 && views.map((v) => <button key={v.key} type="button" className={pill(v.key === view.key)} onClick={() => setPick(v.key)}>{v.tab}</button>)}
+        <span className="text-[11px] text-[var(--text-faint)]">{view.sub}{f ? ` · ${f.curSessions === f.prevSessions ? `${f.curSessions} ca` : `${f.curSessions} ca so ${f.prevSessions} ca`}` : ""}</span>
       </div>
       {view.note && <p className="text-[11px] text-amber-300 leading-snug">{view.note}</p>}
-      {f ? <FunnelBody funnel={f} showAction={showAction} windowTab={view.tab} /> : <p className="text-xs text-[var(--text-muted)]">Chưa đủ dữ liệu để kết luận: {view.empty}</p>}
+      {f ? <FunnelBody funnel={f} showAction={showAction} /> : <p className="text-xs text-[var(--text-muted)]">Chưa đủ dữ liệu để kết luận: {view.empty}</p>}
     </div>
   );
 };
 
-const FunnelBody: React.FC<{ funnel: LiveFunnelLite; showAction: boolean; windowTab: string }> = ({ funnel, showAction, windowTab }) => {
+const FunnelBody: React.FC<{ funnel: LiveFunnelLite; showAction: boolean }> = ({ funnel, showAction }) => {
   const { steps, rates, worst } = funnel;
   const watch = watchRate(funnel);
   return (
@@ -46,19 +46,16 @@ const FunnelBody: React.FC<{ funnel: LiveFunnelLite; showAction: boolean; window
           return (
             <React.Fragment key={s.label}>
               {r && (
-                <div className="md:flex-[0_0_132px] flex md:flex-col items-center justify-center text-center gap-x-2 gap-y-0.5 py-2 md:py-0 px-1 text-[11px] text-[var(--text-muted)]">
+                <div title={`Ngưỡng chú ý ${band(r.watchBand)} · gãy rõ ${band(r.band)} (tính theo số ca của kỳ này và kỳ so)`} className="md:flex-[0_0_132px] flex md:flex-col items-center justify-center text-center gap-x-2 gap-y-0.5 py-2 md:py-0 px-1 text-[11px] text-[var(--text-muted)]">
                   <b className="text-[var(--text)]">{r.label}</b>
                   <span className={`text-sm font-black tabular-nums ${lv?.cls ?? "text-[var(--text)]"}`}>{rt(r.cur)}</span>
                   <span className="text-lg leading-none text-[var(--accent-text)] rotate-90 md:rotate-0">→</span>
-                  <span className="tabular-nums">Kỳ so: {rt(r.prev)}</span>
                   <b className={`tabular-nums ${lv?.cls ?? "text-[var(--text-muted)]"}`}>{sign(r.change)}{lv ? ` · ${lv.text}` : ""}</b>
-                  <span className="text-[11px] text-[var(--text-faint)] tabular-nums">chú ý {band(r.watchBand)} · rõ {band(r.band)}</span>
                 </div>
               )}
               <div className="flex-1 min-w-0 rounded-xl border border-[var(--border)] bg-[var(--surface-base)] px-3 py-3 text-center">
                 <p className="text-xs font-semibold text-[var(--text-muted)]">{s.label}</p>
                 <p className="text-xl font-black tabular-nums text-[var(--text)] my-0.5">{nf(s.cur)}</p>
-                <p className="text-[11px] text-[var(--text-muted)] tabular-nums">Kỳ so: {nf(s.prev)}</p>
                 <p className="mt-1.5 text-xs tabular-nums text-[var(--text-muted)]">{sign(c)}</p>
               </div>
             </React.Fragment>
@@ -69,10 +66,10 @@ const FunnelBody: React.FC<{ funnel: LiveFunnelLite; showAction: boolean; window
       {showAction && (
         <p className="text-xs text-[var(--text-muted)] leading-snug">
           {worst
-            ? <>Gãy rõ ở <b className="text-rose-300">{worst.label} {sign(worst.change)}</b> (vượt ngưỡng {band(worst.band)} của {windowTab.toLowerCase()}) · đầu mối xử lý: {LEVER_OWNER[worst.label] ?? "xem chi tiết từng ca"}.</>
+            ? <>Gãy rõ ở <b className="text-rose-300">{worst.label}</b> · đầu mối xử lý: {LEVER_OWNER[worst.label] ?? "xem chi tiết từng ca"}.</>
             : watch
-              ? <>Cần chú ý <b className="text-amber-300">{watch.label} {sign(watch.change)}</b> — vượt ngưỡng chú ý {band(watch.watchBand)} nhưng chưa tới ngưỡng gãy rõ {band(watch.band)} của {windowTab.toLowerCase()}.</>
-              : `Không tỷ lệ nào giảm vượt ngưỡng của ${windowTab.toLowerCase()} — chưa có chỗ gãy.`}
+              ? <>Cần chú ý <b className="text-amber-300">{watch.label}</b> — chưa tới mức gãy rõ.</>
+              : "Chưa có tỷ lệ nào gãy."}
         </p>
       )}
     </div>

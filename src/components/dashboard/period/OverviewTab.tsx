@@ -111,8 +111,8 @@ export const OverviewTab: React.FC<{
                   <div className="border-t border-[var(--border)] px-4 py-3 grid gap-3 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] xl:pl-[182px]">
                     {r.funnels.length > 0 && (
                       <div className="xl:col-span-2">
-                        <p className="text-xs font-bold text-[var(--text-muted)] mb-1.5">Phễu LIVE · ngày Daily so tháng trước — kênh đang gãy ở đâu</p>
-                        <LiveFunnel views={r.funnels} />
+                        <p className="text-xs font-bold text-[var(--text-muted)] mb-1.5">Phễu LIVE</p>
+                        <LiveFunnel views={r.funnels} showAction={false} />
                       </div>
                     )}
                     <div>
