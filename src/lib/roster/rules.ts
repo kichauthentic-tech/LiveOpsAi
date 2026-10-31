@@ -203,7 +203,7 @@ export function personEntries(shifts: readonly RosterShift[]): Map<string, Perso
   return out;
 }
 
-export type IssueCode = "clash" | "week_over" | "draft_no_host" | "no_host" | "no_co" | "week_warn" | "rest" | "room" | "day" | "streak" | "new_channel";
+export type IssueCode = "clash" | "week_over" | "draft_no_host" | "no_host" | "no_co" | "week_warn" | "rest" | "room" | "day" | "streak" | "new_channel" | "brand_blocked" | "brand_exclusive";
 /** block = DB/công bố sẽ chặn; hole = ca thiếu host (còn trống, không chặn công bố); warn = cảnh báo. */
 export type IssueSeverity = "block" | "hole" | "warn";
 
@@ -218,8 +218,43 @@ export const ISSUE_SEVERITY: Record<IssueCode, IssueSeverity> = {
   room: "warn",
   day: "warn",
   streak: "warn",
-  new_channel: "warn"
+  new_channel: "warn",
+  brand_blocked: "warn",
+  brand_exclusive: "warn"
 };
+
+/**
+ * Điều khoản về host giữa YFB và brand (brand_talent_rules, 0191): host brand không nhận, host độc quyền cho một brand,
+ * host brand muốn ưu tiên. Khoá `${brandId}|${talentId}` cho blocked / preferred; exclusive tra theo talentId.
+ */
+export interface BrandRuleIndex {
+  blocked: ReadonlySet<string>;
+  preferred: ReadonlySet<string>;
+  /** talentId → brandId mà host chỉ được làm cho brand đó. */
+  exclusive: ReadonlyMap<string, string>;
+  brandName: (brandId: string) => string;
+}
+
+export function buildBrandRuleIndex(rules: readonly { brandId: string; talentId: string; rule: "preferred" | "blocked" | "exclusive" }[], brandName: (brandId: string) => string): BrandRuleIndex {
+  const blocked = new Set<string>();
+  const preferred = new Set<string>();
+  const exclusive = new Map<string, string>();
+  for (const r of rules) {
+    if (r.rule === "blocked") blocked.add(`${r.brandId}|${r.talentId}`);
+    else if (r.rule === "preferred") preferred.add(`${r.brandId}|${r.talentId}`);
+    else exclusive.set(r.talentId, r.brandId);
+  }
+  return { blocked, preferred, exclusive, brandName };
+}
+
+/** Lý do host KHÔNG hợp với brand này theo điều khoản (undefined = hợp lệ). Một chỗ cho cảnh báo lịch và danh sách gợi ý. */
+export function brandRuleViolation(idx: BrandRuleIndex | undefined, brandId: string, talentId: string): { code: "brand_blocked" | "brand_exclusive"; text: string } | undefined {
+  if (!idx) return undefined;
+  if (idx.blocked.has(`${brandId}|${talentId}`)) return { code: "brand_blocked", text: `${idx.brandName(brandId)} không nhận host này` };
+  const ex = idx.exclusive.get(talentId);
+  if (ex && ex !== brandId) return { code: "brand_exclusive", text: `host độc quyền của ${idx.brandName(ex)}` };
+  return undefined;
+}
 
 export interface RosterIssue {
   code: IssueCode;
@@ -253,7 +288,8 @@ export function analyzeRoster(
   rules: RosterRules,
   weekStart: string,
   nameOf: (talentId: string) => string,
-  familiar?: (talentId: string, channelKey: string) => number
+  familiar?: (talentId: string, channelKey: string) => number,
+  brandRules?: BrandRuleIndex
 ): RosterAnalysis {
   const weekEnd = addDays(weekStart, 6);
   const inWeek = (sh: RosterShift) => sh.date >= weekStart && sh.date <= weekEnd;
@@ -314,6 +350,11 @@ export function analyzeRoster(
   }
 
   for (const sh of shifts) {
+    for (const tid of [sh.hostId, sh.coHostId]) {
+      if (!tid) continue;
+      const v = brandRuleViolation(brandRules, sh.brandId, tid);
+      if (v) add(v.code, sh, `${nameOf(tid)}: ${v.text}`, tid);
+    }
     if (!sh.hostId) {
       if (sh.kind === "open" && sh.drafted) add("draft_no_host", sh, "Nháp có trợ live nhưng chưa có host — công bố sẽ bị chặn");
       else add("no_host", sh, "Ca chưa có host");

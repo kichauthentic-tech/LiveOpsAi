@@ -39,6 +39,8 @@ import { fetchAiAgentPrompts } from "../lib/db/aiAgentPrompts";
 import { fetchBrandPlatformRates } from "../lib/db/brandPlatformRates";
 import { fetchBrandStudios } from "../lib/db/brandStudios";
 import { fetchBrandChannels } from "../lib/db/brandChannels";
+import { fetchMonthFeeInputs, fetchTalentRules, fetchTermsPeriods } from "../lib/db/brandTerms";
+import type { BrandTalentRule, MonthFeeInputs, TermsPeriod } from "../lib/commercial/terms";
 import { fetchShiftSlots } from "../lib/db/shiftSlots";
 import { fetchShiftRegistrations } from "../lib/db/shiftRegistrations";
 import { fetchTalentRateHistory } from "../lib/db/talentRateHistory";
@@ -212,6 +214,11 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
   const [brandStudios, setBrandStudios] = useState<BrandStudio[]>([]);
   // Kênh brand × sàn (0149). null = DB chưa có bảng (0149 chưa chạy) ⇒ App tự suy kênh như cũ.
   const [brandChannels, setBrandChannels] = useState<BrandChannel[] | null>(null);
+  // Điều khoản hợp tác (0191). termsAvailable=false ⇒ DB chưa có bảng, mọi nơi tính tiền quay về billingModel + đơn giá cũ.
+  const [termsPeriods, setTermsPeriods] = useState<TermsPeriod[]>([]);
+  const [termsAvailable, setTermsAvailable] = useState(true);
+  const [monthFeeInputs, setMonthFeeInputs] = useState<MonthFeeInputs[]>([]);
+  const [talentRules, setTalentRules] = useState<BrandTalentRule[]>([]);
   const [shiftRegistrations, setShiftRegistrations] = useState<ShiftRegistration[]>([]);
   const [phase14Error, setPhase14Error] = useState<string | null>(null);
 
@@ -506,6 +513,27 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
     };
   }, [authUserId, isOpsRole, currentRole]);
 
+  // Điều khoản hợp tác (0191) — role agency và brand (đọc điều khoản của chính mình). Số nhập tháng + luật về người chỉ nhân viên agency.
+  useEffect(() => {
+    if (!authUserId || !(isOpsRole || currentRole === "trainer" || currentRole === "brand")) return;
+    let cancelled = false;
+    const staff = isOpsRole || currentRole === "trainer";
+    Promise.all([fetchTermsPeriods(), staff ? fetchMonthFeeInputs() : Promise.resolve([]), staff ? fetchTalentRules() : Promise.resolve([])])
+      .then(([periods, inputs, rules]) => {
+        if (cancelled) return;
+        setTermsAvailable(periods !== null);
+        setTermsPeriods(periods ?? []);
+        setMonthFeeInputs(inputs ?? []);
+        setTalentRules(rules ?? []);
+      })
+      .catch((err) => {
+        if (!cancelled) setPhase19Error(`Không tải được điều khoản hợp tác (tính tiền theo cấu hình cũ): ${errorMessage(err)}`);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [authUserId, isOpsRole, currentRole]);
+
   useEffect(() => {
     if (!authUserId) return;
     let cancelled = false;
@@ -715,6 +743,13 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
     setBrandStudios,
     brandChannels,
     setBrandChannels,
+    termsPeriods,
+    setTermsPeriods,
+    termsAvailable,
+    monthFeeInputs,
+    setMonthFeeInputs,
+    talentRules,
+    setTalentRules,
     shiftRegistrations,
     setShiftRegistrations,
     phase14Error,

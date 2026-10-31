@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ChevronDown, ListChecks } from "lucide-react";
 import { Brand, BrandChannel, BrandMonthPlan, BrandMonthlyCommitment, BrandMonthlyReport, BrandPlatformRate, LiveSession, ShiftSlot, Talent } from "../types";
+import type { TermsPeriod } from "../lib/commercial/terms";
 import { buildTodos, groupTodos, Todo, TodoLevel, TodoRow } from "../lib/todoList";
 import { PlanCoverage, fetchPlanCoverage, planStatusesRead } from "../lib/db/monthPlans";
 import { commitmentsRead } from "../lib/db/brandContracts";
@@ -20,6 +21,7 @@ interface Props {
   sessions: LiveSession[];
   shiftSlots: ShiftSlot[];
   rates: BrandPlatformRate[];
+  termPeriods?: TermsPeriod[];
   monthlyReports: Map<string, BrandMonthlyReport>;
   talents: Talent[];
   canSeeMoney: boolean;
@@ -42,7 +44,7 @@ function prevMonthOf(month: string): string {
   return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
 }
 
-export const TodoPanel: React.FC<Props> = ({ brands, channels, sessions, shiftSlots, rates, monthlyReports, talents, canSeeMoney, draftCount, canOpenTab, onOpen }) => {
+export const TodoPanel: React.FC<Props> = ({ brands, channels, sessions, shiftSlots, rates, termPeriods, monthlyReports, talents, canSeeMoney, draftCount, canOpenTab, onOpen }) => {
   const today = todayVn();
   const month = today.slice(0, 7);
   const [plansThisMonth, setPlansThisMonth] = useState<Map<string, BrandMonthPlan> | null>(null);
@@ -73,8 +75,8 @@ export const TodoPanel: React.FC<Props> = ({ brands, channels, sessions, shiftSl
 
   const todos = useMemo(() => {
     if (!plansThisMonth || !plansNextMonth || !commitments || affiliate === undefined || coverage === undefined || acks === undefined) return null;
-    return buildTodos({ today, draftCount, acks: acks ?? undefined, brands, channels, sessions, shiftSlots, plansThisMonth, plansNextMonth, coverage: coverage ?? undefined, commitments, rates, monthlyReports, talents, canSeeMoney, affiliate: affiliate ?? undefined }).filter((t) => canOpenTab(t.tab));
-  }, [today, acks, brands, channels, sessions, shiftSlots, plansThisMonth, plansNextMonth, coverage, commitments, rates, monthlyReports, talents, canSeeMoney, affiliate, canOpenTab, draftCount]);
+    return buildTodos({ today, draftCount, acks: acks ?? undefined, brands, channels, sessions, shiftSlots, plansThisMonth, plansNextMonth, coverage: coverage ?? undefined, commitments, rates, termPeriods, monthlyReports, talents, canSeeMoney, affiliate: affiliate ?? undefined }).filter((t) => canOpenTab(t.tab));
+  }, [today, acks, brands, channels, sessions, shiftSlots, plansThisMonth, plansNextMonth, coverage, commitments, rates, termPeriods, monthlyReports, talents, canSeeMoney, affiliate, canOpenTab, draftCount]);
 
   if (todos === null) return null; // đang tải — không vẽ khung rỗng rồi nhảy
   const { today: dayRows, month: monthGroups } = groupTodos(todos);

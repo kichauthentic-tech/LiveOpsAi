@@ -23,6 +23,8 @@ import { isUnconfirmedPast } from "../sessionStatus";
 import { platformOf, type ReportPlatform } from "../reportPlatform";
 import { fmtFixed } from "../format";
 import { profileOf } from "../platforms/profiles";
+import { feeInputOf, settleMonth, type Settlement, type SessionFeeInput } from "../commercial/fees";
+import { feeOf, resolveTerms, termsLabel, type MonthFeeInputs, type TermsPeriod } from "../commercial/terms";
 import { DEFAULT_RETURN_RATE_ESTIMATE, NMV_SETTLE_DAYS, refundMonthStatus, settleFromIso, monthEndIso, DEFINITION_WARNING, REFUND_REASON_LABEL, type RefundMonthStatus, type ShopFileTemplate } from "../refundStatus";
 
 export { NMV_SETTLE_DAYS };
@@ -42,7 +44,9 @@ export interface ShopRefundMonth {
 export type RevenueBasis =
   | { kind: "hourly"; ratePerHour: number }
   | { kind: "nmv_estimate"; commissionRate: number; returnRate: number }
-  | { kind: "nmv_final"; commissionRate: number; returnRate: number };
+  | { kind: "nmv_final"; commissionRate: number; returnRate: number }
+  // Điều khoản hợp tác (0191): gói ghép nhiều khoản phí. `state` chỉ có nghĩa khi gói có khoản tính theo NMV.
+  | { kind: "terms"; label: string; returnRate?: number; state: "none" | "estimate" | "final"; mixedLegacy?: boolean };
 
 export interface ContractRevenueRow {
   key: string;
@@ -67,6 +71,8 @@ export interface ContractRevenueRow {
   studioCost: number;
   adsCost: number;
   grossProfit: number;
+  /** Bảng tính phí theo điều khoản hợp tác (0191) — vắng khi hợp đồng còn tính theo cấu hình cũ. */
+  settlement?: Settlement;
 }
 
 /** Giờ + công của một người ở MỘT brand × sàn (để biết giờ của họ đến từ brand nào). */
@@ -164,6 +170,9 @@ export interface MonthCloseInput {
   commitments: BrandMonthlyCommitment[];
   /** Theo brandId; thiếu = chưa có file Seller Center của tháng. */
   shopRefunds: Record<string, ShopRefundMonth | undefined>;
+  /** Điều khoản hợp tác (0191) + số nhập tháng để tính phí Ads/booking. Vắng = tính hoàn toàn theo cấu hình cũ. */
+  termPeriods?: TermsPeriod[];
+  monthFeeInputs?: MonthFeeInputs[];
 }
 
 export const monthEndOf = monthEndIso;
@@ -195,11 +204,13 @@ export function buildMonthClose(input: MonthCloseInput): MonthClose {
   const inMonth = (s: LiveSession) => s.date.startsWith(month);
   const pnlSessions = input.sessions.filter((s) => isPnlSession(s, { includeBackfill: false }) && inMonth(s));
   const rows: SessionPnl[] = pnlSessions.map((s) =>
-    computeSessionPnl(s, financeBySessionId, talentById, brandById, input.brandPlatformRates, input.talentRateHistory, input.brandPlatformRateHistory)
+    computeSessionPnl(s, financeBySessionId, talentById, brandById, input.brandPlatformRates, input.talentRateHistory, input.brandPlatformRateHistory, input.termPeriods ?? [])
   );
 
   // ---- doanh thu theo hợp đồng ----
   const byContract = new Map<string, ContractRevenueRow>();
+  // Phần phụ của từng dòng hợp đồng khi điều khoản hợp tác (0191) tham gia: ca đã tính, giai đoạn điều khoản đã chạm tới.
+  const termsSide = new Map<string, { inputs: SessionFeeInput[]; periodIds: Set<string>; legacySessions: number; committedGmv?: number }>();
   const estimateNotes: string[] = [];
   const definitionWarnings: string[] = [];
   for (const r of rows) {
@@ -237,6 +248,17 @@ export function buildMonthClose(input: MonthCloseInput): MonthClose {
     e.total += 1;
     if (r.missingInputs.length > 0) continue;
     e.counted += 1;
+    let side = termsSide.get(key);
+    if (!side) {
+      side = { inputs: [], periodIds: new Set(), legacySessions: 0, committedGmv: monthCommitmentOf(input.commitments, input.contracts, s.brandId, platform, periodMonth).gmv };
+      termsSide.set(key, side);
+    }
+    if (r.termsPeriod) {
+      side.periodIds.add(r.termsPeriod.id);
+      if (!r.excluded) {
+        side.inputs.push(feeInputOf(s, input.brandPlatformRates.find((x) => x.brandId === s.brandId && x.platform === platform)?.returnRate ?? 0));
+      }
+    } else side.legacySessions += 1;
     e.hours += sessionDurationHours(s.startTime, s.endTime);
     const gmv = r.excluded ? 0 : s.actualGmv;
     e.gmv += gmv;
@@ -251,11 +273,62 @@ export function buildMonthClose(input: MonthCloseInput): MonthClose {
   const rateOf = (brandId: string, platform: ReportPlatform) =>
     input.brandPlatformRates.find((x) => x.brandId === brandId && x.platform === platform);
 
+  // Vì sao hợp đồng NMV còn ở dạng ước tính — một chỗ cho cả đường cũ và đường điều khoản hợp tác.
+  const pushRefundNotes = (e: ContractRevenueRow, expected: number, hasRefundFile: boolean) => {
+    const sf = input.shopRefunds[e.brandId];
+    const pName = profileOf(e.platform).label;
+    if (!hasRefundFile) {
+      estimateNotes.push(`${e.brandName} · ${pName}: chưa có file hoàn tiền của sàn nên giữ ước tính theo % hoàn dự kiến ${expected}%.`);
+    } else if (today < nmvSettledFrom(month)) {
+      estimateNotes.push(`${e.brandName} · ${pName}: sàn chốt hoàn/huỷ từ ${nmvSettledFrom(month)}, tới lúc đó dùng % hoàn dự kiến ${expected}%.`);
+    } else if (!sf) {
+      estimateNotes.push(`${e.brandName} · ${pName}: chưa có file Shop Analytics của tháng ở Dữ Liệu Gốc nên giữ ước tính (hoàn dự kiến ${expected}%).`);
+    } else {
+      const why = shopRefundStatus(month, today, sf).reasons.map((r) => REFUND_REASON_LABEL[r]).join("; ");
+      estimateNotes.push(`${e.brandName} · ${pName}: giữ ước tính (hoàn dự kiến ${expected}%) vì ${why}.`);
+    }
+  };
+
   for (const e of byContract.values()) {
     const rate = rateOf(e.brandId, e.platform);
+    const side = termsSide.get(e.key);
+    if (side && side.periodIds.size > 0) {
+      // ---- Điều khoản hợp tác (0191) ----
+      const termPeriods = input.termPeriods ?? [];
+      const period = resolveTerms(termPeriods, e.brandId, e.platform, monthEndIso(month)) ?? termPeriods.filter((p) => side.periodIds.has(p.id)).sort((a, b) => b.startDate.localeCompare(a.startDate))[0];
+      const terms = period.terms;
+      const pct = feeOf(terms, "pct_nmv");
+      const needsReturn = (!!pct && pct.basis === "nmv") || terms.gmvBonus?.basis === "nmv";
+      const crmExpected = rate?.returnRate ?? 0;
+      const usesDefault = !(crmExpected > 0);
+      const expected = usesDefault ? DEFAULT_RETURN_RATE_ESTIMATE : crmExpected;
+      const hasRefundFile = profileOf(e.platform).dataRawTypes.includes("shop_analytics");
+      const settled = needsReturn && hasRefundFile ? settledReturnRate(month, today, input.shopRefunds[e.brandId]) : undefined;
+      const pure = side.legacySessions === 0 && side.periodIds.size === 1;
+      const mi = input.monthFeeInputs?.find((x) => x.brandId === e.brandId && x.platform === e.platform && x.periodMonth === periodMonth);
+      const run = (returnRateOverride?: number) =>
+        settleMonth(terms, { sessions: side.inputs, committedHours: e.committedHours, committedGmv: side.committedGmv, returnRateOverride, adsSpend: mi?.adsSpend, creatorsBooked: mi?.creatorsBooked, affiliateGmv: mi?.affiliateGmv });
+      const settlement = run(pure && needsReturn ? settled ?? expected : undefined);
+      // Tháng có một giai đoạn điều khoản và mọi ca theo đó ⇒ doanh thu = bảng tính. Tháng đổi điều khoản giữa chừng (hoặc còn ca
+      // tính theo cấu hình cũ) ⇒ giữ doanh thu từng ca đã tính đúng điều khoản của nó + các khoản cả tháng của giai đoạn cuối tháng.
+      e.revenue = pure ? settlement.total : e.revenue + settlement.monthAdjustments;
+      e.revenueEstimate = pure ? (needsReturn ? run(expected).total : settlement.total) : e.revenue;
+      e.settlement = settlement;
+      const state = !needsReturn ? "none" : settled != null ? "final" : "estimate";
+      e.basis = { kind: "terms", label: termsLabel(terms), returnRate: needsReturn ? settled ?? expected : undefined, state, mixedLegacy: side.legacySessions > 0 || side.periodIds.size > 1 };
+      if (needsReturn && settled == null) {
+        if (usesDefault) estimateNotes.push(`${e.brandName} · ${profileOf(e.platform).label}: CRM chưa nhập % hoàn dự kiến nên NMV ước tính theo mặc định ${DEFAULT_RETURN_RATE_ESTIMATE}%.`);
+        pushRefundNotes(e, expected, hasRefundFile);
+      }
+      if (settlement.missing.length > 0) estimateNotes.push(`${e.brandName} · ${profileOf(e.platform).label}: thiếu ${settlement.missing.join("; ")} để tính đủ phí tháng.`);
+      if (settlement.owedHours > 0) estimateNotes.push(`${e.brandName} · ${profileOf(e.platform).label}: còn nợ ${fmtFixed(settlement.owedHours, 1)} giờ cam kết cần bù theo điều khoản.`);
+      if (!pure) estimateNotes.push(`${e.brandName} · ${profileOf(e.platform).label}: tháng này có nhiều giai đoạn điều khoản hoặc ca tính theo cấu hình cũ — doanh thu từng ca theo giai đoạn của ca, các khoản cả tháng theo giai đoạn cuối tháng (${period.label || "điều khoản chính"}).`);
+      e.grossProfit = e.revenue - e.hostPay - e.coHostPay - e.studioCost - e.adsCost;
+      continue;
+    }
     if (e.basis.kind === "hourly") {
       e.basis = { kind: "hourly", ratePerHour: rate?.ratePerHour ?? 0 };
-    } else {
+    } else if (e.basis.kind !== "terms") {
       const crmExpected = rate?.returnRate ?? 0;
       const usesDefault = !(crmExpected > 0);
       const expected = usesDefault ? DEFAULT_RETURN_RATE_ESTIMATE : crmExpected;
@@ -279,18 +352,7 @@ export function buildMonthClose(input: MonthCloseInput): MonthClose {
           e.revenueEstimate = e.revenue;
           estimateNotes.push(`${e.brandName} · ${profileOf(e.platform).label}: CRM chưa nhập % hoàn dự kiến nên NMV ước tính theo mặc định ${DEFAULT_RETURN_RATE_ESTIMATE}%.`);
         }
-        const sf = input.shopRefunds[e.brandId];
-        const pName = profileOf(e.platform).label;
-        if (!hasRefundFile) {
-          estimateNotes.push(`${e.brandName} · ${pName}: chưa có file hoàn tiền của sàn nên giữ ước tính theo % hoàn dự kiến ${expected}%.`);
-        } else if (today < nmvSettledFrom(month)) {
-          estimateNotes.push(`${e.brandName} · ${pName}: sàn chốt hoàn/huỷ từ ${nmvSettledFrom(month)}, tới lúc đó dùng % hoàn dự kiến ${expected}%.`);
-        } else if (!sf) {
-          estimateNotes.push(`${e.brandName} · ${pName}: chưa có file Shop Analytics của tháng ở Dữ Liệu Gốc nên giữ ước tính (hoàn dự kiến ${expected}%).`);
-        } else {
-          const why = shopRefundStatus(month, today, sf).reasons.map((r) => REFUND_REASON_LABEL[r]).join("; ");
-          estimateNotes.push(`${e.brandName} · ${pName}: giữ ước tính (hoàn dự kiến ${expected}%) vì ${why}.`);
-        }
+        pushRefundNotes(e, expected, hasRefundFile);
       }
     }
     e.grossProfit = e.revenue - e.hostPay - e.coHostPay - e.studioCost - e.adsCost;

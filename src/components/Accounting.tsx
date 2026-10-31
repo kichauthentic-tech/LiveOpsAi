@@ -12,6 +12,8 @@ import type {
   TalentRateHistoryEntry
 } from "../types";
 import { PNL_MISSING_LABEL } from "../lib/pnl";
+import type { MonthFeeInputs, TermsPeriod } from "../lib/commercial/terms";
+import { AccountingFeeDetail } from "./AccountingFeeDetail";
 import { HOUR_TOLERANCE, buildMonthClose, monthEndOf, type ContractRevenueRow, type RevenueBasis, type ShopRefundMonth, type TalentPayRow } from "../lib/accounting/monthClose";
 import { fetchBrandContracts, fetchBrandMonthlyCommitments } from "../lib/db/brandContracts";
 import { fetchShopDaysMonthSlice } from "../lib/dataraw/monthlyProductSlice";
@@ -34,6 +36,11 @@ interface AccountingProps {
   brandPlatformRates: BrandPlatformRate[];
   talentRateHistory: TalentRateHistoryEntry[];
   brandPlatformRateHistory: BrandPlatformRateHistoryEntry[];
+  /** Điều khoản hợp tác (0191) + số nhập tháng để tính phí Ads/booking. */
+  termPeriods?: TermsPeriod[];
+  monthFeeInputs?: MonthFeeInputs[];
+  onMonthFeeInputSaved?: (row: MonthFeeInputs) => void;
+  canEditFees?: boolean;
 }
 
 const TH = "py-2 pr-3 text-[11px] font-semibold text-[var(--text-muted)] whitespace-nowrap";
@@ -42,6 +49,10 @@ const NUM = `${TD} text-right tabular-nums`;
 
 function basisLabel(b: RevenueBasis): string {
   if (b.kind === "hourly") return `Theo giờ · ${fmtVndFull(b.ratePerHour)}/giờ`;
+  if (b.kind === "terms") {
+    const nmv = b.state === "none" || b.returnRate == null ? "" : b.state === "final" ? ` · NMV chính thức (hoàn ${fmtFixed(b.returnRate, 1)}% cả shop)` : ` · NMV ước tính (hoàn dự kiến ${fmtFixed(b.returnRate, 1)}%)`;
+    return `${b.label}${nmv}`;
+  }
   const rate = `${fmtFixed(b.commissionRate, 1)}% NMV`;
   return b.kind === "nmv_final"
     ? `${rate} · chính thức (hoàn ${fmtFixed(b.returnRate, 1)}% cả shop)`
@@ -143,7 +154,11 @@ export const Accounting: React.FC<AccountingProps> = ({
   financeRecords,
   brandPlatformRates,
   talentRateHistory,
-  brandPlatformRateHistory
+  brandPlatformRateHistory,
+  termPeriods,
+  monthFeeInputs,
+  onMonthFeeInputSaved,
+  canEditFees = false
 }) => {
   const { showToast } = useToast();
   const today = todayVn();
@@ -221,9 +236,11 @@ export const Accounting: React.FC<AccountingProps> = ({
       brandPlatformRateHistory,
       contracts: contracts ?? [],
       commitments,
-      shopRefunds: shopRefunds?.month === month ? shopRefunds.byBrand : {}
+      shopRefunds: shopRefunds?.month === month ? shopRefunds.byBrand : {},
+      termPeriods,
+      monthFeeInputs
     });
-  }, [ready, month, today, sessions, talents, brands, financeRecords, brandPlatformRates, talentRateHistory, brandPlatformRateHistory, contracts, commitments, shopRefunds]);
+  }, [ready, month, today, sessions, talents, brands, financeRecords, brandPlatformRates, talentRateHistory, brandPlatformRateHistory, contracts, commitments, shopRefunds, termPeriods, monthFeeInputs]);
 
   function exportXlsx() {
     if (!close) return;
@@ -321,7 +338,7 @@ export const Accounting: React.FC<AccountingProps> = ({
       notices.push({ tone: "slate", text: <>{close.backfillCount} ca nạp bù không tính (rate tháng đó không chuẩn).</> });
     for (const t of close.definitionWarnings) notices.push({ tone: "amber", text: t });
     for (const t of close.estimateNotes) notices.push({ tone: "slate", text: t });
-    if (close.contracts.some((c) => c.basis.kind === "nmv_final"))
+    if (close.contracts.some((c) => c.basis.kind === "nmv_final" || (c.basis.kind === "terms" && c.basis.state === "final")))
       notices.push({ tone: "slate", text: "NMV chính thức suy từ % hoàn thật của cả shop (file Shop Analytics), không riêng live — là số xấp xỉ." });
   }
   const DOT = { rose: "bg-rose-500", amber: "bg-amber-500", slate: "bg-[var(--text-faint)]" };
@@ -410,7 +427,7 @@ export const Accounting: React.FC<AccountingProps> = ({
                         <td className={NUM}>{c.counted < c.total ? <span title="ca đủ dữ liệu / tổng ca">{c.counted}/{c.total}</span> : c.total}</td>
                         <td className={NUM}>
                           {fmtVndFull(c.revenue)}
-                          {c.basis.kind === "nmv_final" && c.revenue !== c.revenueEstimate && (
+                          {(c.basis.kind === "nmv_final" || (c.basis.kind === "terms" && c.basis.state === "final")) && c.revenue !== c.revenueEstimate && (
                             <div className="text-[11px] text-[var(--text-faint)]" title="so với số ước tính trước đó">
                               ước tính {fmtVndFull(c.revenueEstimate)}
                             </div>
@@ -423,6 +440,30 @@ export const Accounting: React.FC<AccountingProps> = ({
                     ))}
                   </tbody>
                 </table>
+                {close.contracts.some((c) => c.settlement) && (
+                  <div className="mt-3 space-y-1.5">
+                    {close.contracts.filter((c) => c.settlement).map((c) => (
+                      <details key={c.key} className="rounded-lg border border-[var(--border)] bg-[var(--surface-base)]/40">
+                        <summary className="cursor-pointer px-3 py-2 text-xs text-[var(--text)] flex flex-wrap items-center gap-x-2">
+                          <b>{c.brandName}</b> <PlatformChip platform={c.platform} />
+                          <span className="text-[var(--text-muted)]">chi tiết phí · {fmtVndFull(c.revenue)}</span>
+                          {c.settlement!.missing.length > 0 && <span className="text-amber-300">thiếu số</span>}
+                        </summary>
+                        <div className="px-3 pb-3">
+                          <AccountingFeeDetail
+                            brandId={c.brandId}
+                            platform={c.platform}
+                            periodMonth={`${month}-01`}
+                            settlement={c.settlement!}
+                            saved={monthFeeInputs?.find((x) => x.brandId === c.brandId && x.platform === c.platform && x.periodMonth === `${month}-01`)}
+                            canEdit={canEditFees && !!onMonthFeeInputSaved}
+                            onSaved={(row) => onMonthFeeInputSaved?.(row)}
+                          />
+                        </div>
+                      </details>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </section>

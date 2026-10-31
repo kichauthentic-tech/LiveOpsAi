@@ -11,6 +11,8 @@ import {
 import { sessionAdsCost } from "./metrics/adsCost";
 import { hasLiveEvidence } from "./sessionStatus";
 import { hasStaffSegments, segmentsOfRole, sessionMinutes, type StaffRole } from "./staffSegments";
+import { feeInputOf, sessionFee } from "./commercial/fees";
+import { feeOf, resolveTerms, type TermsPeriod } from "./commercial/terms";
 
 export const DEFAULT_FINANCE: Omit<SessionFinance, "sessionId"> = {
   agencyCommissionRate: 15,
@@ -99,6 +101,8 @@ export interface SessionPnl {
   // người. hostPayout / coHostPayout ở trên là TỔNG các dòng cùng vai.
   payouts: PersonPayout[];
   segmented: boolean;
+  /** Giai đoạn điều khoản (0191) đã dùng để tính doanh thu ca này; vắng = tính theo cấu hình cũ (billingModel + đơn giá). */
+  termsPeriod?: TermsPeriod;
 }
 
 export interface PersonPayout {
@@ -148,7 +152,10 @@ export function computeSessionPnl(
   brandById: Record<string, Brand>,
   brandPlatformRates: BrandPlatformRate[],
   talentRateHistory: TalentRateHistoryEntry[],
-  brandPlatformRateHistory: BrandPlatformRateHistoryEntry[]
+  brandPlatformRateHistory: BrandPlatformRateHistoryEntry[],
+  // Điều khoản hợp tác (0191). Có điều khoản phủ ngày của ca thì doanh thu ca tính theo đó (giờ có luật giá, % doanh số,
+  // phụ thu trợ live…); không thì giữ đường cũ — ca trước ngày bắt đầu điều khoản đầu tiên không bị tính lại.
+  termPeriods: TermsPeriod[] = []
 ): SessionPnl {
   const excluded = !!session.excludedFromReports;
   const gmv = excluded ? 0 : session.actualGmv;
@@ -176,15 +183,20 @@ export function computeSessionPnl(
   const hostFixRate = hostPaidHourly
     ? talentHourRate * billableHours
     : finance.hostFixRateOverride ?? talentRateAtDate?.ratePerSession ?? talent?.ratePerSession ?? 0;
-  const isHourly = brand?.billingModel === "hourly";
+  const termsPeriod = termPeriods.length > 0 ? resolveTerms(termPeriods, session.brandId, session.platform, session.date) : undefined;
+  const termsHourly = termsPeriod ? feeOf(termsPeriod.terms, "per_hour") : undefined;
+  const termsPct = termsPeriod ? feeOf(termsPeriod.terms, "pct_nmv") : undefined;
+  const isHourly = termsPeriod ? !!termsHourly : brand?.billingModel === "hourly";
   const hourlyRate = brandRateAtDate?.ratePerHour ?? currentBrandRate?.ratePerHour ?? 0;
   const returnRate = brandRateAtDate?.returnRate ?? currentBrandRate?.returnRate ?? 0;
   const estimatedNmv = gmv * (1 - returnRate / 100);
   const grossAgencyRev = excluded
     ? 0
-    : isHourly
-      ? sessionDurationHours(session.startTime, session.endTime) * hourlyRate
-      : (estimatedNmv * agencyCommissionRate) / 100;
+    : termsPeriod
+      ? sessionFee(termsPeriod.terms, feeInputOf(session, returnRate)).total
+      : isHourly
+        ? sessionDurationHours(session.startTime, session.endTime) * hourlyRate
+        : (estimatedNmv * agencyCommissionRate) / 100;
   let hostPayout = hostFixRate + (gmv * hostCommRate) / 100;
 
   // OT/off sớm khai theo CA (report là của ca, không phải của từng người) nên giờ tính lương của
@@ -275,13 +287,18 @@ export function computeSessionPnl(
     : !!coHost && coHostFixRate <= 0 && coHostCommRate <= 0;
   if (hostRateMissing) missingInputs.push("host_rate");
   if (coHostRateMissing) missingInputs.push("cohost_rate");
-  if (isHourly && hourlyRate <= 0) missingInputs.push("brand_rate");
-  if (!isHourly && brandCommission == null) missingInputs.push("commission_default");
+  if (termsPeriod) {
+    // Điều khoản đã khai rõ từng khoản: chỉ thiếu khi khoản theo giờ chưa có đơn giá. % = 0 là đã đặt (“không thu”).
+    if (termsHourly && termsHourly.rate <= 0 && !termsPct) missingInputs.push("brand_rate");
+  } else {
+    if (isHourly && hourlyRate <= 0) missingInputs.push("brand_rate");
+    if (!isHourly && brandCommission == null) missingInputs.push("commission_default");
+  }
 
   return {
     missingInputs,
     excluded,
-    session, finance, talent, isHourly, agencyCommissionRate, grossAgencyRev, hostPayout, netProfit,
+    session, finance, talent, isHourly, agencyCommissionRate: termsPeriod ? termsPct?.pct ?? 0 : agencyCommissionRate, grossAgencyRev, hostPayout, netProfit,
     hostPaidHourly,
     billableHours,
     otMinutes: session.report?.otMinutes ?? 0,
@@ -291,7 +308,8 @@ export function computeSessionPnl(
     coHostPaidHourly,
     coHostUsesAssistantRate: !!coHost && coHostAssistantRate > 0,
     payouts,
-    segmented
+    segmented,
+    termsPeriod
   };
 }
 

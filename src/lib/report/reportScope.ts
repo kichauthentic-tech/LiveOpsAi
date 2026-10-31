@@ -1,4 +1,5 @@
 import type { BrandPlatformRate } from "../../types";
+import { resolveTerms, type TermsPeriod } from "../commercial/terms";
 
 // PHẠM VI DỊCH VỤ của một brand × sàn (0190, 29/10) — Report Tháng chọn trang/khối theo việc YFB thật sự làm, không
 // theo "có file hay không" (VERA có file Ads + Affiliate nhiều tháng dù YFB chỉ live). Khai ở CRM → Hợp đồng & giá.
@@ -15,7 +16,13 @@ export interface ReportScope {
 
 export const DEFAULT_REPORT_SCOPE: ReportScope = { ads: true, affiliate: true, inhouseLive: false };
 
-export function reportScopeOf(rates: BrandPlatformRate[], brandId: string, platform: BrandPlatformRate["platform"]): ReportScope {
+/**
+ * Phạm vi của brand × sàn. Có điều khoản hợp tác (0191) phủ ngày `asOf` (report: ngày cuối tháng) thì phạm vi lấy từ dịch vụ
+ * đã chọn trong điều khoản; không thì dùng ba cột cũ ở brand_platform_rates.
+ */
+export function reportScopeOf(rates: BrandPlatformRate[], brandId: string, platform: BrandPlatformRate["platform"], periods: TermsPeriod[] = [], asOf?: string): ReportScope {
+  const period = periods.length > 0 && asOf ? resolveTerms(periods, brandId, platform, asOf) : undefined;
+  if (period) return { ads: period.terms.services.includes("ads"), affiliate: period.terms.services.includes("affiliate"), inhouseLive: period.terms.inhouseLive };
   const r = rates.find((x) => x.brandId === brandId && x.platform === platform);
   return {
     ads: r?.scopeAds ?? DEFAULT_REPORT_SCOPE.ads,

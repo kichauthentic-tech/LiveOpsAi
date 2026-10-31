@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import type { ServiceScopePatch } from "../lib/db/brandPlatformRates";
-import { Brand, BrandChannel, BrandContract, BrandMonthlyCommitment, BrandPlatformRate, BrandPlatformRateHistoryEntry, BrandStudio, Studio, SystemUser, UserRole } from "../types";
+import { Brand, BrandChannel, BrandContract, BrandMonthlyCommitment, BrandPlatformRate, BrandPlatformRateHistoryEntry, BrandStudio, LiveSession, Studio, SystemUser, Talent, UserRole } from "../types";
 import { Building2, Plus, Edit3, Trash2, X, FileSignature } from "lucide-react";
 import { BrandLogo } from "./ui/BrandLogo";
 import { BrandConfigPanel } from "./BrandConfigPanel";
+import type { BrandTalentRule, MonthFeeInputs, TermsPeriod } from "../lib/commercial/terms";
 import { useConfirm } from "../hooks/useConfirm";
 import { statusLabel } from "../lib/statusLabels";
 import { PageHeader } from "./common/PageHeader";
@@ -42,6 +43,16 @@ interface CrmProjectsProps {
   channelsEditable: boolean;
   onCreateChannel: (brandId: string, platform: ReportPlatform) => Promise<unknown>;
   onUpdateChannel: (id: string, patch: Partial<Pick<BrandChannel, "shopName" | "shopRef" | "status">>) => Promise<unknown>;
+  /** Điều khoản hợp tác YFB × brand (0191) + dữ liệu để xem thử bảng tính phí tháng. */
+  termPeriods: TermsPeriod[];
+  termsAvailable: boolean;
+  onTermsChanged: (next: TermsPeriod[]) => void;
+  sessions: LiveSession[];
+  monthFeeInputs: MonthFeeInputs[];
+  onMonthFeeInputSaved: (row: MonthFeeInputs) => void;
+  talents: Talent[];
+  talentRules: BrandTalentRule[];
+  onTalentRulesChanged: (next: BrandTalentRule[]) => void;
 }
 
 // Lượt đọc lúc mở màn — nạp trước trong lúc chờ đợt nạp chung (lib/db/prefetch.ts).
@@ -73,7 +84,16 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
   channels,
   channelsEditable,
   onCreateChannel,
-  onUpdateChannel
+  onUpdateChannel,
+  termPeriods,
+  termsAvailable,
+  onTermsChanged,
+  sessions,
+  monthFeeInputs,
+  onMonthFeeInputSaved,
+  talents,
+  talentRules,
+  onTalentRulesChanged
 }) => {
   const confirm = useConfirm();
   const today = todayVn();
@@ -290,7 +310,7 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
                   // Giờ cam kết của tháng có thể gõ thẳng ở Kế Hoạch Tháng (không hợp đồng) — vẫn là cam kết thật mà Bảng Vận Hành /
                   // Toàn Cảnh Brand đang đo; ghi "chưa có" ở đây là nói ngược với các màn đó.
                   const monthCommit = commitments.find((c) => c.brandId === b.id && platformOf(c) === p && c.periodMonth.startsWith(thisMonth.slice(0, 7)));
-                  const price = brandPriceLabel(b, brandPlatformRates, p);
+                  const price = brandPriceLabel(b, brandPlatformRates, p, termPeriods, today);
                   const studio = studios.find((x) => x.id === findBrandStudioId(brandStudios, b.id, p));
                   const open = focus?.brandId === b.id && focus.platform === p;
                   const ch = findChannel(channels, b.id, p);
@@ -372,6 +392,15 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
               onSetBrandStudio={onSetBrandStudio}
               onContractsChanged={reloadContracts}
               onOpenMonthPlan={onOpenMonthPlan && ((p) => onOpenMonthPlan(b.id, p))}
+              termPeriods={termPeriods}
+              termsAvailable={termsAvailable}
+              onTermsChanged={onTermsChanged}
+              sessions={sessions}
+              monthFeeInputs={monthFeeInputs}
+              onMonthFeeInputSaved={onMonthFeeInputSaved}
+              talents={talents}
+              talentRules={talentRules}
+              onTalentRulesChanged={onTalentRulesChanged}
             />
           </div>
         );

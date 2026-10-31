@@ -76,6 +76,8 @@ const REPORT_VIEWS: Record<ReportPlatform, { preload: () => void; pdf: boolean; 
 import { MonthPicker } from "../common/MonthPicker";
 import { PageHeader } from "../common/PageHeader";
 import { dataSourceTier } from "../../lib/dataSource";
+import type { TermsPeriod } from "../../lib/commercial/terms";
+import { monthEndIso } from "../../lib/refundStatus";
 import { reportScopeOf, type ReportScope } from "../../lib/report/reportScope";
 
 // Report Tuần không còn là tab riêng ở menu (2026-08-23) — gộp làm chế độ xem "Tuần" ngay trong
@@ -92,6 +94,8 @@ interface BrandMonthlyReportProps {
   sessions: LiveSession[];
   currentRole: UserRole;
   brandPlatformRates: BrandPlatformRate[];
+  /** Điều khoản hợp tác (0191) — phạm vi trang report lấy từ dịch vụ đã chọn khi có. */
+  termPeriods?: TermsPeriod[];
   shiftSlots?: ShiftSlot[]; // Report Tuần: ca mở chưa có người tuần tới
   /** Tham số engine admin đã vặn — chỉ chuyển cho Report Tuần để cuối tháng khớp thẻ kênh. */
   engineParams?: EngineParams;
@@ -136,7 +140,7 @@ const fmtStamp = (iso: string) => {
 // đã tách sang tab riêng "Nhập Ads" (BrandAdsReport.tsx, 2026-09-21) — Report Tháng chỉ
 // còn tài liệu 6 tab + phát hành/thu hồi (tab 05 "Phân Tích Sâu" gộp vào 2026-09-23, ops-only).
 
-export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId, brandName, platform, sessions, currentRole, brandPlatformRates, shiftSlots, engineParams, onOpenAdsReport, planMonthTotals }) => {
+export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId, brandName, platform, sessions, currentRole, brandPlatformRates, termPeriods = [], shiftSlots, engineParams, onOpenAdsReport, planMonthTotals }) => {
   const confirm = useConfirm();
   const { showToast } = useToast();
   const canManage = CAN_MANAGE_ROLES.includes(currentRole);
@@ -154,7 +158,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
   const [month, setMonth] = useState(() => defaultReportMonth(`${getTodayMonth()}-01`, sessions.filter((s) => s.brandId === brandId)));
   const monthNowVn = getTodayMonth();
   const [report, setReport] = useState<BrandMonthlyReportType | null>(null);
-  const reportScope = useMemo(() => reportScopeOf(brandPlatformRates, brandId, platform), [brandPlatformRates, brandId, platform]);
+  const reportScope = useMemo(() => reportScopeOf(brandPlatformRates, brandId, platform, termPeriods, monthEndIso(month)), [brandPlatformRates, brandId, platform, termPeriods, month]);
   const [loading, setLoading] = useState(true);
   const [publishing, setPublishing] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);

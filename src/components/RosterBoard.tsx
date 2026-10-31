@@ -28,7 +28,8 @@ import {
   type RosterMonth,
   type RosterWeek
 } from "../lib/db/roster";
-import { analyzeRoster, buildRosterShifts, channelKeyOf, DEFAULT_ROSTER_RULES, type RosterRole, type RosterRules, type RosterShift } from "../lib/roster/rules";
+import type { BrandTalentRule } from "../lib/commercial/terms";
+import { analyzeRoster, buildBrandRuleIndex, buildRosterShifts, channelKeyOf, DEFAULT_ROSTER_RULES, type RosterRole, type RosterRules, type RosterShift } from "../lib/roster/rules";
 import { autofillWeek, buildFamiliarity, famOf, planCostCut, shiftCost, type CostMove, type RankContext, type RankMode } from "../lib/roster/candidates";
 import { ShiftPanel, dayLabel } from "./roster/ShiftPanel";
 import { AbsencePanel, ChangeLogPanel, ChecksPanel, HoursCostPanel, MatrixPanel, RulesPanel, WeekGrid, type ChannelRow } from "./roster/panels";
@@ -53,6 +54,8 @@ interface Props {
   shiftRegistrations: ShiftRegistration[];
   talents: Talent[];
   talentRateHistory: TalentRateHistoryEntry[];
+  /** Điều khoản về host với brand (0191) — cảnh báo khi xếp host brand không nhận / độc quyền brand khác. */
+  talentRules?: BrandTalentRule[];
   brandChannels: BrandChannel[];
   brandStudios: BrandStudio[];
   studios: Studio[];
@@ -215,10 +218,11 @@ export const RosterBoard: React.FC<Props> = (p) => {
     () => buildRosterShifts(p.sessions, p.shiftSlots, drafts, p.shiftRegistrations, addDays(weekStart, -7), addDays(weekEnd, 1)),
     [p.sessions, p.shiftSlots, drafts, p.shiftRegistrations, weekStart, weekEnd]
   );
-  const analysis = useMemo(() => analyzeRoster(shifts, rules, weekStart, nameOf, familiar), [shifts, rules, weekStart, nameOf, familiar]);
+  const brandRules = useMemo(() => (p.talentRules && p.talentRules.length > 0 ? buildBrandRuleIndex(p.talentRules, (id) => p.brands.find((b) => b.id === id)?.name ?? "brand") : undefined), [p.talentRules, p.brands]);
+  const analysis = useMemo(() => analyzeRoster(shifts, rules, weekStart, nameOf, familiar, brandRules), [shifts, rules, weekStart, nameOf, familiar, brandRules]);
   const ctx: RankContext = useMemo(
-    () => ({ shifts, rules, weekStart, fam, talents: p.talents, history: p.talentRateHistory, mode, nameOf }),
-    [shifts, rules, weekStart, fam, p.talents, p.talentRateHistory, mode, nameOf]
+    () => ({ shifts, rules, weekStart, fam, talents: p.talents, history: p.talentRateHistory, mode, nameOf, brandRules }),
+    [shifts, rules, weekStart, fam, p.talents, p.talentRateHistory, mode, nameOf, brandRules]
   );
   const wk = useMemo(() => shifts.filter((s) => s.date >= weekStart && s.date <= weekEnd), [shifts, weekStart, weekEnd]);
 

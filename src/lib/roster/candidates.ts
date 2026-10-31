@@ -5,8 +5,10 @@ import { findTalentRateAsOf } from "../pnl";
 import {
   absRange,
   analyzeRoster,
+  brandRuleViolation,
   channelKeyOf,
   shiftHours,
+  type BrandRuleIndex,
   type RosterAnalysis,
   type RosterRole,
   type RosterRules,
@@ -92,6 +94,8 @@ export interface RankContext {
   history: readonly TalentRateHistoryEntry[];
   mode: RankMode;
   nameOf: (talentId: string) => string;
+  /** Điều khoản về host với brand (0191): host bị brand từ chối / độc quyền brand khác không vào danh sách gợi ý. */
+  brandRules?: BrandRuleIndex;
 }
 
 export interface Candidate {
@@ -114,6 +118,8 @@ const fmtH = (h: number) => (Math.round(h * 10) / 10).toString().replace(".", ",
 
 /** Những gì sẽ xảy ra nếu xếp `talentId` vào ca: trùng (chặn), quá giờ tuần (chặn), nghỉ ngắn / chạy phòng / quá giờ ngày (cảnh báo). */
 function whatIf(shift: RosterShift, talentId: string, ctx: RankContext, an: RosterAnalysis): { blocked?: string; issues: string[]; weekHours: number } {
+  const violation = brandRuleViolation(ctx.brandRules, shift.brandId, talentId);
+  if (violation) return { blocked: violation.text[0].toUpperCase() + violation.text.slice(1), issues: [], weekHours: 0 };
   const want = { date: shift.date, startTime: shift.startTime, endTime: shift.endTime };
   const [a, b] = absRange(want);
   const list = (an.entries.get(talentId) ?? []).filter((e) => e.shift.key !== shift.key);
@@ -179,6 +185,7 @@ export function rankCandidates(shift: RosterShift, role: RosterRole, ctx: RankCo
     let score = (45 * Math.log1p(famN)) / Math.log1p(30) + 30 * Math.max(-0.5, 1 - w.weekHours / SOFT_WEEK_CAP) - 12 * w.issues.length;
     if (f.host + f.co === 0) score -= 25;
     if (registered) score += 30;
+    if (ctx.brandRules?.preferred.has(`${shift.brandId}|${t.id}`)) score += 20;
     const known = role === "host" ? f.host >= 3 : f.host + f.co >= 3;
     const qualified = known && w.issues.length === 0 && w.weekHours + h <= SOFT_WEEK_CAP && !cost.missing;
     out.push({ talentId: t.id, score, famHost: f.host, famCo: f.co, weekHours: w.weekHours, issues: w.issues, cost, registered, qualified });
@@ -218,7 +225,7 @@ export function autofillWeek(ctx: RankContext): { assignments: Assignment[]; mis
     for (const role of ["host", "co_host"] as const) {
       const cur = shifts.find((s) => s.key === t.key)!;
       if (role === "host" ? cur.hostId : cur.coHostId) continue;
-      const an = analyzeRoster(shifts, ctx.rules, ctx.weekStart, ctx.nameOf);
+      const an = analyzeRoster(shifts, ctx.rules, ctx.weekStart, ctx.nameOf, undefined, ctx.brandRules);
       const pick = rankCandidates(cur, role, { ...ctx, shifts }, an).find(
         (c) => !c.blocked && c.issues.length === 0 && c.famHost + c.famCo > 0 && (ctx.mode !== "cost" || c.qualified)
       );
@@ -257,7 +264,7 @@ export function planCostCut(ctx: RankContext, limit: number): { moves: CostMove[
   const added = new Map<string, number>();
   const costCtx: RankContext = { ...ctx, mode: "cost" };
   for (let k = 0; k < limit; k++) {
-    const an = analyzeRoster(shifts, ctx.rules, ctx.weekStart, ctx.nameOf);
+    const an = analyzeRoster(shifts, ctx.rules, ctx.weekStart, ctx.nameOf, undefined, ctx.brandRules);
     let best: (CostMove & { key: number; hours: number }) | null = null;
     for (const s of shifts) {
       if (s.kind !== "open" || s.date < ctx.weekStart || s.date > weekEnd) continue;

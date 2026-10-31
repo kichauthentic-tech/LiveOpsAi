@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
-import { CalendarRange, FileSignature, History, MapPin, Pencil, Plus, Tag, Trash2 } from "lucide-react";
-import { Brand, BrandChannel, BrandContract, BrandMonthlyCommitment, BrandPlatformRate, BrandPlatformRateHistoryEntry, BrandStudio, Studio } from "../types";
+import { CalendarRange, FileSignature, History, MapPin, Pencil, Plus, Tag, Trash2, UserCheck } from "lucide-react";
+import { Brand, BrandChannel, BrandContract, BrandMonthlyCommitment, BrandPlatformRate, BrandPlatformRateHistoryEntry, BrandStudio, LiveSession, Studio, Talent } from "../types";
 import { createBrandContract, deleteBrandContract, generateContractCommitments, updateBrandContract } from "../lib/db/brandContracts";
 import { findBrandStudioId } from "../lib/db/brandStudios";
 import { generateThroughMonth, monthKeyOf, todayVn } from "../lib/performance/brandCommitment";
@@ -13,6 +13,11 @@ import { MonthPicker } from "./common/MonthPicker";
 import { profileOf } from "../lib/platforms/profiles";
 import { reportScopeOf } from "../lib/report/reportScope";
 import type { ServiceScopePatch } from "../lib/db/brandPlatformRates";
+import { feeOf, type BrandTalentRule, type CommercialTerms, type MonthFeeInputs, type TermsPeriod } from "../lib/commercial/terms";
+import { NumberField, btnCls, inputCls } from "./crm/fields";
+import { TermsPanel } from "./crm/TermsPanel";
+import { MonthSettlementPanel } from "./crm/MonthSettlementPanel";
+import { TalentRulesPanel } from "./crm/TalentRulesPanel";
 
 // "Hợp đồng & giá" của MỘT brand — chỗ nhập DUY NHẤT cho mọi điều khoản thương mại (gộp cấu hình 06/10, user: "đưa
 // vào cấu hình đúng 1 chỗ ở CRM"). Trước đó: đơn giá/hoa hồng/hoàn huỷ ở nút Rate Card trong CRM, hợp đồng + giờ cam
@@ -49,6 +54,17 @@ interface Props {
   onContractsChanged: () => Promise<void>;
   /** Sang Kế Hoạch Tháng của đúng brand × sàn (sửa cam kết một tháng). */
   onOpenMonthPlan?: (platform: ReportPlatform) => void;
+  /** Điều khoản hợp tác (0191). available=false ⇒ DB chưa chạy migration: giữ khối giá cũ để vẫn nhập được. */
+  termPeriods: TermsPeriod[];
+  termsAvailable: boolean;
+  onTermsChanged: (next: TermsPeriod[]) => void;
+  /** Ca của app — tab “Tính phí tháng” xem thử trên ca thật. */
+  sessions: LiveSession[];
+  monthFeeInputs: MonthFeeInputs[];
+  onMonthFeeInputSaved: (row: MonthFeeInputs) => void;
+  talents: Talent[];
+  talentRules: BrandTalentRule[];
+  onTalentRulesChanged: (next: BrandTalentRule[]) => void;
 }
 
 interface ContractDraft {
@@ -62,58 +78,8 @@ interface ContractDraft {
   note: string;
 }
 
-const inputCls =
-  "w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-xs text-[var(--text)] focus:outline-none focus:border-[var(--accent)] disabled:opacity-60";
-const btnCls = "px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white text-xs font-bold";
 const fmtHours = (n: number) => `${n.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h`;
 const STATUS_LABEL: Record<BrandContract["status"], string> = { draft: "nháp", active: "đang hiệu lực", ended: "đã kết thúc" };
-
-/** Một ô số + nút Lưu (giá trị đang lưu hiện bên cạnh). */
-function NumberField({
-  label,
-  hint,
-  current,
-  placeholder,
-  max,
-  step,
-  canEdit,
-  onSave
-}: {
-  label: string;
-  hint?: string;
-  current: string;
-  placeholder: string;
-  max?: number;
-  step?: number;
-  canEdit: boolean;
-  onSave: (v: number) => Promise<boolean>;
-}) {
-  const [draft, setDraft] = useState("");
-  const [busy, setBusy] = useState(false);
-  const save = async () => {
-    const v = Number(draft);
-    if (draft.trim() === "" || !Number.isFinite(v) || v < 0 || (max !== undefined && v > max)) return;
-    setBusy(true);
-    const ok = await onSave(v);
-    setBusy(false);
-    if (ok) setDraft("");
-  };
-  return (
-    <div className="space-y-1">
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="text-[11px] font-bold text-[var(--text-muted)]">{label}</span>
-        <span className="text-xs font-black text-[var(--text)]">{current}</span>
-      </div>
-      {canEdit && (
-        <div className="flex items-center gap-2">
-          <input type="number" min={0} max={max} step={step} value={draft} placeholder={placeholder} aria-label={label} onChange={(e) => setDraft(e.target.value)} className={inputCls} />
-          <button onClick={save} disabled={busy || draft.trim() === ""} className={btnCls}>{busy ? "…" : "Lưu"}</button>
-        </div>
-      )}
-      {hint && <p className="text-[11px] text-[var(--text-faint)] leading-snug">{hint}</p>}
-    </div>
-  );
-}
 
 // Thông tin KÊNH (0149): tên gian hàng, mã shop trên sàn, đang chạy / tạm dừng. Brand + sàn của kênh không đổi được.
 // Phạm vi dịch vụ (0190, 29/10): YFB làm gì cho brand × sàn này. Report Tháng chọn trang theo đây (CROCS: đủ; VERA/JOCKEY:
@@ -211,7 +177,16 @@ export const BrandConfigPanel: React.FC<Props> = ({
   onSaveServiceScope,
   onSetBrandStudio,
   onContractsChanged,
-  onOpenMonthPlan
+  onOpenMonthPlan,
+  termPeriods,
+  termsAvailable,
+  onTermsChanged,
+  sessions,
+  monthFeeInputs,
+  onMonthFeeInputSaved,
+  talents,
+  talentRules,
+  onTalentRulesChanged
 }) => {
   const confirm = useConfirm();
   const today = todayVn();
@@ -219,6 +194,7 @@ export const BrandConfigPanel: React.FC<Props> = ({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  const [tab, setTab] = useState<"terms" | "contract" | "fees" | "people">("terms");
 
   const hourly = brand.billingModel === "hourly";
   const rate = rateOf(rates, brand.id, platform);
@@ -319,22 +295,36 @@ export const BrandConfigPanel: React.FC<Props> = ({
     });
   }
 
+  // Điều khoản chính đang chạy vừa lưu ⇒ chép đơn giá / % / phạm vi sang các cột mà màn cũ (nhãn giá, việc cần làm, phạm vi Report)
+  // còn đọc. Đây là chỗ GHI DUY NHẤT của các cột đó khi đã có điều khoản — không có ô nhập thứ hai.
+  async function mirrorLegacy(terms: CommercialTerms) {
+    const hourlyFee = feeOf(terms, "per_hour");
+    const pctFee = feeOf(terms, "pct_nmv");
+    if (hourlyFee && hourlyFee.rate !== (rate?.ratePerHour ?? 0)) await onSaveRate(brand.id, platform, hourlyFee.rate);
+    if (pctFee && pctFee.pct !== rate?.commissionRate) await onSaveCommissionRate(brand.id, platform, pctFee.pct);
+    await onSaveServiceScope?.(brand.id, platform, { scopeAds: terms.services.includes("ads"), scopeAffiliate: terms.services.includes("affiliate"), hasInhouseLive: terms.inhouseLive });
+  }
+
   return (
     <div className="space-y-4">
-      {/* Cách thu phí — theo brand, quyết định ô giá nào có nghĩa. */}
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[11px] font-bold text-[var(--text-muted)]">Cách thu phí:</span>
-        {(["gmv_commission", "hourly"] as const).map((m) => (
-          <button
-            key={m}
-            disabled={!canEdit}
-            aria-pressed={brand.billingModel === m}
-            onClick={() => brand.billingModel !== m && onUpdateBrand({ ...brand, billingModel: m })}
-            className={`min-h-6 px-3 py-1.5 rounded-lg text-xs font-bold border transition ${brand.billingModel === m ? "seg-on" : "border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]"}`}
-          >
-            {m === "hourly" ? "Theo giờ live" : "Theo % doanh số"}
-          </button>
-        ))}
+        {/* Công tắc cũ (hai kiểu thu phí) chỉ còn khi DB chưa chạy 0191; có bảng điều khoản thì mọi thứ khai ở khối “Điều khoản hợp tác”. */}
+        {!termsAvailable && (
+          <>
+            <span className="text-[11px] font-bold text-[var(--text-muted)]">Cách thu phí:</span>
+            {(["gmv_commission", "hourly"] as const).map((m) => (
+              <button
+                key={m}
+                disabled={!canEdit}
+                aria-pressed={brand.billingModel === m}
+                onClick={() => brand.billingModel !== m && onUpdateBrand({ ...brand, billingModel: m })}
+                className={`min-h-6 px-3 py-1.5 rounded-lg text-xs font-bold border transition ${brand.billingModel === m ? "seg-on" : "border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]"}`}
+              >
+                {m === "hourly" ? "Theo giờ live" : "Theo % doanh số"}
+              </button>
+            ))}
+          </>
+        )}
         <span className="flex-1" />
         <div className="inline-flex items-center gap-1 bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-1" role="group" aria-label="Sàn">
           {platforms.map((p) => (
@@ -350,75 +340,111 @@ export const BrandConfigPanel: React.FC<Props> = ({
         </div>
       </div>
 
-      <ChannelInfo key={channel?.id ?? platform} channel={channel} platform={platform} canEdit={canEdit && !!onUpdateChannel} onSave={(patch) => run(async () => { await onUpdateChannel!(channel!.id, patch); setNote(`Đã lưu kênh ${brand.name} · ${platform}.`); })} />
+
+      <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Phần của hợp đồng & giá">
+        {([["terms", termsAvailable ? "Điều khoản" : "Giá"], ["contract", "Hợp đồng"], ...(termsAvailable ? [["fees", "Tính phí tháng"]] : []), ["people", "Kênh, host, phòng"]] as [typeof tab, string][]).map(([k, label]) => (
+          <button
+            key={k}
+            role="tab"
+            aria-selected={tab === k}
+            onClick={() => setTab(k)}
+            className={`min-h-6 px-3 py-1.5 rounded-lg text-xs font-bold border transition ${tab === k ? "seg-on" : "border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]"}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
 
       {error && <p className="text-xs text-rose-300 bg-rose-950/30 border border-rose-900 rounded-lg px-3 py-2">{error}</p>}
       {note && <p className="text-xs text-emerald-300 bg-emerald-950/30 border border-emerald-900 rounded-lg px-3 py-2">{note}</p>}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* 1. Giá */}
-        <div className="bg-[var(--surface-base)]/60 border border-[var(--border)] rounded-xl p-4 space-y-3">
-          <h4 className="text-xs font-black text-[var(--text)] flex items-center gap-1.5"><Tag className="w-3.5 h-3.5 text-blue-400" /> Giá {platform}</h4>
-          {hourly ? (
+      {tab === "terms" && (
+      <>
+      {termsAvailable ? (
+          <TermsPanel
+            brand={brand}
+            platform={platform}
+            canEdit={canEdit}
+            today={today}
+            available={termsAvailable}
+            periods={termPeriods}
+            rate={rate}
+            onPeriodsChanged={onTermsChanged}
+            onMirrorLegacy={mirrorLegacy}
+            onSaveReturnRate={(v) => onSaveReturnRate(brand.id, platform, v)}
+          />
+        ) : (
+          <>
+            <TermsPanel brand={brand} platform={platform} canEdit={false} today={today} available={false} periods={[]} rate={rate} onPeriodsChanged={onTermsChanged} onMirrorLegacy={mirrorLegacy} onSaveReturnRate={async () => false} />
+            <div className="bg-[var(--surface-base)]/60 border border-[var(--border)] rounded-xl p-4 space-y-3">
+            <h4 className="text-xs font-black text-[var(--text)] flex items-center gap-1.5"><Tag className="w-3.5 h-3.5 text-blue-400" /> Giá {platform}</h4>
+            {hourly ? (
+              <NumberField
+                key={`rate-${platform}`}
+                label="Đơn giá / giờ live"
+                current={rate && rate.ratePerHour > 0 ? fmtVndFull(rate.ratePerHour) : "chưa nhập"}
+                placeholder="Đơn giá mới"
+                canEdit={canEdit}
+                hint="Doanh thu agency = giờ ca theo lịch × đơn giá (Finance & P&L)."
+                onSave={(v) => onSaveRate(brand.id, platform, v)}
+              />
+            ) : (
+              <NumberField
+                key={`comm-${platform}`}
+                label="% hoa hồng agency (trên NMV)"
+                current={rate?.commissionRate != null ? `${rate.commissionRate}%` : "chưa đặt"}
+                placeholder="% mới"
+                max={100}
+                step={0.1}
+                canEdit={canEdit}
+                hint="Doanh thu agency = NMV × %. Áp cho mọi ca của sàn này (không sửa từng ca)."
+                onSave={(v) => onSaveCommissionRate(brand.id, platform, v)}
+              />
+            )}
             <NumberField
-              key={`rate-${platform}`}
-              label="Đơn giá / giờ live"
-              current={rate && rate.ratePerHour > 0 ? fmtVndFull(rate.ratePerHour) : "chưa nhập"}
-              placeholder="Đơn giá mới"
-              canEdit={canEdit}
-              hint="Doanh thu agency = giờ ca theo lịch × đơn giá (Finance & P&L)."
-              onSave={(v) => onSaveRate(brand.id, platform, v)}
-            />
-          ) : (
-            <NumberField
-              key={`comm-${platform}`}
-              label="% hoa hồng agency (trên NMV)"
-              current={rate?.commissionRate != null ? `${rate.commissionRate}%` : "chưa đặt"}
+              key={`ret-${platform}`}
+              label="Tỷ lệ hoàn huỷ"
+              current={rate && rate.returnRate > 0 ? `${rate.returnRate}%` : "chưa nhập"}
               placeholder="% mới"
               max={100}
               step={0.1}
               canEdit={canEdit}
-              hint="Doanh thu agency = NMV × %. Áp cho mọi ca của sàn này (không sửa từng ca)."
-              onSave={(v) => onSaveCommissionRate(brand.id, platform, v)}
+              hint="NMV ước tính = GMV × (1 − tỷ lệ). Chưa nhập thì NMV bằng GMV."
+              onSave={(v) => onSaveReturnRate(brand.id, platform, v)}
             />
-          )}
-          <NumberField
-            key={`ret-${platform}`}
-            label="Tỷ lệ hoàn huỷ"
-            current={rate && rate.returnRate > 0 ? `${rate.returnRate}%` : "chưa nhập"}
-            placeholder="% mới"
-            max={100}
-            step={0.1}
-            canEdit={canEdit}
-            hint="NMV ước tính = GMV × (1 − tỷ lệ). Chưa nhập thì NMV bằng GMV."
-            onSave={(v) => onSaveReturnRate(brand.id, platform, v)}
-          />
-          <ServiceScope
-            key={`scope-${platform}`}
-            platform={platform}
-            scope={reportScopeOf(rates, brand.id, platform)}
-            canEdit={canEdit && !!onSaveServiceScope}
-            onSave={(patch) => onSaveServiceScope!(brand.id, platform, patch)}
-          />
-          {history.length > 0 && (
-            <details className="text-[11px]">
-              <summary className="cursor-pointer font-bold text-[var(--text-muted)] flex items-center gap-1"><History className="w-3 h-3" /> Lịch sử giá ({history.length})</summary>
-              <div className="mt-1.5 space-y-1">
-                {history.map((h) => (
-                  <div key={h.id} className="flex flex-wrap justify-between gap-1 bg-[var(--surface)] border border-[var(--border)] rounded-lg px-2 py-1">
-                    <span className="text-[var(--text-muted)]">{fmtDateVn(h.effectiveFrom)} → {h.effectiveTo ? fmtDateVn(h.effectiveTo) : "nay"}</span>
-                    <span className="text-[var(--text)]">
-                      {fmtVndFull(h.ratePerHour)}/giờ · hoàn {h.returnRate}%{h.commissionRate != null ? ` · ${h.commissionRate}%` : ""}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </details>
-          )}
-        </div>
+            <ServiceScope
+              key={`scope-${platform}`}
+              platform={platform}
+              scope={reportScopeOf(rates, brand.id, platform)}
+              canEdit={canEdit && !!onSaveServiceScope}
+              onSave={(patch) => onSaveServiceScope!(brand.id, platform, patch)}
+            />
+            {history.length > 0 && (
+              <details className="text-[11px]">
+                <summary className="cursor-pointer font-bold text-[var(--text-muted)] flex items-center gap-1"><History className="w-3 h-3" /> Lịch sử giá ({history.length})</summary>
+                <div className="mt-1.5 space-y-1">
+                  {history.map((h) => (
+                    <div key={h.id} className="flex flex-wrap justify-between gap-1 bg-[var(--surface)] border border-[var(--border)] rounded-lg px-2 py-1">
+                      <span className="text-[var(--text-muted)]">{fmtDateVn(h.effectiveFrom)} → {h.effectiveTo ? fmtDateVn(h.effectiveTo) : "nay"}</span>
+                      <span className="text-[var(--text)]">
+                        {fmtVndFull(h.ratePerHour)}/giờ · hoàn {h.returnRate}%{h.commissionRate != null ? ` · ${h.commissionRate}%` : ""}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            )}
+          </div>
+          </>
+        )}
+      </>
+      )}
 
-        {/* 2. Hợp đồng + cam kết */}
-        <div className="bg-[var(--surface-base)]/60 border border-[var(--border)] rounded-xl p-4 space-y-3 lg:col-span-2">
+      <div className="space-y-4">
+        {tab === "contract" && (
+        <>
+        {/* Hợp đồng + cam kết */}
+        <div className="bg-[var(--surface-base)]/60 border border-[var(--border)] rounded-xl p-4 space-y-3">
           <div className="flex items-center justify-between gap-2">
             <h4 className="text-xs font-black text-[var(--text)] flex items-center gap-1.5"><FileSignature className="w-3.5 h-3.5 text-blue-400" /> Hợp đồng {platform}</h4>
             {canEdit && !draft && (
@@ -480,7 +506,7 @@ export const BrandConfigPanel: React.FC<Props> = ({
           )}
 
           {myContracts.length === 0 && !draft ? (
-            <p className="text-[11px] text-[var(--text-faint)]">Chưa có hợp đồng {platform}. Chưa có hợp đồng thì Kế Hoạch Tháng không có giờ cam kết mặc định và Toàn Cảnh Brand không so được giờ đã giao.</p>
+            <p className="text-[11px] text-[var(--text-faint)]">Chưa có hợp đồng {platform}.</p>
           ) : (
             <div className="space-y-1.5">
               {myContracts.map((c) => (
@@ -533,23 +559,47 @@ export const BrandConfigPanel: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* 3. Phòng live mặc định */}
-        <div className="bg-[var(--surface-base)]/60 border border-[var(--border)] rounded-xl p-4 space-y-2 lg:col-span-3">
-          <h4 className="text-xs font-black text-[var(--text)] flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-blue-400" /> Phòng live mặc định ({platform})</h4>
-          <div className="flex flex-wrap items-center gap-3">
-            <select
-              value={studioId}
-              disabled={!canEdit}
-              aria-label={`Phòng live mặc định ${platform}`}
-              onChange={(e) => void onSetBrandStudio(brand.id, platform, e.target.value)}
-              className={`${inputCls} sm:max-w-xs ${studioId ? "" : "border-amber-700"}`}
-            >
-              <option value="">— Chưa chọn phòng —</option>
-              {studios.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.roomNumber})</option>)}
-            </select>
-            <span className="text-[11px] text-[var(--text-faint)]">Chốt Kế Hoạch Tháng gắn phòng này vào ca sinh ra; form mở ca chọn sẵn phòng này.</span>
+        </>
+        )}
+
+        {tab === "fees" && termsAvailable && (
+          <MonthSettlementPanel
+            brand={brand}
+            platform={platform}
+            canEdit={canEdit}
+            today={today}
+            sessions={sessions}
+            rate={rate}
+            contracts={contracts}
+            commitments={commitments}
+            periods={termPeriods}
+            inputs={monthFeeInputs}
+            onInputsChanged={onMonthFeeInputSaved}
+          />
+        )}
+
+        {tab === "people" && (
+          <div className="space-y-4">
+            <ChannelInfo key={channel?.id ?? platform} channel={channel} platform={platform} canEdit={canEdit && !!onUpdateChannel} onSave={(patch) => run(async () => { await onUpdateChannel!(channel!.id, patch); setNote(`Đã lưu kênh ${brand.name} · ${platform}.`); })} />
+            <div className="flex flex-wrap items-center gap-3">
+          <span className="text-xs font-black text-[var(--text)] flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-blue-400" /> Phòng live mặc định</span>
+          <select
+            value={studioId}
+            disabled={!canEdit}
+            aria-label={`Phòng live mặc định ${platform}`}
+            onChange={(e) => void onSetBrandStudio(brand.id, platform, e.target.value)}
+            className={`${inputCls} sm:max-w-xs ${studioId ? "" : "border-amber-700"}`}
+          >
+            <option value="">— Chưa chọn phòng —</option>
+            {studios.map((x) => <option key={x.id} value={x.id}>{x.name} ({x.roomNumber})</option>)}
+          </select>
+            </div>
+            <div className="space-y-2">
+              <p className="text-xs font-black text-[var(--text)] flex items-center gap-1.5"><UserCheck className="w-3.5 h-3.5 text-blue-400" /> Điều khoản về host</p>
+              <TalentRulesPanel brand={brand} talents={talents} rules={talentRules} available={termsAvailable} canEdit={canEdit} onChanged={onTalentRulesChanged} />
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

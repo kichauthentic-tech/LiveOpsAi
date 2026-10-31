@@ -380,6 +380,13 @@ export default function App() {
     setBrandStudios,
     brandChannels,
     setBrandChannels,
+    termsPeriods,
+    setTermsPeriods,
+    termsAvailable,
+    monthFeeInputs,
+    setMonthFeeInputs,
+    talentRules,
+    setTalentRules,
     shiftRegistrations,
     setShiftRegistrations,
     phase14Error,
@@ -1925,6 +1932,7 @@ export default function App() {
                     shiftRegistrations={shiftRegistrations}
                     talents={talents}
                     talentRateHistory={talentRateHistory}
+                    talentRules={talentRules}
                     brandChannels={channels}
                     brandStudios={brandStudios}
                     studios={studios}
@@ -1961,6 +1969,7 @@ export default function App() {
                         sessions={activeSessions}
                         shiftSlots={shiftSlots}
                         rates={brandPlatformRates}
+                        termPeriods={termsPeriods}
                         monthlyReports={monthlyReports}
                         talents={activeTalents}
                         canSeeMoney={currentRole === "ceo" || currentRole === "admin"}
@@ -2185,6 +2194,7 @@ export default function App() {
                     financeRecords={financeRecords}
                     brandPlatformRates={brandPlatformRates}
                     brandPlatformRateHistory={brandPlatformRateHistory}
+                    termPeriods={termsPeriods}
                     talentRateHistory={talentRateHistory}
                   />
                 )}
@@ -2201,6 +2211,7 @@ export default function App() {
                     brandChannels={channels}
                     sessions={activeSessions}
                     brandPlatformRates={brandPlatformRates}
+                    termPeriods={termsPeriods}
                     monthlyReports={monthlyReports}
                     planMonthTotals={planMonthTotals}
                     onReportsChanged={() => {
@@ -2302,6 +2313,7 @@ export default function App() {
                     sessions={platformSessions}
                     currentRole={currentRole}
                     brandPlatformRates={brandPlatformRates}
+                    termPeriods={termsPeriods}
                     shiftSlots={platformSlots}
                     engineParams={engineParams}
                     planMonthTotals={planMonthTotals}
@@ -2432,6 +2444,15 @@ export default function App() {
                     brandStudios={brandStudios}
                     onSetBrandStudio={handleSetBrandStudio}
                     onOpenMonthPlan={(brandId, platform) => openMonthPlanFor(brandId, platform)}
+                    termPeriods={termsPeriods}
+                    termsAvailable={termsAvailable}
+                    onTermsChanged={setTermsPeriods}
+                    sessions={activeSessions}
+                    monthFeeInputs={monthFeeInputs}
+                    onMonthFeeInputSaved={(row) => setMonthFeeInputs((prev) => [...prev.filter((x) => x.id !== row.id), row])}
+                    talents={talents}
+                    talentRules={talentRules}
+                    onTalentRulesChanged={setTalentRules}
                   />
                 )}
 
@@ -2460,6 +2481,7 @@ export default function App() {
                     brandPlatformRates={brandPlatformRates}
                     talentRateHistory={talentRateHistory}
                     brandPlatformRateHistory={brandPlatformRateHistory}
+                    termPeriods={termsPeriods}
                     onUpdateFinance={handleUpdateSessionFinance}
                     onSetFinanceApproval={handleSetSessionFinanceApproval}
                     readOnly={currentRole === "trainer"}
@@ -2476,6 +2498,8 @@ export default function App() {
                     brandPlatformRates={brandPlatformRates}
                     talentRateHistory={talentRateHistory}
                     brandPlatformRateHistory={brandPlatformRateHistory}
+                    termPeriods={termsPeriods}
+                    monthFeeInputs={monthFeeInputs}
                   />
                 )}
 

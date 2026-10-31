@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { defaultViewMonth } from "../lib/defaultMonth";
+import type { TermsPeriod } from "../lib/commercial/terms";
 import {
   LiveSession,
   Talent,
@@ -35,6 +36,8 @@ interface FinanceHrProps {
   brandPlatformRates: BrandPlatformRate[];
   talentRateHistory: TalentRateHistoryEntry[];
   brandPlatformRateHistory: BrandPlatformRateHistoryEntry[];
+  /** Điều khoản hợp tác (0191) — ca nằm trong một giai đoạn điều khoản thì doanh thu tính theo đó. */
+  termPeriods?: TermsPeriod[];
   onUpdateFinance: (
     sessionId: string,
     patch: Partial<Pick<SessionFinance, "studioCost" | "notes">>
@@ -64,6 +67,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
   brandPlatformRates,
   talentRateHistory,
   brandPlatformRateHistory,
+  termPeriods,
   onUpdateFinance,
   onSetFinanceApproval,
   readOnly = false
@@ -126,9 +130,9 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
 
   const rows = useMemo(() => {
     return completedSessions.map((s) =>
-      computeSessionPnl(s, financeBySessionId, talentById, brandById, brandPlatformRates, talentRateHistory, brandPlatformRateHistory)
+      computeSessionPnl(s, financeBySessionId, talentById, brandById, brandPlatformRates, talentRateHistory, brandPlatformRateHistory, termPeriods ?? [])
     );
-  }, [completedSessions, financeBySessionId, talentById, brandById, brandPlatformRates, talentRateHistory, brandPlatformRateHistory]);
+  }, [completedSessions, financeBySessionId, talentById, brandById, brandPlatformRates, talentRateHistory, brandPlatformRateHistory, termPeriods]);
 
   // Luật tiền (WORKSPACE §4.5): chỉ CỘNG ca đủ dữ liệu (missingInputs rỗng) và luôn ghi "tính được X/Y ca". Trước đây tổng
   // cộng cả ca đang tính bằng rate 0 / % hoa hồng mặc định 15% trong code ⇒ 17/10 hiện "576.190.636 (100,0%)" trong khi

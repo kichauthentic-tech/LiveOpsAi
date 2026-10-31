@@ -195,3 +195,22 @@ describe("familiarity + candidates", () => {
     expect(all.save).toBe(3 * 540000);
   });
 });
+
+// ---- Điều khoản về host với brand (0191) ----
+describe("điều khoản về host với brand", () => {
+  const idx = R.buildBrandRuleIndex(
+    [
+      { brandId: "b1", talentId: "x", rule: "blocked" },
+      { brandId: "b2", talentId: "y", rule: "exclusive" },
+      { brandId: "b1", talentId: "z", rule: "preferred" }
+    ],
+    (id) => id.toUpperCase()
+  );
+  test("host brand không nhận / độc quyền brand khác bị báo; host hợp lệ thì không", () => {
+    expect(R.brandRuleViolation(idx, "b1", "x")?.code).toBe("brand_blocked");
+    expect(R.brandRuleViolation(idx, "b1", "y")?.code).toBe("brand_exclusive");
+    expect(R.brandRuleViolation(idx, "b2", "y")).toBeUndefined();
+    expect(R.brandRuleViolation(idx, "b1", "z")).toBeUndefined();
+    expect(R.brandRuleViolation(undefined, "b1", "x")).toBeUndefined();
+  });
+});

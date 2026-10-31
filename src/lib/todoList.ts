@@ -6,6 +6,7 @@ import { platformOf, brandMonthKey, brandPlatformKey, platformIdSuffix, sessionB
 import { profileOf } from "./platforms/profiles";
 import { platformsOfBrand } from "./channels";
 import { brandPriceSet } from "./brandPricing";
+import type { TermsPeriod } from "./commercial/terms";
 import { findPersonClashes } from "./scheduling/conflicts";
 import { draftKeyOf, draftsFromSaved } from "./scheduling/monthPlanGrid";
 import { boostLacksTarget } from "./scheduling/boost";
@@ -64,6 +65,8 @@ export interface TodoInput {
   coverage?: { slotsByPlan: Map<string, BrandMonthPlanSlot[]>; boostByPlan: Map<string, BoostSlot[]> };
   commitments: BrandMonthlyCommitment[];
   rates: BrandPlatformRate[];
+  /** Điều khoản hợp tác (0191): có điều khoản đang chạy thì “đã có giá” xét theo đó. */
+  termPeriods?: TermsPeriod[];
   /** brandMonthKey (brand × tháng × sàn) → dòng report. */
   monthlyReports: Map<string, BrandMonthlyReport>;
   talents: Talent[];
@@ -210,7 +213,7 @@ export function buildTodos(input: TodoInput): Todo[] {
 
     // 6. Giá theo sàn: luật chung `brandPriceSet` (thu theo giờ ⇒ đơn giá/giờ; theo % ⇒ % hoa hồng đã đặt).
     for (const p of platforms) {
-      if (!brandPriceSet(b, input.rates, p)) {
+      if (!brandPriceSet(b, input.rates, p, input.termPeriods ?? [], input.today)) {
         const name = platforms.length > 1 ? `${b.name} ${p}` : b.name;
         out.push({ id: `rate-${b.id}${platformIdSuffix(p)}`, level: "low", title: `${name} chưa có giá`, detail: "Chưa có giá thì Finance & P&L và Dashboard không tính được doanh thu, lợi nhuận.", tab: "crm", rememberBrandId: b.id, rememberPlatform: p, action: "Nhập ở CRM" });
       }

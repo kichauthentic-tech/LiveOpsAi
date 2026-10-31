@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { rememberBrandId } from "../lib/defaultBrand";
 import { requestCrmFocus } from "../lib/crmFocus";
+import type { TermsPeriod } from "../lib/commercial/terms";
 import { brandPriceLabel } from "../lib/brandPricing";
 import { Ban, Clock, Download, LayoutGrid, Loader2, RotateCcw, Send } from "lucide-react";
 import { Brand, BrandChannel, BrandMonthlyReport, BrandMonthPlan, BrandPlatformRate, LiveSession } from "../types";
@@ -49,6 +50,7 @@ interface BrandsOverviewProps {
   brandChannels: BrandChannel[];
   sessions: LiveSession[];
   brandPlatformRates: BrandPlatformRate[];
+  termPeriods?: TermsPeriod[];
   monthlyReports: Map<string, BrandMonthlyReport>;
   /** Để tự tạo bản chụp số liệu (0119) khi phát hành tháng chưa có — không có bản chụp thì brand mở report ra trống. */
   planMonthTotals?: Map<string, number>;
@@ -114,7 +116,7 @@ export function prefetchBrandsOverview(_ctx: TabPrefetchCtx): void {
   commitmentsRead.prefetch();
 }
 
-export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ platform, brands, brandChannels, sessions, brandPlatformRates, monthlyReports, planMonthTotals, onReportsChanged, onNavigate }) => {
+export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ platform, brands, brandChannels, sessions, brandPlatformRates, termPeriods, monthlyReports, planMonthTotals, onReportsChanged, onNavigate }) => {
   const { showToast } = useToast();
   const today = todayVn();
   const [month, setMonth] = useState(today.slice(0, 7));
@@ -175,10 +177,10 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ platform, brands
           reportStatus: (monthlyReports.get(brandMonthKey(b.id, month, p))?.status ?? "none") as BrandMonthlyReport["status"] | "none",
           // Giá theo sàn + cách thu phí (lib/brandPricing.ts — cùng luật với Việc cần làm và P&L). Trước 06/10 chỉ nhìn
           // đơn giá/giờ ⇒ brand thu theo % hoa hồng luôn hiện "Chưa nhập".
-          price: brandPriceLabel(b, brandPlatformRates, p)
+          price: brandPriceLabel(b, brandPlatformRates, p, termPeriods ?? [], today)
         };
       });
-  }, [platform, brands, brandChannels, planStatuses, progressByBrand, sessions, month, today, monthlyReports, brandPlatformRates]);
+  }, [platform, brands, brandChannels, planStatuses, progressByBrand, sessions, month, today, monthlyReports, brandPlatformRates, termPeriods]);
 
   // Tháng đã hết (6 tháng gần nhất) có ca mà report chưa phát hành — bấm tháng để mở bảng của tháng đó.
   const unpublished = useMemo(() => {
@@ -267,6 +269,7 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ platform, brands
         sessions={sessions}
         monthlyReports={monthlyReports}
         brandPlatformRates={brandPlatformRates}
+        termPeriods={termPeriods}
         onNavigate={onNavigate}
       />
 

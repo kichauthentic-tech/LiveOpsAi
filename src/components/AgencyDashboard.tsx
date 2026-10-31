@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { Download, LayoutDashboard } from "lucide-react";
+import type { TermsPeriod } from "../lib/commercial/terms";
 import type { Brand, BrandChannel, BrandPlatformRate, BrandPlatformRateHistoryEntry, LiveSession, SessionFinance, ShiftSlot, Talent, TalentRateHistoryEntry, UserRole } from "../types";
 import { computeSessionPnl } from "../lib/pnl";
 import type { PnlFn } from "../lib/performance/ceoBrief";
@@ -68,6 +69,7 @@ export interface AgencyDashboardProps {
   financeRecords: SessionFinance[];
   brandPlatformRates: BrandPlatformRate[];
   brandPlatformRateHistory: BrandPlatformRateHistoryEntry[];
+  termPeriods?: TermsPeriod[];
   talentRateHistory: TalentRateHistoryEntry[];
 }
 
@@ -145,7 +147,7 @@ export const AgencyDashboard: React.FC<AgencyDashboardProps> = (props) => {
     }));
   }, [loading, cards, platRefs, brandOf]);
 
-  const { talents, financeRecords, brandPlatformRates, brandPlatformRateHistory, talentRateHistory } = props;
+  const { talents, financeRecords, brandPlatformRates, brandPlatformRateHistory, talentRateHistory, termPeriods } = props;
   const canSeeMoney = currentRole === "ceo" || currentRole === "admin";
   const pnl: PnlFn | null = useMemo(() => {
     if (!canSeeMoney) return null;
@@ -153,10 +155,10 @@ export const AgencyDashboard: React.FC<AgencyDashboardProps> = (props) => {
     const talentById = Object.fromEntries(talents.map((t) => [t.id, t]));
     const brandById = Object.fromEntries(brands.map((b) => [b.id, b]));
     return (s: LiveSession) => {
-      const r = computeSessionPnl(s, fin, talentById, brandById, brandPlatformRates, talentRateHistory, brandPlatformRateHistory);
+      const r = computeSessionPnl(s, fin, talentById, brandById, brandPlatformRates, talentRateHistory, brandPlatformRateHistory, termPeriods ?? []);
       return { revenue: r.grossAgencyRev, cost: r.grossAgencyRev - r.netProfit, profit: r.netProfit, missing: r.missingInputs };
     };
-  }, [canSeeMoney, financeRecords, talents, brands, brandPlatformRates, talentRateHistory, brandPlatformRateHistory]);
+  }, [canSeeMoney, financeRecords, talents, brands, brandPlatformRates, talentRateHistory, brandPlatformRateHistory, termPeriods]);
 
   const pickedBrand = brands.find((b) => b.id === brandId) ?? brands[0] ?? null;
   const openBrand = (id: string) => { setBrandId(id); setView("brand"); window.scrollTo({ top: 0, behavior: "smooth" }); };
