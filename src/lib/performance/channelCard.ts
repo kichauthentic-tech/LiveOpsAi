@@ -250,7 +250,7 @@ export function buildChannelCard(x: ChannelCardInput): ChannelCard {
   const l = hasForecast && target ? landingOf(outlook) : null;
   const landing = l && l.pHit != null && l.key !== "no_target" && l.key !== "no_forecast" ? { key: l.key, pHit: l.pHit } : null;
 
-  const plan = hasForecast && target ? handlingPlan({ outlook, today, sessions: x.sessions, camp, slotHours: x.plan?.defaultSlotHours, checkpointCap: x.engineParams.fcCheckpointCap }) : null;
+  const plan = hasForecast && target ? handlingPlan({ outlook, today, sessions: x.sessions, camp, slotHours: x.plan?.defaultSlotHours, checkpointCap: x.engineParams.fcCheckpointCap, reserve: x.plan?.reserveSlots }) : null;
   const need = plan && plan.needRate != null && plan.remainingHours > 0 ? { perHour: plan.needRate, hours: plan.remainingHours, blended: plan.blendedRate } : null;
 
   const pace: CardPace | null = report

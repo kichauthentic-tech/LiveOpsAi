@@ -8,6 +8,7 @@ import type { RebaseItem } from "../scheduling/rebase";
 import type { BoostFillItem } from "../scheduling/boost";
 import { BoostSlot, BrandMonthPlan, BrandMonthPlanSlot, CalendarEventRow, PlanCampRanges, PlanGroupTargets } from "../../types";
 import { platformOf, brandPlatformKey, type ReportPlatform } from "../reportPlatform";
+import { cleanReserve } from "../scheduling/reservePlan";
 
 // Kế Hoạch Tháng (0090). Bảng nhỏ (1 dòng plan + ≤ ~100 ca/brand/tháng) — đọc theo brand+tháng,
 // ghi ca kế hoạch bằng cách thay cả lô (xoá dòng không còn, upsert dòng còn) để UI lưới không phải
@@ -30,6 +31,8 @@ interface DbPlan {
   camp_ranges: PlanCampRanges | null;
   /** 0161 — DB chưa chạy 0161 thì không có cột. */
   group_targets?: PlanGroupTargets | null;
+  /** 0194 — DB chưa chạy 0194 thì không có cột. */
+  reserve_slots?: unknown;
   shop_target_gmv: number | null;
   ads_budget: number | null;
   locked_at: string | null;
@@ -53,6 +56,10 @@ const hhmm = (t: string) => t.slice(0, 5);
 // Có cột group_targets trên DB chưa (0161)? Biết sau lần đọc đầu tiên; chưa biết (null) thì chỉ gửi khi thật sự có target nhóm,
 // để DB chưa chạy 0161 vẫn lưu được kế hoạch như cũ.
 let groupTargetsColumn: boolean | null = null;
+// Cùng cách cho reserve_slots (0194): DB chưa có cột thì không gửi (kế hoạch vẫn lưu được; ca dự phòng chỉ nằm trên trình duyệt).
+let reserveColumn: boolean | null = null;
+/** DB đã có cột ca dự phòng (0194)? null = chưa biết (chưa đọc kế hoạch nào). */
+export const reserveColumnReady = (): boolean | null => reserveColumn;
 
 /** Chỉ giữ khoá hợp lệ với số > 0. */
 export function cleanGroupTargets(g: PlanGroupTargets | null | undefined): PlanGroupTargets {
@@ -79,6 +86,7 @@ const planFromDb = (r: DbPlan): BrandMonthPlan => ({
   targetGmv: Number(r.target_gmv ?? 0),
   campRanges: r.camp_ranges ?? {},
   groupTargets: cleanGroupTargets(r.group_targets),
+  reserveSlots: cleanReserve(r.reserve_slots),
   shopTargetGmv: Number(r.shop_target_gmv ?? 0),
   adsBudget: Number(r.ads_budget ?? 0),
   lockedAt: r.locked_at ?? undefined,
@@ -124,7 +132,10 @@ export async function fetchMonthPlan(
     if (error) throw error;
     return (data ?? []) as (DbPlan & { brand_month_plan_slots: DbPlanSlot[] })[];
   });
-  if (rows.length > 0) groupTargetsColumn = "group_targets" in rows[0];
+  if (rows.length > 0) {
+    groupTargetsColumn = "group_targets" in rows[0];
+    reserveColumn = "reserve_slots" in rows[0];
+  }
   const data = rows.find((r) => platformOf(r) === platform);
   if (!data) return null;
   return { plan: planFromDb(data), slots: (data.brand_month_plan_slots ?? []).map(slotFromDb) };
@@ -137,11 +148,14 @@ export async function fetchPlanStatuses(month: string): Promise<Map<string, Bran
   return new Map((data as DbPlan[]).map((r) => [brandPlatformKey(r.brand_id, r.platform), planFromDb(r)]));
 }
 
-export type PlanSettings = Pick<BrandMonthPlan, "defaultSlotHours" | "liveWindowStart" | "liveWindowEnd" | "maxSlotsPerDay" | "notes" | "blackoutDates" | "targetGmv" | "campRanges" | "groupTargets" | "shopTargetGmv" | "adsBudget">;
+export type PlanSettings = Pick<BrandMonthPlan, "defaultSlotHours" | "liveWindowStart" | "liveWindowEnd" | "maxSlotsPerDay" | "notes" | "blackoutDates" | "targetGmv" | "campRanges" | "groupTargets" | "shopTargetGmv" | "adsBudget" | "reserveSlots">;
 
 export async function upsertMonthPlan(brandId: string, month: string, settings: PlanSettings, platform: ReportPlatform = "TikTok"): Promise<BrandMonthPlan> {
   const groupTargets = cleanGroupTargets(settings.groupTargets);
   const sendGroupTargets = groupTargetsColumn === true || Object.keys(groupTargets).length > 0;
+  const reserve = cleanReserve(settings.reserveSlots);
+  // Đã biết DB thiếu cột (đã đọc kế hoạch, không thấy reserve_slots) thì KHÔNG gửi — không để ca dự phòng chặn việc lưu kế hoạch.
+  const sendReserve = reserveColumn === true || (reserveColumn === null && reserve.length > 0);
   const { data, error } = await supabase
     .from("brand_month_plans")
     .upsert(
@@ -158,6 +172,7 @@ export async function upsertMonthPlan(brandId: string, month: string, settings: 
         target_gmv: settings.targetGmv,
         camp_ranges: settings.campRanges,
         ...(sendGroupTargets ? { group_targets: groupTargets } : {}),
+        ...(sendReserve ? { reserve_slots: reserve } : {}),
         shop_target_gmv: settings.shopTargetGmv > 0 ? settings.shopTargetGmv : null,
         ads_budget: settings.adsBudget > 0 ? settings.adsBudget : null
       },

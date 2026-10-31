@@ -327,7 +327,7 @@ export function activeCheckpoint(list: Checkpoint[], today: string): Checkpoint 
 
 export const BACKTEST_DAYS = [8, 15, 18, 20] as const;
 /** Co giãn giờ dùng cho mô phỏng vòng điều chỉnh (ngày thường CROCS đo 09/10: 0,82). */
-const SIM_ELASTICITY = 0.82;
+export const SIM_ELASTICITY = 0.82;
 
 export interface ForecastFold {
   month: string;

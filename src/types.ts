@@ -746,10 +746,20 @@ export interface BrandMonthPlan {
   shopTargetGmv: number;
   /** Ngân sách Ads của tháng (0146); 0 = chưa đặt. Report Tháng tính % đã dùng. */
   adsBudget: number;
+  /** Ca dự phòng (0194) — nhóm ca "sẵn sàng" ngoài lưới chính, mở dần ở các mốc kiểm nếu dự báo hụt target. Không cộng vào target tháng. */
+  reserveSlots?: ReserveSlot[];
   lockedAt?: string;
   /** Brand đã bấm "xác nhận đã xem lịch" (migration 0110). Tự rớt về undefined nếu ops sửa tham số
    *  kế hoạch hoặc ca kế hoạch SAU khi brand đã xác nhận — xem trigger ở migration, đừng set tay. */
   brandConfirmedAt?: string;
+}
+
+/** Một ca dự phòng của Kế Hoạch Tháng (0194). `expectedGmv` = dự báo engine lúc lập, chỉ để xếp ưu tiên khi chọn ca mở. */
+export interface ReserveSlot {
+  date: string;
+  startTime: string;
+  endTime: string;
+  expectedGmv: number;
 }
 
 export type PlanGroupTargets = Partial<Record<"dday" | "midmonth" | "payday" | "daily", number>>;

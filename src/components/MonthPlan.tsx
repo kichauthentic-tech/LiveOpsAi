@@ -6,7 +6,7 @@ import { commitmentsRead, contractsRead, upsertMonthlyCommitment } from "../lib/
 import type { TabPrefetchCtx } from "../lib/db/prefetch";
 import { loadRememberedBrandId } from "../lib/defaultBrand";
 import { errorMessage } from "../lib/errorMessage";
-import { PlanSettings, calendarEventsRead, deleteMonthPlan, fetchBoostSlots, fetchBrandLockedPlanSlots, fetchMonthPlan, fetchPlanStatuses, fetchRetargetHistory, lockMonthPlan, lockedPlanSlotsRead, monthPlanRead, planStatusesRead, replacePlanSlots, rebaseMonthPlan, setBoostTargets, upsertMonthPlan } from "../lib/db/monthPlans";
+import { PlanSettings, calendarEventsRead, deleteMonthPlan, fetchBoostSlots, fetchBrandLockedPlanSlots, fetchMonthPlan, fetchPlanStatuses, fetchRetargetHistory, lockMonthPlan, lockedPlanSlotsRead, monthPlanRead, planStatusesRead, replacePlanSlots, reserveColumnReady, rebaseMonthPlan, setBoostTargets, upsertMonthPlan } from "../lib/db/monthPlans";
 import { buildCalibration, evaluatePlan } from "../lib/scheduling/planEvaluation";
 import { computeCommitmentProgress, contractCovering, monthCommitmentOf, todayVn } from "../lib/performance/brandCommitment";
 import { useDefaultBrand } from "../hooks/useDefaultBrand";
@@ -35,6 +35,8 @@ import { RetargetBatch } from "../lib/scheduling/retarget";
 import { boostFillItems, boostLacksTarget, summarizeBoost } from "../lib/scheduling/boost";
 import { RebasePlan, RebaseSet, activeDrafts, buildRebase, collectRebase, mergeAllocated } from "../lib/scheduling/rebase";
 import { PlanGroupTargetsBlock } from "./PlanGroupTargets";
+import { ReservePlanPanel } from "./ReservePlanPanel";
+import { reserveKey } from "../lib/scheduling/reservePlan";
 import { PlanMonthGrid, type GridExtra } from "./monthplan/PlanMonthGrid";
 import type { SlotOutcome } from "../lib/scheduling/planWeeks";
 import { HistorySummary, STRATEGY_LABEL, SuggestResult, SuggestStrategy, buildBorrowedHistory, buildHistory, estimateSlots, suggestMonthPlan } from "../lib/scheduling/suggestEngine";
@@ -78,7 +80,7 @@ interface MonthPlanProps {
 }
 
 const fmtH = (n: number) => n.toLocaleString("vi-VN", { maximumFractionDigits: 1 });
-const DEFAULT_SETTINGS: PlanSettings = { defaultSlotHours: 3, liveWindowStart: "09:00", liveWindowEnd: "23:00", maxSlotsPerDay: 3, notes: "", blackoutDates: [], targetGmv: 0, campRanges: {}, groupTargets: {}, shopTargetGmv: 0, adsBudget: 0 };
+const DEFAULT_SETTINGS: PlanSettings = { defaultSlotHours: 3, liveWindowStart: "09:00", liveWindowEnd: "23:00", maxSlotsPerDay: 3, notes: "", blackoutDates: [], targetGmv: 0, campRanges: {}, groupTargets: {}, shopTargetGmv: 0, adsBudget: 0, reserveSlots: [] };
 const CAMP_RANGE_LABEL: Record<keyof PlanCampRanges, string> = { dday: "D-Day", midmonth: "Mid-Month", payday: "Pay Day" };
 
 const nextMonthOf = (month: string, delta: number) => {
@@ -139,6 +141,9 @@ export default function MonthPlan({
   const [settings, setSettings] = useState<PlanSettings>(DEFAULT_SETTINGS);
   const [drafts, setDrafts] = useState<PlanDraftSlot[]>([]);
   const [dirty, setDirty] = useState(false);
+  // Hiện ca dự phòng trên lưới ca (0194) — nhớ lựa chọn theo trình duyệt, mặc định bật.
+  const [showReserve, setShowReserve] = useState(() => { try { return localStorage.getItem("liveops.reserve.onGrid") !== "0"; } catch { return true; } });
+  const toggleReserve = (on: boolean) => { setShowReserve(on); try { localStorage.setItem("liveops.reserve.onGrid", on ? "1" : "0"); } catch { /* không có localStorage: bỏ qua */ } };
   // Cam kết tháng đang gõ dở (chuỗi = đang gõ; null = theo số đã lưu / hợp đồng). Khai báo trước để `leaveDirty` tính cả nó.
   const [commitHoursDraft, setCommitHoursDraft] = useState<string | null>(null);
   const [commitGmvDraft, setCommitGmvDraft] = useState<string | null>(null);
@@ -261,7 +266,7 @@ export default function MonthPlan({
         if (!alive) return;
         if (r) {
           setPlan(r.plan);
-          setSettings({ defaultSlotHours: r.plan.defaultSlotHours, liveWindowStart: r.plan.liveWindowStart, liveWindowEnd: r.plan.liveWindowEnd, maxSlotsPerDay: r.plan.maxSlotsPerDay, notes: r.plan.notes, blackoutDates: r.plan.blackoutDates, targetGmv: r.plan.targetGmv, campRanges: r.plan.campRanges, groupTargets: r.plan.groupTargets, shopTargetGmv: r.plan.shopTargetGmv, adsBudget: r.plan.adsBudget });
+          setSettings({ defaultSlotHours: r.plan.defaultSlotHours, liveWindowStart: r.plan.liveWindowStart, liveWindowEnd: r.plan.liveWindowEnd, maxSlotsPerDay: r.plan.maxSlotsPerDay, notes: r.plan.notes, blackoutDates: r.plan.blackoutDates, targetGmv: r.plan.targetGmv, campRanges: r.plan.campRanges, groupTargets: r.plan.groupTargets, shopTargetGmv: r.plan.shopTargetGmv, adsBudget: r.plan.adsBudget, reserveSlots: r.plan.reserveSlots ?? [] });
           setDrafts(draftsFromSaved(r.slots));
         } else {
           setPlan(null);
@@ -960,9 +965,17 @@ export default function MonthPlan({
       if (used.has(s.id)) continue;
       push({ key: `o-${s.id}`, date: s.date, startTime: s.startTime.slice(0, 5), endTime: s.endTime.slice(0, 5), kind: "offplan", target: null, actual: s.actualGmv ?? 0 });
     }
+    // Ca dự phòng (0194): chỉ hiện khi bật công tắc; ca đã mở thật (cùng ngày + giờ bắt đầu với ca kế hoạch / ca ngoài kế hoạch) thì bỏ.
+    if (showReserve) {
+      const taken = new Set([...drafts.map((d) => `${d.date}|${d.startTime}`), ...[...m.values()].flat().map((x) => `${x.date}|${x.startTime}`)]);
+      for (const r of settings.reserveSlots ?? []) {
+        if (taken.has(`${r.date}|${r.startTime}`)) continue;
+        push({ key: `r-${reserveKey(r)}`, date: r.date, startTime: r.startTime, endTime: r.endTime, kind: "reserve", target: r.expectedGmv > 0 ? r.expectedGmv : null, actual: null });
+      }
+    }
     for (const l of m.values()) l.sort((a, b) => a.startTime.localeCompare(b.startTime));
     return m;
-  }, [offPlan, boostSlots, shiftSlots, locked, plan?.id]);
+  }, [offPlan, boostSlots, shiftSlots, locked, plan?.id, showReserve, settings.reserveSlots, drafts]);
 
   const hoursDelta = planHours > 0 ? totals.hours - planHours : null;
   const targetDelta = targetTotal > 0 ? totals.target - targetTotal : null;
@@ -1248,6 +1261,26 @@ export default function MonthPlan({
           </div>
         )}
       </div>
+
+      <ReservePlanPanel
+        month={month}
+        drafts={drafts}
+        forecast={forecaster ? (slots) => forecastsFor(slots) : null}
+        targetTotal={targetTotal}
+        camp={campRanges}
+        slotHours={settings.defaultSlotHours}
+        windowStart={settings.liveWindowStart}
+        windowEnd={settings.liveWindowEnd}
+        maxSlotsPerDay={settings.maxSlotsPerDay}
+        blackoutDates={settings.blackoutDates}
+        cap={engineParams.fcCheckpointCap}
+        reserve={settings.reserveSlots ?? []}
+        onChange={(next) => { setSettings((s) => ({ ...s, reserveSlots: next })); setDirty(true); }}
+        editable={editable}
+        columnMissing={reserveColumnReady() === false}
+        showOnGrid={showReserve}
+        onToggleGrid={toggleReserve}
+      />
 
       {needsTarget && !retargetOpen && (
         <div className="rounded-2xl border border-[var(--accent)]/60 bg-[var(--accent)]/10 p-3 flex flex-wrap items-center gap-3 text-xs" data-testid="needs-target">
@@ -1542,6 +1575,7 @@ export default function MonthPlan({
         onRemove={(key) => void remove(key)}
         onAdd={addForDay}
         onToggleBlackout={(day) => void toggleBlackout(day)}
+        onRemoveReserve={editable ? (key) => { setSettings((st) => ({ ...st, reserveSlots: (st.reserveSlots ?? []).filter((r) => `r-${reserveKey(r)}` !== key) })); setDirty(true); } : undefined}
       />
 
       {locked && (unsynced > 0 || dirty) && (

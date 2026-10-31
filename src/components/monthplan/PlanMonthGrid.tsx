@@ -18,7 +18,7 @@ export interface GridExtra {
   date: string;
   startTime: string;
   endTime: string;
-  kind: "boost" | "offplan";
+  kind: "boost" | "offplan" | "reserve";
   /** Target đề xuất của ca tăng cường (không cộng vào target tháng); null = ca ngoài kế hoạch, không có target. */
   target: number | null;
   actual: number | null;
@@ -48,6 +48,8 @@ interface Props {
   onRemove: (key: string) => void;
   onAdd: (day: string) => void;
   onToggleBlackout: (day: string) => void;
+  /** Bỏ một ca dự phòng (key của GridExtra kind "reserve"); thiếu = chip chỉ đọc. */
+  onRemoveReserve?: (key: string) => void;
 }
 
 const WEEKDAY_LABELS = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
@@ -142,7 +144,7 @@ function DayCell({ day, p, onEdit, editingKey }: { day: string; p: Props; onEdit
       {label && <div className="text-[11px] text-[var(--accent-text)] truncate" title={label}>{label}</div>}
       {isBlackout && <div className="text-[11px] text-rose-400 font-bold">cấm live</div>}
       {list.map((d) => <SlotChip key={d.key} d={d} p={p} active={d.key === editingKey} onEdit={onEdit} />)}
-      {extras.map((x) => <ExtraChip key={x.key} x={x} />)}
+      {extras.map((x) => <ExtraChip key={x.key} x={x} onRemoveReserve={p.onRemoveReserve} />)}
       {!past && !isBlackout && list.length < p.maxSlotsPerDay && (
         <button onClick={() => p.onAdd(day)} className="mt-auto min-h-6 text-[11px] font-bold text-[var(--text-faint)] hover:text-[var(--accent-text)] flex items-center justify-center gap-1 border border-dashed border-[var(--border)] rounded-lg" aria-label={`Thêm ca ngày ${Number(day.slice(-2))}`}>
           <Plus className="w-3 h-3" /> ca
@@ -198,7 +200,18 @@ function SlotChip({ d, p, active, onEdit }: { d: PlanDraftSlot; p: Props; active
   );
 }
 
-function ExtraChip({ x }: { x: GridExtra }) {
+function ExtraChip({ x, onRemoveReserve }: { x: GridExtra; onRemoveReserve?: (key: string) => void }) {
+  if (x.kind === "reserve") {
+    return (
+      <div title={`Ca dự phòng ${x.startTime}–${x.endTime}${x.target ? ` (dự báo ≈ ${fmtVndShort(x.target)})` : ""}. Chưa phải ca thật: chỉ mở khi tới mốc kiểm mà dự báo hụt target. Không cộng vào target tháng.`} className="w-full min-h-6 flex items-center justify-between gap-1 rounded-md border border-dashed border-amber-500/70 px-1.5 text-[11px] tabular-nums bg-amber-400/10">
+        <span className="text-amber-300">{hm(x.startTime)}–{hm(x.endTime)} dự phòng</span>
+        <span className="flex items-center gap-1 text-amber-200">
+          {x.target ? fmtVndShort(x.target) : ""}
+          {onRemoveReserve && <button onClick={() => onRemoveReserve(x.key)} aria-label={`Bỏ ca dự phòng ${x.startTime}`} className="hover:text-rose-400">×</button>}
+        </span>
+      </div>
+    );
+  }
   const ok = x.actual !== null && x.target !== null && x.actual >= x.target;
   const title =
     x.kind === "boost"
