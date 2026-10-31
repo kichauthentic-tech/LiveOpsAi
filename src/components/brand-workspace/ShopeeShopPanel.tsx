@@ -54,11 +54,11 @@ function summaryOf(kind: ShopeeShopKind, rows: Rows): string | null {
   if (kind === "shopee_shop_stats") {
     const d = shopeeShopData(rows);
     if (!d) return null;
-    return `${d.days.length} ngày · Total ${fmtVndShort(d.placed)} · xác nhận ${fmtVndShort(d.confirmed)}${d.channels ? ` · LIVE ${pct(d.channels.live, d.channels.total)}` : ""}`;
+    return `${d.days.length} ngày · ${SHOPEE_SHOP.totalSales} ${fmtVndShort(d.placed)} · ${SHOPEE_SHOP.salesConfirmed.toLowerCase()} ${fmtVndShort(d.confirmed)}${d.channels ? ` · ${SHOPEE_SHOP.sellerLive.toLowerCase()} ${pct(d.channels.live, d.channels.total)}` : ""}`;
   }
   if (kind === "shopee_voucher") {
     const t = rows.find((r) => r.t === "total");
-    return t ? `${rows.filter((r) => r.t === "voucher").length} mã · doanh số ${fmtVndShort(num(t.sales))} · chi phí ${fmtVndShort(num(t.cost))}` : null;
+    return t ? `${rows.filter((r) => r.t === "voucher").length} mã giảm giá · doanh số ${fmtVndShort(num(t.sales))} · ${SHOPEE_SHOP.cost.toLowerCase()} ${fmtVndShort(num(t.cost))}` : null;
   }
   if (kind === "shopee_discount") {
     const t = rows.find((r) => r.t === "type" && r.type === "Tất cả");
