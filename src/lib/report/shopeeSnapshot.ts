@@ -6,7 +6,7 @@ import type { DataRawImportStamp } from "../db/brandDataRaw";
 import type { SectionInsight } from "./sectionInsights";
 import { fmtVndShort } from "../format";
 import { METRIC } from "../metricGlossary";
-import type { ShopeeAdsStats } from "../dataraw/shopeeAds";
+import { hasShopeeAds, shopeeAdsTotals, type ShopeeAdsStats, type ShopeeAdsSuite } from "../dataraw/shopeeAds";
 import { PLATFORM_PROFILES } from "../platforms/profiles";
 import { platformOf } from "../reportPlatform";
 
@@ -116,6 +116,8 @@ export interface ShopeeReportSnapshot {
   plan: { sessions: number; hours: number; completed: number };
   /** Ads Shopee Live của tháng (bản 2) — null = chưa có file Ads. Thiếu hẳn (bản chụp bản 1) = chưa đọc Ads. */
   ads?: { expense: number; gmv: number; orders: number; roas: number | null; costPerOrder: number | null; campaigns: number; shopName: string | null } | null;
+  /** 3 loại Ads của tháng (31/10, Franklin whole shop): Livestream Ads + Shop+ Ads + Product Ads, mỗi loại null = chưa tải file. Thiếu hẳn = bản chụp cũ. `ads` ở trên giữ phần Livestream Ads. */
+  adsSuite?: ShopeeAdsSuite | null;
   /** Khuyến mãi từ file overview (bản 2): xu khách nhận (1 xu = 1đ), voucher shop / voucher live đã nhận. */
   promo?: { coins: number; vouchers: number; liveVouchers: number } | null;
   quality: DataQuality;
@@ -193,6 +195,8 @@ export interface ShopeeSnapshotInput {
   stamps: string[];
   /** File Ads Shopee của tháng (0142) — null = chưa tải. */
   ads?: ShopeeAdsStats | null;
+  /** Shop+ Ads / Product Ads của tháng (0192) — null = chưa tải. */
+  adsSuite?: ShopeeAdsSuite | null;
   /** Khung camp của Kế Hoạch Tháng Shopee (effectiveCamp) — thiếu/rỗng = lịch cố định. */
   campOverrides?: CampOverrides | null;
   /** Live List các tháng trước (cũ → mới) + khung camp của từng tháng. */
@@ -381,6 +385,7 @@ export function buildShopeeSnapshot(input: ShopeeSnapshotInput): ShopeeReportSna
     ads: input.ads
       ? { expense: input.ads.expense, gmv: input.ads.gmv, orders: input.ads.orders, roas: input.ads.roas, costPerOrder: input.ads.costPerOrder, campaigns: input.ads.campaigns.length, shopName: input.ads.shopName }
       : null,
+    adsSuite: input.adsSuite && hasShopeeAds(input.adsSuite) ? input.adsSuite : null,
     promo: overview ? { coins: overview.coinsClaimed, vouchers: overview.voucherClaimed, liveVouchers: overview.specialVoucherClaimed } : null,
     quality: dataQuality(completed),
     appGmv,
@@ -408,7 +413,10 @@ export function shopeeInsights(s: ShopeeReportSnapshot): Record<ShopeeSection, S
       headline = `GMV Shopee ${fmtM(h.gmv)}, ${d >= 0 ? "tăng" : "giảm"} ${pct(Math.abs(d))} so với tháng trước (${fmtM(s.prev.gmv)}).`;
       if (s.prev.gmvPerHour && h.gmvPerHour) points.push(`GMV/giờ live ${h.gmvPerHour >= s.prev.gmvPerHour ? "tăng" : "giảm"} ${pct(Math.abs((h.gmvPerHour / s.prev.gmvPerHour - 1) * 100))} so với tháng trước.`);
     }
-    if (s.ads && s.ads.expense > 0) {
+    if (hasShopeeAds(s.adsSuite) && (s.adsSuite!.shop || s.adsSuite!.product)) {
+      const t = shopeeAdsTotals(s.adsSuite!);
+      points.push(`Ads Shopee (${[s.adsSuite!.live && "Livestream", s.adsSuite!.shop && "Shop+", s.adsSuite!.product && "Product"].filter(Boolean).join(" + ")}): ${METRIC.expense} ${fmtM(t.expense)}, doanh số ghi nhận ${fmtM(t.gmv)} (${METRIC.roas} ${t.roas != null ? t.roas.toLocaleString("vi-VN", { maximumFractionDigits: 1 }) : "—"}x, đơn trực tiếp ${t.roasDirect != null ? t.roasDirect.toLocaleString("vi-VN", { maximumFractionDigits: 1 }) : "—"}x).`);
+    } else if (s.ads && s.ads.expense > 0) {
       points.push(`Ads Shopee Live: ${METRIC.expense} ${fmtM(s.ads.expense)}, GMV từ Ads ${fmtM(s.ads.gmv)} (${METRIC.roas} ${s.ads.roas != null ? s.ads.roas.toLocaleString("vi-VN", { maximumFractionDigits: 1 }) : "—"}x)${s.ads.costPerOrder != null ? `, ${fmtM(s.ads.costPerOrder)}/${METRIC.orders}` : ""} — GMV từ Ads chiếm ${pct((s.ads.gmv / h.gmv) * 100)} GMV live.`);
     }
     if (s.promo && s.promo.coins > 0) points.push(`${METRIC.coinsClaimed} ${s.promo.coins.toLocaleString("vi-VN")} (≈ ${fmtM(s.promo.coins)}, ${pct((s.promo.coins / h.gmv) * 100, 2)} GMV).`);
@@ -488,7 +496,7 @@ export function shopeeNotes(s: ShopeeReportSnapshot, audience: "brand" | "ops" =
     }
     if (s.unassigned && s.unassigned.sessions > 0) n.push(`${s.unassigned.sessions} ca chưa gán host (${fmtM(s.unassigned.gmv)} GMV) không nằm trong xếp hạng.`);
     if (!s.campFromPlan) n.push("Tháng này chưa có khung campaign ở Kế Hoạch Tháng Shopee — loại ngày đang theo lịch cố định.");
-    if (s.ads === null) n.push("Chưa có file Ads Shopee của tháng (tải ở Nhập Ads, chọn sàn Shopee) — report chưa có chi phí Ads.");
+    if (s.ads === null && !hasShopeeAds(s.adsSuite)) n.push("Chưa có file Ads Shopee của tháng (tải ở Nhập Ads, chọn sàn Shopee) — report chưa có chi phí Ads.");
     return n;
   }
   const n: string[] = [];
@@ -498,7 +506,8 @@ export function shopeeNotes(s: ShopeeReportSnapshot, audience: "brand" | "ops" =
       ? "Loại ngày campaign theo khung campaign đã thống nhất trong kế hoạch tháng."
       : "Loại ngày campaign theo lịch cố định (D-Day = ngày trùng tháng và 2 ngày trước, Mid-Month 13–15, Pay Day 23–25)."
   );
-  if (s.ads) n.push(`Ads lấy từ file "Shopee Live Ads Report"${s.ads.shopName ? ` của shop ${s.ads.shopName}` : ""}: ${s.ads.campaigns} chiến dịch, tổng cả tháng — Shopee không cho số theo ngày nên không tách ROAS theo loại ngày. GMV trong file Ads là một phần của GMV live, không cộng thêm.`);
+  if (hasShopeeAds(s.adsSuite) && (s.adsSuite!.shop || s.adsSuite!.product)) n.push("Ads lấy từ file Seller Centre (Livestream Ads, Shop+ Ads, Product Ads), tổng cả tháng theo chiến dịch/sản phẩm — Shopee không cho số theo ngày nên không tách ROAS theo loại ngày. Doanh số của Shop+ và Product Ads có thể trùng đơn với nhau, và là một phần GMV của shop, không cộng thêm vào GMV live.");
+  else if (s.ads) n.push(`Ads lấy từ file "Livestream Ads"${s.ads.shopName ? ` của shop ${s.ads.shopName}` : ""}: ${s.ads.campaigns} chiến dịch, tổng cả tháng — Shopee không cho số theo ngày nên không tách ROAS theo loại ngày. GMV trong file Ads là một phần của GMV live, không cộng thêm.`);
   if (s.promo) n.push("Coins Claimed và voucher (Shop Voucher Claimed, Special Live Voucher Claimed) lấy từ file overview: Shopee chỉ cho số lượng đã nhận; mỗi xu quy ra 1 đồng, chưa biết xu do shop hay Shopee tài trợ.");
   n.push("Tên chỉ số trong report này lấy đúng tên cột file Shopee (Viewers, Views, ATC, ABS, GPM…). Shopee không có GMV trực tiếp/gián tiếp, LIVE impressions, CTOR hay bảng chấm KPI theo nhóm (video, KOL). Viewers là người xem riêng biệt, không cùng cách đếm với Views của TikTok; GPM của Shopee tính trên Views, không phải Viewers.");
   return n;
@@ -526,7 +535,7 @@ export function shopeeStampsFor(imports: DataRawImportStamp[], month: string): s
   const start = `${month}-01`;
   const end = `${month}-31`;
   return imports
-    .filter((i) => ([...SHOPEE_FILE_TYPES, "shopee_ads"] as string[]).includes(i.reportType) && !!i.periodStart && !!i.periodEnd && i.periodStart <= end && i.periodEnd >= start)
+    .filter((i) => ([...SHOPEE_FILE_TYPES, "shopee_ads", "shopee_shop_ads", "shopee_product_ads"] as string[]).includes(i.reportType) && !!i.periodStart && !!i.periodEnd && i.periodStart <= end && i.periodEnd >= start)
     .map((i) => `${i.id}@${i.importedAt}`)
     .sort();
 }

@@ -7,6 +7,8 @@ import { fmtInt } from "./report/format";
 import { PageHead, PagePager, PageRail, type PageMetric } from "./report/ui";
 import { DemoHead as WhyHead, DemoInsight, type DemoKpi as WhyKpi } from "./report/DemoShopWhy";
 import { DemoHead, DemoLegend, DemoPage, DemoPanel, DemoStack, DemoTable, Html } from "./report/DemoBlocks";
+import { ShopeeAdsPage, shopeeAdsMetrics } from "./report/ShopeeAdsPage";
+import { hasShopeeAds } from "../../lib/dataraw/shopeeAds";
 import { SummaryDemoPage } from "./report/DemoSummaryPages";
 import { ProductsPageBody, productsKpis, type ProductsPageData } from "./report/ProductsPage";
 import { HostPageBody, hostKpis, type HostPageData } from "./report/HostPage";
@@ -366,6 +368,8 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
 
   // ---- Trang hiện (cùng luật report TikTok): trang không có số thì ẩn với brand, ops vẫn thấy kèm lời nhắc tải file.
   const cancel = useMemo(() => shopeeCancelMonths(pm), [pm]);
+  const fullAds = hasShopeeAds(s.adsSuite) && !!(s.adsSuite!.shop || s.adsSuite!.product);
+  const missingAds = [!s.adsSuite?.live && !s.ads && "Livestream Ads", !s.adsSuite?.shop && "Shop+ Ads", !s.adsSuite?.product && "Product Ads"].filter(Boolean) as string[];
   const shown: Record<ShopeePageId, boolean> = {
     summary: true,
     keymetrics: true,
@@ -373,7 +377,7 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
     why: true,
     products: canManage || s.products.count > 0 || !!s.promo,
     people: true,
-    ads: scope.ads && (canManage || !!s.ads),
+    ads: scope.ads && (canManage || !!s.ads || hasShopeeAds(s.adsSuite)),
     next: true
   };
   const visible = PAGES.filter((p) => shown[p.id]);
@@ -799,7 +803,9 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
               title={secTitle("ads")}
               headline={heads.ads}
               metrics={
-                s.ads
+                fullAds
+                  ? shopeeAdsMetrics(s.adsSuite!)
+                  : s.ads
                   ? [
                       { label: METRIC.expense, value: fmtVndShort(s.ads.expense), note: `${s.ads.campaigns} chiến dịch Live Ads` },
                       { label: METRIC.roas, value: s.ads.roas != null ? `${fmtFixed(s.ads.roas, 1)}x` : "—", note: `GMV từ Ads ${fmtVndShort(s.ads.gmv)}` },
@@ -808,14 +814,20 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
                   : []
               }
             />
-            {s.ads ? (
-              <DemoPanel title="Shopee Live Ads (cả tháng)" sub="File Shopee Live Ads Report — tổng cả tháng theo chiến dịch. Shopee không cho số theo ngày nên chưa tách ROAS theo loại ngày.">
+            {fullAds ? (
+              <>
+                <ShopeeAdsPage ads={s.adsSuite!} />
+                {canManage && missingAds.length > 0 && warnBox(<>Chưa có file {missingAds.join(", ")} của tháng trong bản chụp này. Brand có chạy loại Ads đó: tải ở Nhập Ads (sàn Shopee) rồi bấm Cập nhật số liệu.</>)}
+              </>
+            ) : s.ads ? (
+              <DemoPanel title="Shopee Live Ads (cả tháng)" sub="File Livestream Ads — tổng cả tháng theo chiến dịch. Shopee không cho số theo ngày nên chưa tách ROAS theo loại ngày.">
                 <DemoTable
                   html={tbl(
                     [METRIC.expense, "GMV từ Ads", "% GMV live", METRIC.roas, METRIC.orders, `${METRIC.expense}/${METRIC.orders}`],
                     [[fmtVndFull(s.ads.expense), fmtVndFull(s.ads.gmv), h.gmv > 0 ? pct((s.ads.gmv / h.gmv) * 100) : "—", s.ads.roas != null ? `${fmtFixed(s.ads.roas, 1)}x` : "—", fmtInt(s.ads.orders), s.ads.costPerOrder != null ? fmtVndFull(s.ads.costPerOrder) : "—"]]
                   )}
                 />
+                {canManage && missingAds.length > 0 && warnBox(<>Bản chụp chỉ có file Livestream Ads. Nếu brand còn chạy {missingAds.join(", ")}: tải ở Nhập Ads (sàn Shopee) rồi bấm Cập nhật số liệu.</>)}
               </DemoPanel>
             ) : (
               canManage && warnBox(<>Chưa có file Ads Shopee tháng {month.slice(5)}/{month.slice(0, 4)} trong bản chụp này. Brand có chạy Ads: tải file ở Nhập Ads (sàn Shopee) rồi bấm Cập nhật số liệu. Không chạy Ads thì bỏ qua — brand không thấy dòng này.</>)

@@ -89,6 +89,7 @@ export const METRIC = {
   refundRate: "Refund rate",
   returnCancelRate: "Tỷ lệ hoàn hủy",
   roas: "ROAS",
+  acos: "ACOS", // Shopee Ads: chi phí ÷ doanh số từ Ads
   adsCost: "Ads cost",
   share: "Tỷ trọng"
 } as const;
@@ -181,6 +182,7 @@ export const METRIC_HINT: Record<string, string> = {
   [METRIC.expense]: "Shopee Live Ads — Expense: chi phí chiến dịch trong kỳ",
   [METRIC.refundRate]: "Refunds ÷ GMV — hoàn tiền thực tế của shop trong kỳ",
   [METRIC.returnCancelRate]: "Tỷ lệ hoàn hủy giả định nhập ở CRM (Hợp đồng & giá), dùng để ước tính NMV",
+  [METRIC.acos]: "Shopee Ads — ACOS: Expense ÷ doanh số từ Ads (nghịch đảo của ROAS)",
   [METRIC.roas]: "GMV ÷ Ads cost (Shopee Live Ads: GMV ÷ Expense)",
   [METRIC.share]: "Phần trăm trên tổng"
 };

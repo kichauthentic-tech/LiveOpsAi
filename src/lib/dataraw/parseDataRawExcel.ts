@@ -2,7 +2,7 @@ import { DataRawColumn, DataRawReportType } from "../../types";
 import { buildProductListAgg } from "./productListAgg";
 import { parseAdsCampaignOverview } from "./adsCampaignOverview";
 import { parseCsvRows, parseShopeeRows, type ShopeeFileType } from "./shopeeFiles";
-import { parseShopeeAdsRows } from "./shopeeAds";
+import { detectShopeeAdsKind, parseShopeeAdsRows, parseShopeeProductAdsRows, parseShopeeShopAdsRows, type ShopeeAdsKind } from "./shopeeAds";
 
 // Parser cho module Dataraw Brand Workspace (migration 0052) — 4 report Excel export tay từ
 // TikTok Shop Seller Center, mỗi loại có layout khác nhau (xem sample thật đã xem trong phiên
@@ -270,6 +270,8 @@ export async function parseDataRawExcel(file: File, reportType: DataRawReportTyp
     case "shopee_daily":
     case "shopee_overview": return parseShopeeRows(rows, reportType as ShopeeFileType);
     case "shopee_ads": return parseShopeeAdsRows(rows);
+    case "shopee_shop_ads": return parseShopeeShopAdsRows(rows);
+    case "shopee_product_ads": return parseShopeeProductAdsRows(rows);
     case "shop_promotion": return parseShopPromotion(rows);
     case "product_list": return parseProductList(rows);
     case "live_analysis":
@@ -279,4 +281,14 @@ export async function parseDataRawExcel(file: File, reportType: DataRawReportTyp
     case "creator_live_performance": return parseCreatorLivePerformance(rows);
     case "ads_campaign_overview": return parseAdsCampaignOverview(rows);
   }
+}
+
+/** File Ads Shopee: tự nhận 1 trong 3 loại theo tên cột rồi đọc — để thả cả 3 file vào một ô (Franklin có đủ 3 loại Ads). */
+export async function parseShopeeAdsAuto(file: File): Promise<{ kind: ShopeeAdsKind; parsed: ParsedDataRawImport }> {
+  const buf = await file.arrayBuffer();
+  const rows = /\.csv$/i.test(file.name) ? parseCsvRows(new TextDecoder("utf-8").decode(buf)) : await readSheetRows(buf);
+  const kind = detectShopeeAdsKind(rows);
+  if (!kind) throw new Error(`"${file.name}" không phải 1 trong 3 file Ads Shopee (Livestream Ads, Shop+ Ads, Product Ads). Tải ở Seller Centre → Quảng cáo Shopee → xuất dữ liệu.`);
+  const parsed = kind === "shopee_ads" ? parseShopeeAdsRows(rows) : kind === "shopee_shop_ads" ? parseShopeeShopAdsRows(rows) : parseShopeeProductAdsRows(rows);
+  return { kind, parsed };
 }

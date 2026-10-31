@@ -12,6 +12,8 @@ import type { ScoreRow } from "./brandReport";
 import type { SkuRankSlice } from "../dataraw/monthlyProductSlice";
 import type { SessionSpread } from "./rhythm";
 import type { CampDayBucket } from "../campaignDays";
+import { hasShopeeAds } from "../dataraw/shopeeAds";
+import { shopeeAdsHeadline, shopeeAdsSuiteBlocks } from "./shopeeAdsInsight";
 import { monthDays, type ShopeeReportSnapshot, type ShopeeStreamRow } from "./shopeeSnapshot";
 
 // Report Tháng SHOPEE theo khung trang của report TikTok (29/10/2026, làm lại tối 29/10 cho trùng TikTok): Tổng quan & KPI → Key Metrics
@@ -692,6 +694,7 @@ export function shopeeHeadlines(s: ShopeeReportSnapshot, p: ShopeePageModel, blo
   const gph = kmCell(km, "gmvPerHour")?.changes[last] ?? null;
   const worst = p.drivers ? [...p.drivers.parts].filter((d) => d.key !== "hours").sort((a, b) => a.value - b.value)[0] : null;
   if (p.drivers && worst && worst.value < 0 && gph != null) out.why = `${METRIC.gmvPerHour} ${signed(gph)}: yếu tố hiệu suất kéo giảm nhiều nhất là ${SHOPEE_FACTOR_LABEL[worst.key]} (${signed(worst.change)}, ${worst.value >= 0 ? "+" : "−"}${money(Math.abs(worst.value))})`;
+  if (s.adsSuite && hasShopeeAds(s.adsSuite) && (s.adsSuite.shop || s.adsSuite.product)) out.ads = shopeeAdsHeadline(s.adsSuite) ?? out.ads;
   return out;
 }
 
@@ -713,6 +716,7 @@ export function shopeeCancelBlocks(cancel: ShopeeCancelMonth[]): InsightBlocks {
 export const shortName = (name: string, n = 56) => (name.length <= n ? name : `${name.slice(0, name.lastIndexOf(" ", n) > n * 0.6 ? name.lastIndexOf(" ", n) : n)}…`);
 
 export function shopeeAdsBlocks(s: ShopeeReportSnapshot): InsightBlocks {
+  if (s.adsSuite && (s.adsSuite.shop || s.adsSuite.product) && hasShopeeAds(s.adsSuite)) return shopeeAdsSuiteBlocks(s.adsSuite);
   const a = s.ads;
   const g = s.headline.gmv;
   if (!a) return SHOPEE_EMPTY_BLOCKS;

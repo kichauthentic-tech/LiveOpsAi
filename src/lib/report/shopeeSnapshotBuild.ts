@@ -1,7 +1,7 @@
 import type { LiveSession } from "../../types";
 import { fetchOverlappingBatchRows } from "../dataraw/monthlyProductSlice";
 import { readShopeeDays, readShopeeOverview, readShopeeProducts, readShopeeStreams } from "../dataraw/shopeeFiles";
-import { shopeeAdsStats } from "../dataraw/shopeeAds";
+import { shopeeAdsStats, shopeeProductAdsGroup, shopeeSearchAdsGroup } from "../dataraw/shopeeAds";
 import { fetchDataRawImportStamps } from "../db/brandDataRaw";
 import { fetchMonthlyReportSnapshot } from "../db/monthlyReportSnapshots";
 import { buildShopeeSnapshot, shopeeStampsFor, type ShopeeHeadline, type ShopeeReportSnapshot } from "./shopeeSnapshot";
@@ -33,12 +33,14 @@ export async function buildShopeeReportSnapshot(input: { brandId: string; month:
   const { brandId, month, sessions } = input;
   const start = `${month}-01`;
   const end = `${month}-31`;
-  const [live, daily, products, overview, ads, imports, prevStored, plan] = await Promise.all([
+  const [live, daily, products, overview, ads, shopAds, productAds, imports, prevStored, plan] = await Promise.all([
     fetchOverlappingBatchRows(brandId, "shopee_live_list", start, end),
     fetchOverlappingBatchRows(brandId, "shopee_daily", start, end),
     fetchOverlappingBatchRows(brandId, "shopee_product_list", start, end),
     fetchOverlappingBatchRows(brandId, "shopee_overview", start, end),
     fetchOverlappingBatchRows(brandId, "shopee_ads", start, end),
+    fetchOverlappingBatchRows(brandId, "shopee_shop_ads", start, end),
+    fetchOverlappingBatchRows(brandId, "shopee_product_ads", start, end),
     fetchDataRawImportStamps(brandId),
     fetchMonthlyReportSnapshot(brandId, prevMonthOf(month), "Shopee").catch(() => null),
     // Khung camp của Kế Hoạch Tháng Shopee — cùng nguồn với report TikTok (effectiveCamp), không đọc lịch cố định khi đã có kế hoạch.
@@ -63,6 +65,11 @@ export async function buildShopeeReportSnapshot(input: { brandId: string; month:
     files: { live: live.hasAnyBatch, daily: daily.hasAnyBatch, products: products.hasAnyBatch, overview: overview.hasAnyBatch },
     prev,
     ads: ads.hasAnyBatch ? shopeeAdsStats(ads.rows) : null,
+    adsSuite: {
+      live: ads.hasAnyBatch ? shopeeAdsStats(ads.rows) : null,
+      shop: shopAds.hasAnyBatch ? shopeeSearchAdsGroup(shopAds.rows) : null,
+      product: productAds.hasAnyBatch ? shopeeProductAdsGroup(productAds.rows) : null
+    },
     campOverrides: effectiveCamp(plan?.plan.campRanges),
     history,
     prevProducts: prevProductRows?.hasAnyBatch ? readShopeeProducts(prevProductRows.rows) : null,
