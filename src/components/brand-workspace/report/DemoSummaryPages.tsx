@@ -58,8 +58,13 @@ export interface SummaryDemoProps {
   gmvLabel?: string;
   /** Có thì trang dựng theo kiểu "Tổng quan cả shop" (4 ô + GMV theo kênh + target theo loại ngày); vắng (Shopee) thì giữ bố cục cũ. */
   channels?: { throughDay: number; cur: ChannelSplit; prev: ChannelSplit | null };
+  /** Tên kênh theo sàn (Shopee dùng đúng chữ Seller Centre); vắng = tên TikTok. */
+  channelNames?: ChannelNames;
   insight: React.ReactNode;
 }
+
+export interface ChannelNames { total: string; live: string; sellerLive: string; affiliateLive: string; video: string; card: string }
+const TIKTOK_CHANNEL_NAMES: ChannelNames = { total: METRIC.totalGmv, live: "LIVE", sellerLive: CHANNEL.sellerLive, affiliateLive: CHANNEL.affiliateLive, video: CHANNEL.video, card: CHANNEL.productCard };
 
 /** GMV cả shop và 4 kênh của một kỳ (cùng ngày trong tháng) — lib/report/monthlyReportInsights.ts ChannelMix. */
 export interface ChannelSplit {
@@ -72,12 +77,12 @@ export interface ChannelSplit {
 
 const CH_COLOR = { sellerLive: "#e0b43c", affiliate: "#d95926", video: "#199e70", card: "#3987e5" };
 
-const ChannelDonut: React.FC<{ parts: { color: string; v: number }[]; total: number; center: string }> = ({ parts, total, center }) => {
+const ChannelDonut: React.FC<{ parts: { color: string; v: number }[]; total: number; center: string; label: string }> = ({ parts, total, center, label }) => {
   const R = 62;
   const C = 2 * Math.PI * R;
   let acc = 0;
   return (
-    <svg viewBox="0 0 160 160" width="160" height="160" role="img" aria-label="GMV cả shop theo kênh" style={{ flex: "none" }}>
+    <svg viewBox="0 0 160 160" width="160" height="160" role="img" aria-label={`${label} theo kênh`} style={{ flex: "none" }}>
       <circle cx="80" cy="80" r={R} fill="none" stroke="var(--line)" strokeWidth="22" />
       {parts.map((s, i) => {
         const len = total > 0 ? (s.v / total) * C : 0;
@@ -85,7 +90,7 @@ const ChannelDonut: React.FC<{ parts: { color: string; v: number }[]; total: num
         acc += len;
         return el;
       })}
-      <text x="80" y="76" textAnchor="middle" fontSize="11" fill="var(--muted)">{METRIC.totalGmv}</text>
+      <text x="80" y="76" textAnchor="middle" fontSize="11" fill="var(--muted)">{label}</text>
       <text x="80" y="96" textAnchor="middle" fontSize="18" fontWeight="900" fill="var(--cream)">{center}</text>
     </svg>
   );
@@ -206,6 +211,7 @@ export const SummaryDemoPage: React.FC<SummaryDemoProps> = (p) => {
 
   if (p.channels) {
     const { cur, prev, throughDay } = p.channels;
+    const N = p.channelNames ?? TIKTOK_CHANNEL_NAMES;
     const chg = (v: number | null | undefined) =>
       v == null ? null : <span style={{ color: v >= 0 ? "var(--green)" : "var(--red)" }}>{v >= 0 ? "+" : "−"}{fmtNum(Math.abs(v), 1)}%</span>;
     const growth = (a: number | null | undefined, b: number | null | undefined) => (a != null && b != null && a > 0 ? (b / a - 1) * 100 : null);
@@ -214,7 +220,7 @@ export const SummaryDemoPage: React.FC<SummaryDemoProps> = (p) => {
     const shopActual = p.shop?.actual ?? cur.shopGmv;
     const tiles: DemoKpi[] = [
       {
-        lab: `${METRIC.totalGmv} · tới ${throughDay}/${mm}`,
+        lab: `${N.total} · tới ${throughDay}/${mm}`,
         val: amt(shopActual),
         note: (
           <>
@@ -257,11 +263,11 @@ export const SummaryDemoPage: React.FC<SummaryDemoProps> = (p) => {
 
     const liveSplit = cur.liveLinked + cur.affiliate;
     const rows: { name: string; v: number | null; prevV: number | null; color: string; sub?: boolean }[] = [
-      { name: "LIVE", v: liveSplit, prevV: prev ? prev.liveLinked + prev.affiliate : null, color: CH_COLOR.sellerLive },
-      { name: CHANNEL.sellerLive, v: cur.liveLinked, prevV: prev?.liveLinked ?? null, color: CH_COLOR.sellerLive, sub: true },
-      { name: CHANNEL.affiliateLive, v: cur.affiliate, prevV: prev?.affiliate ?? null, color: CH_COLOR.affiliate, sub: true },
-      { name: CHANNEL.video, v: cur.video, prevV: prev?.video ?? null, color: CH_COLOR.video },
-      { name: CHANNEL.productCard, v: cur.card, prevV: prev?.card ?? null, color: CH_COLOR.card }
+      { name: N.live, v: liveSplit, prevV: prev ? prev.liveLinked + prev.affiliate : null, color: CH_COLOR.sellerLive },
+      { name: N.sellerLive, v: cur.liveLinked, prevV: prev?.liveLinked ?? null, color: CH_COLOR.sellerLive, sub: true },
+      { name: N.affiliateLive, v: cur.affiliate, prevV: prev?.affiliate ?? null, color: CH_COLOR.affiliate, sub: true },
+      { name: N.video, v: cur.video, prevV: prev?.video ?? null, color: CH_COLOR.video },
+      { name: N.card, v: cur.card, prevV: prev?.card ?? null, color: CH_COLOR.card }
     ];
     const donut = [
       { color: CH_COLOR.sellerLive, v: cur.liveLinked },
@@ -282,9 +288,9 @@ export const SummaryDemoPage: React.FC<SummaryDemoProps> = (p) => {
       <DemoPage>
         <DemoHead no={p.no} title={p.title} headline={p.headline} />
         <DemoKpis items={tiles} />
-        <DemoPanel title={`${METRIC.totalGmv} theo kênh`} sub={`Tới ${throughDay}/${mm}. % tăng giảm ${vs} cùng ngày.`}>
+        <DemoPanel title={`${N.total} theo kênh`} sub={`Tới ${throughDay}/${mm}. % tăng giảm ${vs} cùng ngày.`}>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 20, alignItems: "center" }}>
-            <ChannelDonut parts={donut} total={cur.shopGmv} center={amt(cur.shopGmv)} />
+            <ChannelDonut parts={donut} total={cur.shopGmv} center={amt(cur.shopGmv)} label={N.total} />
             <div style={{ flex: "1 1 320px", minWidth: 0, overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, fontVariantNumeric: "tabular-nums" }}>
                 <thead>
@@ -308,7 +314,7 @@ export const SummaryDemoPage: React.FC<SummaryDemoProps> = (p) => {
                     </tr>
                   ))}
                   <tr style={{ fontWeight: 800 }}>
-                    <td style={{ padding: "9px 8px" }}>{METRIC.totalGmv}</td>
+                    <td style={{ padding: "9px 8px" }}>{N.total}</td>
                     <td style={{ padding: "9px 8px", textAlign: "right" }}>{amt(cur.shopGmv)}</td>
                     <td style={{ padding: "9px 8px", textAlign: "right" }}>100%</td>
                     <td style={{ padding: "9px 8px", textAlign: "right" }}>{chg(growth(prev?.shopGmv, cur.shopGmv)) ?? "—"}</td>

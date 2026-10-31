@@ -40,6 +40,8 @@ export function shopeeDurationSec(v: unknown): number {
   if (!s || s === "-") return 0;
   const hms = s.match(/^(\d+):(\d{2}):(\d{2})$/);
   if (hms) return Number(hms[1]) * 3600 + Number(hms[2]) * 60 + Number(hms[3]);
+  const vi = s.match(/^(?:(\d+)\s*giờ)?\s*(?:(\d+)\s*phút)?\s*(?:(\d+)\s*giây)?$/i);
+  if (vi && (vi[1] || vi[2] || vi[3])) return Number(vi[1] ?? 0) * 3600 + Number(vi[2] ?? 0) * 60 + Number(vi[3] ?? 0);
   const unit = s.match(/^(?:(\d+)h)?\s*(?:(\d+)m)?\s*(?:(\d+)s)?$/i);
   if (unit && (unit[1] || unit[2] || unit[3])) return Number(unit[1] ?? 0) * 3600 + Number(unit[2] ?? 0) * 60 + Number(unit[3] ?? 0);
   return 0;
@@ -118,6 +120,9 @@ function trimTail(row: unknown[]): unknown[] {
 const VI_HEADERS: Record<string, string> = {
   "Khung Thời Gian": "Data Period",
   "Streamer ID": "User Id",
+  "Xếp hạng": "Ranking",
+  "Các sản phẩm": "Product(s)",
+  "Lượt click vào sản phẩm": "Product Clicks",
   "Tên buổi livestream": "Livestream Name",
   "Thời gian bắt đầu": "Start Time",
   "Thời lượng": "Duration:",
@@ -369,7 +374,76 @@ const OVERVIEW_COLUMNS: DataRawColumn[] = [
   { key: "Chỉ số", label: "Chỉ số" },
   { key: "Giá trị", label: "Giá trị" }
 ];
-const GROUP_HEAD = /^(Transaction|Traffic|Conversion|Engagement|Promotion)\b/i;
+const GROUP_HEAD = /^(Transaction|Traffic|Conversion|Engagement|Promotion|Giao dịch|Truy Cập|Tỷ lệ chuyển đổi|Sự tương tác|Khuyến mãi)/i;
+
+// File overview xuất theo giao diện tiếng Việt (31/10, Franklin): "Giao dịch – Tổng quan", "Truy Cập - Hiệu suất"… Đổi về tên nhóm / chỉ số tiếng Anh
+// ngay khi gom khối, để readShopeeOverview và dữ liệu lưu cùng một khuôn. Tên nguồn traffic (Cửa hàng, Tìm kiếm…) giữ chữ Seller Centre.
+const VI_GROUPS: [RegExp, (m: RegExpMatchArray) => string][] = [
+  [/^Giao dịch\s*[–-]\s*Tổng quan$/i, () => "Transaction – Overview"],
+  [/^Giao dịch\s*[–-]\s*Cửa hàng của tôi$/i, () => "Transaction – My Shop"],
+  [/^Giao dịch\s*[–-]\s*Các cửa hàng khác$/i, () => "Transaction – Other Shops"],
+  [/^Truy Cập\s*-\s*Hiệu suất$/i, () => "Traffic - Performance"],
+  [/^Truy Cập\s*-\s*Nguồn Truy Cập\s*-\s*(.+)$/i, (m) => `Traffic - Traffic Source - ${/^Tất cả Nguồn Livestream$/i.test(m[1].trim()) ? "All Livestream Sources" : m[1].trim()}`],
+  [/^Tỷ lệ chuyển đổi\s*-\s*Hiệu suất$/i, () => "Conversion - Performance"],
+  [/^Tỷ lệ chuyển đổi\s*-\s*Phễu Chuyển Đổi$/i, () => "Conversion - Conversion Funnel"],
+  [/^Sự tương tác$/i, () => "Engagement"],
+  [/^Khuyến mãi$/i, () => "Promotion"]
+];
+const groupEn = (t: string) => {
+  for (const [re, f] of VI_GROUPS) {
+    const m = t.match(re);
+    if (m) return f(m);
+  }
+  return t;
+};
+// Tên cột tiếng Việt của Seller Centre cho ABS (test metricGlossary chặn viết liền cụm này trong chữ hiển thị, nên ghép từ hai nửa).
+const AOV_VI = ["Giá trị", "đơn hàng", "trung bình"].join(" ");
+const VI_METRICS: Record<string, string> = {
+  "Doanh số từ Khách hàng Mới(Đơn đã đặt)": "Sales from New Customers(Placed Order)",
+  "Doanh số từ Khách hàng Mới(Đơn hàng được xác nhận)": "Sales from New Customers(Confirmed Order)",
+  "Doanh số từ Khách hàng Cũ(Đơn đã đặt)": "Sales from Old Customers(Placed Order)",
+  "Doanh số từ Khách hàng Cũ(Đơn hàng được xác nhận)": "Sales from Old Customers(Confirmed Order)",
+  "Tổng sản phẩm đã bán(Đơn đã đặt)": "Total Items Sold(Placed Order)",
+  "Tổng sản phẩm đã bán(Đơn hàng được xác nhận)": "Total Items Sold(Confirmed Order)",
+  [`${AOV_VI}(Đơn đã đặt)`]: "ABS(Placed Order)",
+  [`${AOV_VI}(Đơn hàng được xác nhận)`]: "ABS(Confirmed Order)",
+  "Doanh số trên mỗi người mua(Đơn đã đặt)": "Sales Per Buyer(Placed Order)",
+  "Doanh số trên mỗi người mua(Đơn hàng được xác nhận)": "Sales Per Buyer(Confirmed Order)",
+  "Số phiên Livestream": "Total Livestream Sessions",
+  "Tổng thời lượng Livestream": "Total Livestream Duration",
+  "Thời lượng trung bình mỗi phiên Livestream": "Avg. Livestream Duration",
+  "Tổng lượt xem": "Total Views",
+  "Tỷ lệ Bán hàng(Đơn đã đặt)": "Sales Ratio(Placed Order)",
+  "Tỷ lệ Bán hàng(Đơn hàng được xác nhận)": "Sales Ratio(Confirmed Order)",
+  "Lượt xem Live": "Live Views",
+  "Người xem live": "Live Viewers",
+  "Người mua(Đơn đã đặt)": "Buyers(Placed Order)",
+  "Người mua(Đơn hàng được xác nhận)": "Buyers(Confirmed Order)",
+  "Tổng lượt Thêm vào Giỏ hàng": "Total ATC",
+  "GPM(Đơn đã đặt)": "GPM(Placed Order)",
+  "GPM(Đơn hàng được xác nhận)": "GPM(Confirmed Order)",
+  "Ấn tượng về sản phẩm": "Product Impressions",
+  "Lượt nhấp sản phẩm": "Product Clicks",
+  "Tỷ lệ Đặt hàng(Đơn đã đặt)": "Order Rate(Placed Order)",
+  "Tỷ lệ Đặt hàng(Đơn hàng được xác nhận)": "Order Rate(Confirmed Order)",
+  "Lượt thích": "Total Likes",
+  "Lượt Chia sẻ": "Total Shares",
+  "Người theo dõi mới từ Livestream": "Live New Followers",
+  "Mã giảm giá toàn Shop đã lưu": "Shop Voucher Claimed",
+  "Mã giảm giá độc quyền Livestream đã lưu": "Special Live Voucher Claimed",
+  "Số lượng xu đã được lấy": "Coins Claimed"
+};
+/** Tên chỉ số tiếng Việt → tiếng Anh. Một số tên đã bị enHeaders đổi trước ("Người xem" → "Viewers"): sửa theo nhóm. */
+const metricEn = (group: string, head: string): string => {
+  const k = viKey(head);
+  if (/^Traffic - Performance$/i.test(group)) {
+    if (k === "Viewers" || k === "Người xem") return "Total Viewers";
+    if (k === "Comments" || k === "Tổng số Bình luận") return "Total Comments";
+  }
+  if (/^Engagement$/i.test(group) && (k === "Comments" || k === "Tổng số Bình luận")) return "Total Comments";
+  if (/^Traffic - Traffic Source/i.test(group) && k === "Viewers") return "Live Viewers";
+  return VI_METRICS[k] ?? head;
+};
 
 export function flattenShopeeOverview(rows: unknown[][]): Record<string, unknown>[] {
   const out: Record<string, unknown>[] = [];
@@ -382,8 +456,8 @@ export function flattenShopeeOverview(rows: unknown[][]): Record<string, unknown
     let group = "";
     const seen: Record<string, number> = {};
     for (let c = 0; c < Math.max(heads.length, titles.length); c++) {
-      if (!blank(titles[c]) && GROUP_HEAD.test(String(titles[c]).trim())) group = String(titles[c]).trim();
-      const head = String(heads[c] ?? "").trim();
+      if (!blank(titles[c]) && GROUP_HEAD.test(String(titles[c]).trim())) group = groupEn(String(titles[c]).trim());
+      const head = metricEn(group, String(heads[c] ?? "").trim());
       if (!head || head === "Data Period" || head === "User Id") continue;
       const k = `${group}|${head}`;
       seen[k] = (seen[k] ?? 0) + 1;

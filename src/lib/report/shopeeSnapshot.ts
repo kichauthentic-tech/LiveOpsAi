@@ -6,6 +6,8 @@ import type { DataRawImportStamp } from "../db/brandDataRaw";
 import type { SectionInsight } from "./sectionInsights";
 import { fmtVndShort } from "../format";
 import { METRIC } from "../metricGlossary";
+import { SHOPEE_SHOP_KINDS } from "../dataraw/shopeeShop";
+import type { ShopeeShopMonth, ShopeeShopSnapshot } from "./shopeeShopReport";
 import { hasShopeeAds, shopeeAdsTotals, type ShopeeAdsStats, type ShopeeAdsSuite } from "../dataraw/shopeeAds";
 import { PLATFORM_PROFILES } from "../platforms/profiles";
 import { platformOf } from "../reportPlatform";
@@ -30,7 +32,7 @@ const SHOPEE = PLATFORM_PROFILES.Shopee.id;
 // Bản 5 (29/10, report Shopee theo khung trang của TikTok): phiên mang thêm ATC/Engaged/Comments/Items/Avg. Viewing Duration,
 // `history` = Live List 3 tháng trước (Key Metrics nhiều tháng + tách nguyên nhân), `planSlots` = ca Kế Hoạch Tháng có target.
 // Bản 6 (29/10 tối): `prevProducts` = Product List tháng trước (hạng + Sales) cho cột hạng của bảng Top sản phẩm như TikTok.
-export const SHOPEE_SNAPSHOT_VERSION = 6;
+export const SHOPEE_SNAPSHOT_VERSION = 7;
 
 export interface ShopeeHeadline {
   gmv: number; // doanh số đặt
@@ -118,6 +120,12 @@ export interface ShopeeReportSnapshot {
   ads?: { expense: number; gmv: number; orders: number; roas: number | null; costPerOrder: number | null; campaigns: number; shopName: string | null } | null;
   /** 3 loại Ads của tháng (31/10, Franklin whole shop): Livestream Ads + Shop+ Ads + Product Ads, mỗi loại null = chưa tải file. Thiếu hẳn = bản chụp cũ. `ads` ở trên giữ phần Livestream Ads. */
   adsSuite?: ShopeeAdsSuite | null;
+  /** Phần CẢ SHOP (bản 7, 0193): Total GMV, kênh, khuyến mãi, người mua, sản phẩm cả shop. null = chưa tải Shop Stats; thiếu = bản chụp cũ. */
+  shop?: ShopeeShopSnapshot | null;
+  /** Phần cả shop của bản chụp tháng trước (để so cùng ngày); null = tháng trước chưa có. */
+  shopPrev?: ShopeeShopSnapshot | null;
+  /** Tóm tắt tối đa 2 tháng trước nữa của phần cả shop (cũ → mới) để so 3 tháng gần nhất; chuỗi nối qua các bản chụp. */
+  shopHistory?: ShopeeShopMonth[];
   /** Khuyến mãi từ file overview (bản 2): xu khách nhận (1 xu = 1đ), voucher shop / voucher live đã nhận. */
   promo?: { coins: number; vouchers: number; liveVouchers: number } | null;
   quality: DataQuality;
@@ -197,6 +205,10 @@ export interface ShopeeSnapshotInput {
   ads?: ShopeeAdsStats | null;
   /** Shop+ Ads / Product Ads của tháng (0192) — null = chưa tải. */
   adsSuite?: ShopeeAdsSuite | null;
+  /** Phần cả shop đã dựng từ 5 file cả shop (shopeeShopReport.ts). */
+  shop?: ShopeeShopSnapshot | null;
+  shopPrev?: ShopeeShopSnapshot | null;
+  shopHistory?: ShopeeShopMonth[];
   /** Khung camp của Kế Hoạch Tháng Shopee (effectiveCamp) — thiếu/rỗng = lịch cố định. */
   campOverrides?: CampOverrides | null;
   /** Live List các tháng trước (cũ → mới) + khung camp của từng tháng. */
@@ -386,6 +398,9 @@ export function buildShopeeSnapshot(input: ShopeeSnapshotInput): ShopeeReportSna
       ? { expense: input.ads.expense, gmv: input.ads.gmv, orders: input.ads.orders, roas: input.ads.roas, costPerOrder: input.ads.costPerOrder, campaigns: input.ads.campaigns.length, shopName: input.ads.shopName }
       : null,
     adsSuite: input.adsSuite && hasShopeeAds(input.adsSuite) ? input.adsSuite : null,
+    shop: input.shop ?? null,
+    shopPrev: input.shopPrev ?? null,
+    shopHistory: input.shopHistory ?? [],
     promo: overview ? { coins: overview.coinsClaimed, vouchers: overview.voucherClaimed, liveVouchers: overview.specialVoucherClaimed } : null,
     quality: dataQuality(completed),
     appGmv,
@@ -535,7 +550,7 @@ export function shopeeStampsFor(imports: DataRawImportStamp[], month: string): s
   const start = `${month}-01`;
   const end = `${month}-31`;
   return imports
-    .filter((i) => ([...SHOPEE_FILE_TYPES, "shopee_ads", "shopee_shop_ads", "shopee_product_ads"] as string[]).includes(i.reportType) && !!i.periodStart && !!i.periodEnd && i.periodStart <= end && i.periodEnd >= start)
+    .filter((i) => ([...SHOPEE_FILE_TYPES, "shopee_ads", "shopee_shop_ads", "shopee_product_ads", ...SHOPEE_SHOP_KINDS] as string[]).includes(i.reportType) && !!i.periodStart && !!i.periodEnd && i.periodStart <= end && i.periodEnd >= start)
     .map((i) => `${i.id}@${i.importedAt}`)
     .sort();
 }

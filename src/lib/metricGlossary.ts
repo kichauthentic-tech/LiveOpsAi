@@ -196,3 +196,44 @@ export function metricHint(label: string): string | undefined {
   }
   return best ? METRIC_HINT[best] : undefined;
 }
+
+/**
+ * Thuật ngữ của phần CẢ SHOP Shopee — đúng chữ Seller Centre (giao diện tiếng Việt) trên 5 file cả shop: Shop Stats, Voucher, Discount,
+ * Sales Composition, Sản phẩm cả shop. Không dùng tên TikTok (Total GMV, Seller LIVE, Affiliate LIVE, Product card) cho phần này.
+ * Shopee gọi doanh số là "Doanh số", đơn hủy viết "hủy" (ủ), kênh theo "nguồn doanh số": Thẻ sản phẩm / Livestream của người bán /
+ * Video của người bán / Tiếp thị liên kết (Affiliate Video, Affiliate Live); Dịch vụ Hiển thị Shopee là quảng cáo, chồng lên các kênh.
+ */
+export const SHOPEE_SHOP = {
+  totalSales: "Tổng doanh số",
+  salesPlaced: "Doanh số (Đơn đã đặt)",
+  salesConfirmed: "Doanh số (Đơn đã xác nhận)",
+  salesPaid: "Doanh số (Đơn đã thanh toán)",
+  orders: "Tổng số đơn hàng",
+  visits: "Số lượt truy cập",
+  productClicks: "Lượt nhấp vào sản phẩm",
+  orderConversion: "Tỷ lệ chuyển đổi đơn hàng",
+  cancelledOrders: "Đơn đã hủy",
+  refundedOrders: "Đơn đã hoàn trả / hoàn tiền",
+  buyers: "Số người mua",
+  newBuyers: "Người mua mới",
+  existingBuyers: "Người mua hiện tại",
+  productCard: "Thẻ sản phẩm",
+  sellerLive: "Livestream của người bán",
+  sellerVideo: "Video của người bán",
+  affiliate: "Tiếp thị liên kết",
+  affiliateLive: "Affiliate Live",
+  affiliateVideo: "Affiliate Video",
+  shopeeAds: "Dịch vụ Hiển thị Shopee",
+  traffic: "Nguồn lưu lượng",
+  voucher: "Voucher",
+  promotion: "Khuyến mãi",
+  promoProgram: "Chương Trình Khuyến Mãi",
+  combo: "Combo Khuyến Mãi",
+  dealShock: "Mua Kèm Deal Sốc",
+  claimed: "Nhận",
+  usageRate: "Tỷ lệ sử dụng",
+  cost: "Chi phí",
+  salesComposition: "Thành phần doanh số",
+  priceBand: "Phân Khúc Giá",
+  category: "Ngành Hàng"
+} as const;

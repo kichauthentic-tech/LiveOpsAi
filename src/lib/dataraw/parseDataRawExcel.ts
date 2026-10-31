@@ -2,6 +2,7 @@ import { DataRawColumn, DataRawReportType } from "../../types";
 import { buildProductListAgg } from "./productListAgg";
 import { parseAdsCampaignOverview } from "./adsCampaignOverview";
 import { parseCsvRows, parseShopeeRows, type ShopeeFileType } from "./shopeeFiles";
+import { detectShopeeShopKind, parseShopeeShopSheets, SHOPEE_SHOP_KINDS, type ShopeeShopKind, type ShopeeSheets } from "./shopeeShop";
 import { detectShopeeAdsKind, parseShopeeAdsRows, parseShopeeProductAdsRows, parseShopeeShopAdsRows, type ShopeeAdsKind } from "./shopeeAds";
 
 // Parser cho module Dataraw Brand Workspace (migration 0052) — 4 report Excel export tay từ
@@ -74,6 +75,13 @@ async function readSheetRows(file: ArrayBuffer): Promise<unknown[][]> {
   const wb = XLSX.read(file, { type: "array" });
   const sheet = wb.Sheets[wb.SheetNames[0]];
   return XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: true, defval: null });
+}
+
+/** Mọi sheet của file xlsx (tên sheet → các dòng). Ô giữ nguyên chuỗi/số của file: ngày kiểu "01-10-2026" không bị SheetJS đổi. */
+async function readAllSheets(file: ArrayBuffer): Promise<ShopeeSheets> {
+  const XLSX = await import("xlsx");
+  const wb = XLSX.read(file, { type: "array" });
+  return Object.fromEntries(wb.SheetNames.map((name) => [name, XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[name], { header: 1, raw: true, defval: null })]));
 }
 
 // "dd/mm/yyyy" -> "yyyy-mm-dd"
@@ -272,6 +280,11 @@ export async function parseDataRawExcel(file: File, reportType: DataRawReportTyp
     case "shopee_ads": return parseShopeeAdsRows(rows);
     case "shopee_shop_ads": return parseShopeeShopAdsRows(rows);
     case "shopee_product_ads": return parseShopeeProductAdsRows(rows);
+    case "shopee_shop_stats":
+    case "shopee_voucher":
+    case "shopee_discount":
+    case "shopee_composition":
+    case "shopee_shop_products": return parseShopeeShopSheets(await readAllSheets(buf), reportType as ShopeeShopKind, file.name);
     case "shop_promotion": return parseShopPromotion(rows);
     case "product_list": return parseProductList(rows);
     case "live_analysis":
@@ -291,4 +304,13 @@ export async function parseShopeeAdsAuto(file: File): Promise<{ kind: ShopeeAdsK
   if (!kind) throw new Error(`"${file.name}" không phải 1 trong 3 file Ads Shopee (Livestream Ads, Shop+ Ads, Product Ads). Tải ở Seller Centre → Quảng cáo Shopee → xuất dữ liệu.`);
   const parsed = kind === "shopee_ads" ? parseShopeeAdsRows(rows) : kind === "shopee_shop_ads" ? parseShopeeShopAdsRows(rows) : parseShopeeProductAdsRows(rows);
   return { kind, parsed };
+}
+
+/** File cả shop Shopee: tự nhận 1 trong 5 loại theo tên sheet / cột rồi đọc — thả cả 5 file vào một ô. */
+export async function parseShopeeShopAuto(file: File): Promise<{ kind: ShopeeShopKind; parsed: ParsedDataRawImport }> {
+  if (/\.csv$/i.test(file.name)) throw new Error(`"${file.name}" là file .csv — 5 file cả shop đều là .xlsx.`);
+  const sheets = await readAllSheets(await file.arrayBuffer());
+  const kind = detectShopeeShopKind(sheets);
+  if (!kind) throw new Error(`"${file.name}" không phải 1 trong ${SHOPEE_SHOP_KINDS.length} file cả shop Shopee (Shop Stats, Voucher, Discount, Sales Composition, Sản phẩm cả shop). File phải xuất từ Seller Centre bằng giao diện tiếng Việt.`);
+  return { kind, parsed: parseShopeeShopSheets(sheets, kind, file.name) };
 }

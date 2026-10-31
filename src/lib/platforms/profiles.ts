@@ -158,6 +158,8 @@ export interface PlatformProfile {
   sellerCenterLabel: string;
   /** Ghi chú cách up lại file trong cùng tháng. */
   dataRawReplaceNote: string;
+  /** Sàn có nhóm file "cả shop" ở Dữ Liệu Gốc (Shopee, 0193: Shop Stats, Voucher, Discount, Sales Composition, Sản phẩm cả shop). */
+  wholeShopFiles: boolean;
   /** Loại file Ads (tải ở Nhập Ads). */
   adsFileType: DataRawReportType;
   adsFileLabel: string;
@@ -205,6 +207,7 @@ export const PLATFORM_PROFILES: Record<ReportPlatform, PlatformProfile> = {
     dataRawAcceptLabel: "Excel",
     sellerCenterLabel: "TikTok Shop",
     dataRawReplaceNote: "(file TikTok luôn luỹ kế từ đầu tháng)",
+    wholeShopFiles: false,
     adsFileType: "ads_campaign_overview",
     adsFileLabel: "Campaign overview data (TikTok Ads, theo ngày)",
     hiddenBrandTabs: [],
@@ -247,6 +250,7 @@ export const PLATFORM_PROFILES: Record<ReportPlatform, PlatformProfile> = {
     dataRawAcceptLabel: "Excel / CSV",
     sellerCenterLabel: "Shopee Seller Centre",
     dataRawReplaceNote: "",
+    wholeShopFiles: true,
     adsFileType: "shopee_ads",
     adsFileLabel: "Shopee Live Ads Report (một dòng mỗi chiến dịch)",
     hiddenBrandTabs: ["brand_affiliate", "brand_skus"],

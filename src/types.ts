@@ -435,6 +435,13 @@ export type DataRawReportType =
   // migration 0192 (2026-10-31) — Shop+ Ads (tìm kiếm) và Product Ads (CPC/GMV Max) của Shopee, cùng khuôn với shopee_ads (lib/dataraw/shopeeAds.ts).
   | "shopee_shop_ads"
   | "shopee_product_ads"
+  // migration 0193 (2026-10-31) — 5 file cả shop của Shopee cho brand dùng dịch vụ whole shop (lib/dataraw/shopeeShop.ts): Shop Stats (theo ngày,
+  // theo kênh), Voucher, Discount, Sales Composition, Sản phẩm cả shop. Dòng lưu dạng phẳng, cột `t` là loại dòng.
+  | "shopee_shop_stats"
+  | "shopee_voucher"
+  | "shopee_discount"
+  | "shopee_composition"
+  | "shopee_shop_products"
   // migration 0183 (2026-10-27) — "Live Analysis" xuất ở view creator AFFILIATE (cùng 28 cột với live_analysis, nhưng toàn
   // dòng phiên của creator affiliate). Nguồn của trang Affiliate; live_analysis chỉ còn dòng shop cho Report Tuần.
   | "affiliate_live_analysis";

@@ -2,6 +2,8 @@ import type { LiveSession } from "../../types";
 import { fetchOverlappingBatchRows } from "../dataraw/monthlyProductSlice";
 import { readShopeeDays, readShopeeOverview, readShopeeProducts, readShopeeStreams } from "../dataraw/shopeeFiles";
 import { shopeeAdsStats, shopeeProductAdsGroup, shopeeSearchAdsGroup } from "../dataraw/shopeeAds";
+import { SHOPEE_SHOP_KINDS, reconcileShopLive, type ShopeeShopKind } from "../dataraw/shopeeShop";
+import { buildShopeeShopSnapshot, shopeeShopMonthOf } from "./shopeeShopReport";
 import { fetchDataRawImportStamps } from "../db/brandDataRaw";
 import { fetchMonthlyReportSnapshot } from "../db/monthlyReportSnapshots";
 import { buildShopeeSnapshot, shopeeStampsFor, type ShopeeHeadline, type ShopeeReportSnapshot } from "./shopeeSnapshot";
@@ -33,7 +35,7 @@ export async function buildShopeeReportSnapshot(input: { brandId: string; month:
   const { brandId, month, sessions } = input;
   const start = `${month}-01`;
   const end = `${month}-31`;
-  const [live, daily, products, overview, ads, shopAds, productAds, imports, prevStored, plan] = await Promise.all([
+  const [live, daily, products, overview, ads, shopAds, productAds, imports, prevStored, plan, shopFiles] = await Promise.all([
     fetchOverlappingBatchRows(brandId, "shopee_live_list", start, end),
     fetchOverlappingBatchRows(brandId, "shopee_daily", start, end),
     fetchOverlappingBatchRows(brandId, "shopee_product_list", start, end),
@@ -44,7 +46,9 @@ export async function buildShopeeReportSnapshot(input: { brandId: string; month:
     fetchDataRawImportStamps(brandId),
     fetchMonthlyReportSnapshot(brandId, prevMonthOf(month), "Shopee").catch(() => null),
     // Khung camp của Kế Hoạch Tháng Shopee — cùng nguồn với report TikTok (effectiveCamp), không đọc lịch cố định khi đã có kế hoạch.
-    fetchMonthPlan(brandId, month, "Shopee").catch(() => null)
+    fetchMonthPlan(brandId, month, "Shopee").catch(() => null),
+    // 5 file cả shop (0193). DB chưa chạy 0193 / brand không tải ⇒ không có batch ⇒ không có phần cả shop.
+    Promise.all(SHOPEE_SHOP_KINDS.map((k) => fetchOverlappingBatchRows(brandId, k, start, end).catch(() => null)))
   ]);
   const histMonths: string[] = [];
   for (let m = month, i = 0; i < HISTORY_MONTHS; i++) histMonths.unshift((m = prevMonthOf(m)));
@@ -54,6 +58,17 @@ export async function buildShopeeReportSnapshot(input: { brandId: string; month:
     fetchOverlappingBatchRows(brandId, "shopee_product_list", `${prevMonth}-01`, `${prevMonth}-31`).catch(() => null)
   ]);
   const prev: ShopeeHeadline | null = (prevStored?.snapshot as unknown as ShopeeReportSnapshot | undefined)?.headline ?? null;
+  const shopRows: Partial<Record<ShopeeShopKind, Record<string, unknown>[]>> = {};
+  SHOPEE_SHOP_KINDS.forEach((k, i) => {
+    if (shopFiles[i]?.hasAnyBatch) shopRows[k] = shopFiles[i]!.rows;
+  });
+  const statsImport = imports.find((i) => i.reportType === "shopee_shop_stats" && !!i.periodStart && !!i.periodEnd && i.periodStart <= end && i.periodEnd >= start);
+  const dailyDays = readShopeeDays(daily.rows).filter((d) => d.date.startsWith(month));
+  const shop = buildShopeeShopSnapshot(shopRows, statsImport ? { start: statsImport.periodStart!, end: statsImport.periodEnd! } : null, []);
+  if (shop?.channels && dailyDays.length > 0) {
+    const w = reconcileShopLive(shop.channels.live, dailyDays.reduce((a, d) => a + d.salesPlaced, 0));
+    if (w) shop.warnings.push(w);
+  }
   return buildShopeeSnapshot({
     brandId,
     month,
@@ -70,6 +85,13 @@ export async function buildShopeeReportSnapshot(input: { brandId: string; month:
       shop: shopAds.hasAnyBatch ? shopeeSearchAdsGroup(shopAds.rows) : null,
       product: productAds.hasAnyBatch ? shopeeProductAdsGroup(productAds.rows) : null
     },
+    shop,
+    shopPrev: (prevStored?.snapshot as unknown as ShopeeReportSnapshot | undefined)?.shop ?? null,
+    // Chuỗi 3 tháng: bản chụp tháng trước giữ phần cả shop của nó + 1 tháng trước nữa ⇒ tháng này giữ tối đa 2 tháng trước.
+    shopHistory: (() => {
+      const ps = prevStored?.snapshot as unknown as ShopeeReportSnapshot | undefined;
+      return [...(ps?.shopHistory ?? []), ...(ps?.shop ? [shopeeShopMonthOf(ps.shop, prevMonth)] : [])].slice(-2);
+    })(),
     campOverrides: effectiveCamp(plan?.plan.campRanges),
     history,
     prevProducts: prevProductRows?.hasAnyBatch ? readShopeeProducts(prevProductRows.rows) : null,

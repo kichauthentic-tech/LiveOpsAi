@@ -12,6 +12,7 @@ import { importReconciliationFromParsed } from "../../lib/db/liveReconciliation"
 import { errorMessage } from "../../lib/errorMessage";
 import { useConfirm } from "../../hooks/useConfirm";
 import { platformOf } from "../../lib/reportPlatform";
+import { ShopeeShopPanel } from "./ShopeeShopPanel";
 import { profileOf } from "../../lib/platforms/profiles";
 import { PageHeader } from "../common/PageHeader";
 
@@ -132,6 +133,8 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ platform, brandId, b
   const prof = profileOf(platform);
   const visibleTabs = ALL_TABS.filter((t) => prof.dataRawTypes.includes(t.id));
   const [activeType, setActiveType] = useState<DataRawReportType>(visibleTabs[0]?.id ?? DEFAULT_REPORT_TYPE);
+  // Sàn có file cả shop (Shopee, 0193) chia 2 nhóm riêng: file LIVE (đối soát ca + report LIVE) và file cả shop (report whole shop).
+  const [section, setSection] = useState<"live" | "shop">("live");
   // Nạp bù ca chỉ cho ca đúng sàn của workspace.
   const sessions = useMemo(() => allSessions.filter((s) => platformOf(s) === platform), [allSessions, platform]);
   const [imports, setImports] = useState<BrandDataRawImport[]>([]);
@@ -302,21 +305,42 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ platform, brandId, b
         title={`Dữ Liệu Gốc — ${brandName}`}
         description={<>Nơi lưu nguyên trạng report Excel tải tay từ {prof.sellerCenterLabel} mỗi tuần/tháng (workspace này chỉ có file của sàn {platform}). Đây là cơ sở để dựng report + đối soát cuối tháng, sau này cần tra chỉ số nào chỉ cần mở lại import đúng kỳ. Tải lại file trong cùng một tháng sẽ thay bản cũ của tháng đó {prof.dataRawReplaceNote}.</>}
       >
+        {prof.wholeShopFiles && (
+          <div className="flex flex-wrap gap-2 mb-2">
+            {([["live", "File LIVE"], ["shop", "File cả shop"]] as const).map(([id, label]) => (
+              <button
+                key={id}
+                onClick={() => setSection(id)}
+                className={`text-xs font-bold px-3 py-1.5 rounded-xl border ${
+                  section === id ? "seg-on" : "bg-[var(--surface-elevated)] text-[var(--text-muted)] border-[var(--border)] hover:bg-[var(--surface-hover)]"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+        {section === "live" && (
         <div className="flex flex-wrap gap-2">
-          {visibleTabs.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setActiveType(t.id)}
-              className={`text-xs font-bold px-3 py-1.5 rounded-xl border ${
-                activeType === t.id ? "seg-on" : "bg-[var(--surface-elevated)] text-[var(--text-muted)] border-[var(--border)] hover:bg-[var(--surface-hover)]"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+            {visibleTabs.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setActiveType(t.id)}
+                className={`text-xs font-bold px-3 py-1.5 rounded-xl border ${
+                  activeType === t.id ? "seg-on" : "bg-[var(--surface-elevated)] text-[var(--text-muted)] border-[var(--border)] hover:bg-[var(--surface-hover)]"
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        )}
       </PageHeader>
 
+      {prof.wholeShopFiles && section === "shop" ? (
+        <ShopeeShopPanel brandId={brandId} brandName={brandName} canManage={canManage} />
+      ) : (
+      <>
       {error && (
         <div className="bg-red-950/40 border border-red-800/50 text-red-400 text-xs font-semibold p-3 rounded-xl flex items-center gap-2">
           <AlertTriangle className="w-4 h-4 shrink-0" /> {error}
@@ -534,6 +558,8 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ platform, brandId, b
           </div>
         )}
       </div>
+      </>
+      )}
     </div>
   );
 };

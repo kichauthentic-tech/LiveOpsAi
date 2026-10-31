@@ -9,7 +9,10 @@ import { DemoHead as WhyHead, DemoInsight, type DemoKpi as WhyKpi } from "./repo
 import { DemoHead, DemoLegend, DemoPage, DemoPanel, DemoStack, DemoTable, Html } from "./report/DemoBlocks";
 import { ShopeeAdsPage, shopeeAdsMetrics } from "./report/ShopeeAdsPage";
 import { hasShopeeAds } from "../../lib/dataraw/shopeeAds";
+import { SHOPEE_SHOP } from "../../lib/metricGlossary";
 import { SummaryDemoPage } from "./report/DemoSummaryPages";
+import { ShopeeChannelsPage, ShopeeGrowthPage, ShopeePromoPage, ShopeeShopAdsPanel, ShopeeShopCancelPanel, ShopeeShopProductsPanel, ShopeeShopTrendPanel, shopeeShopHeadlines } from "./report/ShopeeShopPages";
+import { shopeeShopSplitThrough, shopeeShopTrend } from "../../lib/report/shopeeShopReport";
 import { ProductsPageBody, productsKpis, type ProductsPageData } from "./report/ProductsPage";
 import { HostPageBody, hostKpis, type HostPageData } from "./report/HostPage";
 import { NextLivePlanPanel, LIVE_TARGET_MANUAL_KEY, decodeLiveTarget, encodeLiveTarget } from "./report/NextMonthPanels";
@@ -73,13 +76,22 @@ import "./report/demo.css";
 // Trang Quảng cáo theo phạm vi dịch vụ (0190) như TikTok. TÊN CHỈ SỐ: cột file Shopee (Viewers, ATC, Sales (Confirmed Order)…) qua
 // METRIC, GMV Shopee = Sales(Placed Order) (user chốt 06/10). Chữ gửi brand: "phiên", "YFB".
 
-type ShopeePageId = ShopeeInsightPage;
-const SHOPEE_PAGE_IDS: ShopeePageId[] = ["summary", "keymetrics", "nmv", "why", "products", "people", "ads", "next"];
+// 3 trang CẢ SHOP (bản 7, 0193): growth / channels / promo — không có hàm Insight tự động (chỉ khối Insight sửa tay của trang có sẵn).
+type ShopeeShopPageId = "growth" | "channels" | "promo";
+type ShopeePageId = ShopeeInsightPage | ShopeeShopPageId;
+// Thứ tự trang: Tổng quan, Tăng trưởng & khách, Kênh bán, Key Metrics LIVE, Nguyên nhân, Khuyến mãi & voucher, Sản phẩm, Quảng cáo, Đơn huỷ, Host, Kế hoạch tháng sau.
+const SHOPEE_PAGE_IDS: ShopeePageId[] = ["summary", "growth", "channels", "keymetrics", "why", "promo", "products", "ads", "nmv", "people", "next"];
+const SHOP_PAGE_META: Record<ShopeeShopPageId, { label: string; title: string }> = {
+  growth: { label: "Tăng trưởng & khách", title: "Tăng trưởng & khách hàng" },
+  channels: { label: "Kênh bán", title: "Kênh bán" },
+  promo: { label: "Khuyến mãi & voucher", title: "Khuyến mãi & voucher" }
+};
 // Nhãn/tiêu đề lấy từ SECTIONS của TikTok; riêng trang "nmv": Shopee không có Refund rate/NMV mà có Sales (Confirmed Order).
 const PAGES: { id: ShopeePageId; label: string; title: string }[] = SHOPEE_PAGE_IDS.map((id) =>
-  id === "nmv" ? { id, label: "Đơn huỷ", title: `Đơn huỷ & ${METRIC.salesConfirmed}` } : { id, label: SECTIONS.find((x) => x.id === id)!.label, title: SECTIONS.find((x) => x.id === id)!.title }
+  id === "growth" || id === "channels" || id === "promo" ? { id, ...SHOP_PAGE_META[id] } : id === "nmv" ? { id, label: "Đơn huỷ", title: `Đơn huỷ & ${METRIC.salesConfirmed}` } : { id, label: SECTIONS.find((x) => x.id === id)!.label, title: SECTIONS.find((x) => x.id === id)!.title }
 );
-const PAGE_LABEL = Object.fromEntries(PAGES.map((p) => [p.id, p.label])) as Record<ShopeePageId, string>;
+// Chỉ các trang có Insight tự động (3 trang cả shop không có) — shopeeHeadlines duyệt theo khoá của bảng này.
+const PAGE_LABEL = Object.fromEntries(PAGES.filter((p) => p.id !== "growth" && p.id !== "channels" && p.id !== "promo").map((p) => [p.id, p.label])) as Record<ShopeeInsightPage, string>;
 const SHOPEE = PLATFORM_PROFILES.Shopee.id;
 
 const BLUE = "#7fb0e0";
@@ -339,7 +351,7 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
 
   // ---- Insight 4 khối + tiêu đề kết luận (khoá pg_<trang>, sàn Shopee) — chung hàm với TikTok.
   const relByName = useMemo(() => new Map(reliability.map((r) => [r.name, r])), [reliability]);
-  const auto: Record<ShopeePageId, InsightBlocks> = useMemo(
+  const auto: Record<ShopeeInsightPage, InsightBlocks> = useMemo(
     () =>
       shopeeInsights(s, pm, {
         hosts: hostPeer.rows
@@ -356,7 +368,7 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
     [s, pm, hostPeer, relByName, relMonths, nextMonth, nextPlan, scope.ads]
   );
   const heads = useMemo(() => shopeeHeadlines(s, pm, auto, PAGE_LABEL), [s, pm, auto]);
-  const insight = (page: ShopeePageId) => (
+  const insight = (page: ShopeeInsightPage) => (
     <DemoInsight
       auto={auto[page]}
       note={report?.sectionNotes?.[pageNoteKey(page)]}
@@ -370,12 +382,21 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
   const cancel = useMemo(() => shopeeCancelMonths(pm), [pm]);
   const fullAds = hasShopeeAds(s.adsSuite) && !!(s.adsSuite!.shop || s.adsSuite!.product);
   const missingAds = [!s.adsSuite?.live && !s.ads && "Livestream Ads", !s.adsSuite?.shop && "Shop+ Ads", !s.adsSuite?.product && "Product Ads"].filter(Boolean) as string[];
+  const shop = s.shop ?? null;
+  const shopPrev = s.shopPrev ?? null;
+  const shopHeads = shopeeShopHeadlines(shop, shopPrev);
+  const trend = shopeeShopTrend(shop, month, s.shopHistory);
+  const shopProps = { shop, prev: shopPrev, trend, prevLabel: `Tháng ${Number(prevMonth.slice(5))}`, monthDays: lastDayOf(month), canManage };
   const shown: Record<ShopeePageId, boolean> = {
     summary: true,
+    // 3 trang cả shop luôn có (user chốt 31/10: report luôn đủ trang dù brand chưa tải file; thiếu file thì khung báo cần file nào).
+    growth: true,
+    channels: true,
+    promo: true,
     keymetrics: true,
-    nmv: canManage || cancel.some((c) => c.cancelRate != null),
+    nmv: canManage || !!shop || cancel.some((c) => c.cancelRate != null),
     why: true,
-    products: canManage || s.products.count > 0 || !!s.promo,
+    products: canManage || s.products.count > 0 || !!s.promo || !!shop?.products,
     people: true,
     ads: scope.ads && (canManage || !!s.ads || hasShopeeAds(s.adsSuite)),
     next: true
@@ -610,7 +631,7 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
 
   return (
     <div className="rt rounded-2xl" style={{ background: PAL.bg }} ref={topRef} aria-label={`Report Shopee tháng ${Number(month.slice(5))}/${month.slice(0, 4)} ${brandName}`}>
-      <PageRail ref={railRef} items={rail} current={curPage} onSelect={goPage} onExcel={handleExcel} />
+      <PageRail ref={railRef} items={rail} current={curPage as ReportSectionId} onSelect={goPage} onExcel={handleExcel} />
       <div className="p-5 flex flex-col gap-8">
         {canManage && s.version < 6 && warnBox(<>Số liệu này chốt trước khi report Shopee dùng chung trang với TikTok (hạng sản phẩm so tháng trước) — bấm &quot;Cập nhật số liệu&quot; ở trên để có đủ các trang.</>)}
         {canManage && (scopeLine || outsideLine) && (
@@ -647,9 +668,22 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
             planHours={shopeePlanHours(s, pm)}
             actualHours={Object.fromEntries(pm.score.filter((r) => r.key !== "all").map((r) => [r.key, r.hours]))}
             gmvLabel={gmvLabel}
+            channelNames={{ total: SHOPEE_SHOP.totalSales, live: "Livestream", sellerLive: SHOPEE_SHOP.sellerLive, affiliateLive: SHOPEE_SHOP.affiliateLive, video: "Video (người bán + Affiliate Video)", card: SHOPEE_SHOP.productCard }}
+            channels={shop?.channels ? { throughDay: shop.throughDay, cur: shopeeShopSplitThrough(shop, shop.throughDay), prev: shopPrev ? shopeeShopSplitThrough(shopPrev, Math.min(shop.throughDay, shopPrev.throughDay)) : null } : undefined}
             insight={insight("summary")}
           />
+          <ShopeeShopTrendPanel trend={trend} />
           {opsNotes.length > 0 && warnBox(<ul style={{ paddingLeft: 16, listStyle: "disc", margin: 0 }}>{opsNotes.map((t, i) => <li key={i}>Chỉ ops thấy: {t}</li>)}</ul>)}
+        </section>
+
+        {/* ===== cả shop · growth ===== */}
+        <section id="mr-growth" className="space-y-4 scroll-mt-16" style={secStyle("growth")}>
+          <ShopeeGrowthPage no={secNo("growth")} title={secTitle("growth")} headline={shopHeads.growth} {...shopProps} />
+        </section>
+
+        {/* ===== cả shop · channels ===== */}
+        <section id="mr-channels" className="space-y-4 scroll-mt-16" style={secStyle("channels")}>
+          <ShopeeChannelsPage no={secNo("channels")} title={secTitle("channels")} headline={shopHeads.channels} {...shopProps} />
         </section>
 
         {/* ===== 2 · Key Metrics ===== */}
@@ -680,28 +714,6 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
             {insight("keymetrics")}
           </DemoPage>
         </section>
-
-        {/* ===== 3 · Đơn huỷ (vị trí trang NMV của TikTok) ===== */}
-        {shown.nmv && (
-          <section id="mr-nmv" className="space-y-4 scroll-mt-16" style={secStyle("nmv")}>
-            <DemoPage>
-              <DemoHead no={secNo("nmv")} title={secTitle("nmv")} headline={heads.nmv} />
-              {cancelCur?.cancelRate == null ? (
-                <DemoPanel title={`${METRIC.gmv} và ${METRIC.salesConfirmed}`}><p className="pns">{fileHint("Live List có cột Sales(Confirmed Order)")}</p></DemoPanel>
-              ) : (
-                <DemoStack>
-                  <DemoPanel title={`${METRIC.gmv} tách thành ${METRIC.salesConfirmed} và phần đơn huỷ`} sub={`${winNote ? `Cùng kỳ ${winNote} mỗi tháng` : "Cả tháng"} · thanh = ${METRIC.salesConfirmed}, vạch trắng = ${METRIC.gmv} (Sales(Placed Order)) · số xác nhận tính tới lúc tải Live List.`}>
-                    <Html className="hb" html={cancelBars} />
-                  </DemoPanel>
-                  <DemoPanel title="Tỷ lệ đơn huỷ theo loại ngày" sub={`% giá trị đặt không thành đơn xác nhận = 1 − ${METRIC.salesConfirmed} ÷ ${METRIC.gmv}; mỗi tháng theo khung campaign của chính tháng đó.`}>
-                    <DemoTable html={cancelDayHtml} />
-                  </DemoPanel>
-                </DemoStack>
-              )}
-              {insight("nmv")}
-            </DemoPage>
-          </section>
-        )}
 
         {/* ===== 4 · Nguyên nhân ===== */}
         <section id="mr-why" className="pg on scroll-mt-16" style={secStyle("why")}>
@@ -752,6 +764,11 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
           {insight("why")}
         </section>
 
+        {/* ===== cả shop · promo ===== */}
+        <section id="mr-promo" className="space-y-4 scroll-mt-16" style={secStyle("promo")}>
+          <ShopeePromoPage no={secNo("promo")} title={secTitle("promo")} headline={shopHeads.promo} {...shopProps} />
+        </section>
+
         {/* ===== 5 · Sản phẩm & khuyến mãi ===== */}
         {shown.products && (
           <section id="mr-products" className="space-y-4 scroll-mt-16" style={secStyle("products")}>
@@ -765,6 +782,7 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
               prevMonthLabel={prevMonth.slice(5)}
               empty={<p className="text-sm text-center py-6" style={{ color: PAL.muted }}>{fileHint("Product List (…live_product_list…xlsx)")}</p>}
             />
+            <ShopeeShopProductsPanel shop={shop} canManage={canManage} />
             {s.promo && (
               <DemoPanel title="Khuyến mãi đã nhận" sub="File overview: Shopee chỉ cho số lượng đã nhận; 1 xu quy ra 1 đồng, chưa biết xu do shop hay Shopee tài trợ.">
                 <DemoTable html={tbl([METRIC.coinsClaimed, METRIC.shopVoucherClaimed, METRIC.specialLiveVoucherClaimed], [[fmtInt(s.promo.coins), fmtInt(s.promo.vouchers), fmtInt(s.promo.liveVouchers)]])} />
@@ -773,27 +791,6 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
             {insight("products")}
           </section>
         )}
-
-        {/* ===== 6 · Host & khung giờ ===== */}
-        <section id="mr-people" className="space-y-4 scroll-mt-16" style={secStyle("people")}>
-          <PageHead no={secNo("people")} title={secTitle("people")} headline={heads.people} metrics={hostKpis(hostData)} />
-          <HostPageBody data={hostData}>
-            {canManage && hostQuality.reconciled < hostQuality.total && (
-              <div className="mb-3">
-                {warnBox(
-                  <>
-                    {hostQuality.total} phiên Shopee: {hostQuality.reconciled} đã đối soát bằng Live List
-                    {hostQuality.manual > 0 ? `, ${hostQuality.manual} số tạm tính` : ""}. Đối soát ở &quot;Vận Hành Live → Đối Soát Số Liệu&quot; trước khi phát hành report.
-                  </>
-                )}
-              </div>
-            )}
-            {canManage && unassigned && (
-              <div className="mb-3">{warnBox(<>{unassigned.sessionCount} ca Shopee chưa gán host ({fmtVndShort(unassigned.gmv)} · {fmtFixed(unassigned.hours, 1)}h) không nằm trong bảng này — gán host cho ca để số về đúng người.</>)}</div>
-            )}
-          </HostPageBody>
-          {insight("people")}
-        </section>
 
         {/* ===== 7 · Quảng cáo (theo phạm vi dịch vụ) ===== */}
         {shown.ads && (
@@ -832,9 +829,54 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
             ) : (
               canManage && warnBox(<>Chưa có file Ads Shopee tháng {month.slice(5)}/{month.slice(0, 4)} trong bản chụp này. Brand có chạy Ads: tải file ở Nhập Ads (sàn Shopee) rồi bấm Cập nhật số liệu. Không chạy Ads thì bỏ qua — brand không thấy dòng này.</>)
             )}
+            <ShopeeShopAdsPanel shop={shop} />
             {insight("ads")}
           </section>
         )}
+
+        {/* ===== 3 · Đơn huỷ (vị trí trang NMV của TikTok) ===== */}
+        {shown.nmv && (
+          <section id="mr-nmv" className="space-y-4 scroll-mt-16" style={secStyle("nmv")}>
+            <DemoPage>
+              <DemoHead no={secNo("nmv")} title={secTitle("nmv")} headline={heads.nmv} />
+              {cancelCur?.cancelRate == null ? (
+                <DemoPanel title={`${METRIC.gmv} và ${METRIC.salesConfirmed}`}><p className="pns">{fileHint("Live List có cột Sales(Confirmed Order)")}</p></DemoPanel>
+              ) : (
+                <DemoStack>
+                  <DemoPanel title={`${METRIC.gmv} tách thành ${METRIC.salesConfirmed} và phần đơn huỷ`} sub={`${winNote ? `Cùng kỳ ${winNote} mỗi tháng` : "Cả tháng"} · thanh = ${METRIC.salesConfirmed}, vạch trắng = ${METRIC.gmv} (Sales(Placed Order)) · số xác nhận tính tới lúc tải Live List.`}>
+                    <Html className="hb" html={cancelBars} />
+                  </DemoPanel>
+                  <DemoPanel title="Tỷ lệ đơn huỷ theo loại ngày" sub={`% giá trị đặt không thành đơn xác nhận = 1 − ${METRIC.salesConfirmed} ÷ ${METRIC.gmv}; mỗi tháng theo khung campaign của chính tháng đó.`}>
+                    <DemoTable html={cancelDayHtml} />
+                  </DemoPanel>
+                </DemoStack>
+              )}
+              <ShopeeShopCancelPanel shop={shop} liveGmv={h.gmv} liveConfirmed={h.confirmed} canManage={canManage} trend={trend} />
+              {insight("nmv")}
+            </DemoPage>
+          </section>
+        )}
+
+        {/* ===== 6 · Host & khung giờ ===== */}
+        <section id="mr-people" className="space-y-4 scroll-mt-16" style={secStyle("people")}>
+          <PageHead no={secNo("people")} title={secTitle("people")} headline={heads.people} metrics={hostKpis(hostData)} />
+          <HostPageBody data={hostData}>
+            {canManage && hostQuality.reconciled < hostQuality.total && (
+              <div className="mb-3">
+                {warnBox(
+                  <>
+                    {hostQuality.total} phiên Shopee: {hostQuality.reconciled} đã đối soát bằng Live List
+                    {hostQuality.manual > 0 ? `, ${hostQuality.manual} số tạm tính` : ""}. Đối soát ở &quot;Vận Hành Live → Đối Soát Số Liệu&quot; trước khi phát hành report.
+                  </>
+                )}
+              </div>
+            )}
+            {canManage && unassigned && (
+              <div className="mb-3">{warnBox(<>{unassigned.sessionCount} ca Shopee chưa gán host ({fmtVndShort(unassigned.gmv)} · {fmtFixed(unassigned.hours, 1)}h) không nằm trong bảng này — gán host cho ca để số về đúng người.</>)}</div>
+            )}
+          </HostPageBody>
+          {insight("people")}
+        </section>
 
         {/* ===== 8 · Kế hoạch tháng sau ===== */}
         <section id="mr-next" className="space-y-4 scroll-mt-16" style={secStyle("next")}>
