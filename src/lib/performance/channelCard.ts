@@ -256,7 +256,7 @@ export function buildChannelCard(x: ChannelCardInput): ChannelCard {
   const l = hasForecast && target ? landingOf(outlook) : null;
   const landing = l && l.pHit != null && l.key !== "no_target" && l.key !== "no_forecast" ? { key: l.key, pHit: l.pHit } : null;
 
-  const plan = hasForecast && target ? handlingPlan({ outlook, today, sessions: x.sessions, camp, slotHours: x.plan?.defaultSlotHours, checkpointCap: x.engineParams.fcCheckpointCap, reserve: x.plan?.reserveSlots }) : null;
+  const plan = hasForecast && target ? handlingPlan({ outlook, today, sessions: x.sessions, camp, slotHours: x.plan?.defaultSlotHours, checkpointCap: x.engineParams.fcCheckpointCap, slotRules: x.plan ? { windowStart: x.plan.liveWindowStart.slice(0, 5), windowEnd: x.plan.liveWindowEnd.slice(0, 5), maxSlotsPerDay: x.plan.maxSlotsPerDay, blackoutDates: x.plan.blackoutDates } : undefined }) : null;
   const need = plan && plan.needRate != null && plan.remainingHours > 0 ? { perHour: plan.needRate, hours: plan.remainingHours, blended: plan.blendedRate } : null;
 
   const pace: CardPace | null = report

@@ -1,5 +1,5 @@
 import type { LiveSession, ReserveSlot } from "../../types";
-import { pickReserve } from "../scheduling/reservePlan";
+import { reserveHours, suggestReservePool } from "../scheduling/reservePlan";
 import { addDays } from "../dateUtils";
 import { sessionDurationHours } from "../pnl";
 import { fmtVndShort } from "../format";
@@ -61,6 +61,8 @@ export interface Lever {
   /** GMV dự kiến thêm / giữ được nếu làm (null = không ước lượng được). */
   gmv: number | null;
   hours: number | null;
+  /** Ca cụ thể nên mở (chọn lúc tới mốc theo lịch còn trống; chỉ có ở đòn bẩy "add_hours"). */
+  slots?: ReserveSlot[];
   /** Căn cứ tính — hiện cạnh đòn bẩy để người đọc kiểm được. */
   basis: string;
 }
@@ -98,8 +100,8 @@ export interface PlanInput {
   slotHours?: number;
   /** Mốc điều chỉnh: bù tối đa +X giờ của phần còn lại (EngineParams.fcCheckpointCap). Thiếu = 0,3. */
   checkpointCap?: number;
-  /** Ca dự phòng của Kế Hoạch Tháng (0194): có thì lever mốc chỉ ra những ca dự phòng nên mở. */
-  reserve?: ReserveSlot[];
+  /** Khung live + số ca tối đa/ngày + ngày cấm của kế hoạch: có thì đòn bẩy mốc chỉ ra những ca CỤ THỂ nên mở, chọn lúc tới mốc theo lịch còn trống. */
+  slotRules?: { windowStart: string; windowEnd: string; maxSlotsPerDay: number; blackoutDates: string[] };
 }
 
 const round1 = (v: number) => Math.round(v * 10) / 10;
@@ -191,10 +193,12 @@ export function handlingPlan(x: PlanInput): HandlingPlan {
 
   // 4. Khung giờ nên dồn thêm (chỉ khi quy tắc qua backtest walk-forward).
   let bestBlock: { block: SlotBlock; idx: number } | null = null;
+  let blockIdx: ReturnType<typeof slotIndex> | null = null;
   {
     const idx = slotIndex(x.sessions, bucketOf, 400);
     const wf = walkForward(x.sessions, bucketOf, (s) => slotBlock(s.startTime));
     if (slotRuleReliable(idx, wf)) {
+      blockIdx = idx;
       const rows = Object.values(idx).filter((r): r is NonNullable<typeof r> => !!r && r.lo > 1 && r.sessions >= 5);
       rows.sort((a, b) => b.idx - a.idx);
       if (rows[0]) bestBlock = { block: rows[0].block, idx: rows[0].idx };
@@ -206,20 +210,43 @@ export function handlingPlan(x: PlanInput): HandlingPlan {
     // 5. Thiếu: cần thêm bao nhiêu giờ — công thức mốc điều chỉnh (đổi_giờ = ((R̂ + thiếu) ÷ R̂)^(1 ÷ co_giãn) − 1, kẹp trần).
     const hrs = checkpoint.extraHours;
     const cpLabel = `${CHECKPOINT_LABEL[checkpoint.checkpoint.key]} (${Number(checkpoint.checkpoint.date.slice(8))}/${Number(checkpoint.checkpoint.date.slice(5, 7))})`;
-    // Ca dự phòng đã mở (có ca thật cùng ngày + giờ bắt đầu, chưa huỷ) thì không gợi ý lần nữa.
-    const reservePick = x.reserve && x.reserve.length > 0
-      ? pickReserve(x.reserve, hrs, x.today > checkpoint.checkpoint.date ? x.today : checkpoint.checkpoint.date, new Set(x.sessions.filter((s) => s.status !== "Cancelled").map((s) => `${s.date}|${s.startTime}|${s.endTime}`)))
-      : null;
-    const reserveText = reservePick
-      ? reservePick.picked.length > 0
-        ? ` Ca dự phòng đã lập sẵn nên mở: ${reservePick.picked.map((r) => `${Number(r.date.slice(8))}/${Number(r.date.slice(5, 7))} ${r.startTime}–${r.endTime}`).join(", ")}${reservePick.shortHours > 0 ? ` (còn thiếu ${h1(reservePick.shortHours)} giờ so với nhu cầu — thêm ca ngoài danh sách dự phòng)` : ""}.`
-        : " Nhóm ca dự phòng đã lập không còn ca nào từ ngày này — cần mở ca mới."
+    // Ca cụ thể nên mở: chọn LÚC TỚI MỐC trên lịch thật còn trống (không lập trước từ đầu tháng — lịch đổi thì danh sách cũ lỗi thời).
+    // Mỗi ngày tối đa một ca thêm, ưu tiên khung giờ có GMV/giờ dự báo cao nhất (GMV/giờ theo loại ngày × chỉ số khung giờ nếu qua backtest).
+    let picked: ReserveSlot[] = [];
+    let pickedHours = 0;
+    if (x.slotRules && o.rates) {
+      const rates = o.rates;
+      const tomorrow = addDays(x.today, 1);
+      const from = tomorrow > checkpoint.checkpoint.date ? tomorrow : checkpoint.checkpoint.date;
+      picked = suggestReservePool({
+        month: o.month,
+        fromDate: from,
+        planned: x.sessions.filter((s) => s.status !== "Cancelled" && s.date.slice(0, 7) === o.month).map((s) => ({ date: s.date, startTime: s.startTime.slice(0, 5), endTime: s.endTime.slice(0, 5) })),
+        windowStart: x.slotRules.windowStart,
+        windowEnd: x.slotRules.windowEnd,
+        slotHours,
+        maxSlotsPerDay: x.slotRules.maxSlotsPerDay,
+        blackoutDates: x.slotRules.blackoutDates,
+        budgetHours: Math.ceil(hrs / slotHours) * slotHours,
+        forecast: (slots) => slots.map((sl) => {
+          const rate = bucketOf(sl.date) === "daily" ? rates.daily : rates.camp;
+          const block = blockIdx?.[slotBlock(sl.startTime)];
+          return reserveHours(sl) * rate * (block ? block.idx : 1);
+        })
+      });
+      pickedHours = picked.reduce((a, r) => a + reserveHours(r), 0);
+    }
+    const slotText = x.slotRules && o.rates
+      ? picked.length > 0
+        ? ` Ca nên mở (chọn theo lịch còn trống từ ${Number(picked[0].date.slice(8))}/${Number(picked[0].date.slice(5, 7))}): ${picked.map((r) => `${Number(r.date.slice(8))}/${Number(r.date.slice(5, 7))} ${r.startTime}–${r.endTime}`).join(", ")}${pickedHours + 1e-9 < hrs ? ` — chỉ tìm được ${h1(pickedHours)}h còn trống phù hợp, thiếu ${h1(hrs - pickedHours)}h (mỗi ngày một ca thêm): cần kéo dài ca hoặc thêm ca thứ hai trong ngày` : ""}.`
+        : " Không còn khung giờ trống phù hợp trong tháng để mở thêm ca — cần kéo dài ca hiện có hoặc đổi target."
       : "";
     levers.push({
       id: "add_hours",
       tone: "grow",
       title: `Mốc ${cpLabel}: thêm khoảng ${Math.ceil(hrs)} giờ live (+${Math.round(checkpoint.pct * 100)}% giờ còn lại, ≈ ${Math.ceil(hrs / slotHours)} ca ${slotHours}h)`,
-      detail: `${checkpoint.capped ? `Để đạt target cần thêm +${Math.round(checkpoint.needPct * 100)}% giờ — vượt giới hạn +${Math.round((x.checkpointCap ?? 0.3) * 100)}%, nên thêm tối đa +${Math.round((x.checkpointCap ?? 0.3) * 100)}% và báo brand sớm khả năng hụt (thêm đủ thì dự báo ≈ ${fmtVndShort(checkpoint.projectedAfter)}). ` : `Thêm đủ thì dự báo ≈ ${fmtVndShort(checkpoint.projectedAfter)} (đạt target). `}${bestBlock ? `Ưu tiên khung ${SLOT_BLOCK_LABEL[bestBlock.block].toLowerCase()} — chỉ số ${bestBlock.idx.toLocaleString("vi-VN", { maximumFractionDigits: 2 })} so với ngày Daily (đã kiểm chứng trên các tháng trước).` : "Chưa đủ dữ liệu để chỉ ra khung giờ tốt hơn."}${reserveText}`,
+      detail: `${checkpoint.capped ? `Để đạt target cần thêm +${Math.round(checkpoint.needPct * 100)}% giờ — vượt giới hạn +${Math.round((x.checkpointCap ?? 0.3) * 100)}%, nên thêm tối đa +${Math.round((x.checkpointCap ?? 0.3) * 100)}% và báo brand sớm khả năng hụt (thêm đủ thì dự báo ≈ ${fmtVndShort(checkpoint.projectedAfter)}). ` : `Thêm đủ thì dự báo ≈ ${fmtVndShort(checkpoint.projectedAfter)} (đạt target). `}${bestBlock ? `Ưu tiên khung ${SLOT_BLOCK_LABEL[bestBlock.block].toLowerCase()} — chỉ số ${bestBlock.idx.toLocaleString("vi-VN", { maximumFractionDigits: 2 })} so với ngày Daily (đã kiểm chứng trên các tháng trước).` : "Chưa đủ dữ liệu để chỉ ra khung giờ tốt hơn."}${slotText}`,
+      slots: picked,
       gmv: checkpoint.projectedAfter - o.projected,
       hours: Math.ceil(hrs),
       basis: `Thiếu ${fmtVndShort(gap)} trên dự báo ${fmtVndShort(futureForecast)} của ${h1(remainingHours)}h còn lại; giờ cần = ((còn lại + thiếu) ÷ còn lại)^(1 ÷ hệ số co giãn) − 1; ${elNote}. Ba mốc điều chỉnh mỗi tháng: sau đợt D-Day, sau Mid-Month, ngày 20.`

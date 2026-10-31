@@ -58,8 +58,6 @@ const hhmm = (t: string) => t.slice(0, 5);
 let groupTargetsColumn: boolean | null = null;
 // Cùng cách cho reserve_slots (0194): DB chưa có cột thì không gửi (kế hoạch vẫn lưu được; ca dự phòng chỉ nằm trên trình duyệt).
 let reserveColumn: boolean | null = null;
-/** DB đã có cột ca dự phòng (0194)? null = chưa biết (chưa đọc kế hoạch nào). */
-export const reserveColumnReady = (): boolean | null => reserveColumn;
 
 /** Chỉ giữ khoá hợp lệ với số > 0. */
 export function cleanGroupTargets(g: PlanGroupTargets | null | undefined): PlanGroupTargets {

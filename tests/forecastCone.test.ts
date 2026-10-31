@@ -120,6 +120,25 @@ describe("handlingPlan", () => {
     expect(p.levers.find((l) => l.id === "open_slots")!.hours).toBe(12);
     expect(p.needRate).not.toBeNull();
   });
+  test("có khung live ⇒ đòn bẩy mốc nêu ca CỤ THỂ chọn lúc tới mốc: sau hôm nay, không đè ca có sẵn, mỗi ngày một ca", () => {
+    const base = scenario();
+    const { o, sessions } = scenario({ targetTotal: base.o.projected * 1.3, extraOpen: 4 });
+    const rules = { windowStart: "09:00", windowEnd: "23:00", maxSlotsPerDay: 5, blackoutDates: [] as string[] };
+    const p = handlingPlan({ outlook: o, today: "2026-09-10", sessions, slotRules: rules });
+    const add = p.levers.find((l) => l.id === "add_hours")!;
+    expect(add.slots!.length).toBeGreaterThan(0);
+    expect(add.detail).toContain("Ca nên mở");
+    const days = add.slots!.map((r) => r.date);
+    expect(new Set(days).size).toBe(days.length);
+    for (const r of add.slots!) {
+      expect(r.date > "2026-09-10").toBe(true);
+      const clash = sessions.some((s) => s.status !== "Cancelled" && s.date === r.date && s.startTime.slice(0, 5) < r.endTime && r.startTime < s.endTime.slice(0, 5));
+      expect(clash).toBe(false);
+    }
+    // Không có khung live ⇒ không nêu ca cụ thể.
+    const q = handlingPlan({ outlook: o, today: "2026-09-10", sessions });
+    expect(q.levers.find((l) => l.id === "add_hours")!.slots ?? []).toEqual([]);
+  });
   test("giờ thêm tính theo GMV/giờ × co giãn (đo được < 1) chứ không theo GMV/giờ trung bình", () => {
     const hist: LiveSession[] = [];
     let i = 0;
