@@ -13,13 +13,14 @@ import {
   dataCoverage,
   gmvTree,
   likeForLike,
-  liveFunnelLite,
   nextWaveReadiness,
   targetFeasibility,
   type Cause,
   type DataCoverage,
   type GmvTree,
   type LiveFunnelLite,
+  type FunnelView,
+  funnelViews,
   type TargetFeasibility,
   type WaveReadiness
 } from "./channelHealth";
@@ -124,8 +125,10 @@ export interface ChannelCard {
   report: AccountRunRate | null;
   plan: HandlingPlan | null;
   tree: GmvTree | null;
-  /** Phễu LIVE (TikTok) cùng tập ca với `tree`; null khi ca chưa có impressions (Shopee không có số này). */
+  /** Phễu LIVE (TikTok) cùng tập ca với `tree`; TikTok: impressions → Views → clicks → Orders; Shopee: Viewers → ATC → Orders; null khi thiếu số. */
   funnel: LiveFunnelLite | null;
+  /** Hai cửa sổ xem phễu (Luỹ kế tháng / 7 ngày), ngưỡng báo động tính theo số ca từng cửa sổ. */
+  funnels: FunnelView[];
   feasibility: TargetFeasibility | null;
   wave: WaveReadiness | null;
   camp: CampOverrides | undefined;
@@ -234,7 +237,10 @@ export function buildChannelCard(x: ChannelCardInput): ChannelCard {
   const feasibility = rr && x.planSlots ? targetFeasibility(x.sessions, month, x.planSlots) : null;
   const dailyPairs = likeForLike(x.sessions, month, coverage.completeThrough, bucketOf, undefined, (k) => k === "daily");
   const tree = gmvTree(profileOf(platform).metrics, dailyPairs);
-  const funnel = liveFunnelLite(dailyPairs);
+  const funnelOf = profileOf(platform).liveFunnel;
+  const funnels = funnelViews({ sessions: x.sessions, funnelOf, through: coverage.completeThrough, month, bucketOf });
+  // Mặc định cho thẻ và câu hành động: luỹ kế tháng (~30 ca, ngưỡng chặt); chưa đủ ca thì lùi về 7 ngày.
+  const funnel = (funnels.find((f) => f.key === "mtd")?.funnel ?? funnels.find((f) => f.key === "week")?.funnel) ?? null;
   const openByDate = new Map<string, number>();
   for (const p of outlook.pending) if (p.kind === "open_slot") openByDate.set(p.date, (openByDate.get(p.date) ?? 0) + p.hours);
   const wave = month === today.slice(0, 7) ? nextWaveReadiness(x.sessions, openByDate, month, today, bucketOf) : null;
@@ -303,6 +309,7 @@ export function buildChannelCard(x: ChannelCardInput): ChannelCard {
     plan,
     tree,
     funnel,
+    funnels,
     feasibility,
     wave,
     camp,

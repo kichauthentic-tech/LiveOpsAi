@@ -46,10 +46,10 @@ export const WhySection: React.FC<{ card: ChannelCard; sessions: LiveSession[]; 
       <Sect title="Nguyên nhân và hành động đề xuất" sub="tháng đang chạy · cùng số với thẻ kênh" />
       <Card>
         <BlockHead title="Phân rã GMV/giờ · ngày Daily" />
-        {card.funnel && (
+        {card.funnels.length > 0 && (
           <div className="mb-4">
             <p className="text-xs font-bold text-[var(--text-muted)] mb-1.5">Phễu LIVE · chỗ đang gãy</p>
-            <LiveFunnel funnel={card.funnel} />
+            <LiveFunnel views={card.funnels} />
           </div>
         )}
         <TreeCard tree={card.tree} platform={platform} />

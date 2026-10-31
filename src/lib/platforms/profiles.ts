@@ -4,6 +4,7 @@ import { fmtKeyMetric, KEY_METRIC_GROUPS, KEY_METRICS, keyMetricsOfSessions, key
 import { byHost, splitUnassignedHost } from "../performance/hostPerformance";
 import { driverBreakdown, DRIVER_LABEL, type LiveStats } from "../report/monthlyReportInsights";
 import { METRIC } from "../metricGlossary";
+import { liveFunnelLite, shopeeFunnelLite, type LiveFunnelLite, type LikeForLike, type FunnelCv } from "../performance/channelHealth";
 import { byHostShopee, splitUnassignedShopee } from "../performance/shopeeHostPerformance";
 import { fmtShopeeMetric, SHOPEE_DRIVER_LABEL, SHOPEE_METRIC_GROUPS, SHOPEE_METRICS, shopeeDriverBreakdown, shopeeKeyMetricsOfSessions, shopeeMetricValue, type ShopeeKeyMetrics, type ShopeeMetricKey } from "../report/shopeeKeyMetrics";
 
@@ -113,6 +114,8 @@ export interface PlatformProfile {
   basketLabel: string;
   /** Bộ chỉ số tầng 2. */
   metrics: PlatformMetricSet;
+  /** Phễu LIVE của kênh (thẻ kênh Dashboard): TikTok impressions → Views → clicks → Orders; Shopee Viewers → ATC → Orders. */
+  liveFunnel: (l: LikeForLike, cvs?: FunnelCv) => LiveFunnelLite | null;
   /** Có file Shop Analytics (GMV cả shop theo ngày) ở Dữ Liệu Gốc — nhóm đối chứng "phần còn lại của shop", cột Total GMV. */
   hasShopAnalytics: boolean;
   /** Ghi chú cách tính dưới khối Key Metrics. */
@@ -183,6 +186,7 @@ export const PLATFORM_PROFILES: Record<ReportPlatform, PlatformProfile> = {
     viewsLabel: "Views",
     basketLabel: METRIC.aov,
     metrics: TIKTOK_METRICS,
+    liveFunnel: liveFunnelLite,
     briefKpis: [{ key: "views", label: "Views" }, { key: "ctr", label: "Product CTR" }],
     hasShopAnalytics: true,
     metricsNote: "",
@@ -226,6 +230,7 @@ export const PLATFORM_PROFILES: Record<ReportPlatform, PlatformProfile> = {
     viewsLabel: "Viewers",
     basketLabel: METRIC.abs,
     metrics: SHOPEE_METRICS_SET,
+    liveFunnel: shopeeFunnelLite,
     briefKpis: [{ key: "viewers", label: METRIC.viewers }, { key: "atc", label: METRIC.atc }],
     hasShopAnalytics: false,
     metricsNote: `Tên chỉ số theo file Shopee. GMV = Sales(Placed Order). ${METRIC.viewersPerHour} là số tự tính; ${METRIC.atc}, ${METRIC.orders}, ${METRIC.abs}, ${METRIC.itemsSoldShopee} chỉ tính trên các ca đã có file Live List.`,

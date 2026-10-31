@@ -1,7 +1,7 @@
 import type { LiveSession } from "../../types";
 import type { ReportPlatform } from "../reportPlatform";
 import type { ChannelCard } from "./channelCard";
-import type { GmvTree, LiveFunnelLite } from "./channelHealth";
+import type { FunnelView, GmvTree, LiveFunnelLite } from "./channelHealth";
 import { LANDING_LABEL } from "./forecastCone";
 import { isCountable } from "./hostPerformance";
 
@@ -76,6 +76,7 @@ export interface AccountRow {
   rescue: AccountRescue;
   tree: GmvTree | null;
   funnel: LiveFunnelLite | null;
+  funnels: FunnelView[];
   hours: AccountHours | null;
   waiting: number;
   /** Ngày có ca live gần nhất trước tháng (chỉ khi tháng này không chạy). */
@@ -170,6 +171,7 @@ export function accountRow(card: ChannelCard, sessions: LiveSession[] = []): Acc
     rescue,
     tree: card.state === "live" ? card.tree : null,
     funnel: card.state === "live" ? card.funnel : null,
+    funnels: card.state === "live" ? card.funnels : [],
     hours,
     waiting: card.coverage.missingSessions,
     lastLive
@@ -233,7 +235,7 @@ export function accountActions(r: AccountRow, today: string, fmtMoney: (v: numbe
   const w = r.tree?.worst;
   if (w && w.change < -0.03) out.push(`Yếu tố giảm mạnh nhất: ${w.label} −${vnNum(Math.abs(w.change) * 100, Math.abs(w.change) < 0.1 ? 1 : 0)}% · Đầu mối xử lý: ${leverOwner[w.label] ?? "xem chi tiết từng ca"}.`);
   const fw = r.funnel?.worst;
-  if (fw && fw.label !== w?.label) out.push(`Phễu LIVE gãy ở ${fw.label} −${vnNum(Math.abs(fw.change!) * 100, Math.abs(fw.change!) < 0.1 ? 1 : 0)}% · Đầu mối xử lý: ${leverOwner[fw.label] ?? "xem chi tiết từng ca"}.`);
+  if (fw && fw.label !== w?.label) out.push(`Phễu LIVE (${r.funnel?.windowTab ?? "kỳ gần nhất"}) gãy ở ${fw.label} −${vnNum(Math.abs(fw.change!) * 100, Math.abs(fw.change!) < 0.1 ? 1 : 0)}%, vượt ngưỡng dao động ±${vnNum((fw.band ?? 0) * 100)}% · Đầu mối xử lý: ${leverOwner[fw.label] ?? "xem chi tiết từng ca"}.`);
   if (r.hours && x.kind !== "no_schedule") {
     if (r.hours.gap > 0.5) out.push(`Còn ${vnNum(r.hours.gap)} giờ cam kết chưa xếp lịch live.`);
     else if (r.hours.gap < -0.5 && (x.kind === "cannot" || x.kind === "save")) out.push(`Giờ đã live + đã xếp vượt cam kết ${vnNum(-r.hours.gap)} giờ.`);

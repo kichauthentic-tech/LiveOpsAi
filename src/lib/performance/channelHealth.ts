@@ -3,6 +3,7 @@ import { addDays, eachDay, isoWeekStart } from "../dateUtils";
 import { sessionDurationHours } from "../pnl";
 import { CampDayBucket, resolveCampBucketType } from "../campaignDays";
 import { METRIC } from "../metricGlossary";
+import { noiseBand } from "../report/brandReport";
 import { fmtVndShort } from "../format";
 import type { MetricTotals, PlatformMetricSet } from "../platforms/profiles";
 import { assertOnePlatform } from "../platforms/perf";
@@ -195,32 +196,121 @@ export interface GmvTree {
 }
 
 export interface FunnelStep { label: string; prev: number; cur: number }
-export interface FunnelRate { label: string; prev: number | null; cur: number | null; change: number | null }
+export interface FunnelRate {
+  label: string;
+  prev: number | null;
+  cur: number | null;
+  change: number | null;
+  /** Ngưỡng "gãy rõ" = dao động 95% (phân số, 0,18 = ±18%) theo số ca của hai kỳ đang so và hệ số dao động đo trên chính kênh này. */
+  band: number | null;
+  /** Ngưỡng "chú ý" = dao động 80% của cùng công thức (hẹp hơn `band`). */
+  watchBand: number | null;
+  /** Đổi vượt ngưỡng 95% (cả tăng lẫn giảm): giảm = gãy rõ, tăng = tốt rõ. */
+  sig: boolean;
+  /** Đổi vượt ngưỡng 80% nhưng chưa tới 95% — chỉ để ý, chưa phải hành động. */
+  watch: boolean;
+}
 export interface LiveFunnelLite {
-  /** LIVE impressions → Views → Product clicks → Orders, tổng các ca like-for-like. */
+  /** TikTok: LIVE impressions → Views → Product clicks → Orders; Shopee: Viewers → ATC → Orders. Tổng các ca ghép cặp. */
   steps: FunnelStep[];
-  /** ERR (Views ÷ impressions) · LIVE CTR (Product clicks ÷ Views) · CTOR (Orders ÷ Product clicks): tỷ lệ giữa các bậc. */
+  /** Tỷ lệ giữa các bậc (TikTok: ERR · LIVE CTR · CTOR; Shopee: ATC/Viewer · Orders/ATC). */
   rates: FunnelRate[];
-  /** Tỷ lệ giảm nhiều nhất (null khi không tỷ lệ nào giảm quá 3%). */
+  /** Tỷ lệ GIẢM vượt ngưỡng dao động, giảm nhiều nhất (null khi không tỷ lệ nào giảm vượt ngưỡng). */
   worst: FunnelRate | null;
+  /** Số ca có số ở kỳ này / kỳ so — ngưỡng dao động tính từ đây. */
+  curSessions: number;
+  prevSessions: number;
+  /** Tên cửa sổ đã dựng phễu (Luỹ kế tháng / 7 ngày) — gắn bởi funnelViews. */
+  windowTab?: string;
 }
 
+/** Một cửa sổ xem phễu (Luỹ kế tháng / 7 ngày); `funnel` null ⇒ `empty` nói vì sao chưa kết luận. */
+export interface FunnelView {
+  key: "mtd" | "week";
+  tab: string;
+  /** Câu mô tả kỳ đang so, vd "29/10 so với 22/10". */
+  sub: string;
+  funnel: LiveFunnelLite | null;
+  empty: string | null;
+  /** Cảnh báo cách ghép (vd kỳ này nhiều ngày Campaign hơn kỳ so) — tỷ lệ có thể lệch vì loại ngày, đọc kèm. */
+  note: string | null;
+}
+
+// ---- hệ số dao động theo từng bậc phễu --------------------------------------------------------------------------
+// Đo 31/10/2026 trên 1.075 ca TikTok / 373 ca Shopee đã chạy: CV của tỷ lệ MỘT ca trong nhóm tháng × loại ngày × buổi — ERR 0,22 ·
+// LIVE CTR 0,23 · CTOR 0,32 · Orders/ATC 0,42 · ATC/Viewer 0,75 (chỉ 6 nhóm, kẹp 0,60). Dùng làm mặc định khi kênh chưa đủ ca để tự đo.
+interface FunnelRateDef { label: string; num: (s: LiveSession) => number | null | undefined; den: (s: LiveSession) => number | null | undefined; cv: number }
+const TIKTOK_RATES: FunnelRateDef[] = [
+  { label: METRIC.err, num: (s) => s.totalViews, den: (s) => s.impressions, cv: 0.22 },
+  { label: METRIC.liveCtr, num: (s) => s.productClicks, den: (s) => s.totalViews, cv: 0.23 },
+  { label: METRIC.ctor, num: (s) => s.totalOrders, den: (s) => s.productClicks, cv: 0.32 }
+];
+const SHOPEE_RATES: FunnelRateDef[] = [
+  { label: METRIC.atcRate, num: (s) => s.report?.atcCount, den: (s) => s.totalViews, cv: 0.6 },
+  { label: `${METRIC.orders}/${METRIC.atc}`, num: (s) => s.totalOrders, den: (s) => s.report?.atcCount, cv: 0.42 }
+];
+const CV_MIN = 0.15, CV_MAX = 0.6;
+export type FunnelCv = Record<string, number>;
+
+/** CV của tỷ lệ MỘT ca đo trên chính kênh (nhóm tháng × cuối tuần/ngày thường × buổi, gộp theo bậc tự do). Cần ≥ 30 ca nằm trong nhóm ≥ 3 ca, không thì dùng mặc định. */
+export function estimateFunnelCv(sessions: LiveSession[]): FunnelCv {
+  const out: FunnelCv = {};
+  const ran = sessions.filter(isCountable);
+  for (const def of [...TIKTOK_RATES, ...SHOPEE_RATES]) {
+    const groups = new Map<string, number[]>();
+    for (const s of ran) {
+      const n = def.num(s), d = def.den(s);
+      if (n == null || !(n >= 0) || !(d != null && d > 0)) continue;
+      const h = (new Date(s.actualStartAt ?? s.startTime).getUTCHours() + 7) % 24;
+      const dow = new Date(`${s.date}T00:00:00Z`).getUTCDay();
+      const key = `${s.date.slice(0, 7)}|${dow === 0 || dow === 6 ? "we" : "wd"}|${h < 12 ? "s" : h < 17 ? "c" : "t"}`;
+      (groups.get(key) ?? groups.set(key, []).get(key)!).push(n / d);
+    }
+    let used = 0, df = 0, ss = 0;
+    for (const xs of groups.values()) {
+      if (xs.length < 3) continue;
+      const mean = xs.reduce((a, b) => a + b, 0) / xs.length;
+      if (mean <= 0) continue;
+      const v = xs.reduce((a, b) => a + (b - mean) ** 2, 0) / (xs.length - 1);
+      used += xs.length;
+      df += xs.length - 1;
+      ss += ((xs.length - 1) * v) / (mean * mean);
+    }
+    if (used >= 30 && df > 0) out[def.label] = Math.min(CV_MAX, Math.max(CV_MIN, Math.sqrt(ss / df)));
+  }
+  return out;
+}
+
+const Z95 = 1.96, Z80 = 1.28;
+
+function funnelRate(def: FunnelRateDef, pn: number, pd: number, cn: number, cd: number, nPrev: number, nCur: number, cvs: FunnelCv): FunnelRate {
+  const a = pd > 0 ? (pn / pd) * 100 : null, b = cd > 0 ? (cn / cd) * 100 : null;
+  const change = a && b != null ? b / a - 1 : null;
+  const bandPct = noiseBand(nPrev, nCur, cvs[def.label] ?? def.cv);
+  const band = bandPct == null ? null : bandPct / 100;
+  const watchBand = band == null ? null : (band * Z80) / Z95;
+  const abs = change == null ? 0 : Math.abs(change);
+  const sig = band != null && abs > band;
+  return { label: def.label, prev: a, cur: b, change, band, watchBand, sig, watch: !sig && watchBand != null && abs > watchBand };
+}
+const worstRate = (rates: FunnelRate[]) => [...rates].filter((r) => r.sig && r.change! < 0).sort((a, b) => a.change! - b.change!)[0] ?? null;
+/** Tỷ lệ giảm trong khoảng chú ý (80%–95%), giảm nhiều nhất — hiện ở thẻ nhưng KHÔNG vào Hành động đề xuất. */
+export const watchRate = (f: LiveFunnelLite) => [...f.rates].filter((r) => r.watch && r.change! < 0).sort((a, b) => a.change! - b.change!)[0] ?? null;
+
 /** Phễu LIVE TikTok cùng tập ca với cây GMV/giờ. Thiếu impressions ở một vế (ca cũ chưa có số) ⇒ null. */
-export function liveFunnelLite(l: LikeForLike): LiveFunnelLite | null {
+export function liveFunnelLite(l: LikeForLike, cvs: FunnelCv = {}): LiveFunnelLite | null {
   if (l.cur.length < MIN_COMPARE_SESSIONS || l.prev.length < MIN_COMPARE_SESSIONS) return null;
+  const has = (s: LiveSession) => (s.impressions ?? 0) > 0;
+  const cur = l.cur.filter(has), prev = l.prev.filter(has);
   const sum = (xs: LiveSession[]) => xs.reduce((a, s) => ({ imp: a.imp + (s.impressions ?? 0), views: a.views + (s.totalViews ?? 0), clicks: a.clicks + (s.productClicks ?? 0), orders: a.orders + (s.totalOrders ?? 0) }), { imp: 0, views: 0, clicks: 0, orders: 0 });
-  const p = sum(l.prev), c = sum(l.cur);
-  if (p.imp <= 0 || c.imp <= 0 || p.views <= 0 || c.views <= 0) return null;
-  const rate = (label: string, pn: number, pd: number, cn: number, cd: number): FunnelRate => {
-    const a = pd > 0 ? (pn / pd) * 100 : null, b = cd > 0 ? (cn / cd) * 100 : null;
-    return { label, prev: a, cur: b, change: a && b != null ? b / a - 1 : null };
-  };
+  const p = sum(prev), c = sum(cur);
+  if (cur.length < MIN_COMPARE_SESSIONS || prev.length < MIN_COMPARE_SESSIONS || p.views <= 0 || c.views <= 0) return null;
+  const [err, ctr, ctor] = TIKTOK_RATES;
   const rates = [
-    rate(METRIC.err, p.views, p.imp, c.views, c.imp),
-    rate(METRIC.liveCtr, p.clicks, p.views, c.clicks, c.views),
-    rate(METRIC.ctor, p.orders, p.clicks, c.orders, c.clicks)
+    funnelRate(err, p.views, p.imp, c.views, c.imp, prev.length, cur.length, cvs),
+    funnelRate(ctr, p.clicks, p.views, c.clicks, c.views, prev.length, cur.length, cvs),
+    funnelRate(ctor, p.orders, p.clicks, c.orders, c.clicks, prev.length, cur.length, cvs)
   ];
-  const worst = [...rates].filter((r) => r.change != null && r.change < -0.03).sort((a, b) => a.change! - b.change!)[0] ?? null;
   return {
     steps: [
       { label: METRIC.liveImpressions, prev: p.imp, cur: c.imp },
@@ -229,8 +319,95 @@ export function liveFunnelLite(l: LikeForLike): LiveFunnelLite | null {
       { label: METRIC.orders, prev: p.orders, cur: c.orders }
     ],
     rates,
-    worst
+    worst: worstRate(rates),
+    curSessions: cur.length,
+    prevSessions: prev.length
   };
+}
+
+/** Phễu LIVE Shopee (Live List): Viewers → ATC → Orders. Chỉ cộng các ca có số ATC — ca thiếu ATC không được kéo tỷ lệ xuống. */
+export function shopeeFunnelLite(l: LikeForLike, cvs: FunnelCv = {}): LiveFunnelLite | null {
+  const has = (s: LiveSession) => s.report?.atcCount != null;
+  const cur = l.cur.filter(has), prev = l.prev.filter(has);
+  if (cur.length < MIN_COMPARE_SESSIONS || prev.length < MIN_COMPARE_SESSIONS) return null;
+  const sum = (xs: LiveSession[]) => xs.reduce((a, s) => ({ viewers: a.viewers + (s.totalViews ?? 0), atc: a.atc + (s.report?.atcCount ?? 0), orders: a.orders + (s.totalOrders ?? 0) }), { viewers: 0, atc: 0, orders: 0 });
+  const p = sum(prev), c = sum(cur);
+  if (p.viewers <= 0 || c.viewers <= 0 || p.atc <= 0 || c.atc <= 0) return null;
+  const [atcRate, orderAtc] = SHOPEE_RATES;
+  const rates = [
+    funnelRate(atcRate, p.atc, p.viewers, c.atc, c.viewers, prev.length, cur.length, cvs),
+    funnelRate(orderAtc, p.orders, p.atc, c.orders, c.atc, prev.length, cur.length, cvs)
+  ];
+  return {
+    steps: [
+      { label: METRIC.viewers, prev: p.viewers, cur: c.viewers },
+      { label: METRIC.atc, prev: p.atc, cur: c.atc },
+      { label: METRIC.orders, prev: p.orders, cur: c.orders }
+    ],
+    rates,
+    worst: worstRate(rates),
+    curSessions: cur.length,
+    prevSessions: prev.length
+  };
+}
+
+/** Ghép ngày theo thứ: mỗi ngày trong `span` ngày kết thúc ở `end` ghép với đúng ngày đó TUẦN TRƯỚC. `sameType` = chỉ giữ cặp cùng loại ngày (Campaign↔Campaign); dashboard không dùng (xem funnelViews). */
+export function weekdayPairedLikeForLike(sessions: LiveSession[], end: string, span: number, bucketOf: (d: string) => CampDayBucket, sameType = true): LikeForLike {
+  const pairs = new Map<string, string>();
+  for (const d of eachDay(addDays(end, -(span - 1)), end)) {
+    const pd = addDays(d, -7);
+    if (!sameType || bucketOf(d) === bucketOf(pd)) pairs.set(d, pd);
+  }
+  const prevSet = new Set(pairs.values());
+  return { pairs, cur: sessions.filter((s) => pairs.has(s.date) && isCountable(s)), prev: sessions.filter((s) => prevSet.has(s.date) && isCountable(s)) };
+}
+
+const ddmm = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
+
+/** Luỹ kế tháng: mọi ngày từ mùng 1 tới `through` ghép với CÙNG ngày-của-tháng ở tháng trước (ngày không có ở tháng trước thì bỏ). Không phân loại ngày: mỗi tháng có đúng một bộ ngày Campaign nên hai khoảng tự cân (đo T9/T10: lệch 0 ngày). */
+export function monthToDateLikeForLike(sessions: LiveSession[], month: string, through: string): LikeForLike {
+  const pairs = new Map<string, string>();
+  const [y, m] = month.split("-").map(Number);
+  const prevMonth = new Date(Date.UTC(y, m - 2, 1)).toISOString().slice(0, 7);
+  const prevLen = new Date(Date.UTC(y, m - 1, 0)).getUTCDate();
+  const last = through.slice(0, 7) === month ? Number(through.slice(8, 10)) : through > month ? 31 : 0;
+  for (let d = 1; d <= last; d++) if (d <= prevLen) pairs.set(`${month}-${String(d).padStart(2, "0")}`, `${prevMonth}-${String(d).padStart(2, "0")}`);
+  const prevSet = new Set(pairs.values());
+  return { pairs, cur: sessions.filter((s) => pairs.has(s.date) && isCountable(s)), prev: sessions.filter((s) => prevSet.has(s.date) && isCountable(s)) };
+}
+
+/**
+ * Hai cửa sổ xem phễu cho thẻ kênh (chỉ so cùng kỳ, KHÔNG ghép theo loại ngày — đo 31/10 thì ghép loại ngày làm mất hơn nửa số ca và nhiễu hơn):
+ * **Luỹ kế tháng** (mùng 1 → ngày đủ số gần nhất so với tháng trước cùng khoảng ngày; mặc định, ~30 ca) và **7 ngày** (so 7 ngày liền trước,
+ * ghép cùng thứ; cảnh báo sớm). Ngưỡng báo động tính theo số ca của từng cửa sổ. Hai kỳ lệch số ngày Campaign ⇒ `note`.
+ */
+export function funnelViews(x: {
+  sessions: LiveSession[];
+  funnelOf: (l: LikeForLike, cvs: FunnelCv) => LiveFunnelLite | null;
+  through: string | null;
+  month: string;
+  bucketOf: (d: string) => CampDayBucket;
+}): FunnelView[] {
+  const cvs = estimateFunnelCv(x.sessions);
+  const bucket = (d: string) => (d.slice(0, 7) === x.month ? x.bucketOf(d) : resolveCampBucketType(d));
+  const camps = (ds: Iterable<string>) => [...ds].filter((d) => bucket(d) !== "daily").length;
+  const thin = (l: LikeForLike) => (l.pairs.size === 0 ? "Chưa có ngày đủ số để so." : `Mới ${l.cur.length} ca kỳ này và ${l.prev.length} ca kỳ so — cần ≥ ${MIN_COMPARE_SESSIONS} ca có số ở mỗi kỳ.`);
+  const mk = (key: FunnelView["key"], tab: string, sub: string, l: LikeForLike): FunnelView => {
+    const raw = x.funnelOf(l, cvs);
+    const funnel = raw ? { ...raw, windowTab: tab } : null;
+    const a = camps(l.pairs.keys()), b = camps(l.pairs.values());
+    const note = funnel && a !== b ? `Kỳ này có ${a} ngày Campaign, kỳ so ${b} — tỷ lệ có thể lệch vì camp, đọc kèm.` : null;
+    return { key, tab, sub, funnel, empty: funnel ? null : thin(l), note };
+  };
+  const E = x.through;
+  const none: LikeForLike = { pairs: new Map<string, string>(), cur: [], prev: [] };
+  const mtd = E ? monthToDateLikeForLike(x.sessions, x.month, E) : none;
+  const week = E ? weekdayPairedLikeForLike(x.sessions, E, 7, bucket, false) : none;
+  const mtdDays = [...mtd.pairs.keys()].sort(), mtdPrev = [...mtd.pairs.values()].sort();
+  return [
+    mk("mtd", "Luỹ kế tháng", mtdDays.length ? `${ddmm(mtdDays[0])}–${ddmm(mtdDays[mtdDays.length - 1])} so với ${ddmm(mtdPrev[0])}–${ddmm(mtdPrev[mtdPrev.length - 1])}` : "chưa có ngày đủ số", mtd),
+    mk("week", "7 ngày", E ? `${ddmm(addDays(E, -6))}–${ddmm(E)} so với 7 ngày liền trước, ghép cùng thứ` : "chưa có ngày đủ số", week)
+  ];
 }
 
 /** Cây GMV/giờ ngày thường, cùng loại ngày. Thiếu ca ở một vế (< 3 ca) ⇒ null — không kết luận trên 1–2 ca. */
