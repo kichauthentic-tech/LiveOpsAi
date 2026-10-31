@@ -87,7 +87,7 @@ export function PlanMonthGrid(p: Props) {
 
   return (
     <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 overflow-x-auto">
-      <div className="grid grid-cols-[repeat(7,minmax(0,1fr))_minmax(96px,0.8fr)] gap-1.5 min-w-[1000px]">
+      <div className="grid grid-cols-[repeat(7,minmax(0,1fr))_minmax(120px,0.8fr)] gap-1.5 min-w-[1200px]">
         {WEEKDAY_LABELS.map((w, i) => (
           <div key={w} className={`text-center text-[11px] font-bold py-1 rounded-lg ${i >= 5 ? "text-rose-300 bg-rose-950/30" : "text-[var(--text-faint)] bg-[var(--surface-base)]"}`}>{w}</div>
         ))}
@@ -127,6 +127,8 @@ function DayCell({ day, p, onEdit, editingKey }: { day: string; p: Props; onEdit
   const isBlackout = p.blackoutDates.includes(day);
   const sum = summarizePlanSpan([day], list, p.outcomeOf);
   const label = p.labelOf(day);
+  const fc = list.filter((d) => d.expectedGmv !== undefined && !p.outcomeOf(d));
+  const fcSum = fc.reduce((a, d) => a + (d.expectedGmv ?? 0), 0);
   return (
     <div className={`min-h-[84px] rounded-xl border p-1.5 flex flex-col gap-1 ${isBlackout ? "bg-[var(--surface-base)] border-dashed border-rose-800 opacity-70" : style ? style.cell : "bg-[var(--surface-base)] border-[var(--border)]"}`}>
       <div className="flex items-center justify-between gap-1">
@@ -141,6 +143,7 @@ function DayCell({ day, p, onEdit, editingKey }: { day: string; p: Props; onEdit
           )}
         </span>
       </div>
+      {fc.length > 0 && <div className="text-[11px] text-sky-300 tabular-nums" title="Tổng dự báo các ca chưa chạy trong ngày">dự báo ngày {fmtVndShort(fcSum)}</div>}
       {label && <div className="text-[11px] text-[var(--accent-text)] truncate" title={label}>{label}</div>}
       {isBlackout && <div className="text-[11px] text-rose-400 font-bold">cấm live</div>}
       {list.map((d) => <SlotChip key={d.key} d={d} p={p} active={d.key === editingKey} onEdit={onEdit} />)}
@@ -160,6 +163,8 @@ function SlotChip({ d, p, active, onEdit }: { d: PlanDraftSlot; p: Props; active
   const staffed = p.isStaffed(d);
   const unsynced = p.locked && !d.slotId;
   let right: React.ReactNode;
+  // Dự báo hiện ngay trên ô cho ca chưa có số thực (ca đã có kết quả thì thấy thực đạt).
+  const showForecast = d.expectedGmv !== undefined && (!o || o.state === "no_data");
   let border = "border-[var(--border)]";
   let title = `${d.startTime}–${d.endTime} · target ${fmtVndShort(d.targetGmv)}`;
   if (o?.state === "done") {
@@ -175,7 +180,7 @@ function SlotChip({ d, p, active, onEdit }: { d: PlanDraftSlot; p: Props; active
     border = "border-amber-800";
     title += " · đã qua giờ, chưa có số liệu";
   } else {
-    right = <span className={d.highExpectation ? "text-amber-400 font-bold" : "text-[var(--text)]"}>{d.targetGmv > 0 ? fmtVndShort(d.targetGmv) : "0"}</span>;
+    right = <span className="text-emerald-400 font-bold">{d.targetGmv > 0 ? fmtVndShort(d.targetGmv) : "0"}</span>;
     if (d.expectedGmv !== undefined) title += ` · dự báo ${fmtVndShort(d.expectedGmv)}`;
     if (d.highExpectation) title += " · target cao hơn dự báo";
   }
@@ -189,13 +194,20 @@ function SlotChip({ d, p, active, onEdit }: { d: PlanDraftSlot; p: Props; active
       data-plan-chip
       onClick={(e) => onEdit(d, e.currentTarget)}
       title={title}
-      className={`w-full min-h-6 flex items-center justify-between gap-1 rounded-md border px-1.5 text-[11px] tabular-nums ${unsynced ? "border-dashed border-[var(--accent)]/70" : border} ${active ? "ring-1 ring-[var(--accent)]" : ""} ${o?.state === "cancelled" ? "opacity-60 line-through" : ""} bg-[var(--surface)] hover:bg-[var(--surface-hover)]`}
+      className={`w-full min-h-8 py-1 flex items-center justify-between gap-2 rounded-lg border px-2.5 text-xs tabular-nums ${unsynced ? "border-dashed border-[var(--accent)]/70" : border} ${active ? "ring-1 ring-[var(--accent)]" : ""} ${o?.state === "cancelled" ? "opacity-60 line-through" : ""} bg-[var(--surface)] hover:bg-[var(--surface-hover)]`}
     >
       <span className="text-[var(--text-muted)] flex items-center gap-1">
         {staffed && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" aria-hidden />}
         {hm(d.startTime)}–{hm(d.endTime)}
       </span>
-      {right}
+      <span className="flex flex-col items-end leading-tight">
+        {right}
+        {showForecast && (
+          <span className={`text-[10px] font-medium ${d.highExpectation ? "text-orange-400" : "text-[var(--text-faint)] opacity-70"}`} title={`Dự báo ${fmtVndShort(d.expectedGmv!)}${d.highExpectation ? " — thấp hơn target" : ""}`}>
+            {fmtVndShort(d.expectedGmv!)}
+          </span>
+        )}
+      </span>
     </button>
   );
 }
