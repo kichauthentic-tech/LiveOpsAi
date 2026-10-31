@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { cleanReserve, pickReserve, reserveKey, reserveLadder, reservePoolHours, suggestReservePool } from "../src/lib/scheduling/reservePlan";
+import { baseShortfall, cleanReserve, pickReserve, reserveBudget, reserveKey, reserveLadder, reservePoolHours, suggestReservePool } from "../src/lib/scheduling/reservePlan";
 import type { ReserveSlot } from "../src/types";
 
 const R = (date: string, startTime: string, endTime: string, expectedGmv: number): ReserveSlot => ({ date, startTime, endTime, expectedGmv });
@@ -80,5 +80,35 @@ describe("ca dự phòng trong phương án xử lý", () => {
     const pool = [R("2026-11-14", "20:00", "23:00", 60), R("2026-11-16", "20:00", "23:00", 50)];
     const opened = new Set(["2026-11-14|20:00|23:00"]);
     expect(pickReserve(pool, 3, "2026-11-13", opened).picked.map((r) => r.date)).toEqual(["2026-11-16"]);
+  });
+});
+
+describe("quy mô nhóm dự phòng theo chênh lệch target ↔ dự báo", () => {
+  const slots = Array.from({ length: 24 }, (_, i) => ({ date: `2026-11-${String(i + 5).padStart(2, "0")}`, hours: 3, forecast: 5_000_000 }));
+  const cp = [{ key: "after_dday" as const, date: "2026-11-13" }, { key: "after_midmonth" as const, date: "2026-11-16" }, { key: "day20" as const, date: "2026-11-20" }];
+
+  test("baseShortfall: dự báo đã đạt target ⇒ 0; thiếu 10% ⇒ 0,1", () => {
+    expect(baseShortfall(100, 120)).toBe(0);
+    expect(baseShortfall(100, 90)).toBeCloseTo(0.1);
+    expect(baseShortfall(0, 90)).toBe(0);
+  });
+
+  test("target cao hơn dự báo nhiều ⇒ nhóm dự phòng lớn hơn và chạm trần được báo", () => {
+    const base = { checkpoints: cp, target: 100_000_000, slots, elasticity: 0.82, cap: 0.3, slotHours: 3 };
+    const small = reserveBudget({ ...base, shortfall: 0 })!;
+    const mid = reserveBudget({ ...base, shortfall: 0.1 })!;
+    const huge = reserveBudget({ ...base, shortfall: 0.5 })!;
+    expect(mid.hours).toBeGreaterThan(small.hours);
+    expect(small.capped).toBe(false);
+    expect(huge.capped).toBe(true);
+    expect(huge.hours).toBeLessThanOrEqual(21 * 3 * 0.3 + 1e-9);
+    expect(mid.hours % 3).toBe(0);
+  });
+
+  test("giữ phần cho mốc sau: mốc đầu dùng tối đa 60% giờ dự phòng, mốc giữa dùng được nhiều hơn", () => {
+    const pool = Array.from({ length: 6 }, (_, i) => R(`2026-11-${String(21 + i).padStart(2, "0")}`, "20:00", "23:00", 1_000_000 - i));
+    const rows = reserveLadder({ checkpoints: cp, target: 100_000_000, slots, pool, shortfalls: [0.3], elasticity: 0.82, cap: 0.3 });
+    expect(rows[0].pick!.hours).toBeLessThanOrEqual(18 * 0.6 + 1e-9);
+    expect(rows[1].pick!.hours).toBeGreaterThan(rows[0].pick!.hours);
   });
 });
