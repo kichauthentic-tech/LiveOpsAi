@@ -576,7 +576,10 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
   const fixedKeys = new Set<string>();
   for (const f of c.fixedSlots ?? []) {
     const start = toMin(f.startTime);
-    const end = toMin(f.endTime);
+    // Ca qua nửa đêm (21:00–00:00, 21:00–00:30): giờ kết thúc nhỏ hơn giờ bắt đầu — cộng 24h, không bỏ ca
+    // (trước 01/11/2026 `continue` làm engine coi ca tối mạnh nhất không tồn tại và bù thừa giờ ở chỗ khác).
+    const rawEnd = toMin(f.endTime);
+    const end = rawEnd < start || rawEnd === 0 ? 24 * 60 + rawEnd : rawEnd;
     if (end <= start) continue;
     const { gph, cells } = expectedGphFor(f.date, start, end, history, get, c.calibration);
     chosen.push({ date: f.date, start, end, hours: (end - start) / 60, bucket: resolveCampBucketType(f.date, c.camp), baseGph: gph, cellRefs: cells });
