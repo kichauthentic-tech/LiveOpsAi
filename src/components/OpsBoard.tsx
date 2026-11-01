@@ -18,6 +18,7 @@ import { PageHeader } from "./common/PageHeader";
 import { StatTile } from "./common/StatTile";
 import { SlotDetailModal } from "./scheduling/SlotDetailModal";
 import { DraftsPanel } from "./control-room/DraftsPanel";
+import { ShiftBenchmarkBoard } from "./control-room/ShiftBenchmarkBoard";
 import type { SessionDraft } from "../lib/db/sessionDrafts";
 import type { DraftEdit } from "../hooks/useSessionDrafts";
 import type { ShiftWindow } from "./OpsSupport";
@@ -550,6 +551,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
         }
       />
 
+      {isOps && <div hidden={view !== "day"}><ShiftBenchmarkBoard sessions={sessions} today={today} /></div>}
       {monthSeen && monthView && <div hidden={view !== "month"} className="space-y-4">{monthView}</div>}
       {/* Cả hai chế độ giữ nguyên khi chuyển qua lại (ẩn bằng `hidden`) — không dựng lại việc cần làm / không tải lại dữ liệu.
           Thứ tự DOM = thứ tự màn hẹp: Cần xử lý → việc cần làm → danh sách ca. Màn rộng: việc cần làm là cột phải dính khi cuộn. */}
