@@ -149,6 +149,10 @@ export interface PlanInput {
   range?: { from: string; to: string };
   /** Hệ số nhân giờ tối thiểu khi chỉ xếp một phần tháng (15/30 ⇒ 0,5). Mặc định 1. */
   minScale?: number;
+  /** Chỉ báo khối lượng của lịch hiện có (ca + nháp), không xếp thêm ai. */
+  reportOnly?: boolean;
+  /** Báo khối lượng tính đến hết ngày này (mốc chốt); mặc định hết tháng. */
+  loadTo?: string;
 }
 
 export interface PlannedAssignment {
@@ -173,6 +177,8 @@ export interface PersonLoad {
   role: RosterRole;
   /** Giờ trong tháng đã có từ trước (ca đã lên lịch + nháp). */
   fixedHours: number;
+  /** Trong `fixedHours`: phần của ca MỞ đã có người nháp (chưa công bố). */
+  draftHours: number;
   /** Giờ do bộ xếp thêm. */
   plannedHours: number;
   hours: number;
@@ -296,7 +302,8 @@ export function planMonth(input: PlanInput): MonthPlan {
   const monthShifts = shifts.filter((s) => inMonth(s.date, month));
   const monthOpen = monthShifts.filter((s) => s.kind === "open");
   const inRange = (d: string) => !input.range || (d >= input.range.from && d <= input.range.to);
-  const targets = monthOpen.filter((s) => s.date >= today && inRange(s.date));
+  const targets = input.reportOnly ? [] : monthOpen.filter((s) => s.date >= today && inRange(s.date));
+  const loadTo = input.loadTo ?? `${month}-31`;
   const registeredIn = new Map<string, number>(); // talentId → số ca mở trong tháng đã báo rảnh
   for (const s of monthOpen) for (const t of s.registrants) registeredIn.set(t, (registeredIn.get(t) ?? 0) + 1);
 
@@ -388,7 +395,7 @@ export function planMonth(input: PlanInput): MonthPlan {
     }
   }
 
-  if (input.guaranteeMin) rebalance(input, roster, assignments, assigned, bounds, talentById);
+  if (input.guaranteeMin && !input.reportOnly) rebalance(input, roster, assignments, assigned, bounds, talentById);
 
   // ---- báo cáo khối lượng ----
   const planned = assignments.filter((a) => a.source === "plan");
@@ -400,7 +407,7 @@ export function planMonth(input: PlanInput): MonthPlan {
     let l = load.get(id);
     if (!l) {
       const b = bounds.get(id)!;
-      l = { talentId: id, role: primaryRole(t), fixedHours: 0, plannedHours: 0, hours: 0, min: b.min, max: b.max, shifts: 0, registered: registeredIn.get(id) ?? 0, cost: 0, costMissing: false, perf: perf.get(id), status: "ok" };
+      l = { talentId: id, role: primaryRole(t), fixedHours: 0, draftHours: 0, plannedHours: 0, hours: 0, min: b.min, max: b.max, shifts: 0, registered: registeredIn.get(id) ?? 0, cost: 0, costMissing: false, perf: perf.get(id), status: "ok" };
       load.set(id, l);
     }
     return l;
@@ -411,9 +418,10 @@ export function planMonth(input: PlanInput): MonthPlan {
     const l = ensure(id);
     if (!l) continue;
     for (const e of list) {
-      if (!inMonth(e.shift.date, month) || plannedKeys.has(`${e.shift.key}|${e.role}|${id}`)) continue;
+      if (!inMonth(e.shift.date, month) || e.shift.date > loadTo || plannedKeys.has(`${e.shift.key}|${e.role}|${id}`)) continue;
       const h = e.minutes / 60;
       l.fixedHours += h;
+      if (e.shift.kind === "open") l.draftHours += h;
       l.shifts += 1;
       const c = costOf(id, e.role, e.shift);
       l.cost += c.missing ? 0 : c.amount * (c.hourly ? h / shiftHours(e.shift) : 1);
@@ -423,7 +431,7 @@ export function planMonth(input: PlanInput): MonthPlan {
   for (const a of planned) {
     const l = ensure(a.talentId);
     const s = shiftByKey.get(a.shiftKey);
-    if (!l || !s) continue;
+    if (!l || !s || s.date > loadTo) continue;
     const h = shiftHours(s);
     l.plannedHours += h;
     l.shifts += 1;

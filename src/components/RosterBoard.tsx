@@ -37,6 +37,7 @@ import { MonthStrip, fmtWhen, type MonthAction, type MonthCard } from "./roster/
 import { monthStatus } from "../lib/roster/monthStatus";
 import { OpenMonthWizard } from "./roster/OpenMonthWizard";
 import { MonthPlanPanel } from "./roster/MonthPlanPanel";
+import { WorkloadTable } from "./roster/WorkloadTable";
 import { DEFAULT_BOUNDS, GOALS, GOAL_HINT, GOAL_LABEL, applyPlanRows, buildHostPerformance, daysInMonth, planMonth, releaseAutoFilled, type AutoFill, type MonthBounds, type PlanGoal } from "../lib/roster/monthPlanner";
 import { platformOf } from "../lib/reportPlatform";
 import type { EngineParams } from "../lib/scheduling/engineParams";
@@ -593,6 +594,11 @@ export const RosterBoard: React.FC<Props> = (p) => {
       setPlanNote(null);
       showToast(`Đã công bố ${published} ca của ${rangeWeeks.length} tuần, gửi ${notified} tin cho host/trợ`);
     });
+  // Khối lượng từng người theo lịch + nháp HIỆN CÓ (không xếp thêm), tính tới hết phạm vi đang chọn (1–15 hoặc cả tháng).
+  const workload = useMemo(() => {
+    const monthShifts = buildRosterShifts(p.sessions, p.shiftSlots, drafts, p.shiftRegistrations, addDays(`${viewMonth}-01`, -7), addDays(`${viewMonth}-31`, 7));
+    return planMonth({ shifts: monthShifts, month: viewMonth, today, goal, bounds, guaranteeMin: false, rules, talents: p.talents, history: p.talentRateHistory, fam: new Map(), perf: buildHostPerformance(p.sessions, today), brandRules, minScale: planMinScale, reportOnly: true, loadTo: planRange.to });
+  }, [p.sessions, p.shiftSlots, p.shiftRegistrations, drafts, viewMonth, today, goal, bounds, rules, p.talents, p.talentRateHistory, brandRules, planMinScale, planRange.to]);
   const clearAuto = () =>
     run(async () => {
       const freed = releaseAutoFilled(buildRosterShifts(p.sessions, p.shiftSlots, drafts, p.shiftRegistrations, `${viewMonth}-01`, planRange.to), auto, planRange);
@@ -850,13 +856,23 @@ export const RosterBoard: React.FC<Props> = (p) => {
                 Gỡ phần tự fill
               </button>
               <button type="button" onClick={() => openSection("plan")} className="px-2.5 py-1 rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]">
-                Khối lượng nhân sự
+                So sánh 3 mục tiêu
               </button>
             </div>
             <p className="text-[11px] text-[var(--text-muted)]">{planNote ?? "Chỉ lấy người đã đăng ký đúng ca, giữ giờ tối thiểu/tối đa và luật lịch. Bấm là ghi NHÁP ngay, talent chưa thấy; ô bạn tự xếp không bị ghi đè."}</p>
           </div>
           <WeekGrid weekStart={weekStart} channels={channels} shifts={wk} analysis={analysis} nameOf={nameOf} selectedKey={selectedKey} canAdd={!readOnly} onSelect={setSelectedKey} onAdd={addShift} channelMeta={channelMeta} />
         </div>
+        <section className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 space-y-2" aria-label="Khối lượng nhân sự">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-sm font-black text-[var(--text)]">Khối lượng nhân sự · {planScopeLabel}</h2>
+            <span className="text-[11px] text-[var(--text-muted)]">
+              {workload.totals.below} dưới tối thiểu · {workload.totals.over} vượt tối đa · tính theo ca đã lên lịch + nháp hiện có
+            </span>
+          </div>
+          <p className="text-[11px] text-[var(--text-muted)]">Thanh: đậm = ca đã lên lịch, nhạt = nháp chưa công bố; vạch đứng = giờ tối thiểu (đảm bảo thu nhập), cuối thanh = giờ tối đa.</p>
+          <WorkloadTable load={workload.load} nameOf={nameOf} showCost={showCost} />
+        </section>
         <aside className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 space-y-2" aria-label="Việc cần làm">
           <h2 className="flex items-baseline justify-between gap-2 text-sm font-black text-[var(--text)]">
             Việc cần làm
