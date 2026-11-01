@@ -14,7 +14,10 @@ import type {
 import { PNL_MISSING_LABEL } from "../lib/pnl";
 import type { MonthFeeInputs, TermsPeriod } from "../lib/commercial/terms";
 import { AccountingFeeDetail } from "./AccountingFeeDetail";
-import { HOUR_TOLERANCE, buildMonthClose, monthEndOf, type ContractRevenueRow, type RevenueBasis, type ShopRefundMonth, type TalentPayRow } from "../lib/accounting/monthClose";
+import { PnlStatementView } from "./PnlStatementView";
+import { buildDailyTrend, buildPnlStatement, buildPnlTrend } from "../lib/accounting/pnlStatement";
+import { shiftMonth } from "../lib/report/monthlySnapshot";
+import { HOUR_TOLERANCE, buildMonthClose, latestSettledReturnRates, monthEndOf, type ContractRevenueRow, type RevenueBasis, type ShopRefundMonth, type TalentPayRow } from "../lib/accounting/monthClose";
 import { fetchBrandContracts, fetchBrandMonthlyCommitments } from "../lib/db/brandContracts";
 import { fetchShopDaysMonthSlice } from "../lib/dataraw/monthlyProductSlice";
 import { downloadSheetsAsXlsx } from "../lib/exportXlsx";
@@ -165,7 +168,10 @@ export const Accounting: React.FC<AccountingProps> = ({
   const [month, setMonth] = useState(() => defaultViewMonth(today, sessions));
   const [contracts, setContracts] = useState<BrandContract[] | null>(null);
   const [commitments, setCommitments] = useState<BrandMonthlyCommitment[]>([]);
-  const [shopRefunds, setShopRefunds] = useState<{ month: string; byBrand: Record<string, ShopRefundMonth | undefined> } | null>(null);
+  // Hoàn của cả shop theo tháng: tháng đang xem + 3 tháng trước (tháng trước để so, cả ba để lấy % hoàn thật đã chốt gần nhất).
+  const [shopRefunds, setShopRefunds] = useState<{ month: string; byMonth: Record<string, Record<string, ShopRefundMonth | undefined>> } | null>(null);
+  const [view, setView] = useState<"pnl" | "detail">("pnl");
+  const lookbackMonths = useMemo(() => [-5, -4, -3, -2, -1].map((d) => shiftMonth(month, d)), [month]);
 
   useEffect(() => {
     let alive = true;
@@ -192,55 +198,55 @@ export const Accounting: React.FC<AccountingProps> = ({
   );
   useEffect(() => {
     let alive = true;
-    const start = `${month}-01`;
-    const end = monthEndOf(month);
+    const months = [month, ...lookbackMonths];
     Promise.all(
-      nmvBrandIds.map(async (id) => {
-        const slice = await fetchShopDaysMonthSlice(id, start, end);
-        if (!slice.hasAnyBatch || slice.days.length === 0) return [id, undefined] as const;
-        const v: ShopRefundMonth = {
-          gmv: slice.days.reduce((a, d) => a + d.gmv, 0),
-          refunds: slice.days.reduce((a, d) => a + d.refunds, 0),
-          lastDate: slice.days[slice.days.length - 1].date,
-          template: slice.template,
-          exportedAt: slice.exportedAt
-        };
-        return [id, v] as const;
+      months.map(async (m) => {
+        const pairs = await Promise.all(
+          nmvBrandIds.map(async (id) => {
+            const slice = await fetchShopDaysMonthSlice(id, `${m}-01`, monthEndOf(m));
+            if (!slice.hasAnyBatch || slice.days.length === 0) return [id, undefined] as const;
+            const v: ShopRefundMonth = {
+              gmv: slice.days.reduce((a, d) => a + d.gmv, 0),
+              refunds: slice.days.reduce((a, d) => a + d.refunds, 0),
+              lastDate: slice.days[slice.days.length - 1].date,
+              template: slice.template,
+              exportedAt: slice.exportedAt
+            };
+            return [id, v] as const;
+          })
+        );
+        return [m, Object.fromEntries(pairs)] as const;
       })
     )
-      .then((pairs) => {
-        if (alive) setShopRefunds({ month, byBrand: Object.fromEntries(pairs) });
+      .then((byMonth) => {
+        if (alive) setShopRefunds({ month, byMonth: Object.fromEntries(byMonth) });
       })
       .catch((e) => {
         if (!alive) return;
-        setShopRefunds({ month, byBrand: {} });
+        setShopRefunds({ month, byMonth: {} });
         showToast(`Không đọc được file Shop Analytics: ${errorMessage(e)}`);
       });
     return () => {
       alive = false;
     };
-  }, [month, nmvBrandIds, showToast]);
+  }, [month, lookbackMonths, nmvBrandIds, showToast]);
 
   const ready = contracts != null && (nmvBrandIds.length === 0 || shopRefunds?.month === month);
-  const close = useMemo(() => {
-    if (!ready) return null;
-    return buildMonthClose({
-      month,
-      today,
-      sessions,
-      talents,
-      brands,
-      financeRecords,
-      brandPlatformRates,
-      talentRateHistory,
-      brandPlatformRateHistory,
-      contracts: contracts ?? [],
-      commitments,
-      shopRefunds: shopRefunds?.month === month ? shopRefunds.byBrand : {},
-      termPeriods,
-      monthFeeInputs
-    });
+  const { close, prevClose, trend, daily } = useMemo(() => {
+    if (!ready) return { close: null, prevClose: null, trend: [], daily: { days: [], series: [] } };
+    const byMonth = shopRefunds?.month === month ? shopRefunds.byMonth : {};
+    const common = { today, sessions, talents, brands, financeRecords, brandPlatformRates, talentRateHistory, brandPlatformRateHistory, contracts: contracts ?? [], commitments, termPeriods, monthFeeInputs };
+    // % hoàn thật gần nhất đã chốt, chỉ lấy từ các tháng TRƯỚC tháng được tính (không tự lấy số của chính nó).
+    const priorOf = (m: string) => latestSettledReturnRates([shiftMonth(m, -3), shiftMonth(m, -2), shiftMonth(m, -1)], today, byMonth);
+    const prevMonth = shiftMonth(month, -1);
+    const closeOf = (m: string) => buildMonthClose({ ...common, month: m, shopRefunds: byMonth[m] ?? {}, priorReturnRates: priorOf(m) });
+    const cur = closeOf(month);
+    const prev = closeOf(prevMonth);
+    const older = [closeOf(shiftMonth(month, -2))]; // xu hướng chỉ so 3 tháng: tháng này, tháng trước, trước đó nữa
+    const three = [...older, prev, cur];
+    return { close: cur, prevClose: prev, trend: buildPnlTrend(three), daily: buildDailyTrend(cur) };
   }, [ready, month, today, sessions, talents, brands, financeRecords, brandPlatformRates, talentRateHistory, brandPlatformRateHistory, contracts, commitments, shopRefunds, termPeriods, monthFeeInputs]);
+  const statement = useMemo(() => (close ? buildPnlStatement(close, prevClose ?? undefined) : null), [close, prevClose]);
 
   function exportXlsx() {
     if (!close) return;
@@ -348,7 +354,7 @@ export const Accounting: React.FC<AccountingProps> = ({
       <PageHeader
         icon={Calculator}
         title="Kế Toán"
-        description={`Số tháng ${fmtMonth(month)} để đối chiếu với sổ sách: doanh thu theo hợp đồng, công talent, chi phí ca và lãi gộp. Chỉ tính từ dữ liệu trong app.`}
+        description={`P&L tháng ${fmtMonth(month)}: doanh thu theo hợp đồng, công talent, chi phí ca và lãi gộp; tab Đối chiếu có số chi tiết để khớp sổ sách. Chỉ tính từ dữ liệu trong app.`}
         actions={
           <>
             <MonthPicker value={month} onChange={setMonth} size="sm" />
@@ -368,6 +374,25 @@ export const Accounting: React.FC<AccountingProps> = ({
         <p role="status" className="text-sm text-[var(--text-muted)]">Đang nạp hợp đồng và dữ liệu tháng…</p>
       ) : (
         <>
+          <div role="tablist" aria-label="Chế độ xem" className="inline-flex gap-1 p-1 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-xs">
+            {([["pnl", "P&L"], ["detail", "Đối chiếu"]] as const).map(([k, label]) => (
+              <button
+                key={k}
+                type="button"
+                role="tab"
+                aria-selected={view === k}
+                onClick={() => setView(k)}
+                className={`px-3 py-1.5 rounded-lg border border-transparent min-h-[32px] transition-all ${view === k ? "seg-on" : "text-[var(--text-muted)] hover:text-[var(--text)]"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {view === "pnl" && statement && <PnlStatementView statement={statement} trend={trend} daily={daily} hasPrev={!!statement.prevTotal} onOpenDetail={() => setView("detail")} />}
+
+          {view === "detail" && (
+          <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <StatTile frame="card" label="Doanh thu" value={fmtVndFull(s.revenue)} hint={`tính được ${s.counted}/${s.total} ca`} />
             <StatTile frame="card" label="Công talent" value={fmtVndFull(s.talentPay)} hint="host + trợ live, ca tính được" />
@@ -533,6 +558,8 @@ export const Accounting: React.FC<AccountingProps> = ({
             people={close.assistants}
             empty="Tháng này chưa có công trợ live riêng."
           />
+          </>
+          )}
         </>
       )}
     </div>

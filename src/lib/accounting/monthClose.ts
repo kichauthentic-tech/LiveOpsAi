@@ -132,8 +132,20 @@ export interface MonthCloseSummary {
   total: number;
 }
 
+/** Lãi gộp một ca (đã tính được), để vẽ lãi/lỗ theo ngày. Chưa gồm điều chỉnh chốt cả tháng (NMV chốt, phí tháng của điều khoản). */
+export interface DailyPnlPoint {
+  date: string;
+  brandId: string;
+  brandName: string;
+  platform: ReportPlatform;
+  revenue: number;
+  cost: number;
+}
+
 export interface MonthClose {
   month: string;
+  /** Từng ca đã tính tiền, theo ngày của ca. */
+  daily: DailyPnlPoint[];
   contracts: ContractRevenueRow[];
   /** Người có làm host trong tháng (giờ trợ live của họ nằm ở cột riêng cùng dòng). */
   hosts: TalentPayRow[];
@@ -173,6 +185,32 @@ export interface MonthCloseInput {
   /** Điều khoản hợp tác (0191) + số nhập tháng để tính phí Ads/booking. Vắng = tính hoàn toàn theo cấu hình cũ. */
   termPeriods?: TermsPeriod[];
   monthFeeInputs?: MonthFeeInputs[];
+  /** % hoàn thật đã chốt gần nhất của từng brand (từ các tháng trước, file Shop Analytics) — dùng để ước tính NMV khi CRM chưa nhập % hoàn dự kiến. */
+  priorReturnRates?: Record<string, number>;
+}
+
+/** % hoàn dùng để ước tính NMV: CRM nhập tay > % hoàn thật tháng gần nhất đã chốt của chính brand > mặc định. */
+export function expectedReturnRate(crm: number | undefined, prior: number | undefined): { rate: number; source: "crm" | "prior" | "default" } {
+  if (crm != null && crm > 0) return { rate: crm, source: "crm" };
+  if (prior != null && prior >= 0) return { rate: prior, source: "prior" };
+  return { rate: DEFAULT_RETURN_RATE_ESTIMATE, source: "default" };
+}
+
+/** % hoàn thật chốt gần nhất của từng brand: duyệt các tháng (mới → cũ), lấy tháng đầu tiên đã chốt. */
+export function latestSettledReturnRates(
+  months: string[],
+  today: string,
+  byMonth: Record<string, Record<string, ShopRefundMonth | undefined>>
+): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const m of [...months].sort().reverse()) {
+    for (const [brandId, shop] of Object.entries(byMonth[m] ?? {})) {
+      if (out[brandId] != null) continue;
+      const r = settledReturnRate(m, today, shop);
+      if (r != null) out[brandId] = r;
+    }
+  }
+  return out;
 }
 
 export const monthEndOf = monthEndIso;
@@ -211,6 +249,7 @@ export function buildMonthClose(input: MonthCloseInput): MonthClose {
   const byContract = new Map<string, ContractRevenueRow>();
   // Phần phụ của từng dòng hợp đồng khi điều khoản hợp tác (0191) tham gia: ca đã tính, giai đoạn điều khoản đã chạm tới.
   const termsSide = new Map<string, { inputs: SessionFeeInput[]; periodIds: Set<string>; legacySessions: number; committedGmv?: number }>();
+  const daily: DailyPnlPoint[] = [];
   const estimateNotes: string[] = [];
   const definitionWarnings: string[] = [];
   for (const r of rows) {
@@ -268,6 +307,7 @@ export function buildMonthClose(input: MonthCloseInput): MonthClose {
     e.coHostPay += r.coHostPayout;
     e.studioCost += r.finance.studioCost;
     e.adsCost += sessionAdsCost(s);
+    daily.push({ date: s.date, brandId: s.brandId, brandName: s.brandName, platform, revenue: r.grossAgencyRev, cost: r.hostPayout + r.coHostPayout + r.finance.studioCost + sessionAdsCost(s) });
   }
 
   const rateOf = (brandId: string, platform: ReportPlatform) =>
@@ -289,6 +329,12 @@ export function buildMonthClose(input: MonthCloseInput): MonthClose {
     }
   };
 
+  const pushReturnSourceNote = (e: ContractRevenueRow, exp: { rate: number; source: "crm" | "prior" | "default" }) => {
+    const where = `${e.brandName} · ${profileOf(e.platform).label}`;
+    if (exp.source === "prior") estimateNotes.push(`${where}: CRM chưa nhập % hoàn dự kiến nên NMV ước tính theo % hoàn thật tháng gần nhất đã chốt của brand (${fmtFixed(exp.rate, 1)}%).`);
+    else if (exp.source === "default") estimateNotes.push(`${where}: CRM chưa nhập % hoàn dự kiến và chưa có tháng nào đã chốt nên NMV ước tính theo mặc định ${DEFAULT_RETURN_RATE_ESTIMATE}%.`);
+  };
+
   for (const e of byContract.values()) {
     const rate = rateOf(e.brandId, e.platform);
     const side = termsSide.get(e.key);
@@ -299,9 +345,8 @@ export function buildMonthClose(input: MonthCloseInput): MonthClose {
       const terms = period.terms;
       const pct = feeOf(terms, "pct_nmv");
       const needsReturn = (!!pct && pct.basis === "nmv") || terms.gmvBonus?.basis === "nmv";
-      const crmExpected = rate?.returnRate ?? 0;
-      const usesDefault = !(crmExpected > 0);
-      const expected = usesDefault ? DEFAULT_RETURN_RATE_ESTIMATE : crmExpected;
+      const exp = expectedReturnRate(rate?.returnRate, input.priorReturnRates?.[e.brandId]);
+      const expected = exp.rate;
       const hasRefundFile = profileOf(e.platform).dataRawTypes.includes("shop_analytics");
       const settled = needsReturn && hasRefundFile ? settledReturnRate(month, today, input.shopRefunds[e.brandId]) : undefined;
       const pure = side.legacySessions === 0 && side.periodIds.size === 1;
@@ -317,7 +362,7 @@ export function buildMonthClose(input: MonthCloseInput): MonthClose {
       const state = !needsReturn ? "none" : settled != null ? "final" : "estimate";
       e.basis = { kind: "terms", label: termsLabel(terms), returnRate: needsReturn ? settled ?? expected : undefined, state, mixedLegacy: side.legacySessions > 0 || side.periodIds.size > 1 };
       if (needsReturn && settled == null) {
-        if (usesDefault) estimateNotes.push(`${e.brandName} · ${profileOf(e.platform).label}: CRM chưa nhập % hoàn dự kiến nên NMV ước tính theo mặc định ${DEFAULT_RETURN_RATE_ESTIMATE}%.`);
+        pushReturnSourceNote(e, exp);
         pushRefundNotes(e, expected, hasRefundFile);
       }
       if (settlement.missing.length > 0) estimateNotes.push(`${e.brandName} · ${profileOf(e.platform).label}: thiếu ${settlement.missing.join("; ")} để tính đủ phí tháng.`);
@@ -329,9 +374,9 @@ export function buildMonthClose(input: MonthCloseInput): MonthClose {
     if (e.basis.kind === "hourly") {
       e.basis = { kind: "hourly", ratePerHour: rate?.ratePerHour ?? 0 };
     } else if (e.basis.kind !== "terms") {
-      const crmExpected = rate?.returnRate ?? 0;
-      const usesDefault = !(crmExpected > 0);
-      const expected = usesDefault ? DEFAULT_RETURN_RATE_ESTIMATE : crmExpected;
+      const exp = expectedReturnRate(rate?.returnRate, input.priorReturnRates?.[e.brandId]);
+      const expected = exp.rate;
+      const usesDefault = exp.source !== "crm";
       const commissionRate = e.basis.commissionRate;
       // Hoàn thật lấy từ file Shop Analytics: sàn nào không có loại file này (Shopee) thì luôn ước tính.
       const hasRefundFile = profileOf(e.platform).dataRawTypes.includes("shop_analytics");
@@ -350,7 +395,7 @@ export function buildMonthClose(input: MonthCloseInput): MonthClose {
         if (usesDefault) {
           e.revenue = (e.gmv * (1 - expected / 100) * commissionRate) / 100;
           e.revenueEstimate = e.revenue;
-          estimateNotes.push(`${e.brandName} · ${profileOf(e.platform).label}: CRM chưa nhập % hoàn dự kiến nên NMV ước tính theo mặc định ${DEFAULT_RETURN_RATE_ESTIMATE}%.`);
+          pushReturnSourceNote(e, exp);
         }
         pushRefundNotes(e, expected, hasRefundFile);
       }
@@ -450,6 +495,7 @@ export function buildMonthClose(input: MonthCloseInput): MonthClose {
 
   return {
     month,
+    daily,
     contracts,
     hosts,
     hourCheck,
