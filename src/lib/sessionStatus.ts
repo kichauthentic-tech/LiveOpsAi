@@ -21,8 +21,17 @@ export function effectiveStatus(s: LiveSession, nowMs: number): LiveSession["sta
   if (s.status === "Cancelled" || s.status === "Completed") return s.status;
   const [start, end] = sessionWindowMs(s);
   if (nowMs >= end) return "Completed";
-  if (nowMs >= start) return "Live Now";
+  if (nowMs >= start) return endedEarly(s, nowMs) ? "Completed" : "Live Now";
   return "Upcoming";
+}
+
+// Ca off sớm đã có kết quả (report "Kết thúc sớm" hoặc file số liệu cho thấy room đã tắt, live ngắn hơn kế hoạch ≥ 10p):
+// không chờ tới giờ kế hoạch mới thôi "Đang live" nhấp nháy — hiện luôn % Target.
+function endedEarly(s: LiveSession, nowMs: number): boolean {
+  if ((s.report?.earlyLeaveMinutes ?? 0) > 0) return true;
+  const endMs = s.actualEndAt ? Date.parse(s.actualEndAt) : NaN;
+  if (!Number.isFinite(endMs) || endMs > nowMs || !hasSessionData(s)) return false;
+  return durationDeviationInfo(s)?.kind === "early";
 }
 
 // Trả về ĐÚNG mảng đầu vào khi không ca nào đổi trạng thái — không phải tiết kiệm vài phép map,
