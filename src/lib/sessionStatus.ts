@@ -1,4 +1,4 @@
-import { LiveSession } from "../types";
+import { LiveSession, LiveSessionReport } from "../types";
 import { dataSourceTier } from "./dataSource";
 
 // Trạng thái HIỂN THỊ của ca theo giờ thật (audit N1, 0096). DB chỉ ghi 'Completed' khi có số liệu
@@ -100,6 +100,8 @@ export interface DurationDeviationInfo {
   minutes: number;
   plannedMinutes: number;
   liveMinutes: number;
+  /** Số lấy từ Report ca ops đã khai (không phải suy ra từ file). */
+  declared?: boolean;
   /** HH:MM giờ VN của room trong file — chỉ để tham khảo, có thể thiếu. */
   actualStart?: string;
   actualEnd?: string;
@@ -108,12 +110,31 @@ export interface DurationDeviationInfo {
 const vnClock = (ms: number) => new Date(ms + 7 * 3600000).toISOString().slice(11, 16);
 
 export function durationDeviationInfo(
-  s: Pick<LiveSession, "date" | "startTime" | "endTime" | "status" | "isBackfill" | "liveDurationMinutes" | "actualStartAt" | "actualEndAt">
+  s: Pick<LiveSession, "date" | "startTime" | "endTime" | "status" | "isBackfill" | "liveDurationMinutes" | "actualStartAt" | "actualEndAt"> & { report?: Pick<LiveSessionReport, "otMinutes" | "earlyLeaveMinutes"> }
 ): DurationDeviationInfo | null {
-  if (s.isBackfill || s.status === "Cancelled" || !((s.liveDurationMinutes ?? 0) > 0)) return null;
-  const liveMinutes = Math.round(s.liveDurationMinutes!);
+  if (s.isBackfill || s.status === "Cancelled") return null;
   const [start, end] = sessionWindowMs(s);
   const plannedMinutes = Math.round((end - start) / 60000);
+  // OT / off sớm ops đã khai ở Report ca là số tính công ⇒ ưu tiên hơn số suy ra từ file (file có thể thiếu hoặc ngắn hơn room).
+  const declared = (s.report?.otMinutes ?? 0) > 0 ? "ot" : (s.report?.earlyLeaveMinutes ?? 0) > 0 ? "early" : null;
+  if (declared) {
+    const minutes = Math.round(declared === "ot" ? s.report!.otMinutes : s.report!.earlyLeaveMinutes);
+    const clockOf = (iso?: string) => {
+      const ms = iso ? Date.parse(iso) : NaN;
+      return Number.isFinite(ms) ? vnClock(ms) : undefined;
+    };
+    return {
+      kind: declared,
+      declared: true,
+      minutes,
+      plannedMinutes,
+      liveMinutes: plannedMinutes + (declared === "ot" ? minutes : -minutes),
+      actualStart: clockOf(s.actualStartAt),
+      actualEnd: clockOf(s.actualEndAt)
+    };
+  }
+  if (!((s.liveDurationMinutes ?? 0) > 0)) return null;
+  const liveMinutes = Math.round(s.liveDurationMinutes!);
   const diff = liveMinutes - plannedMinutes;
   const kind = diff >= DURATION_DEVIATION_MIN && diff <= OT_MAX_MIN ? "ot" : -diff >= DURATION_DEVIATION_MIN ? "early" : null;
   if (!kind) return null;

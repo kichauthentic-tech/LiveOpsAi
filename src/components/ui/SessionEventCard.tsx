@@ -257,7 +257,7 @@ export const buildDurationBadge = (s: LiveSession, viewerRole?: "agency" | "bran
     kind: dev.kind,
     prefix: ot ? "OT " : "Off ",
     value: `${ot ? "+" : "−"}${minutesLabel(dev.minutes)}`,
-    title: `${ot ? "Live quá giờ" : "Live thiếu giờ"} ${dev.minutes} phút: ${minutesLabel(dev.liveMinutes)} thật / ${minutesLabel(dev.plannedMinutes)} kế hoạch. ${window}(theo file số liệu)`
+    title: `${ot ? "Live quá giờ" : "Live thiếu giờ"} ${dev.minutes} phút: ${minutesLabel(dev.liveMinutes)} thật / ${minutesLabel(dev.plannedMinutes)} kế hoạch. ${window}(${dev.declared ? "theo Report ca" : "theo file số liệu"})`
   };
 };
 
