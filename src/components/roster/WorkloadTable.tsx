@@ -13,7 +13,7 @@ const STATUS_CLASS: Record<PersonLoad["status"], string> = {
   idle: "text-[var(--text-faint)] border-[var(--border)]"
 };
 
-export const WorkloadTable: React.FC<{ load: readonly PersonLoad[]; nameOf: (id: string) => string; showCost: boolean; maxHeightClass?: string }> = ({ load, nameOf, showCost, maxHeightClass = "max-h-[460px]" }) => {
+export const WorkloadTable: React.FC<{ load: readonly PersonLoad[]; nameOf: (id: string) => string; showCost: boolean; maxHeightClass?: string; hideRole?: boolean; emptyText?: string }> = ({ load, nameOf, showCost, maxHeightClass = "max-h-[460px]", hideRole = false, emptyText = "Chưa có ca hay đăng ký nào trong tháng này." }) => {
   const maxScale = Math.max(1, ...load.map((l) => Math.max(l.max, l.hours)));
   const pct = (h: number) => `${(h / maxScale) * 100}%`;
   return (
@@ -37,7 +37,7 @@ export const WorkloadTable: React.FC<{ load: readonly PersonLoad[]; nameOf: (id:
             return (
               <tr key={l.talentId} className="border-t border-[var(--border)]">
                 <td className="px-3 py-1.5 whitespace-nowrap">
-                  <span className="font-bold text-[var(--text)]">{nameOf(l.talentId)}</span> <span className="text-[var(--text-faint)]">{l.role === "host" ? "Host" : "Trợ"}</span>
+                  <span className="font-bold text-[var(--text)]">{nameOf(l.talentId)}</span>{!hideRole && <> <span className="text-[var(--text-faint)]">{l.role === "host" ? "Host" : "Trợ"}</span></>}
                 </td>
                 <td className="px-3 py-1.5">
                   <div className="relative h-2.5 rounded-full bg-[var(--surface-base)] overflow-hidden" title={`${fmtH(l.hours)}h · tối thiểu ${fmtH(l.min)}h · tối đa ${fmtH(l.max)}h`}>
@@ -65,7 +65,7 @@ export const WorkloadTable: React.FC<{ load: readonly PersonLoad[]; nameOf: (id:
           {load.length === 0 && (
             <tr>
               <td colSpan={7} className="px-3 py-3 text-[var(--text-muted)]">
-                Chưa có ca hay đăng ký nào trong tháng này.
+                {emptyText}
               </td>
             </tr>
           )}

@@ -871,7 +871,19 @@ export const RosterBoard: React.FC<Props> = (p) => {
             </span>
           </div>
           <p className="text-[11px] text-[var(--text-muted)]">Thanh: đậm = ca đã lên lịch, nhạt = nháp chưa công bố; vạch đứng = giờ tối thiểu (đảm bảo thu nhập), cuối thanh = giờ tối đa.</p>
-          <WorkloadTable load={workload.load} nameOf={nameOf} showCost={showCost} />
+          <div className="grid gap-3 xl:grid-cols-2">
+            {(["host", "assistant"] as const).map((role) => {
+              const rows = workload.load.filter((l) => (role === "host" ? l.role === "host" : l.role !== "host"));
+              return (
+                <div key={role} className="space-y-1.5 min-w-0">
+                  <h3 className="text-xs font-black text-[var(--text)]">
+                    {role === "host" ? "Host" : "Trợ"} <span className="font-medium text-[var(--text-muted)]">· {rows.length} người</span>
+                  </h3>
+                  <WorkloadTable load={rows} nameOf={nameOf} showCost={showCost} hideRole emptyText={`Chưa có ca hay đăng ký ${role === "host" ? "host" : "trợ"} trong tháng này.`} />
+                </div>
+              );
+            })}
+          </div>
         </section>
         <aside className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 space-y-2" aria-label="Việc cần làm">
           <h2 className="flex items-baseline justify-between gap-2 text-sm font-black text-[var(--text)]">
