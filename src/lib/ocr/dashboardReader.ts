@@ -162,16 +162,81 @@ function readShopee(text: string, words: OcrWord[]): DashboardReading {
   return out;
 }
 
+
+/**
+ * Dashboard TikTok đặt tiếng Anh ("LIVE Dashboard", Seller Center desktop — đo trên ảnh thật 01/11): ô GMV to ở giữa ("Attributed GMV" + số có dấu phẩy,
+ * OCR hay tách "85,569," và "686"), lưới KPI 4 cột nhãn trên số: Impressions · Views · Ads Cost · GMV per hour / … / Tap-through rate · LIVE CTR · … /
+ * AOV · Product Impressions · Attributed orders. "Attributed items sold" là số SẢN PHẨM, không phải đơn ⇒ đơn lấy ở "Attributed orders".
+ * Nhãn trùng ở biểu đồ/bảng (Views, Impressions, Attributed GMV) ⇒ neo vào hàng "Ads Cost" (nhãn duy nhất) để chọn đúng cột.
+ */
+function readTikTokEnglish(text: string, words: OcrWord[]): DashboardReading {
+  const out: DashboardReading = {};
+  const dur = text.match(/(\d+)\s*(?:hours?|hrs?)\W*(\d+)\s*(?:minutes?|mins?)\W*(\d+)?/i);
+  if (dur) out.minutes = { value: Number(dur[1]) * 60 + Number(dur[2]) + (Number(dur[3] ?? 0) >= 30 ? 1 : 0), guessed: false, raw: dur[0] };
+
+  // GMV: số lớn nhất dưới nhãn "GMV" (ô to ở giữa); ghép các mảnh số cùng dòng ("85,569," + "686").
+  let gmvBest: Reading | null = null;
+  for (const l of findLabels(words, ["gmv"])) {
+    const b = box(l), h = hOf(l[0]);
+    const below = words.filter((w) => hasDigit(w.text) && w.y0 >= b.y1 - h * 0.3 && w.y0 <= b.y1 + h * 9 && w.x1 >= b.x0 - h * 6 && w.x0 <= b.x1 + h * 6).sort((a, c) => a.y0 - c.y0 || a.x0 - c.x0);
+    const first = below.find((w) => /^\d{1,3}(?:[.,]\d{3})*[.,]?$/.test(w.text) && /[.,]/.test(w.text));
+    if (!first) continue;
+    let joined = first.text, edge = first.x1;
+    for (const w of words.filter((x) => x !== first && /^\d{1,3}$/.test(x.text) && x.x0 >= edge - 5 && x.x0 - edge < hOf(first) * 1.2 && x.y1 > first.y0 && x.y0 < first.y1).sort((a, c) => a.x0 - c.x0)) {
+      if (!/[.,]$/.test(joined)) break;
+      joined += w.text; edge = w.x1;
+    }
+    const r = parseDashNumber(joined);
+    if (r && (!gmvBest || r.value > gmvBest.value)) gmvBest = r;
+  }
+  if (gmvBest) out.gmv = gmvBest;
+
+  const ads = findLabels(words, ["ads", "cost"])[0] ?? findLabels(words, ["ad", "cost"])[0] ?? findLabels(words, ["ad", "spend"])[0];
+  if (ads) {
+    const a = box(ads), h = hOf(ads[0]);
+    // Dashboard hiện K/M với 2 số thập phân; OCR rơi mất chữ số cuối ("3.41M" → "3.4m") nên 1 số thập phân + K/M ⇒ số đoán (tô vàng).
+    const read = (l: { x0: number; y1: number; x1: number }) => {
+      const v = valueBelow(words, l, h), r = v ? parseDashNumber(v, true) : null;
+      return r ? { ...r, guessed: r.guessed || /^\d+[.,]\d[kmb]$/i.test(v!.replace(/\s+/g, "")) } : undefined;
+    };
+    out.ads = read(a);
+    const row = words.filter((w) => Math.abs(w.y0 - a.y0) < h * 0.8 && w.x0 < a.x0 - 5 && ["views", "impressions"].includes(norm(w.text)));
+    const imp = row.find((w) => norm(w.text) === "impressions"), views = row.find((w) => norm(w.text) === "views");
+    if (imp) out.impressions = read({ x0: imp.x0, y1: imp.y1, x1: imp.x1 });
+    if (views) out.views = read({ x0: views.x0, y1: views.y1, x1: views.x1 });
+  }
+
+  const ctr = findLabels(words, ["live", "ctr"])[0] ?? findLabels(words, ["livectr"])[0];
+  if (ctr) {
+    const b = box(ctr), v = valueBelow(words, b, hOf(ctr[0]));
+    out.liveCtr = (v && parseDashPercent(v)) || undefined;
+  }
+
+  const ord = findLabels(words, ["attributed", "orders"])[0];
+  if (ord) {
+    const b = box(ord), v = valueBelow(words, b, hOf(ord[0]));
+    out.orders = (v && parseDashNumber(v)) || undefined;
+  }
+  return out;
+}
+
 /** Nhận ra sàn theo chữ đặc trưng rồi đọc theo nhãn của sàn đó; bố cục (vị trí các ô) không được dùng, chỉ dùng quan hệ nhãn → số ngay dưới. */
 export function readDashboard(text: string, words: OcrWord[]): DashboardReading {
-  if (/real-?time\s+insight|total\s+views|viewing\s+duration/i.test(text)) return readShopee(text, words);
+  // Chữ "Total views"/"Viewing duration" cũng xuất hiện ở bảng sản phẩm/chú thích của Dashboard TikTok (01/11: ảnh TikTok bị báo là Shopee) ⇒ có chỉ số
+  // đặc trưng TikTok (GMV, LIVE CTR, CTOR; Dashboard Shopee không có) thì KHÔNG phải Shopee.
+  const tiktokSignature = /\bctor\b|live\s*ctr|\bgmv\b/i.test(text);
+  if (!tiktokSignature && /real-?time\s+insight|total\s+views|viewing\s+duration/i.test(text)) return readShopee(text, words);
+  // TikTok tiếng Anh ("LIVE Dashboard" + "Attributed GMV"/"Ads Cost"): bộ đọc riêng, nhãn khác hẳn bản tiếng Việt.
+  if (/attributed\s+gmv|ads\s+cost|attributed\s+orders/i.test(text)) return readTikTokEnglish(text, words);
   const out: DashboardReading = {};
 
-  const dur = text.match(/(\d+)\s*gi[oờ]\S*[\s,]+(\d+)\s*ph[uú]t/i) ?? text.match(/(\d+)\s*ph[uú]t/i);
+  // Tiếng Việt "2 giờ 58 phút" · tiếng Anh "2 hours 58 minutes" / "2h 58m" / "58 min" (Seller Center đặt tiếng Anh, 01/11).
+  const dur = text.match(/(\d+)\s*gi[oờ]\S*[\s,]+(\d+)\s*ph[uú]t/i) ?? text.match(/(\d+)\s*(?:hours?|hrs?|h)\b[\s,]*(\d+)\s*(?:minutes?|mins?|m)\b/i)
+    ?? text.match(/(\d+)\s*ph[uú]t/i) ?? text.match(/(\d+)\s*(?:minutes?|mins?)\b/i);
   if (dur) out.minutes = { value: dur.length > 2 ? Number(dur[1]) * 60 + Number(dur[2]) : Number(dur[1]), guessed: false, raw: dur[0] };
 
   // GMV: số lớn nhất (nhiều chữ số, có dấu phẩy nghìn) nằm dưới nhãn "GMV đã ghi nhận" — chữ giữa, nên không ràng vị trí ngang.
-  const gmvLabels = findLabels(words, ["gmv", "da", "ghi", "nhan"]);
+  const gmvLabels = [...findLabels(words, ["gmv", "da", "ghi", "nhan"]), ...findLabels(words, ["gmv"]).filter((l) => !findLabels(words, ["gmv", "da"]).some((v) => v[0] === l[0]))];
   let gmvBest: Reading | null = null;
   for (const l of gmvLabels) {
     const b = box(l);
@@ -184,11 +249,13 @@ export function readDashboard(text: string, words: OcrWord[]): DashboardReading 
   if (gmvBest) out.gmv = gmvBest;
 
   // Hàng KPI 1: Lượt xem · Lượt hiển thị · Chi phí quảng cáo (cột theo thứ tự trái → phải; "hiển thị" hay bị đọc hỏng nên không dựa vào nó).
-  const ads = findLabels(words, ["chi", "phi"])[0];
+  const ads = findLabels(words, ["chi", "phi"])[0] ?? findLabels(words, ["ad", "spend"])[0] ?? findLabels(words, ["ads", "spend"])[0] ?? findLabels(words, ["ad", "cost"])[0] ?? findLabels(words, ["ads", "cost"])[0];
   if (ads) {
     const a = box(ads), h = hOf(ads[0]);
-    const row = words.filter((w) => Math.abs(w.y0 - a.y0) < h * 0.8 && w.x0 < a.x0 - 5 && ["luot", "xem", "hien", "thi"].includes(norm(w.text)));
-    const cols = row.filter((w) => norm(w.text) === "luot").sort((x, y) => x.x0 - y.x0);
+    const row = words.filter((w) => Math.abs(w.y0 - a.y0) < h * 0.8 && w.x0 < a.x0 - 5 && ["luot", "xem", "hien", "thi", "views", "live", "impressions"].includes(norm(w.text)));
+    // Việt: mỗi cột bắt đầu bằng "Lượt"; Anh: cột 1 = "Views", cột 2 = "Impressions" (đứng sau chữ "LIVE" nếu có).
+    const en = row.filter((w) => ["views", "impressions"].includes(norm(w.text)));
+    const cols = (row.some((w) => norm(w.text) === "luot") ? row.filter((w) => norm(w.text) === "luot") : en).sort((x, y) => x.x0 - y.x0);
     if (cols[0]) {
       const v = valueBelow(words, { x0: cols[0].x0, y1: cols[0].y1, x1: cols[0].x1 + h * 3 }, h);
       out.views = (v && parseDashNumber(v, true)) || undefined;
@@ -202,7 +269,7 @@ export function readDashboard(text: string, words: OcrWord[]): DashboardReading 
   }
 
   // LIVE CTR dưới nhãn "CTR của LIVE" (hàng KPI 2, cột đầu).
-  const ctr = findLabels(words, ["ctr", "cua", "live"])[0];
+  const ctr = findLabels(words, ["ctr", "cua", "live"])[0] ?? findLabels(words, ["live", "ctr"])[0] ?? findLabels(words, ["ctr", "of", "live"])[0];
   if (ctr) {
     const b = box(ctr), h = hOf(ctr[0]);
     const v = valueBelow(words, { x0: b.x0, y1: b.y1, x1: b.x1 }, h);
@@ -210,7 +277,8 @@ export function readDashboard(text: string, words: OcrWord[]): DashboardReading 
   }
 
   // Đơn hàng đã ghi nhận.
-  const ord = findLabels(words, ["don", "hang", "da", "ghi"])[0] ?? findLabels(words, ["don", "hang"]).find((l) => l[0].y0 > 1000) ?? findLabels(words, ["don", "hang"])[0];
+  const ord = findLabels(words, ["don", "hang", "da", "ghi"])[0] ?? findLabels(words, ["don", "hang"]).find((l) => l[0].y0 > 1000) ?? findLabels(words, ["don", "hang"])[0]
+    ?? findLabels(words, ["orders"]).find((l) => l[0].y0 > 1000) ?? findLabels(words, ["orders"])[0];
   if (ord) {
     const b = box(ord), h = hOf(ord[0]);
     const v = valueBelow(words, { x0: b.x0, y1: b.y1, x1: b.x1 }, h);

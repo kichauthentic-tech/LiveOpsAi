@@ -60,6 +60,52 @@ describe("readDashboard trên ảnh Dashboard thật", () => {
   });
 });
 
+describe("Dashboard TikTok nhãn tiếng Anh (dựng tay theo bố cục thật)", () => {
+  const w = (text: string, x0: number, y0: number, big = false) => ({ text, x0, y0, x1: x0 + text.length * 14, y1: y0 + (big ? 40 : 20) });
+  const words = [
+    w("GMV", 100, 300), w("recorded", 160, 300), w("3,236,853", 100, 340, true),
+    w("Views", 100, 600), w("LIVE", 400, 600), w("impressions", 460, 600), w("Ad", 800, 600), w("spend", 840, 600),
+    w("1.69K", 100, 640, true), w("44.82K", 400, 640, true), w("537.51K", 800, 640, true),
+    w("LIVE", 100, 800), w("CTR", 160, 800), w("41,93%", 100, 840, true),
+    w("Orders", 100, 1200), w("12", 100, 1240, true)
+  ];
+  const r = readDashboard("Live 2 hours 58 minutes GMV LIVE CTR", words);
+  test("đọc đủ 7 số", () => {
+    expect(r.minutes?.value).toBe(178);
+    expect(r.gmv?.value).toBe(3236853);
+    expect(r.views?.value).toBe(1690);
+    expect(r.impressions?.value).toBe(44820);
+    expect(r.ads?.value).toBe(537510);
+    expect(r.liveCtr?.value).toBe(41.93);
+    expect(r.orders?.value).toBe(12);
+  });
+});
+
+describe("readDashboard trên Dashboard TikTok tiếng Anh thật (CROCS 01/11, tab LIVE Dashboard)", () => {
+  const f = JSON.parse(readFileSync("tests/fixtures/dashboard-ocr/tiktok-en-live-words.json", "utf8"));
+  const r = readDashboard(f.text, f.words);
+  test("đọc đủ 7 số, không nhầm sang Shopee dù có chữ 'viewing duration'", () => {
+    expect(r.platform).toBeUndefined();
+    expect(r.minutes?.value).toBe(334);
+    expect(r.gmv?.value).toBe(85569686);
+    expect(r.views?.value).toBe(15960);
+    expect(r.impressions?.value).toBe(777670);
+    expect(r.liveCtr?.value).toBe(46.36);
+    expect(r.orders?.value).toBe(75); // "Attributed items sold 118" là số sản phẩm, không lấy
+  });
+  test("Ads: OCR rơi chữ số cuối (3.41M → 3.4m) ⇒ số đoán", () => {
+    expect(r.ads?.value).toBe(3400000);
+    expect(r.ads?.guessed).toBe(true);
+  });
+});
+
+describe("nhận sàn", () => {
+  test("ảnh TikTok có thêm chữ Total views / Viewing duration vẫn là TikTok", () => {
+    const f = JSON.parse(readFileSync("tests/fixtures/dashboard-ocr/tiktok-live-words.json", "utf8"));
+    expect(readDashboard(`${f.text}\nTotal views Viewing duration`, f.words).platform).toBeUndefined();
+  });
+});
+
 describe("readDashboard trên Dashboard Shopee thật", () => {
   const f = JSON.parse(readFileSync("tests/fixtures/dashboard-ocr/shopee-live-words.json", "utf8"));
   test("nhận ra Shopee và đọc đúng Sales, Total Views, Orders, thời lượng live (không lẫn Avg. Viewing Duration)", () => {

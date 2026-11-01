@@ -4,7 +4,10 @@ import { sumByPlatform } from "../platforms/perf";
 
 // Benchmark theo ca cho OP (01/11/2026). OP đọc số trên TikTok/Shopee Dashboard rồi đối chiếu với thang này — app KHÔNG nhận số real-time
 // (user chốt: không nối API vì rủi ro lộ dữ liệu), nên đây là hàm thuần chỉ đọc lịch sử ca đã có số.
-// Nhóm so sánh = brand × sàn × khung giờ (giờ bắt đầu kế hoạch). Mỗi chỉ số chia 4 vùng theo phân vị của chính nhóm:
+// Nhóm so sánh = brand × sàn, MỌI ca đã xong trước hôm nay, ca càng gần càng nặng (trọng số giảm một nửa sau mỗi HALF_LIFE_DAYS ngày). User chốt 01/11
+// sau backtest 472 ca (15/9–31/10, 8 chỉ số, 28 phương án): bán rã 10 ngày tốt hơn "trung bình 3 tháng" 8,6% sai số phân vị (CI95 0,886–0,933), vì GMV/giờ
+// trôi theo tháng (VERA TikTok 2,78M T6 → 1,57M T10) nên mốc cũ kéo thang lệch (27% ca rơi vào "kết thúc sớm" thay vì 15%). Tách theo khung giờ / thứ / ngày
+// đôi-lương / host KHÔNG cải thiện (CI chứa 1). Mỗi chỉ số chia 4 vùng theo phân vị có trọng số của nhóm:
 //   < P15 kết thúc sớm · P15–P40 cần action · P40–P75 đúng target · ≥ P75 có thể xin OT.
 // Đo 01/11 trên 1.388 ca (T6–T10), tương quan hạng với GMV/giờ trong nhóm: Đơn/giờ 0,93 · GPM 0,74 · Lượt xem/giờ 0,59 ·
 // CTOR 0,48 · LIVE CTR 0,48 (TikTok); Shopee Đơn/giờ 0,96. Cờ `lead` đánh dấu các chỉ số đó; chỉ số yếu (AOV, thời lượng xem…) không vào bảng.
@@ -32,9 +35,10 @@ export interface BenchItem {
 export interface ShiftBenchmark {
   brandId: string;
   platform: LiveSession["platform"];
-  band: BenchBand;
-  /** "band" = đúng khung giờ; "all-bands" = nhóm khung giờ ít ca nên gộp mọi khung giờ của brand × sàn. */
-  scope: "band" | "all-bands";
+  /** Cỡ mẫu hiệu dụng sau khi trọng số giảm dần ((Σw)²/Σw²); 0 khi không có `today` (mọi ca nặng như nhau). */
+  ess: number;
+  /** Ngày của ca gần nhất làm mốc. */
+  latest: string;
   /** Số ca lịch sử làm mốc (ca đủ điều kiện của nhóm). */
   n: number;
   /** Số ca ít (< WEAK_N) ⇒ mốc chưa vững. */
@@ -45,8 +49,13 @@ export interface ShiftBenchmark {
 }
 
 export const MIN_BENCH_N = 20;
-export const WEAK_N = 40;
+/** Dưới mức này (cỡ mẫu hiệu dụng) ⇒ mốc chưa vững. */
+export const WEAK_N = 25;
+/** Bán rã trọng số theo tuổi ca (ngày). */
+export const HALF_LIFE_DAYS = 10;
 const MIN_LIVE_MINUTES = 60;
+
+const dayNum = (d: string) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10)) / 864e5;
 
 export function benchBandOf(startTime: string): BenchBand {
   const h = Number(startTime.slice(0, 2));
@@ -58,10 +67,21 @@ export function isBenchHistory(s: LiveSession): boolean {
   return s.status === "Completed" && !s.excludedFromReports && s.actualGmv > 0 && (s.liveDurationMinutes ?? 0) >= MIN_LIVE_MINUTES;
 }
 
+/** Phân vị có trọng số, nội suy theo điểm giữa của từng mẫu; trọng số bằng nhau cho kết quả như phân vị thường. */
+function wQuantile(sorted: { v: number; w: number }[], p: number): number {
+  const tot = sorted.reduce((a, x) => a + x.w, 0), target = p * tot;
+  let c = 0, prev: { mid: number; v: number } | null = null;
+  for (const x of sorted) {
+    c += x.w;
+    const mid = c - x.w / 2;
+    if (mid >= target) return prev ? prev.v + (x.v - prev.v) * ((target - prev.mid) / (mid - prev.mid)) : x.v;
+    prev = { mid, v: x.v };
+  }
+  return sorted[sorted.length - 1].v;
+}
+/** Phân vị thường (dùng cho ads theo ngày). */
 function quantile(sorted: number[], p: number): number {
-  const i = (sorted.length - 1) * p;
-  const lo = Math.floor(i), hi = Math.ceil(i);
-  return sorted[lo] + (sorted[hi] - sorted[lo]) * (i - lo);
+  return wQuantile(sorted.map((v) => ({ v, w: 1 })), p);
 }
 
 interface Def {
@@ -116,28 +136,38 @@ const DEFS: Record<LiveSession["platform"], { funnel: Def[]; rates: Def[]; outco
   Shopee: { funnel: SHOPEE_FUNNEL, rates: SHOPEE_RATES, outcomes: SHOPEE_OUT }
 };
 
-function items(defs: Def[], rows: LiveSession[]): BenchItem[] {
+function items(defs: Def[], rows: { s: LiveSession; w: number }[]): BenchItem[] {
   const out: BenchItem[] = [];
   for (const d of defs) {
-    const xs = rows.map((s) => d.value(s, (s.liveDurationMinutes ?? 0) / 60)).filter((x): x is number => x != null && Number.isFinite(x)).sort((a, b) => a - b);
+    const xs = rows.map(({ s, w }) => ({ v: d.value(s, (s.liveDurationMinutes ?? 0) / 60), w })).filter((x): x is { v: number; w: number } => x.v != null && Number.isFinite(x.v) && x.v > 0);
     if (xs.length < MIN_BENCH_N) continue;
-    out.push({ key: d.key, label: d.label, kind: d.kind, perHour: d.perHour, lead: d.lead, n: xs.length, p15: quantile(xs, 0.15), p40: quantile(xs, 0.4), p50: quantile(xs, 0.5), p75: quantile(xs, 0.75) });
+    // Phân vị tính trên log (đúng như backtest): chỉ số nhân tính nên trung bình hình học hợp lý hơn.
+    const sorted = xs.map((x) => ({ v: Math.log(x.v), w: x.w })).sort((a, b) => a.v - b.v);
+    const q = (p: number) => Math.exp(wQuantile(sorted, p));
+    out.push({ key: d.key, label: d.label, kind: d.kind, perHour: d.perHour, lead: d.lead, n: xs.length, p15: q(0.15), p40: q(0.4), p50: q(0.5), p75: q(0.75) });
   }
   return out;
 }
 
-/** Benchmark của một nhóm brand × sàn × khung giờ; null nếu cả brand × sàn chưa đủ MIN_BENCH_N ca. `history` là mọi ca của app (hàm tự lọc). */
-export function buildShiftBenchmark(history: LiveSession[], brandId: string, platform: LiveSession["platform"], band: BenchBand): ShiftBenchmark | null {
-  const pool = history.filter((s) => s.brandId === brandId && s.platform === platform && isBenchHistory(s));
-  const inBand = pool.filter((s) => benchBandOf(s.startTime) === band);
-  const [rows, scope] = inBand.length >= MIN_BENCH_N ? [inBand, "band" as const] : [pool, "all-bands" as const];
+/**
+ * Benchmark của brand × sàn từ các ca đã xong, trọng số giảm dần theo tuổi so với `today` (YYYY-MM-DD); null nếu chưa đủ MIN_BENCH_N ca.
+ * `history` là mọi ca của app (hàm tự lọc, bỏ ca sau `today`). Không truyền `today` ⇒ mọi ca nặng như nhau (dùng cho test).
+ */
+export function buildShiftBenchmark(history: LiveSession[], brandId: string, platform: LiveSession["platform"], today?: string): ShiftBenchmark | null {
+  const t0 = today ? dayNum(today) : null;
+  const rows = history
+    .filter((s) => s.brandId === brandId && s.platform === platform && isBenchHistory(s) && (t0 == null || dayNum(s.date) <= t0))
+    .map((s) => ({ s, w: t0 == null ? 1 : Math.pow(0.5, Math.max(0, t0 - dayNum(s.date)) / HALF_LIFE_DAYS) }));
   if (rows.length < MIN_BENCH_N) return null;
   const defs = DEFS[platform];
   const funnel = items(defs.funnel, rows);
   const rates = items(defs.rates, rows);
   const outcomes = items(defs.outcomes, rows);
   if (!outcomes.length) return null;
-  return { brandId, platform, band, scope, n: rows.length, weak: rows.length < WEAK_N, funnel, rates, outcomes };
+  const sw = rows.reduce((a, r) => a + r.w, 0), sw2 = rows.reduce((a, r) => a + r.w * r.w, 0);
+  const ess = t0 == null ? 0 : (sw * sw) / sw2;
+  const latest = rows.reduce((m, r) => (r.s.date > m ? r.s.date : m), "");
+  return { brandId, platform, ess, latest, n: rows.length, weak: (t0 == null ? rows.length : ess) < WEAK_N, funnel, rates, outcomes };
 }
 
 /** Vùng của một giá trị trên thang của chỉ số (cao hơn là tốt hơn ở mọi chỉ số trong bảng). */

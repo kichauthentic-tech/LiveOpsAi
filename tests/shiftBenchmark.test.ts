@@ -34,11 +34,10 @@ describe("isBenchHistory", () => {
 
 describe("buildShiftBenchmark", () => {
   test("null khi chưa đủ ca", () => {
-    expect(buildShiftBenchmark(many(MIN_BENCH_N - 1), "crocs", "TikTok", "Tối")).toBeNull();
+    expect(buildShiftBenchmark(many(MIN_BENCH_N - 1), "crocs", "TikTok")).toBeNull();
   });
   test("phân vị tăng dần và có đủ phễu TikTok 4 bậc, 3 tỷ lệ", () => {
-    const b = buildShiftBenchmark(many(60), "crocs", "TikTok", "Tối")!;
-    expect(b.scope).toBe("band");
+    const b = buildShiftBenchmark(many(60), "crocs", "TikTok")!;
     expect(b.funnel.map((x) => x.key)).toEqual(["imp", "views", "clicks", "orders"]);
     expect(b.rates.map((x) => x.key)).toEqual(["err", "liveCtr", "ctor"]);
     for (const it of [...b.funnel, ...b.rates, ...b.outcomes]) expect(it.p15 <= it.p40 && it.p40 <= it.p75).toBe(true);
@@ -46,26 +45,36 @@ describe("buildShiftBenchmark", () => {
     expect(gmv.p50).toBeGreaterThan(5_000_000); // 10M+ / 2 giờ
   });
   test("tỷ lệ tính trên cộng của từng ca: ERR = views / impressions", () => {
-    const b = buildShiftBenchmark(many(30), "crocs", "TikTok", "Tối")!;
+    const b = buildShiftBenchmark(many(30), "crocs", "TikTok")!;
     expect(b.rates.find((r) => r.key === "err")!.p50).toBeCloseTo(5, 5);
   });
-  test("khung giờ ít ca ⇒ gộp mọi khung giờ của brand × sàn", () => {
-    const b = buildShiftBenchmark([...many(25, { startTime: "10:00" }), ...many(3)], "crocs", "TikTok", "Tối")!;
-    expect(b.scope).toBe("all-bands");
-    expect(b.n).toBe(28);
+  test("ca gần nặng hơn ca xa: mốc bám theo ca mới, bỏ ca sau hôm nay", () => {
+    const old = many(30, { date: "2026-08-01", actualGmv: 20_000_000 }), recent = many(30, { date: "2026-10-30", actualGmv: 10_000_000 });
+    const b = buildShiftBenchmark([...old, ...recent, ...many(30, { date: "2026-11-05", actualGmv: 99_000_000 })], "crocs", "TikTok", "2026-11-01")!;
+    const gmv = b.outcomes.find((o) => o.key === "gmvPerHour")!;
+    expect(b.n).toBe(60);
+    expect(b.latest).toBe("2026-10-30");
+    expect(gmv.p50).toBeGreaterThan(4_900_000);
+    expect(gmv.p50).toBeLessThan(5_500_000); // ≈ 10M / 2 giờ, không bị ca cũ 20M kéo lên
+    expect(b.ess).toBeGreaterThan(0);
+  });
+  test("không có today: mọi ca nặng như nhau", () => {
+    const b = buildShiftBenchmark([...many(30, { actualGmv: 20_000_000 }), ...many(30, { actualGmv: 10_000_000 })], "crocs", "TikTok")!;
+    expect(b.outcomes.find((o) => o.key === "gmvPerHour")!.p50).toBeGreaterThan(5_000_000);
+    expect(b.ess).toBe(0);
   });
   test("không lẫn brand hay sàn khác", () => {
-    expect(buildShiftBenchmark(many(40, { brandId: "vera" }), "crocs", "TikTok", "Tối")).toBeNull();
-    expect(buildShiftBenchmark(many(40), "crocs", "Shopee", "Tối")).toBeNull();
+    expect(buildShiftBenchmark(many(40, { brandId: "vera" }), "crocs", "TikTok")).toBeNull();
+    expect(buildShiftBenchmark(many(40), "crocs", "Shopee")).toBeNull();
   });
   test("ca thiếu impressions không kéo tỷ lệ phễu xuống 0", () => {
-    const b = buildShiftBenchmark([...many(30), ...many(10, { impressions: 0, productClicks: 0 })], "crocs", "TikTok", "Tối")!;
+    const b = buildShiftBenchmark([...many(30), ...many(10, { impressions: 0, productClicks: 0 })], "crocs", "TikTok")!;
     expect(b.rates.find((r) => r.key === "err")!.n).toBe(30);
     expect(b.rates.find((r) => r.key === "err")!.p15).toBeGreaterThan(0);
   });
   test("Shopee: phễu Views → ATC → Orders, chỉ ca có ATC vào ATC", () => {
     const rows = many(30, { platform: "Shopee", report: { atcCount: 200 } as LiveSession["report"] });
-    const b = buildShiftBenchmark([...rows, ...many(5, { platform: "Shopee" })], "crocs", "Shopee", "Tối")!;
+    const b = buildShiftBenchmark([...rows, ...many(5, { platform: "Shopee" })], "crocs", "Shopee")!;
     expect(b.funnel.map((x) => x.key)).toEqual(["views", "orders"]);
     expect(b.rates.map((x) => x.key)).toEqual(["ordersViews"]);
   });
@@ -101,7 +110,7 @@ describe("ads: adsHistoryOf / adviseAds", () => {
     const up = adsHistoryOf(hist(25, (i) => 1e7 + i * 1e6), days(25, (i) => 3e6 + i * 1e5), "crocs", "TikTok")!;
     expect(up.rho).toBeGreaterThan(0.95);
   });
-  const bench = buildShiftBenchmark(many(60), "crocs", "TikTok", "Tối")!;
+  const bench = buildShiftBenchmark(many(60), "crocs", "TikTok")!;
   const gmvItem = bench.outcomes.find((o) => o.key === "gmvPerHour")!;
   const flat = { n: 30, p25: 1e6, p50: 2e6, p75: 3e6, rho: 0 };
   test("ROAS cần đạt = GMV cần có ÷ ads; mốc GMV không đổi theo ads", () => {
@@ -137,7 +146,7 @@ describe("checkShift: gãy ở đâu, làm gì, kết luận theo cả phễu", 
     totalViews: 4_000 + (i % 10) * 200, impressions: 80_000 + (i % 10) * 4_000, productClicks: 1_600 + (i % 10) * 90, totalOrders: 20 + (i % 10) * 2,
     actualGmv: 20_000_000 + (i % 10) * 1_000_000
   }));
-  const bench = buildShiftBenchmark(hist, "crocs", "TikTok", "Tối")!;
+  const bench = buildShiftBenchmark(hist, "crocs", "TikTok")!;
   const avg = (key: string) => bench.funnel.find((f) => f.key === key)!.p50 * 2; // tích luỹ sau 120 phút
   const rate = (key: string) => bench.rates.find((r) => r.key === key)!.p50;
   const healthy = { minutes: 120, gmv: bench.outcomes.find((o) => o.key === "gmvPerHour")!.p50 * 2, ads: null, counts: { imp: avg("imp"), views: avg("views"), clicks: avg("clicks"), orders: avg("orders") } };
@@ -198,7 +207,7 @@ describe("Shopee: phễu theo chỉ số Dashboard Shopee", () => {
     platform: "Shopee", impressions: undefined, productClicks: undefined, totalViews: 5_000 + (i % 10) * 300, totalOrders: 20 + (i % 10) * 2,
     actualGmv: 8_000_000 + (i % 10) * 500_000, avgWatchTimeSeconds: 30 + (i % 10) * 3
   }));
-  const bench = buildShiftBenchmark(hist, "crocs", "Shopee", "Tối")!;
+  const bench = buildShiftBenchmark(hist, "crocs", "Shopee")!;
   test("phễu Views → Orders + Orders/Views; kết quả GMV/giờ, GPM (trên Views), AOV, Xem TB — không còn ATC", () => {
     expect(bench.funnel.map((f) => f.key)).toEqual(["views", "orders"]);
     expect(bench.rates.map((r) => r.key)).toEqual(["ordersViews"]);

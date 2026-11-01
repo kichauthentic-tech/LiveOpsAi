@@ -50,7 +50,7 @@ const ZONE_WORD: Record<BenchZone, string> = { off: "gãy nặng", act: "gãy", 
 interface LiveCell { value: string; onChange: (v: string) => void; guessed: boolean; row?: CheckRow; /** Ca nối: số của riêng ca này (đã trừ lúc giao ca); null = chưa trừ được vì thiếu số lúc giao ca. */ adj?: number | null }
 
 /**
- * Một bậc của phễu. Chưa có số ca: số TRUNG BÌNH của ca cùng loại sau `hours` giờ live. Có số ca (dán ảnh / gõ tay): số của phiên (sửa được tại ô),
+ * Một bậc của phễu. Chưa có số ca: số TRUNG BÌNH ưu tiên ca gần đây sau `hours` giờ live. Có số ca (dán ảnh / gõ tay): số của phiên (sửa được tại ô),
  * tô màu theo vùng, kèm số trung bình nhỏ bên dưới.
  */
 const Step: React.FC<{ item: BenchItem; hours: number; live?: LiveCell }> = ({ item, hours, live }) => {
@@ -234,7 +234,7 @@ async function readShot(file: Blob, onProgress: (p: number) => void): Promise<Da
 interface Shot { url: string; busy: boolean; progress: number; error: string | null; read: number }
 
 const Body: React.FC<{ groups: Group[]; g: Group; sessions: LiveSession[]; today: string; onPick: (k: string) => void }> = ({ groups, g, sessions, today, onPick }) => {
-  const bench: ShiftBenchmark | null = useMemo(() => buildShiftBenchmark(sessions, g.brandId, g.platform, g.band), [sessions, g.brandId, g.platform, g.band]);
+  const bench: ShiftBenchmark | null = useMemo(() => buildShiftBenchmark(sessions, g.brandId, g.platform, today), [sessions, g.brandId, g.platform, today]);
   const [hoursPick, setHoursPick] = useState<number>(1);
   const [minutes, setMinutes] = useState("");
   const [gmv, setGmv] = useState("");
@@ -429,9 +429,9 @@ const Body: React.FC<{ groups: Group[]; g: Group; sessions: LiveSession[]; today
           )}
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-              <p className="text-xs font-black text-[var(--text)]">Phễu trung bình ca cùng loại</p>
+              <p className="text-xs font-black text-[var(--text)]">Phễu trung bình, ưu tiên ca gần đây</p>
               <span className="text-[11px] text-[var(--text-muted)]">
-                {bench.n} ca{bench.scope === "all-bands" ? ", gộp mọi khung giờ" : ""}
+                {bench.n} ca · ca gần nhất {bench.latest.slice(8)}/{bench.latest.slice(5, 7)}
                 {bench.weak && <b className="text-amber-300"> · ít ca, mốc chưa vững</b>}
               </span>
               <span className="md:ml-auto inline-flex items-center gap-1.5 text-[11px] text-[var(--text-muted)]">
