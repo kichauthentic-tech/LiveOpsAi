@@ -235,7 +235,7 @@ export function parseShopeeLiveList(rows: unknown[][]): ParsedDataRawImport {
   const streams = readShopeeStreams(data);
   if (streams.length !== data.length) throw new Error("Có phiên không đọc được giờ bắt đầu (cột Start Time) — file có bị sửa tay không?");
   if (streams.length === 0) throw new Error("File không có phiên live nào.");
-  monthOf(streams.map((s) => s.date), "File Live List");
+  // Live List cho phép trải nhiều tháng (ca cuối tháng tải sau nửa đêm / giao ca đầu tháng sau) — mọi nơi đọc đều lọc phiên theo tháng.
   const dates = streams.map((s) => s.date).sort();
   return {
     periodLabel: `${dates[0]} ~ ${dates[dates.length - 1]}`,
