@@ -111,8 +111,8 @@ export const BrandTab: React.FC<{
           {lens === "month" && (
             <Card>
               <BlockHead title="Đã đạt so với target, luỹ kế theo ngày" sub={`Nét liền dừng ở ngày có dữ liệu cuối (${ddmm(r.asOf!)})`} />
-              <CumulativeChart r={r} color={chartColor(brand.name)} showPace={false} />
-              <CumulativeLegend color={chartColor(brand.name)} showPace={false} />
+              <CumulativeChart r={r} color={chartColor(brand.name)} showPace={false} forecastEnd={card?.forecast?.p50 ?? null} />
+              <CumulativeLegend color={chartColor(brand.name)} showPace={false} forecast={card?.forecast != null} />
               <RowsTable kind="Tuần" rows={weeks.rows} total={weeks.total} selected={pick.week ?? ""} onPick={(id) => set({ week: id && id !== pick.week ? id : null })} card={card} lastHead="Target cả kỳ"
                 foot="Bấm một tuần: Key Metrics bên dưới đổi theo tuần đó, so với cùng ngày tháng trước; bấm “Cả tháng tới nay” để quay lại. Target tuần = target các ca đã xếp, cộng phần target tháng chưa xếp vào ca (chia theo tỷ lệ), nên các tuần cộng lại đúng bằng dòng cả tháng." />
             </Card>

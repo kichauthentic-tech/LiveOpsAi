@@ -87,13 +87,21 @@ const dayTip = (d: RRDay) =>
     : `Đạt: ${money(d.actual)}${d.pctTarget != null ? ` (${pct(d.pctTarget)} target)` : ""}\n${d.withData}/${d.shifts} ca có số liệu${d.state === "partial" ? (d.counted ? "\nTạm tính — ca đã có số liệu đã vào Run-rate theo target đúng ca, ca chưa có số liệu thì chưa" : "\nTạm tính — chưa vào Run-rate") : d.state === "missing" ? "\nCòn ca chưa có số liệu" : ""}`);
 
 /** `showPace` = vẽ đường "giữ nhịp" (module Run-rate). Chi tiết kênh tắt nó — dự báo cuối tháng ở đó là của thẻ kênh (engine), một số duy nhất. */
-export const CumulativeChart: React.FC<{ r: AccountRunRate; color: string; showPace?: boolean }> = ({ r, color, showPace = true }) => {
+export const CumulativeChart: React.FC<{ r: AccountRunRate; color: string; showPace?: boolean; forecastEnd?: number | null }> = ({ r, color, showPace = true, forecastEnd = null }) => {
   const { W, H, L, T, B } = FRAME;
   const R = 100; // chừa lề phải cho nhãn cuối đường
   const pts = r.cumulative;
   const n = pts.length;
   const last = pts[n - 1];
-  const maxV = niceMax(Math.max(last?.target ?? 0, ...pts.map((p) => (showPace ? p.projected ?? 0 : 0)), ...pts.map((p) => p.actual ?? 0), 1));
+  // Đường dự báo (engine): từ điểm đã đạt mới nhất đến dự báo cuối tháng, đi theo hình dạng target còn lại.
+  const asOfI = r.asOf ? pts.findIndex((p) => p.date === r.asOf) : -1;
+  const baseA = asOfI >= 0 ? pts[asOfI].actual : null;
+  const tailT = asOfI >= 0 && last ? last.target - pts[asOfI].target : 0;
+  const fcAt = (i: number): number | null => {
+    if (forecastEnd == null || baseA == null || asOfI < 0 || i < asOfI) return null;
+    return tailT > 0 ? baseA + ((pts[i].target - pts[asOfI].target) / tailT) * (forecastEnd - baseA) : i === asOfI ? baseA : forecastEnd;
+  };
+  const maxV = niceMax(Math.max(last?.target ?? 0, ...pts.map((p) => (showPace ? p.projected ?? 0 : 0)), ...pts.map((p) => p.actual ?? 0), forecastEnd ?? 0, 1));
   const x = (i: number) => L + (i / Math.max(1, n - 1)) * (W - L - R);
   const y = (v: number) => T + (H - T - B) * (1 - v / maxV);
   const colW = (W - L - R) / Math.max(1, n - 1);
@@ -101,6 +109,7 @@ export const CumulativeChart: React.FC<{ r: AccountRunRate; color: string; showP
   const line = (sel: (p: (typeof pts)[number]) => number | null) =>
     pts.map((p, i) => ({ i, v: sel(p) })).filter((q): q is { i: number; v: number } => q.v != null).map((q, k) => `${k ? "L" : "M"}${n2(x(q.i))},${n2(y(q.v))}`).join(" ");
   const actualPath = line((p) => p.actual);
+  const fcPath = forecastEnd != null ? pts.map((_, i) => ({ i, v: fcAt(i) })).filter((q): q is { i: number; v: number } => q.v != null).map((q, k) => `${k ? "L" : "M"}${n2(x(q.i))},${n2(y(q.v))}`).join(" ") : "";
   const areaPath = asOfIdx >= 0 ? `${actualPath} L${n2(x(asOfIdx))},${n2(y(0))} L${n2(x(0))},${n2(y(0))} Z` : "";
   const gid = `rr-grad-${r.month}`;
   const dayList = r.days.map((d) => ({ date: d.date, bucket: d.bucket }));
@@ -108,11 +117,9 @@ export const CumulativeChart: React.FC<{ r: AccountRunRate; color: string; showP
   const endLabels: { text: string; y: number; fill: string }[] = [];
   if (last && last.target > 0) endLabels.push({ text: `Target ${money(last.target)}`, y: y(last.target), fill: "var(--text-muted)" });
   if (showPace && r.total.keepPace != null && last?.projected != null) endLabels.push({ text: `Nhịp ${money(last.projected)}`, y: y(last.projected), fill: color });
-  if (endLabels.length === 2 && Math.abs(endLabels[0].y - endLabels[1].y) < 15) {
-    const up = endLabels[0].y <= endLabels[1].y ? 0 : 1;
-    endLabels[up].y -= 8;
-    endLabels[1 - up].y += 8;
-  }
+  if (fcPath) endLabels.push({ text: `Dự báo ${money(forecastEnd!)}`, y: y(forecastEnd!), fill: color });
+  endLabels.sort((a, b) => a.y - b.y);
+  for (let k = 1; k < endLabels.length; k++) if (endLabels[k].y - endLabels[k - 1].y < 15) endLabels[k].y = endLabels[k - 1].y + 15;
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="GMV luỹ kế so với Target luỹ kế">
       <defs>
@@ -134,6 +141,7 @@ export const CumulativeChart: React.FC<{ r: AccountRunRate; color: string; showP
       {areaPath && <path d={areaPath} fill={`url(#${gid})`} />}
       <path d={line((p) => p.target)} fill="none" style={{ stroke: "var(--text-faint)" }} strokeWidth={2} strokeDasharray="2 5" strokeLinecap="round" />
       {showPace && <path d={line((p) => p.projected)} fill="none" stroke={color} strokeWidth={2} strokeDasharray="6 5" opacity={0.85} />}
+      {fcPath && <path d={fcPath} fill="none" stroke={color} strokeWidth={2.5} strokeDasharray="1 6" strokeLinecap="round" opacity={0.95} />}
       {actualPath && <path d={actualPath} fill="none" stroke={color} strokeWidth={3} strokeLinejoin="round" strokeLinecap="round" />}
       {asOfIdx >= 0 && pts[asOfIdx].actual != null && (
         <>
@@ -144,15 +152,16 @@ export const CumulativeChart: React.FC<{ r: AccountRunRate; color: string; showP
       {endLabels.map((l) => <text key={l.text} x={W - R + 8} y={l.y} dominantBaseline="middle" style={{ fill: l.fill, fontSize: 11, fontWeight: 800 }}>{l.text}</text>)}
       {r.days.map((d, i) => (
         <rect key={d.date} x={x(i) - colW / 2} y={T} width={colW} height={H - T - B} fill="transparent"
-          data-tip={`${dayTip(d)}\n\nTarget luỹ kế: ${money(pts[i].target)}${pts[i].actual != null ? `\nĐã đạt luỹ kế: ${money(pts[i].actual)}` : showPace && pts[i].projected != null ? `\nDự báo nếu giữ tiến độ: ${money(pts[i].projected)}` : ""}`} />
+          data-tip={`${dayTip(d)}\n\nTarget luỹ kế: ${money(pts[i].target)}${pts[i].actual != null ? `\nĐã đạt luỹ kế: ${money(pts[i].actual)}` : fcAt(i) != null && i > asOfI ? `\nDự báo luỹ kế: ${money(fcAt(i)!)}` : showPace && pts[i].projected != null ? `\nDự báo nếu giữ tiến độ: ${money(pts[i].projected)}` : ""}`} />
       ))}
     </svg>
   );
 };
 
-export const CumulativeLegend: React.FC<{ color: string; showPace?: boolean }> = ({ color, showPace = true }) => (
+export const CumulativeLegend: React.FC<{ color: string; showPace?: boolean; forecast?: boolean }> = ({ color, showPace = true, forecast = false }) => (
   <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-[var(--text-muted)]">
     <span className="inline-flex items-center gap-1.5"><i className="w-4 h-[3px] rounded inline-block" style={{ background: color }} />Đã đạt (luỹ kế)</span>
+    {forecast && <span className="inline-flex items-center gap-1.5"><i className="w-4 h-[3px] rounded inline-block" style={{ background: `repeating-linear-gradient(90deg,${color} 0 2px,transparent 2px 6px)` }} />Dự báo cuối tháng</span>}
     {showPace && <span className="inline-flex items-center gap-1.5"><i className="w-4 h-[3px] rounded inline-block" style={{ background: `repeating-linear-gradient(90deg,${color} 0 5px,transparent 5px 8px)` }} />Nếu giữ tiến độ hiện tại</span>}
     <span className="inline-flex items-center gap-1.5"><i className="w-4 h-[3px] rounded inline-block" style={{ background: "repeating-linear-gradient(90deg,var(--text-faint) 0 3px,transparent 3px 6px)" }} />Target luỹ kế</span>
     <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: "var(--accent)", opacity: 0.35 }} />Ngày Campaign</span>
