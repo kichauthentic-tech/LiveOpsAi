@@ -551,7 +551,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
         }
       />
 
-      {isOps && <div hidden={view !== "day"}><ShiftBenchmarkBoard sessions={sessions} today={today} /></div>}
+      {isOps && <div hidden={view !== "day"}><ShiftBenchmarkBoard sessions={sessions} today={today} brands={brands} /></div>}
       {monthSeen && monthView && <div hidden={view !== "month"} className="space-y-4">{monthView}</div>}
       {/* Cả hai chế độ giữ nguyên khi chuyển qua lại (ẩn bằng `hidden`) — không dựng lại việc cần làm / không tải lại dữ liệu.
           Thứ tự DOM = thứ tự màn hẹp: Cần xử lý → việc cần làm → danh sách ca. Màn rộng: việc cần làm là cột phải dính khi cuộn. */}

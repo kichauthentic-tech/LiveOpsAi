@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Gauge, ImageUp } from "lucide-react";
-import type { LiveSession } from "../../types";
+import type { Brand, LiveSession } from "../../types";
+import { SessionEventCard, SESSION_TONE } from "../ui/SessionEventCard";
+import { getBrandTheme } from "../../lib/brandTheme";
 import { fmtVndShort } from "../../lib/format";
-import { adsHistoryOf, benchAt, benchBandOf, buildShiftBenchmark, checkShift, findHandoverSource, funnelChain, OPTIONAL_STEPS, subtractHandover, type BenchItem, type BenchZone, type CheckRow, type ShiftBenchmark, type ShiftCheck } from "../../lib/performance/shiftBenchmark";
+import { adsHistoryOf, benchAt, buildShiftBenchmark, checkShift, findHandoverSource, funnelChain, OPTIONAL_STEPS, subtractHandover, type BenchItem, type BenchZone, type CheckRow, type ShiftBenchmark, type ShiftCheck } from "../../lib/performance/shiftBenchmark";
 import { fetchAdsDaily } from "../../lib/db/adsDaily";
 import { readDashboard, type DashboardReading, type OcrWord } from "../../lib/ocr/dashboardReader";
 
@@ -166,30 +168,24 @@ const HandoverPanel: React.FC<{
   );
 };
 
-interface Group { key: string; brandId: string; brandName: string; platform: LiveSession["platform"]; band: ReturnType<typeof benchBandOf>; live: boolean; start: string }
+/** Mỗi ca hôm nay là một nhóm (chip như trên lịch): mốc benchmark theo brand × sàn, còn số OP nhập/dán là của riêng từng ca. */
+interface Group { key: string; brandId: string; brandName: string; platform: LiveSession["platform"]; live: boolean; start: string; session: LiveSession }
 
 function todayGroups(sessions: LiveSession[], today: string): Group[] {
   const live = sessions.filter((s) => s.status !== "Cancelled" && !s.excludedFromReports);
   const days = live.filter((s) => s.date >= today).map((s) => s.date).sort();
   const day = days.includes(today) ? today : days[0];
   if (!day) return [];
-  const map = new Map<string, Group>();
-  for (const s of live.filter((x) => x.date === day).sort((a, b) => a.startTime.localeCompare(b.startTime))) {
-    const band = benchBandOf(s.startTime);
-    const key = `${s.brandId}|${s.platform}|${band}`;
-    const g = map.get(key);
-    if (g) g.live = g.live || s.status === "Live Now";
-    else map.set(key, { key, brandId: s.brandId, brandName: s.brandName, platform: s.platform, band, live: s.status === "Live Now", start: s.startTime });
-  }
-  return [...map.values()].sort((a, b) => Number(b.live) - Number(a.live) || a.start.localeCompare(b.start));
+  return live.filter((x) => x.date === day).sort((a, b) => a.startTime.localeCompare(b.startTime))
+    .map((s) => ({ key: s.id, brandId: s.brandId, brandName: s.brandName, platform: s.platform, live: s.status === "Live Now", start: s.startTime, session: s }));
 }
 
-export const ShiftBenchmarkBoard: React.FC<{ sessions: LiveSession[]; today: string }> = ({ sessions, today }) => {
+export const ShiftBenchmarkBoard: React.FC<{ sessions: LiveSession[]; today: string; brands: Brand[] }> = ({ sessions, today, brands }) => {
   const groups = useMemo(() => todayGroups(sessions, today), [sessions, today]);
   const [pick, setPick] = useState<string | null>(null);
   if (!groups.length) return null;
-  const g = groups.find((x) => x.key === pick) ?? groups[0];
-  return <Body groups={groups} g={g} sessions={sessions} today={today} onPick={setPick} />;
+  const g = groups.find((x) => x.key === pick) ?? groups.find((x) => x.live) ?? groups[0];
+  return <Body groups={groups} g={g} sessions={sessions} today={today} brands={brands} onPick={setPick} />;
 };
 
 const monthsBack = (today: string, n: number) => {
@@ -233,7 +229,7 @@ async function readShot(file: Blob, onProgress: (p: number) => void): Promise<Da
 
 interface Shot { url: string; busy: boolean; progress: number; error: string | null; read: number }
 
-const Body: React.FC<{ groups: Group[]; g: Group; sessions: LiveSession[]; today: string; onPick: (k: string) => void }> = ({ groups, g, sessions, today, onPick }) => {
+const Body: React.FC<{ groups: Group[]; g: Group; sessions: LiveSession[]; today: string; brands: Brand[]; onPick: (k: string) => void }> = ({ groups, g, sessions, today, brands, onPick }) => {
   const bench: ShiftBenchmark | null = useMemo(() => buildShiftBenchmark(sessions, g.brandId, g.platform, today), [sessions, g.brandId, g.platform, today]);
   const [hoursPick, setHoursPick] = useState<number>(1);
   const [minutes, setMinutes] = useState("");
@@ -338,15 +334,25 @@ const Body: React.FC<{ groups: Group[]; g: Group; sessions: LiveSession[]; today
   const showFields = manual;
   return (
     <section className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 sm:p-4 space-y-3" aria-label="Benchmark theo ca">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <h2 className="text-sm font-black text-[var(--text)] flex items-center gap-2"><Gauge className="w-4 h-4 text-[var(--accent-text)]" aria-hidden />Phễu benchmark ca</h2>
-        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Nhóm ca">
-          {groups.map((x) => (
-            <button key={x.key} type="button" aria-pressed={x.key === g.key} className={pill(x.key === g.key)} onClick={() => onPick(x.key)}>
-              {x.brandName} · {x.platform} · {x.band.toLowerCase()}{x.live ? " · đang live" : ""}
-            </button>
-          ))}
-        </div>
+      <h2 className="text-sm font-black text-[var(--text)] flex items-center gap-2"><Gauge className="w-4 h-4 text-[var(--accent-text)]" aria-hidden />Phễu benchmark ca</h2>
+      <div className="grid gap-2 grid-cols-[repeat(auto-fill,minmax(230px,1fr))]" role="group" aria-label="Ca hôm nay">
+        {groups.map((x) => {
+          const on = x.key === g.key, ss = x.session;
+          return (
+            <div key={x.key} className={on ? "" : "opacity-60 hover:opacity-100 transition-opacity"} aria-pressed={on}>
+              <SessionEventCard
+                theme={getBrandTheme(ss.brandName)}
+                brand={brands.find((b) => b.id === ss.brandId)}
+                brandName={ss.brandName} platform={ss.platform}
+                startTime={ss.startTime} endTime={ss.endTime}
+                tone={SESSION_TONE[ss.status]}
+                className={on ? "ring-2 ring-[var(--accent)]" : ""}
+                tooltip={`${ss.brandName} · ${ss.platform} · ${ss.startTime}-${ss.endTime}`}
+                onClick={() => onPick(x.key)}
+              />
+            </div>
+          );
+        })}
       </div>
 
       {!bench ? (
