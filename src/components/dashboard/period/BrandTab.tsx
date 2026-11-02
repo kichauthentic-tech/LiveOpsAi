@@ -1,3 +1,4 @@
+import { platformText } from "../../../lib/metricGlossary";
 import React, { useMemo, useState } from "react";
 import { AlertTriangle, BarChart3, CalendarDays, Clapperboard, Megaphone } from "lucide-react";
 import type { Brand, LiveSession } from "../../../types";
@@ -93,8 +94,8 @@ export const BrandTab: React.FC<{
         </>
       ) : (
         <>
-          <CumChart sessions={sessions} P={P} cards={[]} title={`GMV · ${brand.name} ${platform}`} />
-          <CampTable sessions={sessions} P={P} />
+          <CumChart sessions={sessions} P={P} cards={[]} title={`${platformText("GMV", platform)} · ${brand.name} ${platform}`} />
+          <CampTable platform={platform} sessions={sessions} P={P} />
         </>
       )}
 

@@ -1,3 +1,4 @@
+import { platformText } from "../lib/metricGlossary";
 import { useRef, useState } from "react";
 import { ArrowRightLeft, Upload } from "lucide-react";
 import { LiveSession } from "../types";
@@ -76,10 +77,10 @@ function BoundaryCard({ session: s, boundary: b, canSubmit, onSaved }: { boundar
       {done && !open && (
         <div className="space-y-1.5 text-xs text-[var(--text-muted)]">
           <p>
-            {done.source === "file" ? `Từ file ${done.fileName ?? prof.reconciliationFile} — số của ca tính tới lúc đổi: ` : "Số TỔNG lúc đổi (gõ tay, bản cũ): "}<span className="font-mono text-[var(--text)]">GMV {fmtVndFull(done.cumGmv)} · {fmtCount(done.cumViews ?? 0)} {prof.viewsLabel}{done.cumAtc != null ? ` · ${fmtCount(done.cumAtc)} ${METRIC.atc}` : ""} · {fmtCount(done.cumOrders ?? 0)} {METRIC.orders}</span>
+            {done.source === "file" ? `Từ file ${done.fileName ?? prof.reconciliationFile} — số của ca tính tới lúc đổi: ` : "Số TỔNG lúc đổi (gõ tay, bản cũ): "}<span className="font-mono text-[var(--text)]">{platformText("GMV", prof.id)} {fmtVndFull(done.cumGmv)} · {fmtCount(done.cumViews ?? 0)} {prof.viewsLabel}{done.cumAtc != null ? ` · ${fmtCount(done.cumAtc)} ${METRIC.atc}` : ""} · {fmtCount(done.cumOrders ?? 0)} {METRIC.orders}</span>
           </p>
           <p>
-            {b.fromName || "Host trước"} làm: <b className="font-mono text-[var(--text)]">GMV {fmtVndFull(Math.max(done.cumGmv - done.baseGmv, 0))}</b>
+            {b.fromName || "Host trước"} làm: <b className="font-mono text-[var(--text)]">{platformText("GMV", prof.id)} {fmtVndFull(Math.max(done.cumGmv - done.baseGmv, 0))}</b>
             {done.baseGmv > 0 ? " (đã trừ ca nối trước)" : ""}
           </p>
           {canSubmit && (
@@ -144,7 +145,7 @@ export function HostChangeReports({ session: s, canSubmit, onSaved }: Props) {
         </span>
       </div>
       <p className="text-[11px] text-[var(--text-faint)]">
-        Ca đổi host có HAI chỗ nhập report: số lúc host xuống (ở đây — tải lên file {profileOf(s).reconciliationFile} của sàn) và Giao ca cuối ca (bên dưới). Thiếu số lúc đổi thì GMV của ca chỉ chia cho các host theo giờ — không đúng người bán.
+        Ca đổi host có HAI chỗ nhập report: số lúc host xuống (ở đây — tải lên file {profileOf(s).reconciliationFile} của sàn) và Giao ca cuối ca (bên dưới). Thiếu số lúc đổi thì {platformText("GMV", profileOf(s).id)} của ca chỉ chia cho các host theo giờ — không đúng người bán.
       </p>
       {bounds.map((b) => (
         <BoundaryCard key={`${b.atMin}-${s.staffCheckpoints?.find((c) => c.atMin === b.atMin)?.reportedAt ?? "new"}`} session={s} boundary={b} canSubmit={canSubmit} onSaved={onSaved} />

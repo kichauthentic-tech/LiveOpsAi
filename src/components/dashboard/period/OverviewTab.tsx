@@ -1,3 +1,4 @@
+import { platformText } from "../../../lib/metricGlossary";
 import React, { useState } from "react";
 import { ChevronRight } from "lucide-react";
 import type { Brand } from "../../../types";
@@ -82,7 +83,7 @@ export const OverviewTab: React.FC<{
       ) : (
         <div className="space-y-2">
           <div className="hidden xl:grid grid-cols-[150px_190px_minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,1.15fr)_150px_16px] gap-4 px-4 text-[11px] font-semibold text-[var(--text-faint)]" aria-hidden="true">
-            <span>Account</span><span>Trạng thái</span><span>Tiến độ tháng · <span className="font-normal">vạch = target luỹ kế, vòng = dự báo</span></span><span>Khả năng bù thiếu hụt</span><span>Phân rã GMV/giờ · Daily so tháng trước</span><span>Giờ cam kết</span><span />
+            <span>Account</span><span>Trạng thái</span><span>Tiến độ tháng · <span className="font-normal">vạch = target luỹ kế, vòng = dự báo</span></span><span>Khả năng bù thiếu hụt</span><span>Phân rã {platformText("GMV/giờ", "all")} · Daily so tháng trước</span><span>Giờ cam kết</span><span />
           </div>
           {rows.map((r) => {
             const isOpen = open.has(r.key);
@@ -104,7 +105,7 @@ export const OverviewTab: React.FC<{
                   <ChevronRight className={`w-4 h-4 text-[var(--text-faint)] transition-transform justify-self-end self-start xl:self-center row-start-1 col-start-2 md:col-start-3 xl:col-start-7 ${isOpen ? "rotate-90" : ""}`} aria-hidden="true" />
                   <div className="flex flex-col gap-1 min-w-0 col-span-2 md:col-span-3 xl:col-span-1"><Label>Tiến độ tháng</Label><Progress r={r} /></div>
                   <div className="flex flex-col gap-1 min-w-0 col-span-2 md:col-span-3 xl:col-span-1"><Label>Khả năng bù thiếu hụt</Label><Rescue r={r} /></div>
-                  <div className="flex flex-col gap-1 min-w-0 col-span-2 md:col-span-2 xl:col-span-1"><Label>Phân rã GMV/giờ</Label><Why r={r} /></div>
+                  <div className="flex flex-col gap-1 min-w-0 col-span-2 md:col-span-2 xl:col-span-1"><Label>Phân rã {platformText("GMV/giờ", r.platform)}</Label><Why r={r} /></div>
                   <div className="flex flex-col gap-1 min-w-0 col-span-2 md:col-span-1"><Label>Giờ cam kết</Label><Hours r={r} /></div>
                 </button>
                 {isOpen && (
@@ -135,9 +136,9 @@ export const OverviewTab: React.FC<{
         <summary className="cursor-pointer font-bold">Nguồn số liệu của bảng</summary>
         <ul className="list-disc pl-5 mt-2 space-y-1 leading-snug">
           <li><b className="text-[var(--text)]">Trạng thái, Run-rate, dự báo cuối tháng</b>: thẻ kênh (cùng một lần tính với tab Brand).</li>
-          <li><b className="text-[var(--text)]">Cần / Hiện tại</b>: GMV/giờ cần trên các giờ live còn trong lịch để đạt target, so với GMV/giờ dự báo của các ca đó.</li>
+          <li><b className="text-[var(--text)]">Cần / Hiện tại</b>: {platformText("GMV/giờ", "all")} cần trên các giờ live còn trong lịch để đạt target, so với {platformText("GMV/giờ", "all")} dự báo của các ca đó.</li>
           <li><b className="text-[var(--text)]">Bù được hay không</b>: mục Phương án ở tab Brand. Số giờ cần thêm ≤ giới hạn +30% giờ còn lại thì "Bù được"; vượt giới hạn thì thêm tối đa +30% và báo brand sớm. Giới hạn này đã kiểm chứng trên T7–T9: điều chỉnh đủ 3 mốc thì 9/9 tháng CROCS + VERA đạt ≥ 95% target.</li>
-          <li><b className="text-[var(--text)]">Phân rã GMV/giờ</b>: chỉ ngày Daily, so ngày Daily cùng thứ tự tháng trước (TikTok: Views/giờ × LIVE CTR × CTOR × AOV; Shopee: Viewers/giờ × ATC/Viewer × GMV/ATC). Chữ đậm là yếu tố giảm mạnh nhất.</li>
+          <li><b className="text-[var(--text)]">Phân rã {platformText("GMV/giờ", "all")}</b>: chỉ ngày Daily, so ngày Daily cùng thứ tự tháng trước (TikTok: Views/giờ × LIVE CTR × CTOR × AOV; Shopee: Viewers/giờ × ATC/Viewer × {platformText("GMV/ATC", "all")}). Chữ đậm là yếu tố giảm mạnh nhất.</li>
           <li><b className="text-[var(--text)]">Giờ cam kết</b>: đã live + đã xếp lịch so với cam kết của tháng (CRM / Kế Hoạch Tháng).</li>
         </ul>
       </details>
@@ -203,7 +204,7 @@ const Why: React.FC<{ r: AccountRow }> = ({ r }) => {
   const worst = t.worst && t.worst.change < -0.03 ? t.worst.label : null;
   return (
     <>
-      <span className="text-xs text-[var(--text-muted)]">GMV/giờ (Daily) {t.gmvPerHour.change != null && <b className={t.gmvPerHour.change >= 0 ? "text-emerald-400" : "text-rose-400"}>{signPct(t.gmvPerHour.change)}</b>} <span className="text-[var(--text-faint)]">vs {money(t.gmvPerHour.prev)}/giờ</span></span>
+      <span className="text-xs text-[var(--text-muted)]">{platformText("GMV/giờ", r.platform)} (Daily) {t.gmvPerHour.change != null && <b className={t.gmvPerHour.change >= 0 ? "text-emerald-400" : "text-rose-400"}>{signPct(t.gmvPerHour.change)}</b>} <span className="text-[var(--text-faint)]">vs {money(t.gmvPerHour.prev)}/giờ</span></span>
       <div className="grid grid-cols-[80px_minmax(0,1fr)_44px] items-center gap-x-2 gap-y-1 text-[11px]">
         {t.parts.map((p) => {
           const w = (Math.min(Math.abs(p.change), 0.4) / 0.4) * 50;

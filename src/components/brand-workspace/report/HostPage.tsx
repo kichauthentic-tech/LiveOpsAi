@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { fmtVndShort } from "../../../lib/format";
-import { METRIC } from "../../../lib/metricGlossary";
+import { METRIC as BASE_METRIC, METRIC_SHOPEE } from "../../../lib/metricGlossary";
 import { HOST_DAY_TYPE_ORDER, MIN_SESSIONS_TO_COMPARE, DAY_TYPE_DIFF_THRESHOLD, dayTypeMetrics, sumDayTypeParts, vsTeam, type DayTypeMetrics, type DayTypePart, type HostDayTypeRow } from "../../../lib/performance/hostPerformance";
 import { reliabilityText, type HostReliability } from "../../../lib/report/deepAnalysis";
 import type { CampDayBucket } from "../../../lib/campaignDays";
@@ -13,6 +13,8 @@ import type { PageMetric } from "./ui";
 // Trang 6 "Host & khung giờ" dựng theo demo (scratchpad/build/template.html, #p6): KPI → hồ sơ host (4 cặp chỉ số) + GMV/giờ theo khung giờ
 // → Host PFM cả tháng → Host PFM theo loại ngày (tab) → phân bố GMV/giờ + bảng khung giờ → Top phiên. Markup/class lấy nguyên từ demo.
 
+/** Tên chỉ số theo sàn của trang (Shopee: doanh số là "Sales"). */
+const metricOf = (d: { variant?: string }): typeof BASE_METRIC => (d.variant === "shopee" ? METRIC_SHOPEE : BASE_METRIC);
 const esc = (s: unknown) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c as "&" | "<" | ">" | '"']));
 const dec = (v: number, d: number) => v.toLocaleString("vi-VN", { minimumFractionDigits: d, maximumFractionDigits: d });
 const M1 = (v: number) => dec(v / 1e6, 1) + "M";
@@ -73,6 +75,7 @@ const teamAll = (team: Record<CampDayBucket, DayTypePart>) => dayTypeMetrics(sum
 
 /** Bốn ô KPI đầu trang (thứ tự demo): host đứng đầu GMV/giờ · trung bình team · khung giờ lệch rõ nhất · trung vị GMV/giờ mỗi phiên. */
 export function hostKpis(d: HostPageData): PageMetric[] {
+  const METRIC = metricOf(d);
   const out: PageMetric[] = [];
   const hs = hostsAll(d.rows).filter((h) => h.m.gmvPerHour != null);
   const ranked = hs.filter((h) => h.m.sessions >= MIN_RANK_SESSIONS);
@@ -98,7 +101,7 @@ export function hostKpis(d: HostPageData): PageMetric[] {
 // ---- Hồ sơ host: 4 cặp chỉ số ----
 type PairKey = "a" | "b" | "c" | "d";
 
-function pairHtml(k: PairKey, hs: HostAll[], t: DayTypeMetrics, shortName: (n: string) => string, viewsLabel: string = METRIC.viewsPerHour) {
+function pairHtml(k: PairKey, hs: HostAll[], t: DayTypeMetrics, shortName: (n: string) => string, viewsLabel: string = BASE_METRIC.viewsPerHour, METRIC: typeof BASE_METRIC = BASE_METRIC) {
   const f2 = (v: number) => dec(v, 2) + "%";
   const num0 = (v: number) => Math.round(v).toLocaleString("vi-VN");
   const gph = (h: HostAll) => (h.m.gmvPerHour ?? 0) / 1e6;
@@ -154,6 +157,7 @@ const shortNameOf = (shortName: (n: string) => string, h: HostAll) => shortName(
 
 // ---- Bảng Host PFM ----
 function hostTableHtml(d: HostPageData, hs: HostAll[]): string {
+  const METRIC = metricOf(d);
   const shopee = d.variant === "shopee";
   const best = [...hs].filter((h) => h.m.sessions >= MIN_RANK_SESSIONS && h.m.gmvPerHour != null).sort((a, b) => b.m.gmvPerHour! - a.m.gmvPerHour!)[0];
   const sorted = [...hs].sort((a, b) => (b.m.gmvPerHour ?? 0) - (a.m.gmvPerHour ?? 0));
@@ -184,6 +188,7 @@ function hostTableHtml(d: HostPageData, hs: HostAll[]): string {
 }
 
 function hostDayTableHtml(d: HostPageData, b: CampDayBucket): string {
+  const METRIC = metricOf(d);
   const part = (r: HostDayTypeRow) => dayTypeMetrics(r.byBucket[b]);
   const t = dayTypeMetrics(d.team[b]);
   const hs = d.rows.map((r) => ({ name: r.name, m: part(r) })).filter((h) => h.m.sessions > 0).sort((a, b2) => b2.m.gmv - a.m.gmv);
@@ -220,6 +225,7 @@ function spreadHtml(s: SessionSpread): string {
 }
 
 export const HostPageBody: React.FC<{ data: HostPageData; children?: React.ReactNode }> = ({ data: d, children }) => {
+  const METRIC = metricOf(d);
   const [pair, setPair] = useState<PairKey>("a");
   const [dayTab, setDayTab] = useState<CampDayBucket | null>(null);
   const hs = hostsAll(d.rows);
@@ -231,8 +237,8 @@ export const HostPageBody: React.FC<{ data: HostPageData; children?: React.React
   // Shopee không có Product clicks ⇒ chỉ 2 cặp không cần CTOR / LIVE CTR.
   const PAIR_KEYS: PairKey[] = shopee ? ["b", "d"] : ["a", "b", "c", "d"];
   const curPair = PAIR_KEYS.includes(pair) ? pair : PAIR_KEYS[0];
-  const P = hs.length >= 3 ? pairHtml(curPair, hs, team, d.shortName, viewsLabel) : null;
-  const pairNames = PAIR_KEYS.map((k) => ({ k, name: hs.length >= 3 ? pairHtml(k, hs, team, d.shortName, viewsLabel).name : "" }));
+  const P = hs.length >= 3 ? pairHtml(curPair, hs, team, d.shortName, viewsLabel, METRIC) : null;
+  const pairNames = PAIR_KEYS.map((k) => ({ k, name: hs.length >= 3 ? pairHtml(k, hs, team, d.shortName, viewsLabel, METRIC).name : "" }));
   const slotMax = Math.max(5, Math.ceil((Math.max(...d.slots.flatMap((s) => [s.prev ?? 0, s.cur ?? 0])) / 1e6) * 1.25 / 5) * 5);
   const slotChart = columns(
     d.slots.map((s) => ({ l: `${s.label}\n${s.curN} phiên`, v: [s.prev != null ? s.prev / 1e6 : null, s.cur != null ? s.cur / 1e6 : null] })),
@@ -319,7 +325,7 @@ export const HostPageBody: React.FC<{ data: HostPageData; children?: React.React
         )}
       </div>
       <div className="pn">
-        <div className="pnh">{`Top ${d.top.length} phiên theo GMV`}</div>
+        <div className="pnh">{`Top ${d.top.length} phiên theo ${METRIC.gmv}`}</div>
         <div className="tw">
           <table
             dangerouslySetInnerHTML={{

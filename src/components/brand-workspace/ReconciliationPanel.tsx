@@ -1,3 +1,4 @@
+import { platformText } from "../../lib/metricGlossary";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, FileSpreadsheet, RefreshCw, Trash2 } from "lucide-react";
 import {
@@ -42,12 +43,12 @@ interface Props {
 // Chỉ hai rổ này được ghi vào ca khi Áp dụng — nên chỉ ở đây mới chọn phiên nào đối soát.
 const APPLIED_BUCKETS: ReconciliationBucket[] = ["agency", "review"];
 
-const METHOD_TITLE: Record<ReconShare["method"], string> = {
+const methodTitle = (platform: ReportPlatform): Record<ReconShare["method"], string> => ({
   whole: "Cả phiên thuộc ca này",
   snapshot: "Theo snapshot lúc giao ca",
   time: "Có phần ước lượng theo giờ — thiếu snapshot hoặc tải lên trễ",
-  manual: "GMV gõ tay — phần còn lại của phiên chia cho các ca kia"
-};
+  manual: `${platformText("GMV", platform)} gõ tay — phần còn lại của phiên chia cho các ca kia`
+});
 
 const ISSUE_TITLE: Record<CheckKind, string> = {
   sum_mismatch: "Tổng lệch file",
@@ -142,7 +143,7 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
       await setReconGmvOverride(rowId, sessionId, gmv);
       setEditing(null);
       setPreviewKey((k) => k + 1);
-      setNote(gmv == null ? "Đã bỏ số gõ tay — ca quay về cách chia tự động." : "Đã lưu GMV gõ tay. Lô đã áp dụng thì bấm Áp Dụng Lại để ghi vào ca.");
+      setNote(gmv == null ? "Đã bỏ số gõ tay — ca quay về cách chia tự động." : `Đã lưu ${platformText("GMV", platform)} gõ tay. Lô đã áp dụng thì bấm Áp Dụng Lại để ghi vào ca.`);
     });
   }
 
@@ -223,7 +224,7 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
               key={id}
               onClick={editable ? () => setEditing({ rowId: r.id, sessionId: id }) : undefined}
               disabled={editable ? busy : undefined}
-              title={sh ? `${METHOD_TITLE[sh.method]} · ${fmtVndFull(sh.gmv)}${editable ? " · bấm để gõ GMV đúng của ca" : ""}` : undefined}
+              title={sh ? `${methodTitle(platform)[sh.method]} · ${fmtVndFull(sh.gmv)}${editable ? ` · bấm để gõ ${platformText("GMV", platform)} đúng của ca` : ""}` : undefined}
               className={`inline-flex items-center px-1.5 py-0.5 rounded border font-bold whitespace-nowrap ${
                 flagged ? "border-rose-500 text-rose-300"
                   : typed ? "border-violet-500 text-violet-300"
@@ -247,7 +248,7 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
             {selectable && <th className="font-bold pb-1.5 pr-2 w-6" aria-label="Đối soát phiên này" />}
             <th className="font-bold pb-1.5 pr-3">Phiên live</th>
             <th className="font-bold pb-1.5 pr-3">Thời gian</th>
-            <th className="font-bold pb-1.5 pr-3 text-right">GMV</th>
+            <th className="font-bold pb-1.5 pr-3 text-right">{platformText("GMV", platform)}</th>
             <th className="font-bold pb-1.5 pr-3 text-right">Orders</th>
             <th className="font-bold pb-1.5 text-right">Ca khớp</th>
           </tr>
@@ -489,7 +490,7 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
                 <div className="border border-violet-800 bg-violet-950/30 rounded-2xl p-4">
                   <p className="text-xs font-black text-[var(--text)]">Ca bị restart / ngắt giữa chừng · {mergeGroups.length} nhóm</p>
                   <p className="text-[11px] text-[var(--text-muted)] mt-0.5 max-w-2xl">
-                    Mỗi lần tắt bật stream sàn sinh thêm một phiên (có khi chỉ 1–2 phút, GMV 0). Gộp lại thành một phiên: giờ từ đầu tới cuối, GMV/đơn/lượt xem cộng lại (tổng không đổi). Chưa ghi gì vào ca cho tới khi bạn bấm Áp dụng.
+                    Mỗi lần tắt bật stream sàn sinh thêm một phiên (có khi chỉ 1–2 phút, {platformText("GMV", platform)} 0). Gộp lại thành một phiên: giờ từ đầu tới cuối, {platformText("GMV", platform)}/đơn/lượt xem cộng lại (tổng không đổi). Chưa ghi gì vào ca cho tới khi bạn bấm Áp dụng.
                   </p>
                   <ul className="mt-2 space-y-1">
                     {mergeGroups.map((g) => {

@@ -1,3 +1,4 @@
+import { platformText } from "../lib/metricGlossary";
 import React, { useMemo, useState } from "react";
 import { LiveSession } from "../types";
 import { Target } from "lucide-react";
@@ -120,7 +121,7 @@ export const AllocationTrainingCard: React.FC<Props> = ({ brandId, sessions, par
                   </table>
                 </div>
                 <Explain summary="Cách đọc bảng" className="mt-1">
-                  <p>Mỗi tháng engine chỉ được xem các tháng TRƯỚC nó, rồi chia đúng tổng GMV đã đối soát của tháng đó xuống ca; sai số = Σ|target ca − GMV ca đã đối soát| ÷ Σ GMV đã đối soát (thấp hơn là tốt). Bảng chỉ đo việc CHIA, không đo việc đặt tổng target. Gộp theo ngày: {ALLOC_METHODS.filter((k) => result.pooled[k]).map((k) => `${{ hours: "theo giờ", old: "cũ", glm: "v2 riêng", v2: "v2 trộn" }[k]} ${pct(result.pooled[k]!.day)}`).join(" · ")}. {result.folds.some((f) => f.partial) ? "* = tháng chưa trọn, chỉ để tham khảo. " : ""}Sai số quanh 22% là mức nhiễu từng ca — hệ số đúng mấy cũng không xuống dưới ~18%; chênh dưới ~1 điểm % giữa hai cách chưa đủ để kết luận.</p>
+                  <p>Mỗi tháng engine chỉ được xem các tháng TRƯỚC nó, rồi chia đúng tổng {platformText("GMV", platform)} đã đối soát của tháng đó xuống ca; sai số = Σ|target ca − {platformText("GMV", platform)} ca đã đối soát| ÷ Σ {platformText("GMV", platform)} đã đối soát (thấp hơn là tốt). Bảng chỉ đo việc CHIA, không đo việc đặt tổng target. Gộp theo ngày: {ALLOC_METHODS.filter((k) => result.pooled[k]).map((k) => `${{ hours: "theo giờ", old: "cũ", glm: "v2 riêng", v2: "v2 trộn" }[k]} ${pct(result.pooled[k]!.day)}`).join(" · ")}. {result.folds.some((f) => f.partial) ? "* = tháng chưa trọn, chỉ để tham khảo. " : ""}Sai số quanh 22% là mức nhiễu từng ca — hệ số đúng mấy cũng không xuống dưới ~18%; chênh dưới ~1 điểm % giữa hai cách chưa đủ để kết luận.</p>
                 </Explain>
               </>
             )}

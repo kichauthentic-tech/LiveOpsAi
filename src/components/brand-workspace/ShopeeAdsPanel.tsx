@@ -155,7 +155,7 @@ export function ShopeeAdsPanel({ brandId, brandName, month, canManage, isPublish
           <Target className="w-4 h-4 text-[var(--accent-text)]" /> Ads Shopee · tháng {fmtMonth(month)}
         </h3>
         <p className="text-[11px] text-[var(--text-faint)] mt-1">
-          Tới 3 file, mỗi loại Ads một file (Seller Centre → Quảng cáo Shopee → xuất dữ liệu, chọn đúng một tháng): <b>Livestream Ads</b>, <b>Shop+ Ads</b> (tìm kiếm từ khoá / ngành hàng), <b>Product Ads</b> (CPC / GMV Max).
+          Tới 3 file, mỗi loại Ads một file (Seller Centre → Quảng cáo Shopee → xuất dữ liệu, chọn đúng một tháng): <b>Livestream Ads</b>, <b>Shop+ Ads</b> (tìm kiếm từ khoá / ngành hàng), <b>Product Ads</b> (CPC / Sales Max).
           Thả cả 3 file vào một ô, app tự nhận loại. File là tổng cả tháng theo chiến dịch hoặc sản phẩm, không có số theo ngày.
         </p>
       </div>
@@ -255,7 +255,7 @@ export function ShopeeAdsPanel({ brandId, brandName, month, canManage, isPublish
             })}
           </div>
           <p className="text-[11px] text-[var(--text-faint)]">
-            Doanh số trong file Ads là số Shopee quy cho quảng cáo, một phần của GMV shop — không cộng thêm vào GMV live. Shop+ Ads và Product Ads có thể cùng nhận công một đơn nên tổng doanh số có thể cao hơn thực tế; report luôn kèm ROAS đơn trực tiếp.
+            Doanh số trong file Ads là số Shopee quy cho quảng cáo, một phần của Sales shop — không cộng thêm vào Sales live. Shop+ Ads và Product Ads có thể cùng nhận công một đơn nên tổng doanh số có thể cao hơn thực tế; report luôn kèm ROAS đơn trực tiếp.
           </p>
         </>
       )}

@@ -1,3 +1,4 @@
+import { platformText } from "../lib/metricGlossary";
 import React, { useEffect, useMemo, useState } from "react";
 import { inChannelScope, platformOf, REPORT_PLATFORMS, type ChannelScope } from "../lib/reportPlatform";
 import { SESSION_STATUS_CLS, SESSION_STATUS_LABEL_VI } from "../lib/sessionStatusUi";
@@ -237,11 +238,11 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
       if (!isBrandView) row["Trợ live"] = s.coHostName || "";
       row["Trạng thái"] = STATUS_LABEL[s.status];
       row["Giờ live"] = s.liveDurationMinutes ? Number((s.liveDurationMinutes / 60).toFixed(2)) : Number(hours.toFixed(2));
-      if (!isBrandView) row["Target GMV"] = s.targetGmv || 0;
-      row["GMV"] = hideMetrics ? "Chưa phát hành" : s.actualGmv || 0;
+      if (!isBrandView) row[`${platformText("Target GMV", platformScope)}`] = s.targetGmv || 0;
+      row[`${platformText("GMV", platformScope)}`] = hideMetrics ? "Chưa phát hành" : s.actualGmv || 0;
       row["Orders"] = hideMetrics ? "Chưa phát hành" : s.totalOrders || 0;
       if (isBrandView) row[viewsHead] = hideMetrics ? "Chưa phát hành" : s.totalViews || 0;
-      row["GMV/giờ"] = hideMetrics ? "Chưa phát hành" : Math.round(gmvPerHour);
+      row[`${platformText("GMV/giờ", platformScope)}`] = hideMetrics ? "Chưa phát hành" : Math.round(gmvPerHour);
       row[isBrandView ? "Số liệu" : "Dữ liệu"] = isBrandView
         ? hideMetrics
           ? "Chờ phát hành"
@@ -271,7 +272,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
         title="Sổ Ca"
         description={
           isBrandView
-            ? "Từng ca live đã diễn ra cho brand: giờ live thật, GMV, đơn, lượt xem. Số “Tạm tính” còn chờ sàn cập nhật, “Đã chốt” là số đối soát cuối kỳ."
+            ? `Từng ca live đã diễn ra cho brand: giờ live thật, ${platformText("GMV", platformScope)}, đơn, lượt xem. Số “Tạm tính” còn chờ sàn cập nhật, “Đã chốt” là số đối soát cuối kỳ.`
             : "Từng ca đã/đang live: số liệu thực tế của ca, số đó tin được tới đâu, và còn thiếu bước nào (TikTok: tải lên file → giao ca; Shopee: giao ca; rồi đối soát) để chốt tháng."
         }
         actions={
@@ -368,9 +369,9 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
           <StatTile frame="card" label="Số ca" value={String(summary.total)} hint={summary.countable < summary.total ? `${summary.countable} ca có số liệu` : undefined} />
           <StatTile frame="card" label="Giờ live" value={fmtHours(summary.hours)} hint="giờ thật, thiếu thì lấy giờ kế hoạch" />
-          <StatTile frame="card" label="GMV" value={allHidden ? lockedValue : perfValue((x) => fmtVndShort(x.gmv))} tone={allHidden ? undefined : "text-[var(--success)]"} valueTitle={allHidden ? LOCKED_TITLE : undefined} />
+          <StatTile frame="card" label={`${platformText("GMV", platformScope)}`} value={allHidden ? lockedValue : perfValue((x) => fmtVndShort(x.gmv))} tone={allHidden ? undefined : "text-[var(--success)]"} valueTitle={allHidden ? LOCKED_TITLE : undefined} />
           <StatTile frame="card" label="Orders" value={allHidden ? lockedValue : perfValue((x) => fmtInt(x.orders))} valueTitle={allHidden ? LOCKED_TITLE : undefined} />
-          <StatTile frame="card" label="GMV/giờ" value={allHidden ? lockedValue : perfValue((x) => fmtVndShort(x.gmvPerHour))} valueTitle={allHidden ? LOCKED_TITLE : undefined} />
+          <StatTile frame="card" label={`${platformText("GMV/giờ", platformScope)}`} value={allHidden ? lockedValue : perfValue((x) => fmtVndShort(x.gmvPerHour))} valueTitle={allHidden ? LOCKED_TITLE : undefined} />
           <StatTile frame="card" label="Nguồn số liệu" title="">
             {summary.countable === 0 ? (
               <p className="text-xs text-[var(--text-faint)] mt-1">—</p>
@@ -405,11 +406,11 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
                 {/* M4: ở điện thoại bảng rộng 972px (2,8× bề ngang máy). Giữ 6 cột trả lời "ca nào, ai chạy,
                     ra bao nhiêu"; 5 cột phụ chỉ hiện từ sm trở lên — cùng cách Đợt 0 đã làm cho CeoBrief. */}
                 <th className={`${SUB_COL} text-right`}>Giờ live</th>
-                {showTargetCol && <th className={`${SUB_COL} text-right`}>Target GMV</th>}
-                <th className="py-2.5 px-2 text-right">GMV</th>
+                {showTargetCol && <th className={`${SUB_COL} text-right`}>{platformText("Target GMV", platformScope)}</th>}
+                <th className="py-2.5 px-2 text-right">{platformText("GMV", platformScope)}</th>
                 <th className={`${SUB_COL} text-right`}>Orders</th>
                 {isBrandView && <th className={`${SUB_COL} text-right`}>{viewsHead}</th>}
-                <th className={`${SUB_COL} text-right`}>GMV/giờ</th>
+                <th className={`${SUB_COL} text-right`}>{platformText("GMV/giờ", platformScope)}</th>
                 <th className="py-2.5 px-2">{isBrandView ? "Số liệu" : "Dữ liệu"}</th>
                 <th className={SUB_COL}>Sự cố</th>
                 <th className="py-2.5 px-2" />

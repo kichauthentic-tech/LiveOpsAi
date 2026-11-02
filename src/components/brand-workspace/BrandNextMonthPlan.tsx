@@ -1,3 +1,4 @@
+import { platformText } from "../../lib/metricGlossary";
 import React, { useEffect, useMemo, useState } from "react";
 import { CalendarCheck2, CheckCircle2, Clock, Loader2 } from "lucide-react";
 import { BrandMonthPlan, BrandMonthPlanSlot, UserRole } from "../../types";
@@ -155,10 +156,10 @@ export const BrandNextMonthPlan: React.FC<BrandNextMonthPlanProps> = ({ brandId,
                 <Clock className="w-3.5 h-3.5" /> {fmtHours(totalHours)} · {slots.length} ca
               </span>
               {plan.targetGmv > 0 && (
-                <span className="text-xs text-[var(--text-muted)]">Target GMV: {fmtVndShort(plan.targetGmv)}</span>
+                <span className="text-xs text-[var(--text-muted)]">{platformText("Target GMV", platform)}: {fmtVndShort(plan.targetGmv)}</span>
               )}
               {plan.shopTargetGmv > 0 && (
-                <span className="text-xs text-[var(--text-muted)]">KPI GMV (cả shop): {fmtVndShort(plan.shopTargetGmv)}</span>
+                <span className="text-xs text-[var(--text-muted)]">{platformText("KPI GMV", platform)} (cả shop): {fmtVndShort(plan.shopTargetGmv)}</span>
               )}
             </div>
 
@@ -191,7 +192,7 @@ export const BrandNextMonthPlan: React.FC<BrandNextMonthPlanProps> = ({ brandId,
                   <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)] text-[11px] font-semibold">
                     <th className="py-2.5 px-3">Ngày</th>
                     <th className="py-2.5 px-2">Giờ live</th>
-                    <th className="py-2.5 px-2 text-right">Target GMV</th>
+                    <th className="py-2.5 px-2 text-right">{platformText("Target GMV", platform)}</th>
                     <th className="py-2.5 px-3">Ghi chú</th>
                   </tr>
                 </thead>

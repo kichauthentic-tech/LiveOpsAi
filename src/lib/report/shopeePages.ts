@@ -1,3 +1,4 @@
+import { METRIC_SHOPEE as SM, deepPlatformText } from "../metricGlossary";
 import type { LiveSession } from "../../types";
 import { fmtVndShort } from "../format";
 import { METRIC } from "../metricGlossary";
@@ -135,13 +136,13 @@ export const SHOPEE_KM_GROUPS: { group: ShopeeKmDef["group"]; label: string }[] 
 ];
 
 export const SHOPEE_KM: ShopeeKmDef[] = [
-  { key: "gmv", label: METRIC.gmv, kind: "money", goodWhenUp: true, group: "result", result: true, volume: true, value: (c) => (c.sessions ? c.gmv : null) },
+  { key: "gmv", label: SM.gmv, kind: "money", goodWhenUp: true, group: "result", result: true, volume: true, value: (c) => (c.sessions ? c.gmv : null) },
   { key: "hours", label: METRIC.liveHours, kind: "hours", goodWhenUp: null, group: "result", value: (c) => (c.sessions ? c.hours : null) },
-  { key: "gmvPerHour", label: METRIC.gmvPerHour, kind: "money", goodWhenUp: true, group: "result", result: true, value: (c) => ratio(c.gmv, c.hours) },
+  { key: "gmvPerHour", label: SM.gmvPerHour, kind: "money", goodWhenUp: true, group: "result", result: true, value: (c) => ratio(c.gmv, c.hours) },
   { key: "orders", label: METRIC.orders, kind: "int", goodWhenUp: true, group: "result", result: true, volume: true, value: (c) => (c.sessions ? c.orders : null) },
   { key: "abs", label: METRIC.abs, kind: "money", goodWhenUp: true, group: "result", value: (c) => ratio(c.gmv, c.orders) },
   { key: "items", label: METRIC.itemsSoldShopee, kind: "int", goodWhenUp: true, group: "result", result: true, volume: true, value: (c) => (richOk(c) && c.rich.items > 0 ? c.rich.items : null) },
-  { key: "confirmedRate", label: `${METRIC.salesConfirmed} / ${METRIC.gmv}`, kind: "pct", goodWhenUp: true, group: "result", value: (c) => (c.gmv > 0 && c.confirmed > 0 ? (c.confirmed / c.gmv) * 100 : null) },
+  { key: "confirmedRate", label: `${METRIC.salesConfirmed} / ${SM.gmv}`, kind: "pct", goodWhenUp: true, group: "result", value: (c) => (c.gmv > 0 && c.confirmed > 0 ? (c.confirmed / c.gmv) * 100 : null) },
   { key: "viewers", label: METRIC.viewers, kind: "int", goodWhenUp: true, group: "traffic", volume: true, value: (c) => (c.viewers > 0 ? c.viewers : null) },
   { key: "viewersPerHour", label: METRIC.viewersPerHour, kind: "int", goodWhenUp: true, group: "traffic", value: (c) => (c.viewers > 0 ? ratio(c.viewers, c.hours) : null) },
   { key: "engagedRate", label: `${METRIC.engagedViewers} / ${METRIC.viewers}`, kind: "pct", goodWhenUp: true, group: "traffic", value: (c) => (richOk(c) && c.rich.viewers > 0 && c.rich.engaged > 0 ? (c.rich.engaged / c.rich.viewers) * 100 : null) },
@@ -149,7 +150,7 @@ export const SHOPEE_KM: ShopeeKmDef[] = [
   { key: "atc", label: METRIC.atc, kind: "int", goodWhenUp: true, group: "cart", volume: true, value: (c) => (richOk(c) && c.rich.atc > 0 ? c.rich.atc : null) },
   { key: "atcRate", label: METRIC.atcRate, kind: "pct", goodWhenUp: true, group: "cart", value: (c) => (richOk(c) && c.rich.viewers > 0 && c.rich.atc > 0 ? (c.rich.atc / c.rich.viewers) * 100 : null) },
   { key: "ordersPerAtc", label: `${METRIC.orders}/${METRIC.atc}`, kind: "pct", goodWhenUp: true, group: "cart", value: (c) => (richOk(c) && c.rich.atc > 0 ? (c.rich.orders / c.rich.atc) * 100 : null) },
-  { key: "gmvPerAtc", label: METRIC.gmvPerAtc, kind: "money", goodWhenUp: true, group: "cart", value: (c) => (richOk(c) && c.rich.atc > 0 ? c.rich.gmv / c.rich.atc : null) }
+  { key: "gmvPerAtc", label: SM.gmvPerAtc, kind: "money", goodWhenUp: true, group: "cart", value: (c) => (richOk(c) && c.rich.atc > 0 ? c.rich.gmv / c.rich.atc : null) }
 ];
 
 export function fmtShopeeKm(kind: Kind, v: number | null | undefined): string {
@@ -216,8 +217,8 @@ export const SHOPEE_FACTOR_LABEL: Record<ShopeeFactor, string> = {
   hours: METRIC.liveHours,
   viewersPerHour: METRIC.viewersPerHour,
   atcRate: METRIC.atcRate,
-  gmvPerAtc: METRIC.gmvPerAtc,
-  gmvPerViewer: `GMV/${METRIC.viewers}`
+  gmvPerAtc: SM.gmvPerAtc,
+  gmvPerViewer: `Sales/${METRIC.viewers}`
 };
 
 /**
@@ -345,7 +346,7 @@ export function shopeeScoreRows(p: ShopeePageModel): ScoreRow[] {
 
 export function shopeeTargetBridge(p: ShopeePageModel): BridgePoint[] | null {
   const b = targetBridge(shopeeScoreRows(p), (k) => SHOPEE_TAB_LABEL[k]);
-  return b ? bridgePoints(p.model.cutDay != null ? "Target tới nay" : "Target tháng", b.start, b.steps, `${METRIC.gmv} thực tế`, b.end) : null;
+  return b ? bridgePoints(p.model.cutDay != null ? "Target tới nay" : "Target tháng", b.start, b.steps, `${SM.gmv} thực tế`, b.end) : null;
 }
 
 /** GMV/giờ kế hoạch từng loại ngày = Σ target ca ÷ Σ giờ ca (Kế Hoạch Tháng Shopee), cạnh GMV/giờ thực tế. */
@@ -589,7 +590,12 @@ export interface ShopeeInsightExtra {
   withAds?: boolean;
 }
 
+/** Insight dựng bằng hàm dùng chung với TikTok ⇒ đổi tên doanh số sang tên Shopee ở mọi chuỗi (deepPlatformText). */
 export function shopeeInsights(s: ShopeeReportSnapshot, p: ShopeePageModel, x: ShopeeInsightExtra): Record<ShopeeInsightPage, InsightBlocks> {
+  return deepPlatformText(shopeeInsightsRaw(s, p, x), "Shopee");
+}
+
+function shopeeInsightsRaw(s: ShopeeReportSnapshot, p: ShopeePageModel, x: ShopeeInsightExtra): Record<ShopeeInsightPage, InsightBlocks> {
   const all = p.score.find((r) => r.key === "all");
   const days = p.score.filter((r) => r.key !== "all");
   const km = p.km.all;
@@ -610,7 +616,7 @@ export function shopeeInsights(s: ShopeeReportSnapshot, p: ShopeePageModel, x: S
   const shortP = (n: string) => shortName(n, 40);
   return {
     summary: summaryBlocks({
-      gmvLabel: METRIC.gmv,
+      gmvLabel: SM.gmv,
       liveActual: all?.actual ?? s.headline.gmv,
       liveTarget: all ? all.targetToDate ?? all.target : null,
       // Cùng cách đọc của TikTok: thiếu do GMV/giờ hay Giờ live so với kế hoạch (tới ngày cuối có số).
@@ -631,7 +637,7 @@ export function shopeeInsights(s: ShopeeReportSnapshot, p: ShopeePageModel, x: S
     }),
     nmv: shopeeCancelBlocks(cancel),
     why: whyBlocks({
-      gmvLabel: METRIC.gmv,
+      gmvLabel: SM.gmv,
       gmvPerHourChange: kmCell(km, "gmvPerHour") ? kmCell(km, "gmvPerHour")!.changes[last] : null,
       parts: p.drivers ? p.drivers.parts.map((d) => ({ key: d.key, label: SHOPEE_FACTOR_LABEL[d.key], value: d.value, change: d.change })) : [],
       significantDays: sigDays.map((r) => ({ label: SHOPEE_TAB_LABEL[r.key], change: r.change.gmvPerHour! })),
@@ -647,7 +653,7 @@ export function shopeeInsights(s: ShopeeReportSnapshot, p: ShopeePageModel, x: S
           lead: skuRows[0] && top10 > 0 ? { name: shortP(skuRows[0].name), share: (skuRows[0].gmv / top10) * 100 } : null,
           promo: null,
           rateLabel: `${METRIC.orders}/Product Clicks`,
-          promoNote: s.promo && s.promo.coins > 0 ? `${METRIC.coinsClaimed} ${s.promo.coins.toLocaleString("vi-VN")} (≈ ${money(s.promo.coins)}, ${s.headline.gmv > 0 ? pctTxt((s.promo.coins / s.headline.gmv) * 100, 2) : "—"} GMV); ${METRIC.shopVoucherClaimed} ${s.promo.vouchers.toLocaleString("vi-VN")}.` : "Chưa có số khuyến mãi (file overview) của tháng."
+          promoNote: s.promo && s.promo.coins > 0 ? `${METRIC.coinsClaimed} ${s.promo.coins.toLocaleString("vi-VN")} (≈ ${money(s.promo.coins)}, ${s.headline.gmv > 0 ? pctTxt((s.promo.coins / s.headline.gmv) * 100, 2) : "—"} Sales); ${METRIC.shopVoucherClaimed} ${s.promo.vouchers.toLocaleString("vi-VN")}.` : "Chưa có số khuyến mãi (file overview) của tháng."
         }))
       : SHOPEE_EMPTY_BLOCKS,
     people: peopleBlocks({
@@ -668,7 +674,7 @@ function withoutPrevRank(s: ShopeeReportSnapshot, rows: SkuMoves["rows"], b: Ins
   const conv = rows.filter((r) => r.ctor != null).sort((a, z) => z.ctor! - a.ctor!);
   return {
     ...b,
-    observe: lead && top > 0 ? `${shortName(lead.name, 40)} dẫn đầu Top ${rows.length} SKU, ${pctTxt((lead.gmv / top) * 100)} GMV nhóm top; chưa có Product List tháng trước để so hạng.` : NONE,
+    observe: lead && top > 0 ? `${shortName(lead.name, 40)} dẫn đầu Top ${rows.length} SKU, ${pctTxt((lead.gmv / top) * 100)} Sales nhóm top; chưa có Product List tháng trước để so hạng.` : NONE,
     cause: conv.length >= 2 ? `${METRIC.orders}/Product Clicks trong Top ${rows.length}: cao nhất ${shortName(conv[0].name, 40)} (${pctTxt(conv[0].ctor!, 1)}), thấp nhất ${shortName(conv[conv.length - 1].name, 40)} (${pctTxt(conv[conv.length - 1].ctor!, 1)}).` : "—",
     advise: conv.length >= 2 ? `Rà soát giá, voucher và cách giới thiệu ${shortName(conv[conv.length - 1].name, 40)} trong phiên; giữ nhóm sản phẩm dẫn đầu trong kịch bản.` : "Giữ nhóm sản phẩm dẫn đầu trong kịch bản."
   };
@@ -676,13 +682,17 @@ function withoutPrevRank(s: ShopeeReportSnapshot, rows: SkuMoves["rows"], b: Ins
 
 /** Tiêu đề kết luận: Tổng quan / Key Metrics / Nguyên nhân theo đúng câu mẫu của TikTok, trang khác = câu đầu khối Quan sát. */
 export function shopeeHeadlines(s: ShopeeReportSnapshot, p: ShopeePageModel, blocks: Record<ShopeeInsightPage, InsightBlocks>, labels: Record<ShopeeInsightPage, string>): Record<ShopeeInsightPage, string> {
+  return deepPlatformText(shopeeHeadlinesRaw(s, p, blocks, labels), "Shopee");
+}
+
+function shopeeHeadlinesRaw(s: ShopeeReportSnapshot, p: ShopeePageModel, blocks: Record<ShopeeInsightPage, InsightBlocks>, labels: Record<ShopeeInsightPage, string>): Record<ShopeeInsightPage, string> {
   const all = p.score.find((r) => r.key === "all");
   const km = p.km.all;
   const last = p.model.months.length - 1;
   const fb = (id: ShopeeInsightPage) => `${labels[id]}: chưa đủ số liệu để nêu kết luận.`;
   const out = Object.fromEntries((Object.keys(labels) as ShopeeInsightPage[]).map((id) => [id, observeHeadline(blocks[id], fb(id))])) as Record<ShopeeInsightPage, string>;
   out.summary = summaryHeadline({
-    gmvLabel: METRIC.gmv,
+    gmvLabel: SM.gmv,
     liveActual: all?.actual ?? s.headline.gmv,
     liveTarget: all ? all.targetToDate ?? all.target : null,
     days: p.score.filter((r) => r.key !== "all").map((r) => ({ label: SHOPEE_TAB_LABEL[r.key], target: r.targetToDate ?? r.target, actual: r.actual }))
@@ -693,7 +703,7 @@ export function shopeeHeadlines(s: ShopeeReportSnapshot, p: ShopeePageModel, blo
   // Nguyên nhân: cùng câu của DemoWhyPage — bước nghẽn = yếu tố hiệu suất đóng góp âm lớn nhất.
   const gph = kmCell(km, "gmvPerHour")?.changes[last] ?? null;
   const worst = p.drivers ? [...p.drivers.parts].filter((d) => d.key !== "hours").sort((a, b) => a.value - b.value)[0] : null;
-  if (p.drivers && worst && worst.value < 0 && gph != null) out.why = `${METRIC.gmvPerHour} ${signed(gph)}: yếu tố hiệu suất kéo giảm nhiều nhất là ${SHOPEE_FACTOR_LABEL[worst.key]} (${signed(worst.change)}, ${worst.value >= 0 ? "+" : "−"}${money(Math.abs(worst.value))})`;
+  if (p.drivers && worst && worst.value < 0 && gph != null) out.why = `${SM.gmvPerHour} ${signed(gph)}: yếu tố hiệu suất kéo giảm nhiều nhất là ${SHOPEE_FACTOR_LABEL[worst.key]} (${signed(worst.change)}, ${worst.value >= 0 ? "+" : "−"}${money(Math.abs(worst.value))})`;
   if (s.adsSuite && hasShopeeAds(s.adsSuite) && (s.adsSuite.shop || s.adsSuite.product)) out.ads = shopeeAdsHeadline(s.adsSuite) ?? out.ads;
   return out;
 }
@@ -705,9 +715,9 @@ export function shopeeCancelBlocks(cancel: ShopeeCancelMonth[]): InsightBlocks {
   const d = p?.cancelRate != null ? c.cancelRate - p.cancelRate : null;
   const worst = SHOPEE_BUCKETS.map((b) => ({ b, ...c.byBucket[b] })).filter((x) => x.gmv > 0 && x.confirmed > 0).map((x) => ({ ...x, rate: (1 - x.confirmed / x.gmv) * 100 })).sort((a, b) => b.rate - a.rate)[0];
   return {
-    observe: `Đơn huỷ chiếm ${pctTxt(c.cancelRate, 1)} ${METRIC.gmv} kỳ này${p?.cancelRate != null ? ` (${monthShortLabel(p.month)}: ${pctTxt(p.cancelRate, 1)}${d != null ? `, ${d >= 0 ? "+" : "−"}${Math.abs(d).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} điểm` : ""})` : ""}.`,
+    observe: `Đơn huỷ chiếm ${pctTxt(c.cancelRate, 1)} ${SM.gmv} kỳ này${p?.cancelRate != null ? ` (${monthShortLabel(p.month)}: ${pctTxt(p.cancelRate, 1)}${d != null ? `, ${d >= 0 ? "+" : "−"}${Math.abs(d).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} điểm` : ""})` : ""}.`,
     cause: worst ? `Tỷ lệ huỷ cao nhất ở ${SHOPEE_TAB_LABEL[worst.b]} (${pctTxt(worst.rate, 1)}).` : "—",
-    impact: `${METRIC.salesConfirmed} ${money(c.confirmed)} so với ${METRIC.gmv} ${money(c.gmv)}, chênh ${money(c.gmv - c.confirmed)}. Số xác nhận tính tới lúc tải Live List; đơn còn chờ thanh toán có thể thành đơn xác nhận sau.`,
+    impact: `${METRIC.salesConfirmed} ${money(c.confirmed)} so với ${SM.gmv} ${money(c.gmv)}, chênh ${money(c.gmv - c.confirmed)}. Số xác nhận tính tới lúc tải Live List; đơn còn chờ thanh toán có thể thành đơn xác nhận sau.`,
     advise: "YFB cập nhật Sales (Confirmed Order) của tháng sau khi hết thời gian thanh toán/huỷ; file live của Shopee không có lý do huỷ, cần brand cung cấp file đơn hàng nếu muốn phân tích lý do."
   };
 }
@@ -721,8 +731,8 @@ export function shopeeAdsBlocks(s: ShopeeReportSnapshot): InsightBlocks {
   const g = s.headline.gmv;
   if (!a) return SHOPEE_EMPTY_BLOCKS;
   return {
-    observe: `${METRIC.expense} ${money(a.expense)} cho ${a.campaigns} chiến dịch Live Ads; GMV trong file Ads ${money(a.gmv)} (${METRIC.roas} ${a.roas != null ? a.roas.toLocaleString("vi-VN", { maximumFractionDigits: 1 }) : "—"}x).`,
-    cause: g > 0 ? `GMV từ Ads chiếm ${pctTxt((a.gmv / g) * 100)} GMV live; phần còn lại đến từ traffic tự nhiên và người theo dõi.` : "—",
+    observe: `${METRIC.expense} ${money(a.expense)} cho ${a.campaigns} chiến dịch Live Ads; Sales trong file Ads ${money(a.gmv)} (${METRIC.roas} ${a.roas != null ? a.roas.toLocaleString("vi-VN", { maximumFractionDigits: 1 }) : "—"}x).`,
+    cause: g > 0 ? `Sales từ Ads chiếm ${pctTxt((a.gmv / g) * 100)} Sales live; phần còn lại đến từ traffic tự nhiên và người theo dõi.` : "—",
     impact: a.costPerOrder != null ? `Chi phí mỗi đơn từ Ads ${money(a.costPerOrder)} so với ${METRIC.abs} ${money(s.headline.abs ?? 0)}.` : "—",
     advise: "Shopee chỉ cho số Ads cả tháng theo chiến dịch — đề xuất tải file Ads theo từng tuần để so ROAS giữa ngày campaign và Daily."
   };

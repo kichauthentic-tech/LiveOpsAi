@@ -1,3 +1,4 @@
+import { platformText } from "../../lib/metricGlossary";
 import React, { useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import type { Talent, TalentRateHistoryEntry } from "../../types";
@@ -377,7 +378,7 @@ export const HoursCostPanel: React.FC<{
         <section className="rounded-xl border border-[var(--border)] p-3 space-y-2">
           <h4 className="text-sm font-black text-[var(--text)]">Giảm chi phí trên nháp tuần này</h4>
           <p className="text-xs text-[var(--text-muted)]">
-            Thử đổi người ở {openDrafts} ca nháp sang người rẻ hơn ít nhất 15% trong nhóm đủ điều kiện: rảnh giờ đó, đã đứng kênh ≥ 3 ca, không phạm luật, tuần ≤ 36 giờ sau khi xếp, mỗi người nhận thêm tối đa 9 giờ. Ưu tiên lần đổi gỡ được lỗi lịch. Ca đã công bố không tự đổi (đổi phải có lý do). Đổi host không làm GMV đổi đo được (±5%, không lặp lại tháng sau) nên khoản tiết kiệm này không đổi bằng doanh thu.
+            Thử đổi người ở {openDrafts} ca nháp sang người rẻ hơn ít nhất 15% trong nhóm đủ điều kiện: rảnh giờ đó, đã đứng kênh ≥ 3 ca, không phạm luật, tuần ≤ 36 giờ sau khi xếp, mỗi người nhận thêm tối đa 9 giờ. Ưu tiên lần đổi gỡ được lỗi lịch. Ca đã công bố không tự đổi (đổi phải có lý do). Đổi host không làm {platformText("GMV", "all")} đổi đo được (±5%, không lặp lại tháng sau) nên khoản tiết kiệm này không đổi bằng doanh thu.
           </p>
           <div className="flex flex-wrap items-end gap-2 text-xs">
             <label className="flex flex-col gap-1">

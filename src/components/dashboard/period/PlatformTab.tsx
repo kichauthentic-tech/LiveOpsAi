@@ -1,3 +1,4 @@
+import { platformText } from "../../../lib/metricGlossary";
 import React, { useMemo, useState } from "react";
 import type { Brand, LiveSession } from "../../../types";
 import { agencyTodos, monthlyTrend, type AgencyTodo, type ChannelCard } from "../../../lib/performance/channelCard";
@@ -68,10 +69,10 @@ export const PlatformTab: React.FC<PlatformTabProps> = (p) => {
   return (
     <div className="space-y-5">
       <div className={kpiGrid}>
-        {tile(`GMV ${label}`, money(c.gmv), <><Chg cur={c.gmv} prev={b?.gmv} weak={weak} />{vs(b?.gmv, money)}</>)}
+        {tile(`${platformText("GMV", platform)} ${label}`, money(c.gmv), <><Chg cur={c.gmv} prev={b?.gmv} weak={weak} />{vs(b?.gmv, money)}</>)}
         {P.isCurrentMonth && tile(`Run-rate theo kế hoạch · ${profileOf(platform).label}`, rrExp > 0 ? pct(rrAct / rrExp) : "—", rrExp > 0 ? <>{money(rrAct)} / {money(rrExp)} target luỹ kế · <b className="text-amber-300">tính đến ca gần nhất có số liệu</b>{tgt ? ` · đã đạt ${pct(rrAct / tgt)} target tháng` : ""}</> : "chưa có kế hoạch chốt")}
         {P.isCurrentMonth && tile("Dự báo cuối tháng", tgt ? `~${money(fc)}` : "—", tgt ? `${pct(fc / tgt)} của target ${money(tgt)}` : "chưa có target")}
-        {tile("GMV/giờ", money(c.gph), <><Chg cur={c.gph} prev={b?.gph} weak={weak} />{vs(b?.gph, money)}</>)}
+        {tile(`${platformText("GMV/giờ", platform)}`, money(c.gph), <><Chg cur={c.gph} prev={b?.gph} weak={weak} />{vs(b?.gph, money)}</>)}
         {tile("Orders · CVR", nf(c.orders), <><Chg cur={c.orders} prev={b?.orders} weak={weak} /> · CVR <b className="text-[var(--text-muted)]">{c.cvr == null ? "—" : `${nf(c.cvr * 100, 2)}%`}</b> <Chg cur={c.cvr} prev={b?.cvr} points digits={2} weak={weak} /></>)}
         {tile("AOV", money(c.aov), <><Chg cur={c.aov} prev={b?.aov} weak={weak} />{vs(b?.aov, money)}</>)}
       </div>
@@ -90,22 +91,22 @@ export const PlatformTab: React.FC<PlatformTabProps> = (p) => {
         <section className="space-y-2.5" aria-label="Từng brand so cùng kỳ">
           <Sect title="Từng brand" sub={`${label} so với ${prevLabel} · bấm thẻ để mở brand`} />
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {brands.map((br) => <PeriodCard key={br.id} brand={br} sessions={sessions.filter((s) => s.brandId === br.id)} P={P} onOpen={() => onOpenBrand(br.id)} />)}
+            {brands.map((br) => <PeriodCard platform={platform} key={br.id} brand={br} sessions={sessions.filter((s) => s.brandId === br.id)} P={P} onOpen={() => onOpenBrand(br.id)} />)}
           </div>
         </section>
       )}
 
-      <CumChart sessions={sessions} P={P} cards={P.isCurrentMonth ? live : []} title={`GMV luỹ kế · các brand ${profileOf(platform).label}`} />
+      <CumChart sessions={sessions} P={P} cards={P.isCurrentMonth ? live : []} title={`${platformText("GMV", platform)} luỹ kế · các brand ${profileOf(platform).label}`} />
 
       {P.isCurrentMonth && <Todos todos={todos} onNavigate={onNavigate} />}
 
-      <CampTable sessions={sessions} P={P} />
+      <CampTable platform={platform} sessions={sessions} P={P} />
 
       <Sect title="Vận hành" sub="giờ giấc, chi phí" />
       <LateCard s={scope} />
       {p.pnl && <ProfitCard s={scope} pnl={p.pnl} />}
 
-      <MonthlyTables brands={brands} sessions={sessions} through={P.end} forecastOf={P.isCurrentMonth && !cardsLoading ? (id) => cards.find((x) => x.brandId === id) ?? null : null} />
+      <MonthlyTables platform={platform} brands={brands} sessions={sessions} through={P.end} forecastOf={P.isCurrentMonth && !cardsLoading ? (id) => cards.find((x) => x.brandId === id) ?? null : null} />
       <p className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-dashed border-[var(--border)] px-4 py-2.5 text-xs text-[var(--text-muted)]">
         <span>Host · Cặp host + trợ live · Khung giờ · Độ dài ca: xem ở màn <b className="text-[var(--text)]">Hiệu Suất Host</b>.</span>
         <button type="button" onClick={() => onNavigate("host_performance")} className="font-bold text-[var(--accent-text)] hover:underline min-h-[24px]">Mở Hiệu Suất Host →</button>
@@ -116,7 +117,7 @@ export const PlatformTab: React.FC<PlatformTabProps> = (p) => {
 
 // ---------------------------------------------------------------------------
 
-const PeriodCard: React.FC<{ brand: Brand; sessions: LiveSession[]; P: ResolvedPeriod; onOpen: () => void }> = ({ brand, sessions, P, onOpen }) => {
+const PeriodCard: React.FC<{ platform: ReportPlatform; brand: Brand; sessions: LiveSession[]; P: ResolvedPeriod; onOpen: () => void }> = ({ platform, brand, sessions, P, onOpen }) => {
   const c = aggregate(ranIn(sessions, P.start, P.end)), b = P.noBase ? null : aggregate(ranIn(sessions, P.prevStart, P.prevEnd));
   const w = isWeak(c, b);
   return (
@@ -127,8 +128,8 @@ const PeriodCard: React.FC<{ brand: Brand; sessions: LiveSession[]; P: ResolvedP
         <p className="text-xs text-[var(--text-faint)]">Không có ca trong kỳ{b?.n ? ` · kỳ so sánh có ${b.n} ca, ${money(b.gmv)}` : ""}.</p>
       ) : (
         <dl className="grid grid-cols-3 gap-2 text-xs">
-          <div><dt className="text-[var(--text-faint)]">GMV</dt><dd className="font-black text-base text-[var(--text)] tabular-nums">{money(c.gmv)}</dd><dd><Chg cur={c.gmv} prev={b?.gmv} weak={w} /></dd></div>
-          <div><dt className="text-[var(--text-faint)]">GMV/giờ</dt><dd className="font-black text-base text-[var(--text)] tabular-nums">{money(c.gph)}</dd><dd><Chg cur={c.gph} prev={b?.gph} weak={w} /></dd></div>
+          <div><dt className="text-[var(--text-faint)]">{platformText("GMV", platform)}</dt><dd className="font-black text-base text-[var(--text)] tabular-nums">{money(c.gmv)}</dd><dd><Chg cur={c.gmv} prev={b?.gmv} weak={w} /></dd></div>
+          <div><dt className="text-[var(--text-faint)]">{platformText("GMV/giờ", platform)}</dt><dd className="font-black text-base text-[var(--text)] tabular-nums">{money(c.gph)}</dd><dd><Chg cur={c.gph} prev={b?.gph} weak={w} /></dd></div>
           <div><dt className="text-[var(--text-faint)]">Giờ live</dt><dd className="font-black text-base text-[var(--text)] tabular-nums">{Math.round(c.hours)}</dd><dd><Chg cur={c.hours} prev={b?.hours} weak /></dd></div>
         </dl>
       )}
@@ -240,7 +241,7 @@ const Todos: React.FC<{ todos: AgencyTodo[]; onNavigate: (tab: string) => void }
 // ---------------------------------------------------------------------------
 
 const BUCKETS: CampDayBucket[] = ["dday", "midmonth", "payday", "daily"];
-export const CampTable: React.FC<{ sessions: LiveSession[]; P: ResolvedPeriod }> = ({ sessions, P }) => {
+export const CampTable: React.FC<{ platform: ReportPlatform; sessions: LiveSession[]; P: ResolvedPeriod }> = ({ platform, sessions, P }) => {
   const group = (a: string, b: string) => {
     const m = new Map<CampDayBucket, { days: Set<string>; gmv: number; hours: number }>();
     for (const s of sessions) {
@@ -257,8 +258,8 @@ export const CampTable: React.FC<{ sessions: LiveSession[]; P: ResolvedPeriod }>
   const rows = BUCKETS.filter((k) => cm.has(k) || pm.has(k));
   return (
     <Card>
-      <BlockHead title="So công bằng theo loại ngày" sub={`${rangeLabel(P.start, P.end)} so với ${P.noBase ? "—" : rangeLabel(P.prevStart, P.prevEnd)} · GMV trung bình mỗi ngày có ca, theo từng loại ngày`} />
-      <Table head={["Loại ngày", "Kỳ này", "Kỳ so sánh", "GMV/ngày", "so kỳ trước", "GMV/giờ", "so kỳ trước"]} empty={rows.length ? undefined : "Kỳ này chưa có ca có số liệu."}>
+      <BlockHead title="So công bằng theo loại ngày" sub={`${rangeLabel(P.start, P.end)} so với ${P.noBase ? "—" : rangeLabel(P.prevStart, P.prevEnd)} · ${platformText("GMV", platform)} trung bình mỗi ngày có ca, theo từng loại ngày`} />
+      <Table head={["Loại ngày", "Kỳ này", "Kỳ so sánh", `${platformText("GMV", platform)}/ngày`, "so kỳ trước", `${platformText("GMV/giờ", platform)}`, "so kỳ trước"]} empty={rows.length ? undefined : "Kỳ này chưa có ca có số liệu."}>
         {rows.map((k) => {
           const x = cm.get(k), y = pm.get(k);
           const gd = x ? x.gmv / x.days.size : null, gdB = y ? y.gmv / y.days.size : null;
@@ -284,7 +285,7 @@ export const CampTable: React.FC<{ sessions: LiveSession[]; P: ResolvedPeriod }>
 // GMV và GMV/giờ theo tháng (5 tháng), tháng đang chạy cắt ở ngày đủ số.
 // ---------------------------------------------------------------------------
 
-const MonthlyTables: React.FC<{ brands: Brand[]; sessions: LiveSession[]; through: string; forecastOf: ((brandId: string) => ChannelCard | null) | null }> = ({ brands, sessions, through, forecastOf }) => {
+const MonthlyTables: React.FC<{ platform: ReportPlatform; brands: Brand[]; sessions: LiveSession[]; through: string; forecastOf: ((brandId: string) => ChannelCard | null) | null }> = ({ platform, brands, sessions, through, forecastOf }) => {
   const month = through.slice(0, 7);
   const rows = brands.map((b) => ({ b, t: monthlyTrend(sessions.filter((s) => s.brandId === b.id), month, through) })).filter((r) => r.t.some((x) => x.gmv > 0));
   const months = rows[0]?.t.map((x) => x.month) ?? [month, prevMonthOf(month)];
@@ -299,13 +300,13 @@ const MonthlyTables: React.FC<{ brands: Brand[]; sessions: LiveSession[]; throug
   return (
     <div className="grid gap-4 xl:grid-cols-2 items-start [&>*]:min-w-0">
       <Card>
-        <BlockHead title="GMV theo tháng" sub={partial ? `* T${Number(month.slice(5))} luỹ kế đến ${ddmm(through)}${forecastOf ? " · cột cuối: dự báo cuối tháng" : ""}` : undefined} />
+        <BlockHead title={`${platformText("GMV", platform)} theo tháng`} sub={partial ? `* T${Number(month.slice(5))} luỹ kế đến ${ddmm(through)}${forecastOf ? " · cột cuối: dự báo cuối tháng" : ""}` : undefined} />
         <Table head={fcHead} empty={rows.length ? undefined : "Chưa có ca có số liệu."}>
           {rows.map(({ b, t }) => <tr key={b.id}><td className={`${TD} font-semibold text-[var(--text)]`}>{b.name}</td>{t.map((x) => <td key={x.month} className={`${TD}${x.month === month && forecastOf ? " text-[var(--text-faint)]" : ""}`}>{x.gmv ? money(x.gmv) : "—"}</td>)}{forecastOf && fcCell(b.id)}</tr>)}
         </Table>
       </Card>
       <Card>
-        <BlockHead title="GMV/giờ theo tháng" sub="GMV ÷ Giờ live của các ca có số liệu" />
+        <BlockHead title={`${platformText("GMV/giờ", platform)} theo tháng`} sub={`${platformText("GMV", platform)} ÷ Giờ live của các ca có số liệu`} />
         <Table head={head} empty={rows.length ? undefined : "Chưa có ca có số liệu."}>
           {rows.map(({ b, t }) => <tr key={b.id}><td className={`${TD} font-semibold text-[var(--text)]`}>{b.name}</td>{t.map((x) => <td key={x.month} className={TD}>{money(x.gmvPerHour)}</td>)}</tr>)}
         </Table>

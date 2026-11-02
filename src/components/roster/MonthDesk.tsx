@@ -1,3 +1,4 @@
+import { platformText } from "../../lib/metricGlossary";
 import React, { useEffect, useMemo, useState } from "react";
 import { useToast } from "../../hooks/useToast";
 import { useConfirm } from "../../hooks/useConfirm";
@@ -374,7 +375,7 @@ export const NextDesk: React.FC<DeskProps & { registrations: ShiftRegistration[]
                       <Pill tone={tone}>{r.next}</Pill>
                       {r.gmvSuspicious && p.onOpenCrm && (
                         <button type="button" onClick={() => p.onOpenCrm!(card.brandId, card.platform)} className="text-[11px] font-bold text-[var(--accent-text)] hover:underline">
-                          Sửa GMV ở CRM
+                          Sửa {platformText("GMV", "all")} ở CRM
                         </button>
                       )}
                       {(r.step === "commit" || r.step === "plan" || r.step === "lock" || r.step === "open") &&
@@ -395,7 +396,7 @@ export const NextDesk: React.FC<DeskProps & { registrations: ShiftRegistration[]
                         <b className="text-[var(--text)]">{c.hours > 0 ? `${h0(c.hours)} giờ` : "—"}</b>
                         <p className={`text-[11px] ${r.gmvSuspicious ? "text-amber-300 font-bold" : "text-[var(--text-faint)]"}`}>
                           {r.gmvSuspicious && <AlertTriangle className="inline w-3 h-3 mr-0.5 -mt-0.5" />}
-                          GMV {c.gmv ? (r.gmvSuspicious ? `${c.gmv.toLocaleString("vi-VN")}?` : money(c.gmv)) : "—"}
+                          {platformText("GMV", "all")} {c.gmv ? (r.gmvSuspicious ? `${c.gmv.toLocaleString("vi-VN")}?` : money(c.gmv)) : "—"}
                         </p>
                       </>
                     )}

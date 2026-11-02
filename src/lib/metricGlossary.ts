@@ -104,6 +104,80 @@ export const CHANNEL = {
   productCard: "Product card"
 } as const;
 
+// ---- TÊN DOANH SỐ THEO SÀN (user chốt 02/11): mỗi sàn gọi bằng ĐÚNG tên trong report của sàn đó.
+// TikTok Shop: "GMV" (LIVE GMV, Direct/Indirect GMV, GMV/giờ…). Shopee Seller Centre: "Sales" / "Doanh số" — cột Live List, theo ngày, overview,
+// Product List đều ghi Sales(Placed Order) / Sales(Confirmed Order); phần cả shop ghi "Doanh số" (SHOPEE_SHOP). Số vẫn là doanh số ĐẶT (Placed Order,
+// quyết định 06/10), chỉ đổi TÊN. Mọi chỗ biết sàn của số phải lấy tên qua `metricFor(platform)` / `platformText(text, platform)`, không gõ "GMV" cứng.
+export type TermPlatform = "TikTok" | "Shopee";
+/** Nơi một nhãn dùng chung cho cả hai sàn (bảng trộn TikTok + Shopee): hiện cả hai tên, vd "GMV/giờ · Sales/giờ". */
+export type TermScope = TermPlatform | "all";
+
+const SHOPEE_SALES_NAMES = {
+  gmv: "Sales",
+  totalGmv: "Tổng doanh số",
+  liveGmv: "Sales live",
+  directGmv: "Sales trực tiếp",
+  indirectGmv: "Sales gián tiếp",
+  attributedGmv: "Sales quy cho live",
+  kpiGmv: "KPI Sales",
+  targetGmv: "Target Sales",
+  gmvPerHour: "Sales/giờ",
+  gmvPerView: "Sales/Viewer",
+  gmvPerAtc: "Sales/ATC",
+  nmv: "Sales (Confirmed Order)"
+} as const;
+
+/** Bộ tên chỉ số của một sàn: TikTok = METRIC nguyên bản; Shopee = METRIC với nhóm tên doanh số đổi sang "Sales". */
+export function metricFor(platform: TermPlatform | null | undefined): typeof METRIC {
+  return platform === "Shopee" ? ({ ...METRIC, ...SHOPEE_SALES_NAMES } as unknown as typeof METRIC) : METRIC;
+}
+
+/** Đổi tên doanh số trong MỌI chuỗi của một cấu trúc (mảng/đối tượng lồng nhau) — dùng cho khối Insight/tiêu đề do hàm dùng chung dựng ra. */
+export function deepPlatformText<T>(value: T, platform: TermPlatform | null | undefined): T {
+  if (platform !== "Shopee") return value;
+  const walk = (v: unknown): unknown => {
+    if (typeof v === "string") return platformText(v, platform);
+    if (Array.isArray(v)) return v.map(walk);
+    if (v && typeof v === "object") return Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([k, x]) => [k, walk(x)]));
+    return v;
+  };
+  return walk(value) as T;
+}
+
+/** Bộ tên chỉ số của Shopee (METRIC với nhóm doanh số là "Sales") — dùng trong mọi file/khối chỉ phục vụ Shopee. */
+export const METRIC_SHOPEE = metricFor("Shopee");
+
+/** Tên doanh số của sàn dùng giữa câu: TikTok "GMV", Shopee "Sales". */
+export const salesTerm = (platform: TermPlatform | null | undefined): string => (platform === "Shopee" ? "Sales" : "GMV");
+
+const SHOPEE_TEXT_RULES: [RegExp, string | ((m: string, k: string) => string)][] = [
+  [/Total GMV/g, "Tổng doanh số"],
+  [/Direct GMV/g, "Sales trực tiếp"],
+  [/Indirect GMV/g, "Sales gián tiếp"],
+  [/Attributed GMV/g, "Sales quy cho live"],
+  [/LIVE GMV/g, "Sales live"],
+  [/Target GMV/g, "Target Sales"],
+  [/KPI GMV/g, "KPI Sales"],
+  [/GMV\/(giờ|View|ATC|Viewers?)/g, (_m: string, k: string) => `Sales/${k === "View" ? "Viewer" : k}`],
+  [/\bGMV\b/g, "Sales"]
+];
+
+/** Đổi tên doanh số trong một câu/nhãn sang tên của sàn. TikTok giữ nguyên; Shopee "GMV" → "Sales" (Total GMV → Tổng doanh số…);
+ *  "all" (nhãn dùng chung cho cả hai sàn) giữ tên TikTok và thêm tên Shopee: "GMV/giờ · Sales/giờ". */
+export function platformText(text: string, platform: TermScope | null | undefined): string {
+  if ((platform !== "Shopee" && platform !== "all") || !text.includes("GMV")) return text;
+  if (platform === "all") {
+    const TOKEN = /(?<![\w])((?:KPI Total |Total |LIVE |Target |Direct |Indirect |Attributed |KPI )?GMV(?:\/giờ|\/View|\/ATC)?)(?![\w])/g;
+    return text.replace(TOKEN, (m) => {
+      const sh = platformText(m, "Shopee");
+      return sh === m ? m : `${m} · ${sh}`;
+    });
+  }
+  let out = text;
+  for (const [re, to] of SHOPEE_TEXT_RULES) out = out.replace(re, to as string); // `to` có thể là hàm — replace nhận cả hai
+  return out;
+}
+
 /** Loại ngày — đúng tên deck: Daily / Campaign (D-Day, Mid-Month, Pay Day). */
 export const DAY_TYPE = {
   daily: "Daily",

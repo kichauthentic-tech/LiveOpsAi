@@ -1,3 +1,4 @@
+import { platformText } from "../lib/metricGlossary";
 import React, { useMemo, useState } from "react";
 import { Download, LayoutDashboard } from "lucide-react";
 import type { TermsPeriod } from "../lib/commercial/terms";
@@ -175,7 +176,7 @@ export const AgencyDashboard: React.FC<AgencyDashboardProps> = (props) => {
             const xs = platSessions.filter((s) => s.brandId === b.id);
             const c = aggregate(ranIn(xs, period.start, period.end)), p = period.noBase ? null : aggregate(ranIn(xs, period.prevStart, period.prevEnd));
             const r = (v: number | null | undefined) => (v == null ? "" : Math.round(v));
-            return { Brand: b.name, "Sàn": platform, "Kỳ": label, "Kỳ so sánh": prevLabel, GMV: r(c.gmv), "GMV kỳ so sánh": r(p?.gmv), "GMV/giờ": r(c.gph), "GMV/giờ kỳ so sánh": r(p?.gph), "Giờ live": Math.round(c.hours * 10) / 10, "Giờ live kỳ so sánh": p ? Math.round(p.hours * 10) / 10 : "", Sessions: c.n, Orders: c.orders };
+            return { Brand: b.name, "Sàn": platform, "Kỳ": label, "Kỳ so sánh": prevLabel, [platformText("GMV", platform)]: r(c.gmv), [`${platformText("GMV", platform)} kỳ so sánh`]: r(p?.gmv), [`${platformText("GMV/giờ", platform)}`]: r(c.gph), [`${platformText("GMV/giờ", platform)} kỳ so sánh`]: r(p?.gph), "Giờ live": Math.round(c.hours * 10) / 10, "Giờ live kỳ so sánh": p ? Math.round(p.hours * 10) / 10 : "", Sessions: c.n, Orders: c.orders };
           })
         }];
     downloadSheetsAsXlsx(sheets, `Dashboard_${platform}_${period.start}_${period.end}.xlsx`).catch((e) => showToast(`Không tải được file Excel: ${errorMessage(e)}`));

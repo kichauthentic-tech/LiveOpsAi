@@ -1,3 +1,4 @@
+import { platformText } from "../../lib/metricGlossary";
 import React, { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import type { BrandContract, BrandMonthPlan, BrandMonthlyCommitment, LiveSession, ShiftSlot } from "../../types";
@@ -249,7 +250,7 @@ export const OpenMonthWizard: React.FC<{
 
           {rows && step === 1 && (
             <>
-              <p className="text-xs text-[var(--text-muted)]">Giờ live cam kết với brand trong tháng {m}. Mặc định lấy từ hợp đồng ở CRM; gõ số khác là cam kết riêng của tháng. Target GMV vẫn đặt ở Kế Hoạch Tháng.</p>
+              <p className="text-xs text-[var(--text-muted)]">Giờ live cam kết với brand trong tháng {m}. Mặc định lấy từ hợp đồng ở CRM; gõ số khác là cam kết riêng của tháng. {platformText("Target GMV", "all")} vẫn đặt ở Kế Hoạch Tháng.</p>
               <div className="overflow-x-auto rounded-xl border border-[var(--border)]">
                 <table className="w-full text-sm">
                   <thead>
@@ -412,7 +413,7 @@ export const OpenMonthWizard: React.FC<{
               <ul className="text-xs text-[var(--text-muted)] space-y-1 list-disc pl-4">
                 <li>Mỗi kênh: lưu giờ cam kết, lưu lưới ca vào Kế Hoạch Tháng rồi chốt — ca mở hiện ở app talent (Đăng ký ca).</li>
                 <li>Đặt hạn xong mỗi host/trợ nhận một tin. Qua hạn talent không đăng ký thêm được; bạn vẫn xếp hộ.</li>
-                <li>Target GMV: CEO/admin vào Kế Hoạch Tháng — thẻ "Bước tiếp: đặt target tháng" chia target xuống từng ca (ca mới có target 0 tới lúc đó).</li>
+                <li>{platformText("Target GMV", "all")}: CEO/admin vào Kế Hoạch Tháng — thẻ "Bước tiếp: đặt target tháng" chia target xuống từng ca (ca mới có target 0 tới lúc đó).</li>
               </ul>
               {results && (
                 <ul className="rounded-xl border border-[var(--border)] divide-y divide-[var(--border)] text-sm">

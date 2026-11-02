@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { fmtFixed, fmtNum } from "../../../lib/format";
-import { CHANNEL, METRIC } from "../../../lib/metricGlossary";
+import { CHANNEL, METRIC, metricFor } from "../../../lib/metricGlossary";
 import { fmtKeyMetric, KEY_METRICS, type KeyMetricKey } from "../../../lib/report/keyMetrics";
 import { KEY_METRICS_TABS, keyMetricsTable, type KeyMetricsMonth, type KeyMetricsTab, type ScoreRow } from "../../../lib/report/brandReport";
 import type { BridgePoint, PlanHourRow } from "../../../lib/report/reportVisuals";
@@ -56,6 +56,8 @@ export interface SummaryDemoProps {
   cancelledTarget?: number;
   /** Tên chỉ số doanh số — mặc định LIVE GMV (TikTok); report Shopee truyền "GMV" (Sales(Placed Order)). */
   gmvLabel?: string;
+  /** Sàn của số — quyết định tên doanh số (TikTok GMV / Shopee Sales). Vắng = TikTok. */
+  platform?: "Shopee";
   /** Có thì trang dựng theo kiểu "Tổng quan cả shop" (4 ô + GMV theo kênh + target theo loại ngày); vắng (Shopee) thì giữ bố cục cũ. */
   channels?: { throughDay: number; cur: ChannelSplit; prev: ChannelSplit | null };
   /** Tên kênh theo sàn (Shopee dùng đúng chữ Seller Centre); vắng = tên TikTok. */
@@ -97,6 +99,7 @@ const ChannelDonut: React.FC<{ parts: { color: string; v: number }[]; total: num
 };
 
 export const SummaryDemoPage: React.FC<SummaryDemoProps> = (p) => {
+  const METRIC = metricFor(p.platform);
   const mm = p.month.slice(5);
   const gl = p.gmvLabel ?? METRIC.liveGmv;
   const all = p.score.find((r) => r.key === "all");
@@ -296,7 +299,7 @@ export const SummaryDemoPage: React.FC<SummaryDemoProps> = (p) => {
                 <thead>
                   <tr style={{ color: "var(--muted)", fontSize: 12, borderBottom: "1px solid var(--line)" }}>
                     <th style={{ textAlign: "left", fontWeight: 500, padding: "6px 8px" }}>Kênh</th>
-                    <th style={{ textAlign: "right", fontWeight: 500, padding: "6px 8px" }}>GMV</th>
+                    <th style={{ textAlign: "right", fontWeight: 500, padding: "6px 8px" }}>{METRIC.gmv}</th>
                     <th style={{ textAlign: "right", fontWeight: 500, padding: "6px 8px" }}>Tỷ trọng</th>
                     <th style={{ textAlign: "right", fontWeight: 500, padding: "6px 8px" }}>So {p.prevMonthShort}</th>
                   </tr>
@@ -356,7 +359,7 @@ export const SummaryDemoPage: React.FC<SummaryDemoProps> = (p) => {
             <Html className="hb" html={planBars} />
           </DemoPanel>
           <DemoPanel title={`Kế hoạch tháng ${Number(mm)} theo loại ngày`}>
-            <DemoTable html={tbl(["Loại ngày", "Phân bổ", "Target GMV", "Giờ kế hoạch", `${METRIC.gmvPerHour} kế hoạch`], planRows)} />
+            <DemoTable html={tbl(["Loại ngày", "Phân bổ", METRIC.targetGmv, "Giờ kế hoạch", `${METRIC.gmvPerHour} kế hoạch`], planRows)} />
             {p.cancelledTarget != null && p.cancelledTarget > 0 && (
               <DemoLegend>
                 <span>Target tháng {p.liveTargetMonth != null ? amt(p.liveTargetMonth) : ""} gồm {amt(p.cancelledTarget)} của ca kế hoạch đã huỷ (giữ target, không có giờ kế hoạch) nên lớn hơn tổng bảng này {amt(tTarget)}.</span>

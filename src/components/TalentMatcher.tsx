@@ -1,3 +1,4 @@
+import { platformText } from "../lib/metricGlossary";
 import React, { useMemo, useRef, useState } from "react";
 import { Talent, Brand, UserRole, LiveSession } from "../types";
 import { Users, Sparkles, Search, Plus, Edit3, Trash2, X, Phone, Loader2, AlertTriangle, KeyRound, ChevronDown } from "lucide-react";
@@ -381,7 +382,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
       <PageHeader
         icon={Users}
         title="Talent Pool"
-        description="Host và trợ live của agency: vai trò, số ca, GMV và rate. Chọn một người để xem hồ sơ bên cạnh."
+        description={`Host và trợ live của agency: vai trò, số ca, ${platformText("GMV", "all")} và rate. Chọn một người để xem hồ sơ bên cạnh.`}
         actions={
           // Khối AI nằm cuối trang (sau danh sách ~40 người) — nút này mở và cuộn thẳng tới nó.
           <button
@@ -566,13 +567,13 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
               </div>
               {selected.real.sessionCount === 0 && selected.real.assistSessionCount > 0 && (
                 <p className="text-[11px] text-[var(--text-faint)]">
-                  GMV của ca tính cho host, nên người chỉ chạy vai trợ không có GMV lũy kế — không phải chưa làm ca nào.
+                  {platformText("GMV", "all")} của ca tính cho host, nên người chỉ chạy vai trợ không có {platformText("GMV", "all")} lũy kế — không phải chưa làm ca nào.
                 </p>
               )}
 
               {/* GMV TÁCH THEO SÀN (user chốt 07/10: không bao giờ cộng hiệu suất TikTok với Shopee) — mỗi sàn một thanh, không có tổng. */}
               <div className="space-y-2">
-                <p className="font-bold text-[var(--text-muted)]">GMV theo sàn <span className="font-normal text-[var(--text-faint)]">(mỗi sàn một thanh, không cộng gộp)</span></p>
+                <p className="font-bold text-[var(--text-muted)]">{platformText("GMV", "all")} theo sàn <span className="font-normal text-[var(--text-faint)]">(mỗi sàn một thanh, không cộng gộp)</span></p>
                 {selectedGmvMax > 0 ? (
                   REPORT_PLATFORMS.map((p) => {
                     const g = selected.real.perf[p].gmv;
@@ -587,7 +588,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                     );
                   })
                 ) : (
-                  <p className="text-[11px] text-[var(--text-faint)]">Chưa có GMV ở sàn nào.</p>
+                  <p className="text-[11px] text-[var(--text-faint)]">Chưa có {platformText("GMV", "all")} ở sàn nào.</p>
                 )}
               </div>
 
@@ -619,7 +620,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                   </ul>
                 )}
                 <p className="text-[11px] text-[var(--text-faint)] leading-relaxed">
-                  Không có số liệu GMV/giờ gộp mọi brand hay gộp hai sàn: chỉ số này phụ thuộc ngành hàng, giá bán và sàn hơn là người chạy.
+                  Không có số liệu {platformText("GMV/giờ", "all")} gộp mọi brand hay gộp hai sàn: chỉ số này phụ thuộc ngành hàng, giá bán và sàn hơn là người chạy.
                   Muốn xếp hạng host trong một brand thì mở Hiệu Suất Host (có lọc brand, thứ và khung giờ).
                 </p>
               </div>
@@ -697,7 +698,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
               <span>
                 {matchingError}
                 <br />
-                Không có kết quả AI thì màn này không xếp hạng độ phù hợp — bảng Talent Pool bên dưới vẫn có GMV, số ca và giờ live thật của từng người.
+                Không có kết quả AI thì màn này không xếp hạng độ phù hợp — bảng Talent Pool bên dưới vẫn có {platformText("GMV", "all")}, số ca và giờ live thật của từng người.
               </span>
             </div>
           )}
@@ -716,7 +717,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                       </span>
                     </div>
                     <p className="text-[var(--text-muted)] text-[11px] leading-relaxed">{r.reasoning}</p>
-                    <div className="text-right text-[11px] text-emerald-400 font-mono font-bold">Dự đoán GMV: {r.predictedGmv}</div>
+                    <div className="text-right text-[11px] text-emerald-400 font-mono font-bold">Dự đoán {platformText("GMV", "all")}: {r.predictedGmv}</div>
                   </div>
                 ))}
               </div>

@@ -1,3 +1,4 @@
+import { platformText } from "../lib/metricGlossary";
 import React, { useMemo, useState } from "react";
 import { CalendarRange, FileSignature, History, MapPin, Pencil, Plus, Tag, Trash2, UserCheck } from "lucide-react";
 import { Brand, BrandChannel, BrandContract, BrandMonthlyCommitment, BrandPlatformRate, BrandPlatformRateHistoryEntry, BrandStudio, LiveSession, Studio, Talent } from "../types";
@@ -254,7 +255,7 @@ export const BrandConfigPanel: React.FC<Props> = ({
     if (draft.monthlyHours.trim() === "" || !Number.isFinite(hours) || hours < 0) return setError("Giờ cam kết/tháng phải là số không âm.");
     const gmvRaw = draft.monthlyGmv.trim();
     const gmv = gmvRaw === "" ? undefined : Number(gmvRaw);
-    if (gmv !== undefined && (!Number.isFinite(gmv) || gmv < 0)) return setError("GMV cam kết/tháng phải là số không âm, hoặc để trống.");
+    if (gmv !== undefined && (!Number.isFinite(gmv) || gmv < 0)) return setError(`${platformText("GMV", platform)} cam kết/tháng phải là số không âm, hoặc để trống.`);
     if (draft.endMonth && draft.endMonth < draft.startMonth) return setError("Tháng kết thúc không được trước tháng bắt đầu.");
     const payload = {
       contractCode: draft.contractCode.trim(),
@@ -409,7 +410,7 @@ export const BrandConfigPanel: React.FC<Props> = ({
               max={100}
               step={0.1}
               canEdit={canEdit}
-              hint="NMV ước tính = GMV × (1 − tỷ lệ). Chưa nhập thì NMV bằng GMV."
+              hint={`NMV ước tính = ${platformText("GMV", platform)} × (1 − tỷ lệ). Chưa nhập thì NMV bằng ${platformText("GMV", platform)}.`}
               onSave={(v) => onSaveReturnRate(brand.id, platform, v)}
             />
             <ServiceScope
@@ -489,7 +490,7 @@ export const BrandConfigPanel: React.FC<Props> = ({
                   <input type="number" min={0} value={draft.monthlyHours} onChange={(e) => setDraft({ ...draft, monthlyHours: e.target.value })} className={inputCls} />
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-[11px] text-[var(--text-faint)]">GMV cam kết / tháng (tuỳ chọn)</span>
+                  <span className="text-[11px] text-[var(--text-faint)]">{platformText("GMV", platform)} cam kết / tháng (tuỳ chọn)</span>
                   <input type="number" min={0} value={draft.monthlyGmv} onChange={(e) => setDraft({ ...draft, monthlyGmv: e.target.value })} className={inputCls} />
                 </label>
                 <label className="flex flex-col gap-1 col-span-2">
@@ -514,7 +515,7 @@ export const BrandConfigPanel: React.FC<Props> = ({
                   <div className="min-w-0 text-xs">
                     <p className="font-bold text-[var(--text)]">
                       {c.contractCode || "Hợp đồng"} · {fmtHours(c.monthlyHours)}/tháng
-                      {c.monthlyGmv !== undefined && ` · ${fmtVndShort(c.monthlyGmv)} GMV/tháng`}
+                      {c.monthlyGmv !== undefined && ` · ${fmtVndShort(c.monthlyGmv)} ${platformText("GMV", platform)}/tháng`}
                     </p>
                     <p className="text-[11px] text-[var(--text-muted)]">
                       {fmtMonth(c.startMonth.slice(0, 7))} → {c.endMonth ? fmtMonth(c.endMonth.slice(0, 7)) : "chưa chốt"} · {STATUS_LABEL[c.status]}

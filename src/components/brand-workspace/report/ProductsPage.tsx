@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { fmtFixed, fmtVndShort } from "../../../lib/format";
-import { METRIC } from "../../../lib/metricGlossary";
+import { METRIC, METRIC_SHOPEE, platformText } from "../../../lib/metricGlossary";
 import type { PromotionMonthSlice, SkuRankSlice } from "../../../lib/dataraw/monthlyProductSlice";
 import type { GiftStats } from "../../../lib/report/deepAnalysis";
 import type { SkuMoves } from "../../../lib/report/monthlyReportInsights";
@@ -43,7 +43,7 @@ export function productsKpis(d: ProductsPageData): PageMetric[] {
   const out: PageMetric[] = [];
   // Top 1 SKU (dòng 1 bảng Top 10) và quà tặng/đơn (dòng của bảng Quà tặng kèm và UPT) không lặp thành ô — audit trùng lặp 30/10.
   if (d.skuRank?.skusFor80Pct != null && d.skuRank.sellingSkus > 0) {
-    out.push({ label: "Độ tập trung SKU", value: `${fmtInt(d.skuRank.skusFor80Pct)} / ${fmtInt(d.skuRank.sellingSkus)}`, note: `SKU đầu bảng tạo 80% GMV (${fmtFixed((d.skuRank.skusFor80Pct / d.skuRank.sellingSkus) * 100, 0)}%)` });
+    out.push({ label: "Độ tập trung SKU", value: `${fmtInt(d.skuRank.skusFor80Pct)} / ${fmtInt(d.skuRank.sellingSkus)}`, note: `SKU đầu bảng tạo 80% ${platformText("GMV", d.variant === "shopee" ? "Shopee" : "TikTok")} (${fmtFixed((d.skuRank.skusFor80Pct / d.skuRank.sellingSkus) * 100, 0)}%)` });
   }
   if (d.promo?.totalDiscount != null && d.promo.totalDiscount > 0) {
     out.push({ label: "Tiền giảm giá khuyến mãi", value: fmtVndShort(d.promo.totalDiscount), note: `${d.promo.items.length} chương trình chạy trọn tháng` });
@@ -117,7 +117,7 @@ export function skuTableHtml(sku: SkuMoves, images: (name: string) => string | u
   const prevLabel = "so với tháng trước";
   if (variant === "shopee") {
     return tbl(
-      ["Ảnh sản phẩm", `Hạng · ${prevLabel}`, "Sản phẩm", METRIC.gmv, sku.perDay ? "± GMV/ngày" : "± GMV", "Orders", METRIC.itemsSoldShopee, SHOPEE_CONV],
+      ["Ảnh sản phẩm", `Hạng · ${prevLabel}`, "Sản phẩm", METRIC_SHOPEE.gmv, sku.perDay ? `± ${METRIC_SHOPEE.gmv}/ngày` : `± ${METRIC_SHOPEE.gmv}`, "Orders", METRIC.itemsSoldShopee, SHOPEE_CONV],
       sku.rows.map((r) => [
         thumbCell(r.name, images(r.name), editable),
         { t: rankCell(r.rank, r.prevRank), c: "hm" },
@@ -202,7 +202,7 @@ export const ProductsPageBody: React.FC<{
         {data.points.length >= 3 && (
           <div className="pn">
             <div className="pnh">{shopee ? `Tỷ trọng Product Clicks và ${SHOPEE_CONV} của Top ${data.points.length} sản phẩm` : `${METRIC.productCtr} và ${METRIC.ctor} của Top ${data.points.length} SKU`}</div>
-            <div className="pns">{`${shopee ? "Tỷ trọng Product Clicks = Product Clicks của sản phẩm ÷ tổng của nhóm · " : ""}Kích thước điểm = GMV · màu = thay đổi hạng so với tháng ${data.prevMonthNo} · đường nét đứt = trung vị Top ${data.points.length}.`}</div>
+            <div className="pns">{`${shopee ? "Tỷ trọng Product Clicks = Product Clicks của sản phẩm ÷ tổng của nhóm · " : ""}Kích thước điểm = ${shopee ? METRIC_SHOPEE.gmv : METRIC.gmv} · màu = thay đổi hạng so với tháng ${data.prevMonthNo} · đường nét đứt = trung vị Top ${data.points.length}.`}</div>
             <div dangerouslySetInnerHTML={{ __html: shopee ? skuScatterHtml(data.points, { xl: "Tỷ trọng Product Clicks", yl: SHOPEE_CONV }) : skuScatterHtml(data.points) }} />
             <div className="legend">
               <span><i style={{ background: "var(--green)" }} />tăng hạng</span>
@@ -230,8 +230,8 @@ export const ProductsPageBody: React.FC<{
       </div>
       {sku ? (
         <div className="pn">
-          <div className="pnh">{`Top ${sku.rows.length} SKU theo GMV`}</div>
-          <div className="pns">{`Nguồn file ${shopee ? "Product List của Shopee Live · GMV = Sales(Placed Order)" : "Sản Phẩm"}${curDaysLabel} · hạng so với tháng ${data.prevMonthNo}${sku.perDay ? " · % tính trên GMV mỗi ngày" : ""}.`}</div>
+          <div className="pnh">{`Top ${sku.rows.length} SKU theo ${shopee ? METRIC_SHOPEE.gmv : METRIC.gmv}`}</div>
+          <div className="pns">{`Nguồn file ${shopee ? "Product List của Shopee Live · Sales(Placed Order)" : "Sản Phẩm"}${curDaysLabel} · hạng so với tháng ${data.prevMonthNo}${sku.perDay ? ` · % tính trên ${shopee ? METRIC_SHOPEE.gmv : METRIC.gmv} mỗi ngày` : ""}.`}</div>
           <div
             className="tw"
             onClick={(e) => {

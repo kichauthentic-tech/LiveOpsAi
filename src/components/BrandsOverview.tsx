@@ -1,3 +1,4 @@
+import { platformText } from "../lib/metricGlossary";
 import React, { useEffect, useMemo, useState } from "react";
 import { rememberBrandId } from "../lib/defaultBrand";
 import { requestCrmFocus } from "../lib/crmFocus";
@@ -213,7 +214,7 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ platform, brands
       "Giờ live": r.sum.countable > 0 ? r.sum.hours : "",
       "Ca đã diễn ra": r.sum.happened,
       "Ca sắp tới": r.sum.upcoming,
-      GMV: r.sum.gmv > 0 ? r.sum.gmv : "",
+      [platformText("GMV", "all")]: r.sum.gmv > 0 ? r.sum.gmv : "",
       "Report Tháng": REPORT_STATUS_LABEL[r.reportStatus],
       "Giá": r.price ?? "Chưa nhập"
     }));
@@ -282,7 +283,7 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ platform, brands
                 <th className="py-2.5 px-2">Kế hoạch tháng</th>
                 <th className="py-2.5 px-2">Cam kết</th>
                 <th className="py-2.5 px-2 text-right">Giờ live</th>
-                <th className="py-2.5 px-2 text-right">GMV</th>
+                <th className="py-2.5 px-2 text-right">{platformText("GMV", "all")}</th>
                 <th className="py-2.5 px-2">Report Tháng</th>
                 <th className="py-2.5 px-2">Giá</th>
               </tr>

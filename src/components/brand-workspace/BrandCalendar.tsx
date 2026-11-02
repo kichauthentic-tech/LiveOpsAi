@@ -1,5 +1,6 @@
+import { platformText } from "../../lib/metricGlossary";
 import React, { useMemo, useState } from "react";
-import { inChannelScope, type ChannelScope } from "../../lib/reportPlatform";
+import { inChannelScope, platformOf, type ChannelScope } from "../../lib/reportPlatform";
 import { Brand, LiveSession, PromoScheme, ShiftSlot, ShiftRegistration, Studio, Talent, UserRole, BrandStudio, AuditLogEntry, BrandChannel } from "../../types";
 import { SessionWindow } from "../SessionWindow";
 import { Building2, CalendarIcon, ChevronLeft, ChevronRight, Plus, Tag } from "lucide-react";
@@ -456,7 +457,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
       )}
 
       {/* Bố cục 19/10: danh sách ca theo ngày dưới lưới tháng lặp lại đúng các ca đã có trên lưới (CROCS T10: 90 ca hai lần, trang
-          8.300px) — gập lại, mở khi cần xem GMV từng ca theo hàng dài. */}
+          8.300px) — gập lại, mở khi cần xem {platformText("GMV", platformOf(s))} từng ca theo hàng dài. */}
       {viewMode === "month" && (sessionsByDate.size === 0 || Array.from(sessionsByDate.values()).flat().length === 0) && (
         <p className="text-sm text-[var(--text-faint)] text-center py-6">Không có phiên live nào trong tháng {fmtMonth(month)}.</p>
       )}
@@ -498,7 +499,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
                     </div>
                     {/* Audit 2026-09-28 mục 9: chế độ Tháng (mặc định) từng in GMV cho role brand, GMV tháng chưa phát hành
                         bị view 0107 che thành 0 nên hiện "0" — nay vẫn ghi "chưa phát hành" khi bị che. */}
-                    <span className="sc-actual shrink-0 w-24 text-right text-[var(--success)]" title={s.status === "Completed" ? "GMV đã ghi nhận" : undefined}>
+                    <span className="sc-actual shrink-0 w-24 text-right text-[var(--success)]" title={s.status === "Completed" ? `${platformText("GMV", platformOf(s))} đã ghi nhận` : undefined}>
                       {s.status !== "Completed" ? null : metricsHiddenFor(s, currentRole ?? "brand") ? <span className="font-normal text-[var(--text-faint)]">chưa phát hành</span> : fmtVndShort(s.actualGmv || 0)}
                     </span>
                   </div>

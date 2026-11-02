@@ -1,3 +1,4 @@
+import { platformText } from "../lib/metricGlossary";
 import React, { useEffect, useMemo, useState } from "react";
 import { Brand, BrandMonthPlanSlot, CalendarEventRow, LiveSession, PromoScheme, ShiftSlot } from "../types";
 import { BrainCircuit, RotateCcw, Save, Sparkles } from "lucide-react";
@@ -147,9 +148,9 @@ export const EngineTrainingPanel: React.FC<Props> = ({ brands, sessions, shiftSl
             ) : (
               <div className="text-xs space-y-3">
                 <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-                  <span className="text-[var(--text-muted)]" title="Ca đã đối soát, có GMV > 0 và có giờ — ca GMV 0 không dạy được engine">Ca đối soát có GMV</span><b className="text-[var(--text)] text-right">{history.sessions} · {history.months} tháng</b>
+                  <span className="text-[var(--text-muted)]" title={`Ca đã đối soát, có ${platformText("GMV", histPlatform)} > 0 và có giờ — ca ${platformText("GMV", histPlatform)} 0 không dạy được engine`}>Ca đối soát có {platformText("GMV", histPlatform)}</span><b className="text-[var(--text)] text-right">{history.sessions} · {history.months} tháng</b>
                   <span className="text-[var(--text-muted)]">Khoảng</span><b className="text-[var(--text)] text-right">{history.firstDate ? fmtDateVn(history.firstDate) : "—"} → {history.lastDate ? fmtDateVn(history.lastDate) : "—"}</b>
-                  <span className="text-[var(--text-muted)]">GMV/giờ trung bình brand</span><b className="text-[var(--text)] text-right">{fmtM(history.brandGmvPerHour)}</b>
+                  <span className="text-[var(--text-muted)]">{platformText("GMV/giờ", histPlatform)} trung bình brand</span><b className="text-[var(--text)] text-right">{fmtM(history.brandGmvPerHour)}</b>
                   <span className="text-[var(--text-muted)]">Đủ dữ liệu để tin</span><b className={`text-right ${history.enough ? "text-emerald-400" : "text-amber-400"}`}>{history.enough ? "có" : `chưa (cần ≥ ${draft.minHistorySessions} ca, ${draft.minHistoryMonths} tháng)`}</b>
                 </div>
                 <div>
@@ -157,7 +158,7 @@ export const EngineTrainingPanel: React.FC<Props> = ({ brands, sessions, shiftSl
                   {(["dday", "midmonth", "payday"] as const).map((b) => (
                     <div key={b} className="flex justify-between gap-2">
                       <span className="text-[var(--text)]">{{ dday: "D-Day", midmonth: "Mid-Month", payday: "Pay Day" }[b]}</span>
-                      <span className="text-[var(--text)]">GMV/giờ <b>×{fmtFixed(history.campMultipliers[b], 2)}</b> <span className="text-[11px] text-[var(--text-faint)]">{history.campLearned[b] ? "học" : "mặc định"}</span>{history.campHoursLearned[b] ? <> · <b>{fmtFixed(history.campHoursPerDay[b], 1)}h</b>/ngày</> : ""}</span>
+                      <span className="text-[var(--text)]">{platformText("GMV/giờ", histPlatform)} <b>×{fmtFixed(history.campMultipliers[b], 2)}</b> <span className="text-[11px] text-[var(--text-faint)]">{history.campLearned[b] ? "học" : "mặc định"}</span>{history.campHoursLearned[b] ? <> · <b>{fmtFixed(history.campHoursPerDay[b], 1)}h</b>/ngày</> : ""}</span>
                     </div>
                   ))}
                   <div className="flex justify-between gap-2"><span className="text-[var(--text)]">Daily</span><span className="text-[var(--text)]">{history.campHoursLearned.daily ? <><b>{fmtFixed(history.campHoursPerDay.daily, 1)}h</b>/ngày</> : "—"}</span></div>
@@ -185,7 +186,7 @@ export const EngineTrainingPanel: React.FC<Props> = ({ brands, sessions, shiftSl
           <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 space-y-2">
             <h3 className="text-sm font-bold text-[var(--text)]">Kế hoạch vs thực tế (tự hiệu chỉnh)</h3>
             {!evaluation ? (
-              <p className="text-xs text-[var(--text-muted)]">Brand chưa có kế hoạch tháng nào đã chốt → chưa có gì để so. Sau tháng đầu tiên chốt kế hoạch và đối soát, engine tự chỉnh GMV/giờ từng ô theo sai số.</p>
+              <p className="text-xs text-[var(--text-muted)]">Brand chưa có kế hoạch tháng nào đã chốt → chưa có gì để so. Sau tháng đầu tiên chốt kế hoạch và đối soát, engine tự chỉnh {platformText("GMV/giờ", histPlatform)} từng ô theo sai số.</p>
             ) : (
               <div className="text-xs space-y-1.5">
                 {evaluation.evals.map(({ month, ev }) => (

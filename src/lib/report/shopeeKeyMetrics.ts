@@ -1,3 +1,4 @@
+import { METRIC_SHOPEE as SM } from "../metricGlossary";
 import type { LiveSession } from "../../types";
 import { fmtVndShort } from "../format";
 import { METRIC } from "../metricGlossary";
@@ -116,7 +117,7 @@ type Kind = "money" | "int" | "hours";
 export type ShopeeMetricGroup = "result" | "traffic";
 
 export const SHOPEE_METRIC_GROUPS: { group: ShopeeMetricGroup; label: string; hint: string }[] = [
-  { group: "result", label: "Kết quả", hint: "GMV trên số giờ live. Orders, ABS, Items Sold có sau khi đối soát bằng Live List." },
+  { group: "result", label: "Kết quả", hint: "Sales trên số giờ live. Orders, ABS, Items Sold có sau khi đối soát bằng Live List." },
   { group: "traffic", label: "Viewers và ATC", hint: "Shopee phân phối bao nhiêu người vào phiên live và bao nhiêu lần họ thêm vào giỏ (ATC có sau khi đối soát bằng Live List)." }
 ];
 
@@ -133,8 +134,8 @@ export interface ShopeeMetricDef {
 // chia theo giờ là cách agency đo năng suất (GMV/giờ, Viewers/giờ). Bỏ CO, Xu, GPM, Orders/ATC, ATC/giờ — không có trong file Shopee
 // theo phiên (GPM của Shopee chia cho Total Views, Live List không có).
 export const SHOPEE_METRICS: ShopeeMetricDef[] = [
-  { key: "gmv", label: METRIC.gmv, kind: "money", goodWhenUp: true, group: "result" },
-  { key: "gmvPerHour", label: METRIC.gmvPerHour, kind: "money", goodWhenUp: true, group: "result" },
+  { key: "gmv", label: SM.gmv, kind: "money", goodWhenUp: true, group: "result" },
+  { key: "gmvPerHour", label: SM.gmvPerHour, kind: "money", goodWhenUp: true, group: "result" },
   { key: "hours", label: METRIC.liveHours, kind: "hours", goodWhenUp: null, group: "result" },
   { key: "orders", label: METRIC.orders, kind: "int", goodWhenUp: true, group: "result" },
   { key: "abs", label: METRIC.abs, kind: "money", goodWhenUp: true, group: "result" },
@@ -176,7 +177,7 @@ export const SHOPEE_DRIVER_LABEL: Record<ShopeeDriverKey, string> = {
   hours: METRIC.liveHours,
   viewersPerHour: METRIC.viewersPerHour,
   atcRate: METRIC.atcRate,
-  gmvPerAtc: METRIC.gmvPerAtc
+  gmvPerAtc: SM.gmvPerAtc
 };
 
 /**

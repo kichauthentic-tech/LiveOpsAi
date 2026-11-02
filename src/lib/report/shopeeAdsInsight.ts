@@ -133,7 +133,7 @@ export function shopeeAdsSuiteBlocks(a: ShopeeAdsSuite): InsightBlocks {
   if (z.noSales.count > 0) impact.push(`${z.noSales.count} sản phẩm Product Ads chi ${money(z.noSales.expense)} mà không ra doanh số.`);
 
   const advise: string[] = [];
-  if (z.liveDrag) advise.push(`Dừng hoặc đổi mục tiêu chiến dịch "${z.liveDrag.name}" sang tối ưu GMV.`);
+  if (z.liveDrag) advise.push(`Dừng hoặc đổi mục tiêu chiến dịch "${z.liveDrag.name}" sang tối ưu Sales.`);
   if (z.strong.length) advise.push(`Tăng ngân sách cho ${z.strong.slice(0, 3).map((p) => shortAdName(p.name)).join("; ")} (${METRIC.roas} từ ${x1(z.strong[z.strong.length > 3 ? 2 : z.strong.length - 1].roas)}).`);
   if (z.searchManual && z.searchAuto && (z.searchManual.roas ?? 0) > (z.searchAuto.roas ?? 0) * 1.3) advise.push("Dồn ngân sách Shop+ sang chiến dịch thủ công.");
   if (z.noSales.count > 0) advise.push("Không bật lại sản phẩm không có đơn.");

@@ -1,3 +1,4 @@
+import { platformText } from "../lib/metricGlossary";
 import { useEffect, useMemo, useState } from "react";
 import type { CalendarEventRow, LiveSession, PromoScheme } from "../types";
 import type { EngineParams } from "../lib/scheduling/engineParams";
@@ -72,9 +73,9 @@ export default function OpsSupport({ win, expected, sessions, promoSchemes, engi
   return (
     <div className="space-y-2">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-2">
-        {cell("GMV kỳ vọng", expected == null ? (expected === null ? "đang tính…" : "—") : fmtVndShort(expected))}
-        {cell("GMV/giờ kỳ vọng", expected != null && hours > 0 ? fmtVndShort(expected / hours) : "—")}
-        {cell("Target GMV ca", target > 0 ? fmtVndShort(target) : "—", high ? "text-amber-300" : "")}
+        {cell(`${platformText("GMV", win.platform)} kỳ vọng`, expected == null ? (expected === null ? "đang tính…" : "—") : fmtVndShort(expected))}
+        {cell(`${platformText("GMV/giờ", win.platform)} kỳ vọng`, expected != null && hours > 0 ? fmtVndShort(expected / hours) : "—")}
+        {cell(`${platformText("Target GMV", win.platform)} ca`, target > 0 ? fmtVndShort(target) : "—", high ? "text-amber-300" : "")}
         {cell(`${viewsLabel}/giờ`, b ? fmtN(b.viewsPerHour) : "—")}
         {funnel.hasOrderFunnel && b && cell("Orders kỳ vọng", fmtN(b.expectedOrders))}
         {funnel.hasOrderFunnel && b && cell("CVR", fmtPct(b.conversion, 2))}
@@ -91,7 +92,7 @@ export default function OpsSupport({ win, expected, sessions, promoSchemes, engi
           {b.cellTags.includes("weak") ? "Khung giờ hiệu suất thấp trong lịch sử." : ""}
         </p>
       )}
-      <p className="text-[11px] text-[var(--text-faint)]">GMV kỳ vọng cùng số với sa bàn ở "Cả tháng". Phễu theo thứ × giờ trong lịch sử brand. {funnel.inSessionTip}</p>
+      <p className="text-[11px] text-[var(--text-faint)]">{platformText("GMV", win.platform)} kỳ vọng cùng số với sa bàn ở "Cả tháng". Phễu theo thứ × giờ trong lịch sử brand. {funnel.inSessionTip}</p>
     </div>
   );
 }

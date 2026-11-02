@@ -4,6 +4,7 @@ import { PAL } from "./theme";
 import { Panel, ReportTable } from "./ui";
 import { fmtFixed, fmtVndShort } from "../../../lib/format";
 import { errorMessage } from "../../../lib/errorMessage";
+import { salesTerm } from "../../../lib/metricGlossary";
 import { noiseBand } from "../../../lib/report/brandReport";
 import { parseRatePct, type RefundTrackRow } from "../../../lib/report/nextMonthPlan";
 
@@ -78,7 +79,8 @@ export function decodeLiveTarget(text: string | undefined | null): LiveTargetTyp
 
 /** `saved`/`onSave`: số tự điền lưu vào dữ liệu report (brand thấy, bản xuất có); thiếu thì chỉ nháp trong trình duyệt. `canEdit`=false: chỉ hiện số đã lưu.
  *  `cv`: độ lệch GMV/giờ một phiên đo trên brand (estimateSessionCv) — cùng hệ số với ngưỡng ở trang Nguyên nhân và Key Metrics. */
-export const NextLivePlanPanel: React.FC<{ nextMonth: string; curLabel: string; nextLabel: string; rows: LivePlanRow[]; total: LivePlanRow; saved?: LiveTargetTyped; onSave?: (m: LiveTargetTyped) => Promise<void>; canEdit?: boolean; cv?: number }> = ({ nextMonth, curLabel, nextLabel, rows, total, saved, onSave, canEdit = true, cv }) => {
+export const NextLivePlanPanel: React.FC<{ nextMonth: string; curLabel: string; nextLabel: string; rows: LivePlanRow[]; total: LivePlanRow; saved?: LiveTargetTyped; onSave?: (m: LiveTargetTyped) => Promise<void>; canEdit?: boolean; cv?: number; platform?: "Shopee" }> = ({ nextMonth, curLabel, nextLabel, rows, total, saved, onSave, canEdit = true, cv, platform }) => {
+  const S = salesTerm(platform); // tên doanh số theo sàn: TikTok "GMV", Shopee "Sales"
   const [localTyped, saveLocal] = useLocalDraft<LiveTargetTyped>(`liveops-report-live-plan-${nextMonth}`, {});
   const [draft, setDraft] = useState<LiveTargetTyped | null>(null);
   const typed = onSave ? draft ?? saved ?? {} : localTyped;
@@ -125,19 +127,19 @@ export const NextLivePlanPanel: React.FC<{ nextMonth: string; curLabel: string; 
     <div className="pn">
       <div className="pnh">1 · Kế hoạch Target Live (YFB vận hành)</div>
       <div className="pns">
-        {fromApp ? `Giờ live và Target GMV cộng từ các phiên trong Kế Hoạch Tháng ${nextLabel}. ` : "Tự điền Giờ live và Target GMV cho từng loại ngày (chưa có Kế Hoạch Tháng chốt). "}
-        Bảng tính GMV/giờ yêu cầu và so với GMV/giờ đã đạt tháng {curLabel}; đánh giá theo ngưỡng dao động của từng loại ngày.{fromApp ? "" : onSave ? " Số tự điền lưu cùng report." : " Giá trị nhập lưu trong trình duyệt này."}
+        {fromApp ? `Giờ live và Target ${S} cộng từ các phiên trong Kế Hoạch Tháng ${nextLabel}. ` : `Tự điền Giờ live và Target ${S} cho từng loại ngày (chưa có Kế Hoạch Tháng chốt). `}
+        Bảng tính {S}/giờ yêu cầu và so với {S}/giờ đã đạt tháng {curLabel}; đánh giá theo ngưỡng dao động của từng loại ngày.{fromApp ? "" : onSave ? " Số tự điền lưu cùng report." : " Giá trị nhập lưu trong trình duyệt này."}
       </div>
       <div className="tw">
         <table id="t11Tbl">
-          <thead><tr><th>Loại ngày</th><th>GMV/giờ đạt T{curLabel}</th><th>Giờ live T{nextLabel}</th><th>Target GMV T{nextLabel} (triệu)</th><th>GMV/giờ yêu cầu</th><th>So với đạt T{curLabel}</th><th className="w">Đánh giá</th></tr></thead>
+          <thead><tr><th>Loại ngày</th><th>{S}/giờ đạt T{curLabel}</th><th>Giờ live T{nextLabel}</th><th>Target {S} T{nextLabel} (triệu)</th><th>{S}/giờ yêu cầu</th><th>So với đạt T{curLabel}</th><th className="w">Đánh giá</th></tr></thead>
           <tbody>
             {body.map((x) => (
               <tr key={x.r.key}>
                 <td><b>{x.r.name}</b></td>
                 <td>{mvn(x.r.achieved)}</td>
                 <td>{x.r.plan ? fmtFixed(x.r.plan.hours, 1) : cell(x.r.key, "h", "giờ", `Giờ live tháng ${nextLabel} ${x.r.name}`)}</td>
-                <td>{x.r.plan ? fmtFixed(Math.round(x.r.plan.target / 1e6), 0) : cell(x.r.key, "t", "triệu đồng", `Target GMV tháng ${nextLabel} ${x.r.name}`)}</td>
+                <td>{x.r.plan ? fmtFixed(Math.round(x.r.plan.target / 1e6), 0) : cell(x.r.key, "t", "triệu đồng", `Target ${S} tháng ${nextLabel} ${x.r.name}`)}</td>
                 <td>{mvn(x.req)}</td>
                 <td className={cls(x.d, x.band)}>{sd(x.d)}</td>
                 <td className="w">{liveVerdict(x.d, x.band)}</td>
@@ -156,7 +158,7 @@ export const NextLivePlanPanel: React.FC<{ nextMonth: string; curLabel: string; 
         </table>
       </div>
       <div className="legend">
-        <span>{fromApp ? "" : "Target nhập theo triệu đồng (ví dụ 2300 = 2,3B). "}GMV/giờ yêu cầu = Target ÷ Giờ live. Ngưỡng dao động: {bands.join(", ")}.</span>
+        <span>{fromApp ? "" : "Target nhập theo triệu đồng (ví dụ 2300 = 2,3B). "}{S}/giờ yêu cầu = Target ÷ Giờ live. Ngưỡng dao động: {bands.join(", ")}.</span>
         <span className="st" aria-live="polite">{status}</span>
       </div>
     </div>

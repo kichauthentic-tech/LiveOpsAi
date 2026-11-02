@@ -1,3 +1,4 @@
+import { platformText } from "../lib/metricGlossary";
 import { useEffect, useRef, useState } from "react";
 import { Upload, FileSpreadsheet, Trash2, AlertTriangle, CheckCircle2, Pencil } from "lucide-react";
 import { LiveSession } from "../types";
@@ -198,7 +199,7 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
 
           <div className="grid grid-cols-3 gap-2 text-center">
             <div className="bg-[var(--surface-base)] rounded-lg py-1.5">
-              <p className="text-[11px] text-[var(--text-faint)]">GMV ca này</p>
+              <p className="text-[11px] text-[var(--text-faint)]">{platformText("GMV", prof.id)} ca này</p>
               <p className="text-xs font-bold text-emerald-300">{fmtVndFull(session.actualGmv ?? 0)}</p>
             </div>
             <div className="bg-[var(--surface-base)] rounded-lg py-1.5">
@@ -215,16 +216,16 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
             <div className="space-y-1">
               <p className="text-[11px] text-[var(--text-muted)]">
                 {runsPastBoundary(snapshot)
-                  ? `Room vẫn live sau giờ hết ca ${fmtClock(snapshot.boundaryAt)} khi tải file — số trên có thể lẫn phần của ca sau. Gõ GMV đúng của ca (số trên dashboard lúc giao ca):`
-                  : "Gõ GMV đúng của ca:"}
+                  ? `Room vẫn live sau giờ hết ca ${fmtClock(snapshot.boundaryAt)} khi tải file — số trên có thể lẫn phần của ca sau. Gõ ${platformText("GMV", prof.id)} đúng của ca (số trên dashboard lúc giao ca):`
+                  : `Gõ ${platformText("GMV", prof.id)} đúng của ca:`}
               </p>
               <GmvEditor initial={snapshot.typedGmv ?? session.actualGmv} busy={busy} onSave={(v) => void saveGmv(v)} onCancel={() => setEditingGmv(false)} />
-              <p className="text-[11px] text-[var(--text-faint)]">Đơn, lượt xem… tự chia theo % GMV; phần dư tự sang ca sau.</p>
+              <p className="text-[11px] text-[var(--text-faint)]">Đơn, lượt xem… tự chia theo % {platformText("GMV", prof.id)}; phần dư tự sang ca sau.</p>
             </div>
           ) : snapshot.typedGmv != null ? (
             <p className="text-[11px] text-violet-300 flex items-center gap-1.5 flex-wrap">
               <Pencil className="w-3.5 h-3.5 shrink-0" />
-              GMV gõ tay {fmtVndFull(snapshot.typedGmv)} — đơn, lượt xem theo % GMV, phần dư đã sang ca sau.
+              {platformText("GMV", prof.id)} gõ tay {fmtVndFull(snapshot.typedGmv)} — đơn, lượt xem theo % {platformText("GMV", prof.id)}, phần dư đã sang ca sau.
               <button onClick={() => setEditingGmv(true)} disabled={busy} className="underline hover:text-violet-200 disabled:opacity-40">Sửa</button>
               <button onClick={() => void saveGmv(null)} disabled={busy} className="underline text-[var(--text-faint)] hover:text-[var(--text)] disabled:opacity-40">Bỏ, dùng số file</button>
             </p>
@@ -233,7 +234,7 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
               {runsPastBoundary(snapshot) && (
                 <p className="text-[11px] text-amber-300 flex items-start gap-1.5">
                   <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
-                  Room vẫn live sau giờ hết ca {fmtClock(snapshot.boundaryAt)} khi tải file — GMV trên có thể lẫn phần của ca sau.
+                  Room vẫn live sau giờ hết ca {fmtClock(snapshot.boundaryAt)} khi tải file — {platformText("GMV", prof.id)} trên có thể lẫn phần của ca sau.
                 </p>
               )}
               <button
@@ -241,7 +242,7 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
                 disabled={busy}
                 className="inline-flex items-center gap-1 text-[11px] font-bold text-violet-300 hover:text-violet-200 disabled:opacity-40"
               >
-                <Pencil className="w-3 h-3" /> Sửa GMV đúng của ca
+                <Pencil className="w-3 h-3" /> Sửa {platformText("GMV", prof.id)} đúng của ca
               </button>
             </div>
           )}

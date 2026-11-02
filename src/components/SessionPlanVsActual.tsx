@@ -1,3 +1,4 @@
+import { platformText } from "../lib/metricGlossary";
 import { FormEvent, useState } from "react";
 import { Pencil } from "lucide-react";
 import { LiveSession } from "../types";
@@ -6,6 +7,7 @@ import { fmtCount, parseCount } from "../lib/handover";
 import { setSessionActuals } from "../lib/db/sessions";
 import { errorMessage } from "../lib/errorMessage";
 import { metricHint } from "../lib/metricGlossary";
+import { platformOf } from "../lib/reportPlatform";
 
 // "Kế hoạch vs thực tế" của Cửa sổ Ca Live: hai cột — Kế hoạch (giờ ca, target từ Kế Hoạch Tháng) và Thực tế (giờ live thật,
 // GMV). Thực tế có hai đường vào: up file (Creator-Live-Performance / Live List / giao ca) tự ghi đè, hoặc ops gõ tay khi
@@ -54,7 +56,7 @@ export function SessionPlanVsActual({ session: s, planHours, liveHours, hideMetr
   const gmvValue = gmv.trim() === "" ? 0 : parseCount(gmv);
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (gmvValue == null) { setError("GMV chưa đúng — gõ số, không có chữ."); return; }
+    if (gmvValue == null) { setError(`${platformText("GMV", platformOf(s))} chưa đúng — gõ số, không có chữ.`); return; }
     setSaving(true);
     setError(null);
     try {
@@ -102,7 +104,7 @@ export function SessionPlanVsActual({ session: s, planHours, liveHours, hideMetr
 
         {/* Brand không thấy target — ô Kế hoạch của hai dòng dưới để trống, không ẩn cả dòng để cột Thực tế vẫn thẳng hàng. */}
         <div className={row}>
-          <span className={label} title={metricHint("GMV")}>GMV</span>
+          <span className={label} title={metricHint(`${platformText("GMV", platformOf(s))}`)}>{platformText("GMV", platformOf(s))}</span>
           <span className={cell}>
             {isBrandView ? none("—") : s.targetGmv > 0 ? <>{fmtVndShort(s.targetGmv)}<span className="ml-1 text-[11px] font-normal text-[var(--text-muted)]" title={s.boostTarget ? "Ca tăng cường: target đề xuất, không thuộc target tháng" : undefined}>{s.boostTarget ? "target đề xuất" : "target"}</span></> : none("chưa có target")}
           </span>
@@ -115,7 +117,7 @@ export function SessionPlanVsActual({ session: s, planHours, liveHours, hideMetr
         </div>
 
         <div className={row}>
-          <span className={label} title={metricHint("GMV/giờ")}>GMV/giờ</span>
+          <span className={label} title={metricHint(`${platformText("GMV/giờ", platformOf(s))}`)}>{platformText("GMV/giờ", platformOf(s))}</span>
           <span className={cell}>{isBrandView || planGmvPerHour <= 0 ? none("—") : fmtVndShort(planGmvPerHour)}</span>
           <span className={cell}>{hideMetrics ? none("chưa phát hành") : gmvPerHour > 0 ? fmtVndShort(gmvPerHour) : none("—")}</span>
         </div>
@@ -133,7 +135,7 @@ export function SessionPlanVsActual({ session: s, planHours, liveHours, hideMetr
               <input type="time" value={liveEnd} onChange={(e) => setLiveEnd(e.target.value)} className={`${inputCls} font-mono`} />
             </label>
             <label className="block">
-              <span className="font-bold text-[var(--text-muted)] block mb-1">GMV (đồng)</span>
+              <span className="font-bold text-[var(--text-muted)] block mb-1">{platformText("GMV", platformOf(s))} (đồng)</span>
               <input
                 inputMode="numeric"
                 autoComplete="off"

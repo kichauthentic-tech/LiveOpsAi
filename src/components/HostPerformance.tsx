@@ -1,3 +1,4 @@
+import { platformText } from "../lib/metricGlossary";
 import { useMemo, useState } from "react";
 import { AlertTriangle, ChevronLeft, ChevronRight, Download, TrendingUp, Trophy } from "lucide-react";
 import { Brand, LiveSession } from "../types";
@@ -157,7 +158,7 @@ export function HostPerformance({ platform, sessions, brands }: HostPerformanceP
         description={
           <>
             Đọc từ số liệu ca đã có, để trả lời câu hỏi khi sắp lịch: trong MỘT brand, host nào hiệu quả nhất và mạnh nhất vào thứ mấy
-            (GMV/giờ giữa các brand khác nhau chủ yếu do brand, nên không xếp chung). Đây là số liệu tham khảo cho ops tự quyết, app không tự xếp lịch.
+            ({platformText("GMV/giờ", platform)} giữa các brand khác nhau chủ yếu do brand, nên không xếp chung). Đây là số liệu tham khảo cho ops tự quyết, app không tự xếp lịch.
           </>
         }
         actions={
@@ -245,16 +246,16 @@ export function HostPerformance({ platform, sessions, brands }: HostPerformanceP
         <>
           <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-5">
             <h3 className="text-xs font-black text-[var(--text)] flex items-center gap-1.5">
-              <Trophy className="w-3.5 h-3.5" /> Xếp hạng host theo GMV/giờ
+              <Trophy className="w-3.5 h-3.5" /> Xếp hạng host theo {platformText("GMV/giờ", platform)}
             </h3>
             <p className="text-[11px] text-[var(--text-faint)] mt-0.5">
-              GMV/giờ là thước đo dùng để phân bổ ca — đo hiệu quả trên mỗi giờ nhân lực bỏ ra, không thiên vị host được xếp nhiều ca dài.
+              {platformText("GMV/giờ", platform)} là thước đo dùng để phân bổ ca — đo hiệu quả trên mỗi giờ nhân lực bỏ ra, không thiên vị host được xếp nhiều ca dài.
             </p>
             {unassignedHost && (
               <div className="mt-2 flex items-start gap-2 text-[11px] rounded-xl p-2.5 bg-amber-500/10 border border-amber-500/30 text-amber-300">
                 <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                 <span>
-                  {unassignedHost.sessionCount} ca chưa gán host ({fmtVndShort(unassignedHost.gmv)} GMV · {fmtFixed(unassignedHost.hours, 1)}h) không được tính
+                  {unassignedHost.sessionCount} ca chưa gán host ({fmtVndShort(unassignedHost.gmv)} {platformText("GMV", platform)} · {fmtFixed(unassignedHost.hours, 1)}h) không được tính
                   vào xếp hạng — gán host cho ca ở "Dữ Liệu Gốc → nạp bù" hoặc Cửa sổ Ca Live để số này về đúng người.
                 </span>
               </div>
@@ -292,7 +293,7 @@ export function HostPerformance({ platform, sessions, brands }: HostPerformanceP
           <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-5">
             <h3 className="text-xs font-black text-[var(--text)]">Host hiệu quả nhất theo thứ trong tuần</h3>
             <p className="text-[11px] text-[var(--text-faint)] mt-0.5">
-              Đậm hơn = GMV/giờ cao hơn. Ô trống nghĩa là host chưa từng live thứ đó trong khoảng đã chọn, không phải hiệu suất bằng 0.
+              Đậm hơn = {platformText("GMV/giờ", platform)} cao hơn. Ô trống nghĩa là host chưa từng live thứ đó trong khoảng đã chọn, không phải hiệu suất bằng 0.
               Hàng cuối "Mọi host" = hiệu suất chung của thứ đó — dùng để quyết định nên mở nhiều ca vào thứ nào, tách khỏi chuyện host nào trực.
             </p>
             <div className="mt-3 overflow-x-auto">

@@ -25,8 +25,12 @@ const nf = (v: number) => Math.round(v).toLocaleString("vi-VN");
 /** Nhãn nhỏ "Bối cảnh cả shop" đặt đầu panel: phần ngoài phạm vi vận hành của YFB. */
 export const ContextTag: React.FC = () => <span style={{ fontSize: 11, color: "var(--muted)", border: "1px solid var(--line)", borderRadius: 99, padding: "1px 8px", marginLeft: 8 }}>Bối cảnh cả shop</span>;
 
-const MissingFile: React.FC<{ what: string; canManage: boolean }> = ({ what, canManage }) => (
-  <p className="pns">{canManage ? `Chưa có file ${what} của tháng này — tải ở Dữ Liệu Gốc, nhóm "File cả shop".` : "Chưa có số liệu cho phần này trong tháng."}</p>
+const MissingFile: React.FC<{ what: string; canManage: boolean; gift?: boolean }> = ({ what, canManage, gift }) => (
+  <p className="pns">
+    {gift
+      ? "Mục này chưa hiện số: file Shopee không tách được phần hàng quà tặng không bán, mà quà tặng đang bị ghi vào doanh số. Có file đã loại SKU quà tặng thì mục này hiện lại."
+      : canManage ? `Chưa có file ${what} của tháng này — tải ở Dữ Liệu Gốc, nhóm "File cả shop".` : "Chưa có số liệu cho phần này trong tháng."}
+  </p>
 );
 
 // ───────── biểu đồ cột theo ngày (placed, phần LIVE tô riêng) ─────────
@@ -61,7 +65,7 @@ export const shopeeShopHeadlines = (shop: ShopeeShopSnapshot | null | undefined,
     channels: `${SS.productCard} ${pc(ratio(cur.card, cur.total), 0)}, ${SS.sellerLive} ${pc(ratio(cur.live, cur.total), 1)}, ${SS.affiliate} ${pc(ratio(cur.affiliate, cur.total), 1)}, ${SS.sellerVideo} ${pc(ratio(cur.video, cur.total), 1)}${prev ? "" : ". Tháng trước chưa có file cả shop để so"}.`,
     promo: shop.discount || shop.voucher
       ? `${all ? `${pc(ratio(all.sales, shop.placed), 0)} doanh số đi qua ${SS.promotion.toLowerCase()}` : ""}${all && shop.voucher ? ", " : ""}${shop.voucher ? `${SS.voucher} tạo ${pc(ratio(shop.voucher.sales, shop.placed), 0)} với ${SS.cost.toLowerCase()} ${pc(ratio(shop.voucher.cost, shop.voucher.sales), 1)} doanh số ${SS.voucher}` : ""}.`
-      : `Chưa có file ${SS.voucher} / Discount.`
+      : shop.gift ? `Khuyến mãi và ${SS.voucher.toLowerCase()} chưa hiện số vì file chưa tách được hàng quà tặng.` : `Chưa có file ${SS.voucher} / Discount.`
   };
 };
 
@@ -226,7 +230,7 @@ export const ShopeeGrowthPage: React.FC<PageProps> = (p) => {
     { lab: `${SS.totalSales} · tới ngày ${through}`, val: fmtM(shop.placed), note: notes(chgNote(growth(sumP((d) => d.placed), shop.placed), vs), `${SS.salesConfirmed} ${fmtM(shop.confirmed)}`) },
     { lab: SS.visits, val: nf(shop.visits), note: notes(chgNote(growth(sumP((d) => d.visits), shop.visits), vs), `${SS.orderConversion.toLowerCase()} ${pc(ratio(shop.orders, shop.visits), 2)}`) },
     { lab: SS.buyers, val: nf(shop.buyers), note: notes(`${nf(shop.newBuyers)} ${SS.newBuyers.toLowerCase()}, ${nf(shop.oldBuyers)} ${SS.existingBuyers.toLowerCase()}`) },
-    { lab: `Doanh số từ ${SS.newBuyers.toLowerCase()}`, val: newG ? fmtM(newG.sales) : "—", note: newG ? `${pc(newG.share, 0)} doanh số · ${nf(newG.buyers)} người mua` : `chưa có file ${SS.salesComposition}` }
+    { lab: `Doanh số từ ${SS.newBuyers.toLowerCase()}`, val: newG ? fmtM(newG.sales) : "—", note: newG ? `${pc(newG.share, 0)} doanh số · ${nf(newG.buyers)} người mua` : shop.gift ? "chưa tách được hàng quà tặng" : `chưa có file ${SS.salesComposition}` }
   ];
   const buyerBars = mix && newG && oldG
     ? hbars([
@@ -243,6 +247,11 @@ export const ShopeeGrowthPage: React.FC<PageProps> = (p) => {
       <DemoKpis items={tiles} />
       <DemoPanel title={`${SS.totalSales} mỗi ngày`} sub={<>Cột xanh dương = {SS.totalSales.toLowerCase()} (Đơn đã đặt), cột vàng = phần {SS.sellerLive} và {SS.affiliateLive}. Dữ liệu tới ngày {through}.<ContextTag /></>}>
         <Html html={dayChart(shop.days, p.monthDays)} />
+        {shop.gift && (
+          <p className="pns">
+            Đã trừ {fmtM(shop.gift.sales)} hàng quà tặng không bán khỏi {SS.totalSales.toLowerCase()}. Số theo ngày là ước lượng (chia theo doanh số hủy của các ngày có đơn quà tặng); {SS.orders.toLowerCase()}, {SS.buyers.toLowerCase()} và {SS.orderConversion.toLowerCase()} còn gồm đơn quà tặng nên chưa chính xác.
+          </p>
+        )}
         {spikes.days.length > 0 && (
           <p className="pns">
             {spikes.days.length} ngày ({spikes.days.map((d) => d.d).join(", ")}) mỗi ngày trên 3 lần trung vị, cộng lại {fmtM(spikes.days.reduce((a, d) => a + d.placed, 0))}, bằng {pc(spikes.share * 100, 0)} doanh số tháng và chỉ có {spikes.days.reduce((a, d) => a + d.orders, 0)} đơn. Doanh số cả shop nhảy theo vài đơn giá trị cao, không theo đều từng ngày.
@@ -252,7 +261,7 @@ export const ShopeeGrowthPage: React.FC<PageProps> = (p) => {
       <TrendGrowthPanel trend={p.trend} />
       <DemoStack>
         <DemoPanel title={`${SS.newBuyers} và ${SS.existingBuyers.toLowerCase()}`} sub={<>Doanh số đặt theo nhóm người mua.<ContextTag /></>}>
-          {buyerBars ? <Html className="hb" html={buyerBars} /> : <MissingFile what={`${SS.salesComposition} (sales_composition_…xlsx)`} canManage={p.canManage} />}
+          {buyerBars ? <Html className="hb" html={buyerBars} /> : <MissingFile what={`${SS.salesComposition} (sales_composition_…xlsx)`} canManage={p.canManage} gift={!!shop.gift} />}
         </DemoPanel>
         <DemoPanel title={SS.priceBand} sub={<>Người mua và doanh số theo khung giá, từ file {SS.salesComposition}.<ContextTag /></>}>
           {priceHtml ? <DemoTable html={priceHtml} /> : <MissingFile what={`${SS.salesComposition} (sales_composition_…xlsx)`} canManage={p.canManage} />}
@@ -309,6 +318,7 @@ export const ShopeeChannelsPage: React.FC<PageProps> = (p) => {
       <TrendChannelsPanel trend={p.trend} />
       <DemoPanel title={`${SS.traffic} của từng nguồn doanh số`} sub={<>Doanh số (Đơn đã đặt) theo nguồn lưu lượng dẫn vào đơn.<ContextTag /></>}>
         <DemoTable html={tbl([SS.traffic, "Doanh số", "% trong nguồn doanh số", "Đơn", SS.productClicks], srcHtml)} />
+        {shop.gift && <p className="pns">Chỉ hiện nguồn lưu lượng tổng của {SS.productCard}: các nguồn con (Tìm kiếm, Đề xuất, Khác…) còn gồm hàng quà tặng nên chưa hiện.</p>}
         {(shop.sources.find((s) => s.block === "card" && s.source === "Khác")?.share ?? 0) > 30 && (
           <p className="pns">Nguồn &quot;Khác&quot; chiếm phần lớn {SS.productCard}; Shopee không cho biết đây là nguồn gì. {spikes.days.length > 0 ? "Phần này có thể cùng nhóm với các đơn lớn ở những ngày doanh số nhảy, cần xác nhận với brand." : ""}</p>
         )}
@@ -330,8 +340,8 @@ export const ShopeePromoPage: React.FC<PageProps> = (p) => {
   const d = shop.discount, v = shop.voucher;
   const all = d?.types.find((t) => t.type === "Tất cả");
   const tiles: DemoKpi[] = [
-    { lab: `Doanh số qua ${SS.promotion.toLowerCase()}`, val: all ? fmtM(all.sales) : "—", note: all ? `${pc(ratio(all.sales, shop.placed), 0)} ${SS.totalSales.toLowerCase()} · ${all.orders} đơn` : "chưa có file Discount" },
-    { lab: `Doanh số qua ${SS.voucher}`, val: v ? fmtM(v.sales) : "—", note: v ? `${pc(ratio(v.sales, shop.placed), 0)} ${SS.totalSales.toLowerCase()} · ${v.orders} đơn` : `chưa có file ${SS.voucher}` },
+    { lab: `Doanh số qua ${SS.promotion.toLowerCase()}`, val: all ? fmtM(all.sales) : "—", note: all ? `${pc(ratio(all.sales, shop.placed), 0)} ${SS.totalSales.toLowerCase()} · ${all.orders} đơn` : shop.gift ? "chưa tách được hàng quà tặng" : "chưa có file Discount" },
+    { lab: `Doanh số qua ${SS.voucher}`, val: v ? fmtM(v.sales) : "—", note: v ? `${pc(ratio(v.sales, shop.placed), 0)} ${SS.totalSales.toLowerCase()} · ${v.orders} đơn` : shop.gift ? "chưa tách được hàng quà tặng" : `chưa có file ${SS.voucher}` },
     { lab: `${SS.cost} ${SS.voucher}`, val: v ? fmtM(v.cost) : "—", note: v ? `${pc(ratio(v.cost, v.sales), 1)} doanh số ${SS.voucher}` : undefined },
     { lab: `${SS.voucher} (${SS.claimed})`, val: v ? nf(v.claims) : "—", note: v ? `${SS.usageRate} ${pc(ratio(v.orders, v.claims), 1)}` : undefined }
   ];
@@ -345,14 +355,14 @@ export const ShopeePromoPage: React.FC<PageProps> = (p) => {
       <TrendPromoPanel trend={p.trend} />
       <DemoStack>
         <DemoPanel title="Loại khuyến mãi" sub={<>Một đơn có thể nằm ở nhiều loại ({SS.promotion}, {SS.combo}, {SS.dealShock}) nên các dòng cộng lại có thể lớn hơn &quot;Tất cả&quot;.<ContextTag /></>}>
-          {typeHtml ? <DemoTable html={typeHtml} /> : <MissingFile what="Discount (discount_…xlsx)" canManage={p.canManage} />}
+          {typeHtml ? <DemoTable html={typeHtml} /> : <MissingFile what="Discount (discount_…xlsx)" canManage={p.canManage} gift={!!shop.gift} />}
         </DemoPanel>
       </DemoStack>
       <DemoPanel title={`${SS.promoProgram} lớn nhất`} sub={<>Xếp theo doanh số (Đơn đã đặt).<ContextTag /></>}>
-        {progHtml ? <DemoTable html={progHtml} /> : <MissingFile what="Discount (discount_…xlsx)" canManage={p.canManage} />}
+        {progHtml ? <DemoTable html={progHtml} /> : <MissingFile what="Discount (discount_…xlsx)" canManage={p.canManage} gift={!!shop.gift} />}
       </DemoPanel>
       <DemoPanel title={SS.voucher} sub={<>Doanh số và chi phí từng mã giảm giá.<ContextTag /></>}>
-        {vouHtml ? <DemoTable html={vouHtml} /> : <MissingFile what="Voucher (voucher_…xlsx)" canManage={p.canManage} />}
+        {vouHtml ? <DemoTable html={vouHtml} /> : <MissingFile what="Voucher (voucher_…xlsx)" canManage={p.canManage} gift={!!shop.gift} />}
       </DemoPanel>
       {p.insight}
     </DemoPage>

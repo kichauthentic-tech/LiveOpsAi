@@ -1,3 +1,4 @@
+import { METRIC_SHOPEE as SM } from "../../lib/metricGlossary";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { BrandMonthlyReport, BrandMonthPlan, BrandMonthPlanSlot, LiveSession } from "../../types";
 import { fmtFixed, fmtVndFull, fmtVndShort } from "../../lib/format";
@@ -258,18 +259,18 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
     [s.streams, liveSessions, brandId]
   );
   const outsideBig = outside.share != null && outside.share >= OUTSIDE_YFB_LABEL_SHARE;
-  const gmvLabel = scope.inhouseLive && outsideBig ? `${METRIC.gmv} (gồm phiên brand tự live)` : METRIC.gmv;
+  const gmvLabel = scope.inhouseLive && outsideBig ? `${SM.gmv} (gồm phiên brand tự live)` : SM.gmv;
   const scopeLine = [
     [!scope.ads && "Ads", !scope.affiliate && "Affiliate"].some(Boolean) ? `ngoài phạm vi YFB: ${[!scope.ads && "Ads", !scope.affiliate && "Affiliate"].filter(Boolean).join(", ")}` : null,
     scope.inhouseLive ? "brand có tự live cùng tài khoản" : null
   ].filter(Boolean).join(" · ");
   const outsideLine =
     outside.total > 0
-      ? `Live List tháng này: ${outside.streams}/${outside.total} phiên ngoài ca YFB${outside.gmv > 0 || outside.hours > 0 ? ` (${outside.hours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })} giờ, ${fmtM(outside.gmv)}${outside.share != null ? `, ${fmtP(outside.share, 1, false)} ${METRIC.gmv}` : ""})` : ""}${
+      ? `Live List tháng này: ${outside.streams}/${outside.total} phiên ngoài ca YFB${outside.gmv > 0 || outside.hours > 0 ? ` (${outside.hours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })} giờ, ${fmtM(outside.gmv)}${outside.share != null ? `, ${fmtP(outside.share, 1, false)} ${SM.gmv}` : ""})` : ""}${
           scope.inhouseLive
             ? outsideBig
               ? ` — số tổng ghi "gồm phiên brand tự live".`
-              : ` — dưới ${OUTSIDE_YFB_LABEL_SHARE}% nên giữ nhãn ${METRIC.gmv}.`
+              : ` — dưới ${OUTSIDE_YFB_LABEL_SHARE}% nên giữ nhãn ${SM.gmv}.`
             : outsideBig
               ? ` — nếu là brand tự live, bật "Brand có tự live cùng tài khoản" ở CRM → Hợp đồng & giá; nếu là ca YFB thiếu, thêm ca.`
               : "."
@@ -463,7 +464,7 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
   const cancelBars = hbars(
     cancel.map((c) => ({
       name: `Tháng ${Number(c.month.slice(5))}`,
-      sub: `${METRIC.gmv} ${fmtM(c.gmv)} · huỷ ${c.cancelRate != null ? pct(c.cancelRate, 1) : "—"}`,
+      sub: `${SM.gmv} ${fmtM(c.gmv)} · huỷ ${c.cancelRate != null ? pct(c.cancelRate, 1) : "—"}`,
       value: c.confirmed / 1e6,
       mark: c.gmv / 1e6,
       text: `${fmtM(c.confirmed)} / ${fmtM(c.gmv)}`
@@ -499,10 +500,10 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
     );
   }
   const whyKpis: WhyKpi[] = [
-    { key: "gmvPerHour" as const, label: METRIC.gmvPerHour },
+    { key: "gmvPerHour" as const, label: SM.gmvPerHour },
     { key: "viewersPerHour" as const, label: METRIC.viewersPerHour },
     { key: "atcRate" as const, label: METRIC.atcRate },
-    { key: "gmvPerAtc" as const, label: METRIC.gmvPerAtc }
+    { key: "gmvPerAtc" as const, label: SM.gmvPerAtc }
   ].map(({ key, label }) => {
     const r = kmRow(key);
     const c = kmChg(key);
@@ -517,7 +518,7 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
   const factorCols: ShopeeFactor[] = d && d.parts.some((p) => p.key === "atcRate") ? ["hours", "viewersPerHour", "atcRate", "gmvPerAtc"] : ["hours", "viewersPerHour"];
   const dayFactorHtml = pm.dayFactors.length
     ? tbl(
-        ["Loại ngày", ...factorCols.map((f) => SHOPEE_FACTOR_LABEL[f]), METRIC.gmvPerHour, "Ngưỡng", "Đánh giá"],
+        ["Loại ngày", ...factorCols.map((f) => SHOPEE_FACTOR_LABEL[f]), SM.gmvPerHour, "Ngưỡng", "Đánh giá"],
         pm.dayFactors.map((r) => {
           const gp = r.change.gmvPerHour;
           const [t, k] = r.band == null ? ["chưa đủ phiên", "m"] : r.significant ? [(gp ?? 0) < 0 ? "giảm có ý nghĩa" : "tăng có ý nghĩa", (gp ?? 0) < 0 ? "r" : "g"] : ["trong ngưỡng dao động", "m"];
@@ -607,23 +608,23 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
 
   // ======================= Đầu trang Sản phẩm / Host / Ads / Tháng sau (PageHead như TikTok) =======================
   // Tên Product List của Shopee dài cả câu ⇒ ô Top 1 cắt ở ranh giới từ.
-  const productMetrics: PageMetric[] = [...productsKpis(productsData).slice(0, 3).map((m, i) => (i === 0 && sku?.rows[0] ? { ...m, label: `Top 1 · ${shortName(sku.rows[0].name, 44)}` } : m)), ...(s.promo && s.promo.coins > 0 ? [{ label: METRIC.coinsClaimed, value: fmtInt(s.promo.coins), note: `≈ ${fmtVndShort(s.promo.coins)}${h.gmv > 0 ? ` (${pct((s.promo.coins / h.gmv) * 100, 2)} GMV)` : ""}` }] : [])];
+  const productMetrics: PageMetric[] = [...productsKpis(productsData).slice(0, 3).map((m, i) => (i === 0 && sku?.rows[0] ? { ...m, label: `Top 1 · ${shortName(sku.rows[0].name, 44)}` } : m)), ...(s.promo && s.promo.coins > 0 ? [{ label: METRIC.coinsClaimed, value: fmtInt(s.promo.coins), note: `≈ ${fmtVndShort(s.promo.coins)}${h.gmv > 0 ? ` (${pct((s.promo.coins / h.gmv) * 100, 2)} Sales)` : ""}` }] : [])];
 
   // ======================= Xuất Excel =======================
   const handleExcel = () => {
     const n = (v: number | null | undefined) => (v == null ? "" : Math.round(v * 100) / 100);
     void downloadSheetsAsXlsx(
       [
-        { name: "1 Target theo loai ngay", rows: pm.score.map((r) => ({ "Loại ngày": SHOPEE_TAB_LABEL[r.key], Target: n(r.target), "Target tới nay": n(r.targetToDate), GMV: n(r.actual), "% Target": n(r.pct), "Giờ kế hoạch": n(r.planHours), "Giờ live": n(r.hours), Phiên: r.sessions, "GMV/giờ kế hoạch": n(r.requiredPerHour), "GMV/giờ": n(r.gmvPerHour) })) },
+        { name: "1 Target theo loai ngay", rows: pm.score.map((r) => ({ "Loại ngày": SHOPEE_TAB_LABEL[r.key], Target: n(r.target), "Target tới nay": n(r.targetToDate), Sales: n(r.actual), "% Target": n(r.pct), "Giờ kế hoạch": n(r.planHours), "Giờ live": n(r.hours), Phiên: r.sessions, "Sales/giờ kế hoạch": n(r.requiredPerHour), "Sales/giờ": n(r.gmvPerHour) })) },
         ...SHOPEE_TABS.filter((t) => pm.km[t].rows.length).map((t) => ({
           name: `2 Key Metrics ${SHOPEE_TAB_LABEL[t]}`,
           rows: pm.km[t].rows.map((r) => ({ "Chỉ số": r.def.label, ...Object.fromEntries(months.map((m, i) => [monthShortLabel(m.month), n(r.values[i])])) }))
         })),
-        { name: "3 Don huy", rows: cancel.map((c) => ({ Tháng: monthShortLabel(c.month), GMV: n(c.gmv), "Sales (Confirmed Order)": n(c.confirmed), "% huỷ": n(c.cancelRate) })) },
-        { name: "4 Nguyen nhan", rows: (d?.parts ?? []).map((p) => ({ "Yếu tố": SHOPEE_FACTOR_LABEL[p.key], "% đổi": n(p.change), "Đóng góp GMV": n(p.value) })) },
+        { name: "3 Don huy", rows: cancel.map((c) => ({ Tháng: monthShortLabel(c.month), Sales: n(c.gmv), "Sales (Confirmed Order)": n(c.confirmed), "% huỷ": n(c.cancelRate) })) },
+        { name: "4 Nguyen nhan", rows: (d?.parts ?? []).map((p) => ({ "Yếu tố": SHOPEE_FACTOR_LABEL[p.key], "% đổi": n(p.change), "Đóng góp Sales": n(p.value) })) },
         { name: "5 San pham", rows: s.products.top.map((x, i) => ({ "#": i + 1, "Product(s)": x.name, "Sales(Placed Order)": x.salesPlaced, Orders: x.ordersPlaced, "Product Clicks": x.clicks, ATC: x.atc })) },
-        { name: "6 Host", rows: hostPeer.rows.map((x) => ({ Host: x.name, "Giờ live": n(x.hours), GMV: n(x.gmv), "GMV/giờ": n(x.hours > 0 ? x.gmv / x.hours : null) })) },
-        { name: "6 Khung gio", rows: slots.map((x) => ({ "Khung giờ": x.label, [`Phiên ${monthShortLabel(prevMonth)}`]: x.prev.n, [`GMV/giờ ${monthShortLabel(prevMonth)}`]: n(x.prev.gmvPerHour), [`Phiên ${monthShortLabel(month)}`]: x.cur.n, [`GMV/giờ ${monthShortLabel(month)}`]: n(x.cur.gmvPerHour) })) }
+        { name: "6 Host", rows: hostPeer.rows.map((x) => ({ Host: x.name, "Giờ live": n(x.hours), Sales: n(x.gmv), "Sales/giờ": n(x.hours > 0 ? x.gmv / x.hours : null) })) },
+        { name: "6 Khung gio", rows: slots.map((x) => ({ "Khung giờ": x.label, [`Phiên ${monthShortLabel(prevMonth)}`]: x.prev.n, [`Sales/giờ ${monthShortLabel(prevMonth)}`]: n(x.prev.gmvPerHour), [`Phiên ${monthShortLabel(month)}`]: x.cur.n, [`Sales/giờ ${monthShortLabel(month)}`]: n(x.cur.gmvPerHour) })) }
       ],
       `ReportThang_Shopee_${brandName}_${month}.xlsx`.replace(/\s+/g, "_")
     ).catch((e) => showToast(`Không tải được file Excel: ${errorMessage(e)}`));
@@ -645,6 +646,7 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
         {/* ===== 1 · Tổng quan & KPI ===== */}
         <section id="mr-summary" className="space-y-4 scroll-mt-16" style={secStyle("summary")}>
           <SummaryDemoPage
+            platform="Shopee"
             no={secNo("summary")}
             title={secTitle("summary")}
             headline={heads.summary}
@@ -695,7 +697,7 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
             ) : (
               <DemoPanel
                 title={`${pm.km.all.rows.length} chỉ số, ${months.length === 3 ? "ba" : months.length} tháng ${winNote ? `cùng kỳ ${winNote}` : "cả tháng"}`}
-                sub={`Màu xanh / đỏ khi thay đổi vượt ngưỡng dao động của tab đó (độ lệch GMV/giờ mỗi phiên ±${Math.round(pm.cv.cv * 100)}%, ${pm.cv.measured ? "đo trên phiên của brand" : "mức mặc định, chưa đủ phiên để đo riêng"}). ${METRIC.liveHours} và chỉ số quy mô đi theo giờ (${METRIC.gmv}, ${METRIC.orders}, ${METRIC.itemsSoldShopee}, ${METRIC.viewers}, ${METRIC.atc}) không đánh giá tốt hay xấu.`}
+                sub={`Màu xanh / đỏ khi thay đổi vượt ngưỡng dao động của tab đó (độ lệch Sales/giờ mỗi phiên ±${Math.round(pm.cv.cv * 100)}%, ${pm.cv.measured ? "đo trên phiên của brand" : "mức mặc định, chưa đủ phiên để đo riêng"}). ${METRIC.liveHours} và chỉ số quy mô đi theo giờ (${SM.gmv}, ${METRIC.orders}, ${METRIC.itemsSoldShopee}, ${METRIC.viewers}, ${METRIC.atc}) không đánh giá tốt hay xấu.`}
               >
                 <div className="tabs" role="tablist">
                   {kmTabs.map((t) => (
@@ -706,7 +708,7 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
                 </div>
                 <DemoTable html={tbl(kmHead, kmRows)} id="km" />
                 <DemoLegend>
-                  <span>Số theo phiên trong Live List của Shopee; {METRIC.gmv} = Sales(Placed Order). Tỷ lệ tự tính: {METRIC.atcRate} = ATC ÷ Viewers; {METRIC.orders}/{METRIC.atc} = Orders ÷ ATC; {METRIC.gmvPerAtc} = GMV ÷ ATC.</span>
+                  <span>Số theo phiên trong Live List của Shopee; {SM.gmv} = Sales(Placed Order) (doanh số đơn đã đặt). Tỷ lệ tự tính: {METRIC.atcRate} = ATC ÷ Viewers; {METRIC.orders}/{METRIC.atc} = Orders ÷ ATC; {SM.gmvPerAtc} = Sales ÷ ATC.</span>
                   <span>{winNote ? `Cùng kỳ ${winNote} mỗi tháng` : "Cả tháng"} · số phiên {months.map((m) => monthShortLabel(m.month)).join(" → ")}: {kmTable.sessions.join(" → ")} phiên</span>
                 </DemoLegend>
               </DemoPanel>
@@ -720,8 +722,8 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
           <WhyHead no={secNo("why")} title={secTitle("why")} headline={heads.why} kpis={whyKpis} />
           <div className="stk">
             <div className="pn">
-              <div className="pnh">Đóng góp của từng yếu tố vào thay đổi {METRIC.gmv}</div>
-              <div className="pns">GMV = {d ? d.parts.map((p) => SHOPEE_FACTOR_LABEL[p.key]).join(" × ") : `${METRIC.liveHours} × ${METRIC.viewersPerHour} × ${METRIC.atcRate} × ${METRIC.gmvPerAtc}`} · {pm.prevLabel ?? "tháng trước"} so với {pm.curLabel} · {d ? d.parts.length : 4} phần cộng đúng mức thay đổi.</div>
+              <div className="pnh">Đóng góp của từng yếu tố vào thay đổi {SM.gmv}</div>
+              <div className="pns">Sales = {d ? d.parts.map((p) => SHOPEE_FACTOR_LABEL[p.key]).join(" × ") : `${METRIC.liveHours} × ${METRIC.viewersPerHour} × ${METRIC.atcRate} × ${SM.gmvPerAtc}`} · {pm.prevLabel ?? "tháng trước"} so với {pm.curLabel} · {d ? d.parts.length : 4} phần cộng đúng mức thay đổi.</div>
               {bridgeHtml ? <Html html={bridgeHtml} /> : <p className="pns">Chưa đủ số của cả 2 kỳ (Giờ live, Viewers, ATC trong Live List) để tách nguyên nhân.</p>}
             </div>
             {funnel && <FunnelPanel stages={funnel.stages} ratios={funnel.ratios} band={band} prevShort={`Tháng ${Number(prevMonth.slice(5))}`} />}
@@ -805,7 +807,7 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
                   : s.ads
                   ? [
                       { label: METRIC.expense, value: fmtVndShort(s.ads.expense), note: `${s.ads.campaigns} chiến dịch Live Ads` },
-                      { label: METRIC.roas, value: s.ads.roas != null ? `${fmtFixed(s.ads.roas, 1)}x` : "—", note: `GMV từ Ads ${fmtVndShort(s.ads.gmv)}` },
+                      { label: METRIC.roas, value: s.ads.roas != null ? `${fmtFixed(s.ads.roas, 1)}x` : "—", note: `Sales từ Ads ${fmtVndShort(s.ads.gmv)}` },
                       { label: `${METRIC.expense}/${METRIC.orders}`, value: s.ads.costPerOrder != null ? fmtVndShort(s.ads.costPerOrder) : "—", note: `${fmtInt(s.ads.orders)} ${METRIC.orders} trong file Ads` }
                     ]
                   : []
@@ -820,7 +822,7 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
               <DemoPanel title="Shopee Live Ads (cả tháng)" sub="File Livestream Ads — tổng cả tháng theo chiến dịch. Shopee không cho số theo ngày nên chưa tách ROAS theo loại ngày.">
                 <DemoTable
                   html={tbl(
-                    [METRIC.expense, "GMV từ Ads", "% GMV live", METRIC.roas, METRIC.orders, `${METRIC.expense}/${METRIC.orders}`],
+                    [METRIC.expense, "Sales từ Ads", "% Sales live", METRIC.roas, METRIC.orders, `${METRIC.expense}/${METRIC.orders}`],
                     [[fmtVndFull(s.ads.expense), fmtVndFull(s.ads.gmv), h.gmv > 0 ? pct((s.ads.gmv / h.gmv) * 100) : "—", s.ads.roas != null ? `${fmtFixed(s.ads.roas, 1)}x` : "—", fmtInt(s.ads.orders), s.ads.costPerOrder != null ? fmtVndFull(s.ads.costPerOrder) : "—"]]
                   )}
                 />
@@ -840,13 +842,13 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
             <DemoPage>
               <DemoHead no={secNo("nmv")} title={secTitle("nmv")} headline={heads.nmv} />
               {cancelCur?.cancelRate == null ? (
-                <DemoPanel title={`${METRIC.gmv} và ${METRIC.salesConfirmed}`}><p className="pns">{fileHint("Live List có cột Sales(Confirmed Order)")}</p></DemoPanel>
+                <DemoPanel title={`${SM.gmv} và ${METRIC.salesConfirmed}`}><p className="pns">{fileHint("Live List có cột Sales(Confirmed Order)")}</p></DemoPanel>
               ) : (
                 <DemoStack>
-                  <DemoPanel title={`${METRIC.gmv} tách thành ${METRIC.salesConfirmed} và phần đơn huỷ`} sub={`${winNote ? `Cùng kỳ ${winNote} mỗi tháng` : "Cả tháng"} · thanh = ${METRIC.salesConfirmed}, vạch trắng = ${METRIC.gmv} (Sales(Placed Order)) · số xác nhận tính tới lúc tải Live List.`}>
+                  <DemoPanel title={`${SM.gmv} tách thành ${METRIC.salesConfirmed} và phần đơn huỷ`} sub={`${winNote ? `Cùng kỳ ${winNote} mỗi tháng` : "Cả tháng"} · thanh = ${METRIC.salesConfirmed}, vạch trắng = ${SM.gmv} (Sales(Placed Order)) · số xác nhận tính tới lúc tải Live List.`}>
                     <Html className="hb" html={cancelBars} />
                   </DemoPanel>
-                  <DemoPanel title="Tỷ lệ đơn huỷ theo loại ngày" sub={`% giá trị đặt không thành đơn xác nhận = 1 − ${METRIC.salesConfirmed} ÷ ${METRIC.gmv}; mỗi tháng theo khung campaign của chính tháng đó.`}>
+                  <DemoPanel title="Tỷ lệ đơn huỷ theo loại ngày" sub={`% giá trị đặt không thành đơn xác nhận = 1 − ${METRIC.salesConfirmed} ÷ ${SM.gmv}; mỗi tháng theo khung campaign của chính tháng đó.`}>
                     <DemoTable html={cancelDayHtml} />
                   </DemoPanel>
                 </DemoStack>
@@ -882,6 +884,7 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
         <section id="mr-next" className="space-y-4 scroll-mt-16" style={secStyle("next")}>
           <PageHead no={secNo("next")} title={secTitle("next")} headline={heads.next} sub={`Hành động tháng ${Number(nextMonth.slice(5))} + kế hoạch từ Kế Hoạch Tháng (sàn Shopee)`} />
           <NextLivePlanPanel
+            platform="Shopee"
             nextMonth={nextMonth}
             curLabel={String(Number(month.slice(5)))}
             nextLabel={String(Number(nextMonth.slice(5)))}

@@ -1,3 +1,4 @@
+import { platformText } from "../../lib/metricGlossary";
 import React, { useEffect, useMemo, useState } from "react";
 import { LiveSession, Talent } from "../../types";
 import { Layers, Scissors, Users, Wand2, CalendarDays, Save, ChevronDown, ChevronUp, Home, Trash2 } from "lucide-react";
@@ -371,7 +372,7 @@ export const BackfillFromRooms: React.FC<Props> = ({ platform, brandId, brandNam
         {savedInThisMonth.length > 0 && (
           <div className="text-[11px] text-[var(--text-muted)] flex flex-wrap items-center gap-2">
             <Home className="w-3.5 h-3.5 text-sky-500" />
-            <span>Đã ghi nhận inhouse tháng này: <b className="text-sky-500">{savedInThisMonth.length}</b> {prof.liveUnitWord} · GMV {fmtMoney(savedInThisMonth.reduce((a, r) => a + r.gmv, 0))} — không tính vào ca agency</span>
+            <span>Đã ghi nhận inhouse tháng này: <b className="text-sky-500">{savedInThisMonth.length}</b> {prof.liveUnitWord} · {platformText("GMV", platform)} {fmtMoney(savedInThisMonth.reduce((a, r) => a + r.gmv, 0))} — không tính vào ca agency</span>
             <button
               type="button"
               onClick={async () => { if (await confirm(`Bỏ nhãn inhouse của ${savedInThisMonth.length} ${prof.liveUnitWord} tháng này? Chúng sẽ quay lại danh sách chờ sinh ca.`)) await handleUnmark(savedInThisMonth.map((r) => r.roomId)); }}

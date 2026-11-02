@@ -1,3 +1,4 @@
+import { platformText } from "../lib/metricGlossary";
 import React, { useContext, useEffect, useMemo, useState } from "react";
 import { SESSION_STATUS_CLS, SESSION_STATUS_LABEL_VI } from "../lib/sessionStatusUi";
 import { hasSessionData, isUnconfirmedPast } from "../lib/sessionStatus";
@@ -484,7 +485,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                   <input type="text" value={changeReason} onChange={(e) => setChangeReason(e.target.value)} placeholder="Vd: Host báo bận đột xuất" className={inputCls} />
                 </label>
               )}
-              <p className="text-[11px] text-[var(--text-faint)]">Target GMV của ca lấy từ Kế Hoạch Tháng đã chốt — không sửa ở đây.</p>
+              <p className="text-[11px] text-[var(--text-faint)]">{platformText("Target GMV", platformOf(s))} của ca lấy từ Kế Hoạch Tháng đã chốt — không sửa ở đây.</p>
               <div className="flex justify-end gap-2 pt-1">
                 <button onClick={() => setEditing(false)} className="px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] text-[var(--text-muted)] font-bold text-[11px]">Huỷ</button>
                 <button onClick={saveEdit} disabled={saving || personBlocked} title={personBlocked ? "Trùng người — đổi người hoặc giờ ca" : undefined} className="px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-60 text-white font-bold text-[11px]">{saving ? "Đang lưu..." : "Lưu thay đổi"}</button>

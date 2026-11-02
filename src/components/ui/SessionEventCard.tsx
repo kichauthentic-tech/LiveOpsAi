@@ -1,3 +1,4 @@
+import { platformText } from "../../lib/metricGlossary";
 import React from "react";
 import { Building2, CheckCircle2, Clock, LucideIcon, Mic, Users, XCircle } from "lucide-react";
 import { Brand, LiveSession, ShiftSlot, Talent } from "../../types";
@@ -213,12 +214,12 @@ export const SessionEventCard: React.FC<SessionEventCardProps> = ({
             {title && <span className="sc-title">{title}</span>}
             {!!targetGmv && (
               pctBadge ? (
-                <span className="sc-pill sc-pill-split" title={`${pctBadge.title} · Target GMV: ${fmtVndFull(targetGmv)}`}>
+                <span className="sc-pill sc-pill-split" title={`${pctBadge.title} · ${platformText("Target GMV", platform)}: ${fmtVndFull(targetGmv)}`}>
                   <b data-level={pctBadge.level}>{pctBadge.label}</b>
                   <i>{fmtVndShort(targetGmv)}</i>
                 </span>
               ) : (
-                <span className="sc-pill" title={`Target GMV: ${fmtVndFull(targetGmv)}`}>
+                <span className="sc-pill" title={`${platformText("Target GMV", platform)}: ${fmtVndFull(targetGmv)}`}>
                   {fmtVndShort(targetGmv)}
                 </span>
               )

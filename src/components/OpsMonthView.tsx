@@ -1,3 +1,4 @@
+import { platformText } from "../lib/metricGlossary";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { FileClock, MessageSquareText } from "lucide-react";
 import type { Brand, BrandChannel, BrandMonthPlan, BrandStudio, LiveSession, ShiftSlot } from "../types";
@@ -159,7 +160,7 @@ export default function OpsMonthView(props: OpsMonthViewProps) {
           coHostId: p.assistant.id,
           studioId: ch.studioId || null,
           expectedGmv: p.candidate.expected,
-          reason: before != null && after != null && after - before > 0.0005 ? `+${((after - before) * 100).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} điểm % xác suất đạt target` : "Thêm GMV"
+          reason: before != null && after != null && after - before > 0.0005 ? `+${((after - before) * 100).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} điểm % xác suất đạt target` : `Thêm ${platformText("GMV", "all")}`
         };
       });
       await createSessionDrafts(items);

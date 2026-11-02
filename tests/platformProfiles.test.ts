@@ -49,6 +49,7 @@ const BRANCH_RE = /(===|!==)\s*"(Shopee|TikTok)"|"(Shopee|TikTok)"\s*(===|!==)|\
 const ALLOWED = (rel: string) =>
   rel.startsWith("lib/platforms/") ||
   rel === "lib/reportPlatform.ts" ||
+  rel === "lib/metricGlossary.ts" ||
   rel.startsWith("server/");
 
 function walk(dir: string, out: string[] = []): string[] {

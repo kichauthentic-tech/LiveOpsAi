@@ -4,7 +4,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test } from "vitest";
-import { METRIC } from "../src/lib/metricGlossary";
+import { METRIC, METRIC_SHOPEE } from "../src/lib/metricGlossary";
 import { PLATFORM_PROFILES } from "../src/lib/platforms/profiles";
 
 const SHOPEE_ONLY_FILES = [
@@ -43,7 +43,7 @@ test("file thuần Shopee không dùng tên TikTok hay tên Việt hoá của c�
 
 test("bộ chỉ số theo ca của Shopee chỉ gồm tên Shopee hoặc số chia theo giờ/tự tính", () => {
   const labels = PLATFORM_PROFILES.Shopee.metrics.defs.map((d) => d.label);
-  const allowed = [METRIC.gmv, METRIC.gmvPerHour, METRIC.liveHours, METRIC.orders, METRIC.abs, METRIC.itemsSoldShopee, METRIC.viewers, METRIC.viewersPerHour, METRIC.atc];
+  const allowed = [METRIC_SHOPEE.gmv, METRIC_SHOPEE.gmvPerHour, METRIC.liveHours, METRIC.orders, METRIC.abs, METRIC.itemsSoldShopee, METRIC.viewers, METRIC.viewersPerHour, METRIC.atc];
   expect(labels).toEqual(allowed);
   expect(PLATFORM_PROFILES.Shopee.basketLabel).toBe("ABS");
   expect(PLATFORM_PROFILES.Shopee.briefKpis.map((k) => k.label)).toEqual(["Viewers", "ATC"]);

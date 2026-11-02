@@ -1,3 +1,4 @@
+import { platformText } from "../lib/metricGlossary";
 import React, { useMemo, useState } from "react";
 import { defaultViewMonth } from "../lib/defaultMonth";
 import type { TermsPeriod } from "../lib/commercial/terms";
@@ -227,7 +228,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
       <PageHeader
         icon={DollarSign}
         title="Finance & P&L"
-        description="P&L theo từng ca đã kết thúc trong tháng: GMV, hoa hồng agency, chi phí host, studio và ads."
+        description={`P&L theo từng ca đã kết thúc trong tháng: ${platformText("GMV", "all")}, hoa hồng agency, chi phí host, studio và ads.`}
         actions={<MonthPicker value={month} onChange={setMonth} size="sm" />}
       />
 
@@ -239,7 +240,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
               <TrendingUp className="w-5 h-5 text-[var(--accent-text)]" /> P&amp;L từng ca
             </h3>
             <PageIntro>
-              GMV lấy từ số của ca, tiền trả host/trợ live tính theo rate ở Talent Pool, doanh thu agency theo giá của brand (CRM → Hợp đồng & giá). Chi phí studio nhập ở đây, Ads theo ca lấy từ report ca. Chỉ CEO duyệt.
+              {platformText("GMV", "all")} lấy từ số của ca, tiền trả host/trợ live tính theo rate ở Talent Pool, doanh thu agency theo giá của brand (CRM → Hợp đồng & giá). Chi phí studio nhập ở đây, Ads theo ca lấy từ report ca. Chỉ CEO duyệt.
             </PageIntro>
           </div>
           <div className="text-right text-xs bg-[var(--surface-elevated)]/50 border border-[var(--border)] rounded-xl px-4 py-2">
@@ -262,7 +263,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
         {/* Đ3 (2026-09-24): trước bản này màn P&L in ra con số chắc nịch dựng trên rate = 0 và %
             commission mặc định trong code, không một chữ cảnh báo — trong khi Report Tháng thì đã
             cảnh báo đúng kiểu này cho tỷ lệ hoàn huỷ. Đây là cùng một câu, đặt đúng chỗ.
-            10/10: 3 dải cảnh báo (thiếu rate / ca chưa xác nhận / nguồn GMV) gộp thành MỘT khối,
+            10/10: 3 dải cảnh báo (thiếu rate / ca chưa xác nhận / nguồn {platformText("GMV", "all")}) gộp thành MỘT khối,
             mỗi lý do một dòng có chấm màu — trước đó 3 hộp màu chồng nhau đẩy bảng xuống ~230px. */}
         {(missingSummary.rowsAffected > 0 || unconfirmed.length > 0 || (rows.length > 0 && quality.reconciled < quality.total)) && (
           <div className="text-[11px] rounded-xl border border-[var(--border)] bg-[var(--surface-base)] divide-y divide-[var(--border-muted)]">
@@ -306,7 +307,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
               <div className="px-3 py-2 flex gap-2">
                 <span className="mt-1 w-2 h-2 rounded-full bg-amber-500 shrink-0" aria-hidden />
                 <p className="text-amber-200 min-w-0">
-                  Nguồn GMV của {quality.total} phiên: <b>{quality.reconciled}</b> đã đối soát
+                  Nguồn {platformText("GMV", "all")} của {quality.total} phiên: <b>{quality.reconciled}</b> đã đối soát
                   {quality.snapshot > 0 && <>, <b>{quality.snapshot}</b> số lúc giao ca (sàn còn cập nhật đơn/hoàn/huỷ sau đó)</>}
                   {quality.manual > 0 && <>, <b>{quality.manual}</b> talent tự khai (chưa được xác thực)</>}.
                   <span className="text-[var(--text-muted)]"> Số tiền của các phiên chưa đối soát là tạm tính — duyệt sau khi đối soát ở Dữ Liệu Gốc của brand (mục Đối soát số liệu).</span>
@@ -356,7 +357,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
         {rows.length === 0 ? (
           <p className="text-xs text-[var(--text-muted)] italic py-6 text-center">
             {backfillCount > 0
-              ? `Tháng ${fmtMonth(month)} chỉ có ${backfillCount} ca nạp bù từ file — Finance & P&L không tính ca nạp bù (lương và giá các tháng đó chưa nhập chuẩn). Xem GMV và giờ của các ca này ở Dashboard.`
+              ? `Tháng ${fmtMonth(month)} chỉ có ${backfillCount} ca nạp bù từ file — Finance & P&L không tính ca nạp bù (lương và giá các tháng đó chưa nhập chuẩn). Xem ${platformText("GMV", "all")} và giờ của các ca này ở Dashboard.`
               : `Không có ca nào đã xong trong tháng ${fmtMonth(month)} để tính P&L.`}
           </p>
         ) : (
@@ -365,7 +366,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
               <thead>
                 <tr className="text-left text-[var(--text-muted)] border-b border-[var(--border)]">
                   <th className="py-2 pr-3">Ca</th>
-                  <th className="py-2 pr-3">GMV</th>
+                  <th className="py-2 pr-3">{platformText("GMV", "all")}</th>
                   <th className="py-2 pr-3">Doanh thu agency</th>
                   <th className="py-2 pr-3">Chi phí studio</th>
                   <th className="py-2 pr-3">Chi phí ads (report ca)</th>
@@ -383,7 +384,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                         {s.title}
                         {excluded && (
                           <span className="text-[11px] font-bold bg-[var(--surface-elevated)] text-[var(--text-muted)] border border-[var(--border)] px-1.5 py-0.5 rounded-full" title={s.excludedReason ? `Lý do loại: ${s.excludedReason}` : undefined}>
-                            Đã loại khỏi báo cáo — chỉ tính công, không tính GMV/doanh thu
+                            Đã loại khỏi báo cáo — chỉ tính công, không tính {platformText("GMV", "all")}/doanh thu
                           </span>
                         )}
                         {missingInputs.length > 0 && !uniformMissing && (

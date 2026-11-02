@@ -239,7 +239,7 @@ test("Talent Pool: chỉ hiện thứ có dữ liệu, ô trống nói lý do th
   expect(src).toMatch(/hồ sơ chưa gắn với ca nào/);
   // Số 0 không in ra như một giá trị: dùng <Dash />.
   expect(src).toMatch(/\{n \|\| <Dash \/>\}/);
-  expect(src).toMatch(/Chưa có GMV ở sàn nào/);
+  expect(src).toMatch(/Chưa có \{platformText\("GMV", "all"\)\} ở sàn nào/);
   // Số cộng từ ca tính một lần cho cả danh sách, không tính lại mỗi lần gõ ô tìm kiếm.
   expect(src).toMatch(/const allRows = useMemo\(/);
 });
@@ -527,8 +527,8 @@ test("Sổ Ca của brand: tháng chưa phát hành thì ô tổng nói lý do, 
   // Từng dòng trong bảng và bản Excel đã nói "chưa phát hành" từ trước; chỉ dải tổng bị sót.
   const src = readFileSync(join(SRC, "components/SessionLedger.tsx"), "utf8");
   expect(src).toMatch(/const allHidden = rows\.length > 0 && hiddenCount === rows\.length;/);
-  for (const label of ["GMV", "Orders", "GMV/giờ"]) {
-    const at = src.indexOf(`<StatTile frame="card" label="${label}"`);
+  for (const label of ['{`${platformText("GMV", platformScope)}`}', '"Orders"', '{`${platformText("GMV/giờ", platformScope)}`}']) {
+    const at = src.indexOf(`<StatTile frame="card" label=${label.startsWith("{") ? label : label}`);
     expect(at, `ô "${label}"`).toBeGreaterThan(-1);
     expect(src.slice(at, at + 200), `ô "${label}" phải xét allHidden`).toMatch(/allHidden \? lockedValue/);
   }

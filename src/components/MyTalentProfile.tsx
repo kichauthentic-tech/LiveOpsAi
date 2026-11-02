@@ -1,3 +1,4 @@
+import { platformText } from "../lib/metricGlossary";
 import React, { useMemo, useState } from "react";
 import { SystemUser, Talent, LiveSession, SessionFinance, TalentRateHistoryEntry } from "../types";
 import { useAuth } from "../hooks/useAuth";
@@ -274,7 +275,7 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
                     <p className="text-[11px] text-[var(--text-faint)]">
                       {dayLabel(s.date)} · {s.startTime}–{s.endTime} · {asHost ? "Host" : "Trợ live"}
                       {/* GMV chỉ ở ca mình làm HOST — GMV của ca tính cho host (cùng luật assistSessionCount ở Talent Pool). */}
-                      {asHost && s.actualGmv > 0 ? ` · GMV ${fmtVndShort(s.actualGmv)}` : ""}
+                      {asHost && s.actualGmv > 0 ? ` · ${platformText("GMV", "all")} ${fmtVndShort(s.actualGmv)}` : ""}
                     </p>
                   </div>
                   <div className="text-right shrink-0">
@@ -305,7 +306,7 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
             {standing.clear.map((r) => (
               <p key={`${r.brandId}|${r.platform}|${r.role}`} className="text-xs text-[var(--text)]">
                 <b className="inline-flex items-center gap-1">{r.brandName} <PlatformChip platform={r.platform} /></b>, vai {r.role === "host" ? "Host" : "Trợ live"} ({r.sessions} ca):{" "}
-                <b className={r.verdict === "above" ? "text-emerald-400" : "text-rose-400"}>GMV {standingSentence(r)}</b>
+                <b className={r.verdict === "above" ? "text-emerald-400" : "text-rose-400"}>{platformText("GMV", "all")} {standingSentence(r)}</b>
               </p>
             ))}
             {standing.unclear.length > 0 && (
@@ -316,7 +317,7 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
             <details className="text-[11px] text-[var(--text-faint)]">
               <summary className="cursor-pointer font-bold min-h-6 flex items-center">Cách tính · xem từng kênh</summary>
               <p className="mt-1">
-                GMV thực của ca bạn ÷ GMV nếu đạt bằng trung bình cả nhóm cùng kênh, cùng tháng, cùng loại ngày (lịch Campaign cố định) và buổi.
+                {platformText("GMV", "all")} thực của ca bạn ÷ {platformText("GMV", "all")} nếu đạt bằng trung bình cả nhóm cùng kênh, cùng tháng, cùng loại ngày (lịch Campaign cố định) và buổi.
                 Chỉ kết luận cao/thấp khi khoảng tin cậy 95% nằm hẳn một phía.
               </p>
               <ul className="mt-1.5 space-y-1">
@@ -351,7 +352,7 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
           </div>
           <div>
             {/* GMV lũy kế cộng từ live_sessions, tách theo sàn (không bao giờ cộng TikTok với Shopee — user chốt 07/10). */}
-            <div className="text-[var(--text-muted)]">GMV khi làm host</div>
+            <div className="text-[var(--text-muted)]">{platformText("GMV", "all")} khi làm host</div>
             <div className="font-bold text-emerald-400">
               {myReal.perf.TikTok.gmv > 0 || myReal.perf.Shopee.gmv > 0 ? (
                 (["TikTok", "Shopee"] as const)

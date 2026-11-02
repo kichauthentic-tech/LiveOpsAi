@@ -1,3 +1,4 @@
+import { platformText } from "../../lib/metricGlossary";
 import React, { useMemo, useState } from "react";
 import { X, CalendarClock, Trash2 } from "lucide-react";
 import type { Talent, TalentRateHistoryEntry } from "../../types";
@@ -196,7 +197,7 @@ export const ShiftPanel: React.FC<Props> = ({ shift, analysis, ctx, talents, his
           {ctx.mode === "cost"
             ? "Đang ưu tiên chi phí thấp: trong nhóm đủ điều kiện (đã đứng kênh ≥ 3 ca, không cảnh báo, tuần ≤ 36 giờ), người đã báo rảnh lên trước rồi tới người rẻ hơn; người còn lại xếp sau."
             : "Thứ tự gợi ý: đã báo rảnh, quen kênh (số ca 90 ngày), giờ tuần còn thấp, ít cảnh báo."}{" "}
-          Không xếp theo GMV/giờ của host: đo trên 1.197 ca, thành tích host tháng trước không lặp lại tháng sau.
+          Không xếp theo {platformText("GMV/giờ", "all")} của host: đo trên 1.197 ca, thành tích host tháng trước không lặp lại tháng sau.
         </p>
       </div>
     </aside>

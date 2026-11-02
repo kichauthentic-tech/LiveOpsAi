@@ -1,3 +1,4 @@
+import { platformText } from "../lib/metricGlossary";
 import { useMemo, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import type { LiveSession } from "../types";
@@ -95,7 +96,7 @@ export function SnapshotRoomPicker({ session: s, rows, fileName, untilMin, previ
                     {c.suggested && <span className="ml-1.5 rounded bg-emerald-900/60 px-1.5 py-px text-[11px] font-bold text-emerald-200">gợi ý</span>}
                   </span>
                   <span className="block font-mono text-[11px] text-[var(--text-muted)]">
-                    GMV {fmtVndFull(c.row.gmv)} · {fmtCount(c.row.orders)} đơn · {fmtCount(c.row.views)} {viewsWord} · {noun} {shortRoomId(c.row.roomId)}
+                    {platformText("GMV", prof.id)} {fmtVndFull(c.row.gmv)} · {fmtCount(c.row.orders)} đơn · {fmtCount(c.row.views)} {viewsWord} · {noun} {shortRoomId(c.row.roomId)}
                     {c.row.roomTitle ? ` · "${c.row.roomTitle}"` : ""}
                   </span>
                   {!c.inWindow && <span className="block text-[11px] text-[var(--text-faint)]">Ngoài giờ ca theo file — thường là của ca khác.</span>}
@@ -114,7 +115,7 @@ export function SnapshotRoomPicker({ session: s, rows, fileName, untilMin, previ
           `Chưa chọn ${noun} nào.`
         ) : (
           <>
-            Ca này = <b>{totals.rooms} {noun}</b> · <b className="font-mono">GMV {fmtVndFull(totals.gmv)} · {fmtCount(totals.orders)} đơn · {fmtCount(totals.views)} {viewsWord}</b>
+            Ca này = <b>{totals.rooms} {noun}</b> · <b className="font-mono">{platformText("GMV", prof.id)} {fmtVndFull(totals.gmv)} · {fmtCount(totals.orders)} đơn · {fmtCount(totals.views)} {viewsWord}</b>
             <span className="text-[11px] opacity-80"> (số cộng dồn của {noun}; ca nối cùng {noun} app tự trừ lần tải lên trước)</span>
           </>
         )}

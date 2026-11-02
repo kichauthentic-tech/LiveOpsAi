@@ -58,6 +58,9 @@ export interface ShopeeShopSnapshot {
   /** Sản phẩm cả shop xếp theo doanh số đặt (tối đa 25). `gift` = hàng quà tặng không bán — report xếp riêng, không tính vào top. */
   products: { id: string; name: string; sales: number; share: number; impressions: number; clicks: number; orders: number; conversion: number; buyers: number; gift: boolean }[] | null;
   productCount: number;
+  /** Doanh số hàng quà tặng không bán đã trừ khỏi file (ops trừ tay vì Shopee ghi cả vào doanh số). Có giá trị ⇒ các mục KHÔNG tách được theo SKU
+   *  (khuyến mãi, voucher, nhóm người mua mới/cũ, nguồn lưu lượng con của Thẻ sản phẩm) bị giữ lại, không hiện số còn lẫn quà tặng. */
+  gift?: { sales: number } | null;
   warnings: string[];
   files: Record<ShopeeShopKind, boolean>;
 }
@@ -99,6 +102,9 @@ export function buildShopeeShopSnapshot(input: Partial<Record<ShopeeShopKind, Ro
   const prod = input.shopee_shop_products;
   const products = prod ? prod.filter((r) => r.basis === "placed").sort((a, b) => num(b.sales) - num(a.sales)).slice(0, 25).map((r) => ({ id: str(r.id), name: str(r.name), sales: num(r.sales), share: num(r.share), impressions: num(r.impressions), clicks: num(r.clicks), orders: num(r.orders), conversion: num(r.conversion), buyers: num(r.buyers), gift: isGift(str(r.name)) })) : null;
   const total = vou?.find((r) => r.t === "total");
+  // Ops đã trừ hàng quà tặng khỏi số tổng (dòng Shop Stats ghi `giftSales`): chỉ những mục tách được theo SKU/ngày mới còn đúng.
+  const giftSales = num(statsRows.find((r) => r.t === "total")?.giftSales);
+  const gift = giftSales > 0 ? { sales: giftSales } : null;
   const top = (rows: Rows, t: string, n: number) => rows.filter((r) => r.t === t).sort((a, b) => num(b.sales) - num(a.sales)).slice(0, n).map(promoRow);
   return {
     period,
@@ -116,17 +122,18 @@ export function buildShopeeShopSnapshot(input: Partial<Record<ShopeeShopKind, Ro
     days,
     channels: data.channels,
     confirmedChannels: data.confirmedChannels,
-    sources: data.sources,
-    discount: disc
+    sources: gift ? data.sources.filter((x) => !(x.block === "card" && x.share < 100)) : data.sources,
+    gift,
+    discount: disc && !gift
       ? {
           types: disc.filter((r) => r.t === "type").map((r) => ({ type: str(r.type), sales: num(r.sales), confirmedSales: num(r.confirmedSales), orders: num(r.orders), buyers: num(r.buyers) })),
           programs: top(disc, "program", 8)
         }
       : null,
-    voucher: vou && total ? { sales: num(total.sales), confirmedSales: num(total.confirmedSales), orders: num(total.orders), claims: num(total.claims), cost: num(total.cost), buyers: num(total.buyers), list: top(vou, "voucher", 8) } : null,
+    voucher: vou && total && !gift ? { sales: num(total.sales), confirmedSales: num(total.confirmedSales), orders: num(total.orders), claims: num(total.claims), cost: num(total.cost), buyers: num(total.buyers), list: top(vou, "voucher", 8) } : null,
     buyerMix: comp
       ? {
-          groups: comp.filter((r) => r.t === "buyerGroup" && r.basis === "placed").map((r) => ({ name: r.name === "new" ? "new" as const : "existing" as const, buyers: num(r.buyers), sales: num(r.sales), share: num(r.share), conversion: num(r.conversion) })),
+          groups: gift ? [] : comp.filter((r) => r.t === "buyerGroup" && r.basis === "placed").map((r) => ({ name: r.name === "new" ? "new" as const : "existing" as const, buyers: num(r.buyers), sales: num(r.sales), share: num(r.share), conversion: num(r.conversion) })),
           categories: comp.filter((r) => r.t === "category" && r.basis === "placed").map((r) => ({ name: str(r.name), sales: num(r.sales), share: num(r.share) })),
           prices: comp.filter((r) => r.t === "price" && r.basis === "placed").map((r) => ({ band: str(r.band), buyers: num(r.buyers), sales: num(r.sales), conversion: num(r.conversion) }))
         }

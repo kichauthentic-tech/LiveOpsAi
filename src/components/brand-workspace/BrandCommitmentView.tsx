@@ -1,3 +1,4 @@
+import { platformText } from "../../lib/metricGlossary";
 import React, { useEffect, useMemo, useState } from "react";
 import { Download, FileSignature, Loader2, TrendingUp } from "lucide-react";
 import { Brand, BrandPlatformRate, BrandPlatformRateHistoryEntry, LiveSession, UserRole } from "../../types";
@@ -192,7 +193,7 @@ export const BrandCommitmentView: React.FC<BrandCommitmentViewProps> = ({
           "Đã Live (giờ)": Math.round(p.deliveredHours * 10) / 10,
           "Đã Xếp (giờ)": Math.round(p.scheduledHours * 10) / 10,
           "Chênh Lệch (giờ)": Math.round((p.gapHours > 0 ? -p.gapHours : Math.abs(p.gapHours)) * 10) / 10,
-          "GMV": gmvHidden ? "Chưa phát hành" : p.deliveredGmv || 0,
+          [`${platformText("GMV", platform)}`]: gmvHidden ? "Chưa phát hành" : p.deliveredGmv || 0,
           "Tình Trạng": STATUS_LABEL[p.status]
         };
       }),
@@ -297,7 +298,7 @@ export const BrandCommitmentView: React.FC<BrandCommitmentViewProps> = ({
                   <th className="py-2.5 px-2 text-right">Đã live</th>
                   <th className="py-2.5 px-2 text-right">Đã xếp</th>
                   <th className="py-2.5 px-2 text-right">Chênh lệch</th>
-                  <th className="py-2.5 px-2 text-right">GMV</th>
+                  <th className="py-2.5 px-2 text-right">{platformText("GMV", platform)}</th>
                   <th className="py-2.5 px-2">Tình trạng</th>
                 </tr>
               </thead>

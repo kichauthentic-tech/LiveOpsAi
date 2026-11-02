@@ -1,3 +1,4 @@
+import { platformText } from "../lib/metricGlossary";
 import React, { useEffect, useMemo, useState } from "react";
 import { SESSION_STATUS_CLS, SESSION_STATUS_LABEL_VI } from "../lib/sessionStatusUi";
 import { CalendarClock, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, FileClock, Radio, UserX, X } from "lucide-react";
@@ -121,7 +122,7 @@ const onKeyOpen = (fn: () => void) => (e: React.KeyboardEvent) => {
 };
 
 const Expect: React.FC<{ value: number | null | undefined }> = ({ value }) => (
-  <span className="order-5 md:order-none text-right text-xs font-bold tabular-nums text-[var(--text)] leading-tight" title="GMV kỳ vọng ở mức hiện tại của kênh — cùng số với sa bàn Cả tháng">
+  <span className="order-5 md:order-none text-right text-xs font-bold tabular-nums text-[var(--text)] leading-tight" title={`${platformText("GMV", "all")} kỳ vọng ở mức hiện tại của kênh — cùng số với sa bàn Cả tháng`}>
     {value === null ? "…" : value === undefined ? "—" : fmtVndShort(value)}
     <span className="block text-[11px] font-medium text-[var(--text-faint)]">kỳ vọng</span>
   </span>
@@ -587,7 +588,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
                 <div className="flex flex-wrap gap-x-8 gap-y-2 px-2 sm:px-3 pt-1">
                   <StatTile frame="plain" size="sm" label={range === "backlog" ? "Ca chưa có số liệu" : range === "today" ? "Ca hôm nay" : "Ca"} value={String(summary.total)} />
                   {pastRange
-                    ? REPORT_PLATFORMS.filter((p) => summary.gmv[p] > 0).map((p) => <StatTile key={p} frame="plain" size="sm" label={`GMV đã ghi nhận ${p}`} value={fmtVndShort(summary.gmv[p])} />)
+                    ? REPORT_PLATFORMS.filter((p) => summary.gmv[p] > 0).map((p) => <StatTile key={p} frame="plain" size="sm" label={`${platformText("GMV", p)} đã ghi nhận ${p}`} value={fmtVndShort(summary.gmv[p])} />)
                     : summary.expKnown > 0 && REPORT_PLATFORMS.filter((p) => summary.exp[p] > 0).map((p) => <StatTile key={p} frame="plain" size="sm" label={`Kỳ vọng ${p}`} value={fmtVndShort(summary.exp[p])} />)}
                   {range === "past" && <StatTile frame="plain" size="sm" label="Chưa có số liệu" value={String(summary.noNumbers)} tone={summary.noNumbers > 0 ? "text-rose-300" : "text-emerald-300"} />}
                 </div>

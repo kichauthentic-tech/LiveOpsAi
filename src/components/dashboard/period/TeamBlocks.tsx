@@ -1,3 +1,4 @@
+import { platformText } from "../../../lib/metricGlossary";
 import React, { useMemo } from "react";
 import type { Brand, LiveSession } from "../../../types";
 import { addDays } from "../../../lib/dateUtils";
@@ -31,7 +32,7 @@ export const TeamBlocks: React.FC<{ platform: ReportPlatform; sessions: LiveSess
   }, [plat, from, end, byMonth]);
   return (
     <section className="space-y-4" aria-label={`Toàn sàn ${platform}`}>
-      <Sect title={`Toàn sàn ${platform} · mọi brand`} sub="Host, cặp host + trợ live, khung giờ, độ dài ca — chỉ số 100 = GMV/giờ trung bình của chính kênh đó, nên quy mô brand không làm lệch so sánh" />
+      <Sect title={`Toàn sàn ${platform} · mọi brand`} sub={`Host, cặp host + trợ live, khung giờ, độ dài ca — chỉ số 100 = ${platformText("GMV/giờ", platform)} trung bình của chính kênh đó, nên quy mô brand không làm lệch so sánh`} />
       {!s ? <p className="text-sm text-[var(--text-faint)]">Kỳ này chưa có ngày nào đủ số liệu.</p> : (
         <>
           <HostTable s={s} brands={brands} showBrand title="Host" weakBelow={8} />

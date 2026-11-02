@@ -99,7 +99,7 @@ describe("buildShopeeSnapshot", () => {
   test("so tháng trước và nhận xét", () => {
     const withPrev = build({ prev: { ...s.headline, gmv: 50_000_000, gmvPerHour: 2_000_000 } });
     expect(withPrev.insights.summary?.headline).toMatch(/tăng 100% so với tháng trước/);
-    expect(s.insights.summary?.headline).toMatch(/GMV Shopee 100M/);
+    expect(s.insights.summary?.headline).toMatch(/Sales Shopee 100M/);
     expect(s.insights.funnel?.points.join(" ")).toMatch(/Others/);
     // Mỗi khung chỉ có 2 phiên (< 3) ⇒ không nêu "khung hiệu quả nhất" — tránh gán nhãn theo một vài phiên.
     expect(s.insights.schedule?.headline).toMatch(/dưới 3 phiên/);
@@ -111,7 +111,7 @@ describe("buildShopeeSnapshot", () => {
   test("ghi chú: nêu GMV = doanh số đặt, nêu phần Shopee không có, nêu lệch số ca với file", () => {
     const text = s.notes.join("\n");
     expect(text).toMatch(/Sales\(Placed Order\)/);
-    expect(text).toMatch(/GMV trực tiếp\/gián tiếp/);
+    expect(text).toMatch(/Sales trực tiếp\/gián tiếp/);
     // Chưa tải file Ads Shopee (0142) thì nói rõ, không im lặng.
     expect(text).toMatch(/Chưa có file Ads Shopee/);
     expect(text).toMatch(/28M so với 100M/);
