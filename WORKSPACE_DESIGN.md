@@ -245,7 +245,7 @@
 1. **Kế Hoạch Tháng** (`brand_month_plans` + `_slots`): ops lập lưới ca + target từng ca → **Chốt** (`lock_month_plan`) sinh
    `shift_slots` mở → talent đăng ký rảnh (RLS 0133: chỉ ca còn mở, chưa qua ngày) → ops chốt người qua RPC
    `finalize_shift_slot` (0133: một transaction, khoá dòng slot, từ chối slot không còn mở) ⇒ `live_sessions`. Kế hoạch
-   đã chốt: ca đã chốt người không dời/bỏ trong lưới, ca ngày đã qua giữ giờ + target (trigger `trg_guard_locked_plan_slot`);
+   đã chốt: ca đã chốt người không BỎ trong lưới (DB chặn dời qua lưới, nhưng 03/11 lưới cho DỜI GIỜ bằng cách sửa ca thật — `MonthPlan.moveStaffed` → `handleUpdateSession`, trigger `sync_session_plan_time` kéo ca kế hoạch theo, không migration; chưa thử trên dữ liệu thật), ca ngày đã qua giữ giờ + target (trigger `trg_guard_locked_plan_slot`);
    **0185:** đổi target ca có sẵn sau chốt chỉ ceo/admin, mọi đổi target tháng sau chốt có dòng `plan_target_audit`; ca kế hoạch huỷ thì Chốt lại
    GIỮ huỷ (chỉ gắn lại khi đã có ca thật thay thế đúng giờ); giờ ca kế hoạch đi theo ca thật (`sync_session_plan_time`, trừ dời sang tháng khác);
    lưu lưới chỉ qua `replace_plan_slots` (KHÔNG `insert … on conflict` trên bảng này — BEFORE INSERT chạy cả với dòng rơi vào conflict, guard coi là thêm ca ngày đã qua);

@@ -2166,6 +2166,7 @@ export default function App() {
                     shiftSlots={shiftSlots}
                     promoSchemes={promoSchemes}
                     onPlanLocked={reloadShiftSlots}
+                    onUpdateSession={handleUpdateSession}
                     engineParams={engineParams}
                     brandStudios={brandStudios}
                     onOpenCrm={(brandId, platform) => { requestCrmFocus(brandId, platform); navigateTo("crm"); }}

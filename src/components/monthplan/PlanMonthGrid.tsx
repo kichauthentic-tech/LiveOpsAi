@@ -45,6 +45,8 @@ interface Props {
   /** Lý do khoá ô target của ca (undefined = sửa được). */
   targetLockReason: (d: PlanDraftSlot) => string | undefined;
   onUpdate: (key: string, patch: Partial<PlanDraftSlot>) => void;
+  /** Dời giờ ca ĐÃ CHỐT NGƯỜI (ghi vào ca thật, DB kéo ca kế hoạch theo); thiếu = ca đã chốt người khoá giờ. Trả true khi dời được. */
+  onMoveStaffed?: (key: string, startTime: string, endTime: string) => Promise<boolean>;
   onRemove: (key: string) => void;
   onAdd: (day: string) => void;
   onToggleBlackout: (day: string) => void;
@@ -267,6 +269,26 @@ function WeekCell({ days, p }: { days: string[]; p: Props }) {
 
 const SlotEditor = ({ d, x, y, p, onClose, ref }: { d: PlanDraftSlot; x: number; y: number; p: Props; onClose: () => void; ref: React.Ref<HTMLDivElement> }) => {
   const tLocked = p.timeLocked(d);
+  // Ca đã chốt người, ngày chưa qua: sửa giờ trong khung rồi bấm Xong mới ghi (một lần, vào ca thật) — không đổi từng phím.
+  const moveStaffed = p.isStaffed(d) && !!p.onMoveStaffed && !tLocked;
+  const [times, setTimes] = useState({ start: d.startTime, end: d.endTime });
+  const [moving, setMoving] = useState(false);
+  const startVal = moveStaffed ? times.start : d.startTime;
+  const endVal = moveStaffed ? times.end : d.endTime;
+  const setTime = (k: "start" | "end", v: string) => {
+    if (moveStaffed) setTimes((t) => ({ ...t, [k]: v }));
+    else p.onUpdate(d.key, k === "start" ? { startTime: v } : { endTime: v });
+  };
+  const done = async () => {
+    commitTarget();
+    if (moveStaffed && (times.start !== d.startTime || times.end !== d.endTime)) {
+      setMoving(true);
+      const ok = await p.onMoveStaffed!(d.key, times.start, times.end);
+      setMoving(false);
+      if (!ok) return;
+    }
+    onClose();
+  };
   const targetReason = p.targetLockReason(d);
   // Bấm sang ca khác khi khung còn mở: nơi gọi đặt key = ca ⇒ khung dựng lại, ô target theo ca mới.
   const [targetText, setTargetText] = useState(String(d.targetGmv || ""));
@@ -291,11 +313,11 @@ const SlotEditor = ({ d, x, y, p, onClose, ref }: { d: PlanDraftSlot; x: number;
       <div className="grid grid-cols-2 gap-2">
         <label className="block">
           <span className="font-medium text-[var(--text-muted)] block mb-1">Bắt đầu</span>
-          <input type="time" disabled={tLocked} value={d.startTime} onChange={(e) => p.onUpdate(d.key, { startTime: e.target.value })} className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1 font-mono text-[var(--text)] disabled:opacity-60" />
+          <input type="time" disabled={tLocked} value={startVal} onChange={(e) => setTime("start", e.target.value)} className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1 font-mono text-[var(--text)] disabled:opacity-60" />
         </label>
         <label className="block">
           <span className="font-medium text-[var(--text-muted)] block mb-1">Kết thúc</span>
-          <input type="time" disabled={tLocked} value={d.endTime} onChange={(e) => p.onUpdate(d.key, { endTime: e.target.value })} className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1 font-mono text-[var(--text)] disabled:opacity-60" />
+          <input type="time" disabled={tLocked} value={endVal} onChange={(e) => setTime("end", e.target.value)} className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1 font-mono text-[var(--text)] disabled:opacity-60" />
         </label>
       </div>
       <label className="block">
@@ -318,12 +340,13 @@ const SlotEditor = ({ d, x, y, p, onClose, ref }: { d: PlanDraftSlot; x: number;
       </label>
       {o?.state === "done" && <p className="text-[var(--text-muted)]">Thực đạt <b className={o.actual >= d.targetGmv ? "text-emerald-400" : "text-rose-400"}>{fmtVndShort(o.actual)}</b>{d.targetGmv > 0 ? ` · ${Math.round((o.actual / d.targetGmv) * 100)}% target` : ""}</p>}
       {targetReason && <p className="text-[11px] text-[var(--text-faint)]">{targetReason}</p>}
-      {tLocked && <p className="text-[11px] text-[var(--text-faint)]">{p.isStaffed(d) ? "Đã chốt người: đổi giờ / bỏ ca ở Cửa sổ Ca Live." : "Ca ngày đã qua giữ nguyên giờ như lúc chốt."}</p>}
+      {moveStaffed && <p className="text-[11px] text-[var(--text-faint)]">Ca đã chốt người: đổi giờ sẽ dời cả ca thật, host/trợ giữ nguyên.</p>}
+      {tLocked && <p className="text-[11px] text-[var(--text-faint)]">{p.isStaffed(d) ? "Đã chốt người: huỷ ca ở Cửa sổ Ca Live." : "Ca ngày đã qua giữ nguyên giờ như lúc chốt."}</p>}
       {clash && <p className="text-[11px] text-rose-300 font-bold">Trùng phòng với {clash}</p>}
       {d.reason && <p className="text-[11px] text-[var(--text-faint)] leading-snug">{d.reason}</p>}
       <div className="flex items-center gap-2 pt-1">
-        <button onClick={() => { commitTarget(); onClose(); }} className="px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold">Xong</button>
-        {!tLocked && <button onClick={() => { onClose(); p.onRemove(d.key); }} className="px-3 py-1.5 rounded-lg border border-rose-900 text-rose-400 font-bold hover:bg-rose-950/40">Bỏ ca</button>}
+        <button disabled={moving} onClick={() => void done()} className="px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold disabled:opacity-60">{moving ? "Đang dời…" : "Xong"}</button>
+        {!tLocked && !p.isStaffed(d) && <button onClick={() => { onClose(); p.onRemove(d.key); }} className="px-3 py-1.5 rounded-lg border border-rose-900 text-rose-400 font-bold hover:bg-rose-950/40">Bỏ ca</button>}
       </div>
     </div>
   );

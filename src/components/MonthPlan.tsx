@@ -64,6 +64,8 @@ interface MonthPlanProps {
   promoSchemes: PromoScheme[];
   // Chốt xong → App nạp lại shift_slots để Đăng Ký & Chốt Lịch / lịch thấy ca mới.
   onPlanLocked: () => Promise<void>;
+  /** Ghi sửa ca thật (App.handleUpdateSession) — dùng để dời giờ ca đã chốt người từ lưới. */
+  onUpdateSession?: (session: LiveSession, base?: LiveSession) => Promise<boolean>;
   engineParams: EngineParams; // admin vặn ở AI Training Center (0095)
   // Phòng live mặc định của brand (0098) — chốt ghi vào ca sinh ra. Cấu hình của brand: CHỈ ĐỌC ở đây, đổi ở CRM →
   // "Hợp đồng & giá" (gộp cấu hình 06/10; trước đó ô chọn phòng nằm ở màn này).
@@ -115,6 +117,7 @@ export default function MonthPlan({
   shiftSlots,
   promoSchemes,
   onPlanLocked,
+  onUpdateSession,
   engineParams,
   brandStudios,
   onOpenCrm,
@@ -364,7 +367,7 @@ export default function MonthPlan({
   const unsynced = locked ? drafts.filter((d) => !d.slotId).length : 0;
   // Kế hoạch ĐÃ CHỐT (audit workflow 2026-10-04 #3/#4; DB chặn bằng trigger 0133): ca đã chốt người không dời/bỏ
   // trong lưới được — "Chốt lại" chỉ huỷ ca CÒN MỞ, nên ca cũ sẽ giữ nguyên giờ cũ kèm host và một ca mới mở thêm
-  // ở giờ mới. Ca ngày đã qua giữ nguyên giờ + target như lúc chốt (mẫu số run-rate).
+  // ở giờ mới. Muốn dời giờ thì sửa CA THẬT (moveStaffed); ô nháp của ca đó không sửa giờ trực tiếp. Ca ngày đã qua giữ nguyên giờ + target như lúc chốt (mẫu số run-rate).
   const finalizedSlotIds = useMemo(() => new Set(shiftSlots.filter((sl) => sl.status === "finalized").map((sl) => sl.id)), [shiftSlots]);
   const isPastFrozen = (d: PlanDraftSlot) => locked && !!d.id && d.date < today;
   const isStaffed = (d: PlanDraftSlot) => locked && !!d.slotId && finalizedSlotIds.has(d.slotId);
@@ -524,6 +527,29 @@ export default function MonthPlan({
     ))) return;
     setDrafts((prev) => withForecast(prev.filter((x) => x.key !== key)));
     setDirty(true);
+  };
+  // Dời giờ ca đã chốt người: sửa CA THẬT (đúng đường Cửa sổ Ca Live — kiểm tra quyền, tháng đã đóng, ca đã có số), rồi trigger
+  // sync_session_plan_time (0185) kéo ca chờ + ca kế hoạch theo; ở đây chỉ cập nhật ô nháp tương ứng, giữ nguyên các sửa chưa lưu khác.
+  const moveStaffed = async (key: string, startTime: string, endTime: string): Promise<boolean> => {
+    const d = drafts.find((x) => x.key === key);
+    const sessionId = d?.slotId ? shiftSlots.find((sl) => sl.id === d.slotId)?.sessionId : undefined;
+    const session = sessionId ? sessions.find((x) => x.id === sessionId) : undefined;
+    if (!d || !session || !onUpdateSession) {
+      setMsg("Không tìm thấy ca thật của ca này — đổi giờ ở Cửa sổ Ca Live.");
+      return false;
+    }
+    const errors = validateDrafts(drafts.map((x) => (x.key === key ? { ...x, startTime, endTime } : x)), settings);
+    if (errors.length > 0) {
+      setMsg(errors[0]);
+      return false;
+    }
+    const ok = await onUpdateSession({ ...session, startTime, endTime }, session);
+    if (!ok) return false;
+    setDrafts((prev) => withForecast(prev.map((x) => (x.key === key ? { ...x, startTime, endTime } : x))));
+    setMsg(`Đã dời ca ${d.date.slice(8)}/${d.date.slice(5, 7)} sang ${startTime}–${endTime}; host/trợ giữ nguyên.`);
+    await onPlanLocked();
+    setLockedSlotsTick((t) => t + 1);
+    return true;
   };
   const addForDay = (day: string) => {
     const s = nextSlotForDay(day, drafts, settings);
@@ -1538,7 +1564,8 @@ export default function MonthPlan({
           return ev || sch ? [ev?.label, sch ? `Khuyến mãi: ${sch.label}` : ""].filter(Boolean).join(" · ") : undefined;
         }}
         isStaffed={isStaffed}
-        timeLocked={(d) => !editable || timeLocked(d)}
+        timeLocked={(d) => !editable || isPastFrozen(d) || (isStaffed(d) && !onUpdateSession)}
+        onMoveStaffed={onUpdateSession ? moveStaffed : undefined}
         targetLockReason={(d) => (isPastFrozen(d) ? "Ca ngày đã qua: target giữ như lúc chốt — đổi cả tháng bằng \"Chia lại theo lịch hiện có…\"." : locked && !!d.id && !canRetarget ? "Kế hoạch đã chốt: chỉ ceo/admin đổi target ca (có nhật ký)." : undefined)}
         onUpdate={update}
         onRemove={(key) => void remove(key)}
