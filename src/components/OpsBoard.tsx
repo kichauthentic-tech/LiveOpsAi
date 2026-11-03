@@ -19,7 +19,8 @@ import { PageHeader } from "./common/PageHeader";
 import { StatTile } from "./common/StatTile";
 import { SlotDetailModal } from "./scheduling/SlotDetailModal";
 import { DraftsPanel } from "./control-room/DraftsPanel";
-import { ShiftBenchmarkBoard } from "./control-room/ShiftBenchmarkBoard";
+import { ShiftBenchmarkBoard, defaultBenchPick, todayGroups } from "./control-room/ShiftBenchmarkBoard";
+import { DailyTargetBriefCard } from "./DailyTargetBriefCard";
 import type { SessionDraft } from "../lib/db/sessionDrafts";
 import type { DraftEdit } from "../hooks/useSessionDrafts";
 import type { ShiftWindow } from "./OpsSupport";
@@ -333,6 +334,16 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
   const range: Range = rangeState === "drafts" && drafts.length === 0 ? "today" : rangeState;
   const [anchor, setAnchor] = useState(today);
   const [openId, setOpenId] = useState<string | null>(null);
+  // Bản tin target ↔ phễu benchmark: chip ca của bản tin chọn ca cho phễu (ShiftBenchmarkBoard) ngay bên dưới.
+  const [benchPick, setBenchPick] = useState<string | null>(null);
+  const briefOn = range === "today" || range === "tomorrow" || range === "day";
+  const briefDate = range === "tomorrow" ? addDays(today, 1) : range === "day" ? anchor : today;
+  const briefGroups = useMemo(() => todayGroups(sessions, today, briefDate), [sessions, today, briefDate]);
+  const briefPicked = (briefGroups.find((x) => x.key === benchPick) ?? defaultBenchPick(briefGroups))?.key;
+  const pickBench = (id: string) => {
+    setBenchPick(id);
+    requestAnimationFrame(() => document.getElementById("shift-benchmark")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  };
   const [openSlotId, setOpenSlotId] = useState<string | null>(null);
   const [openDraftId, setOpenDraftId] = useState<string | null>(null);
   const [expandId, setExpandId] = useState<string | null>(null);
@@ -552,7 +563,12 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
         }
       />
 
-      {isOps && <div hidden={view !== "day"}><ShiftBenchmarkBoard sessions={sessions} today={today} brands={brands} /></div>}
+      {isOps && (
+        <div hidden={view !== "day"} className="space-y-4">
+          <div hidden={!briefOn}><DailyTargetBriefCard brands={brands} sessions={sessions} date={briefDate} pickedId={briefPicked} onPick={pickBench} /></div>
+          <ShiftBenchmarkBoard sessions={sessions} today={today} brands={brands} date={briefOn ? briefDate : undefined} pick={benchPick} onPick={pickBench} hideChips={briefOn} />
+        </div>
+      )}
       {monthSeen && monthView && <div hidden={view !== "month"} className="space-y-4">{monthView}</div>}
       {/* Cả hai chế độ giữ nguyên khi chuyển qua lại (ẩn bằng `hidden`) — không dựng lại việc cần làm / không tải lại dữ liệu.
           Thứ tự DOM = thứ tự màn hẹp: Cần xử lý → việc cần làm → danh sách ca. Màn rộng: việc cần làm là cột phải dính khi cuộn. */}

@@ -169,23 +169,36 @@ const HandoverPanel: React.FC<{
 };
 
 /** Mỗi ca hôm nay là một nhóm (chip như trên lịch): mốc benchmark theo brand × sàn, còn số OP nhập/dán là của riêng từng ca. */
-interface Group { key: string; brandId: string; brandName: string; platform: LiveSession["platform"]; live: boolean; start: string; session: LiveSession }
+export interface Group { key: string; brandId: string; brandName: string; platform: LiveSession["platform"]; live: boolean; start: string; session: LiveSession }
 
-function todayGroups(sessions: LiveSession[], today: string): Group[] {
+/** Các ca của một ngày (mặc định: hôm nay, hoặc ngày gần nhất còn ca). Bản tin target truyền `date` để bấm chip ca ngày mai / ngày chọn cũng ra phễu. */
+export function todayGroups(sessions: LiveSession[], today: string, date?: string): Group[] {
   const live = sessions.filter((s) => s.status !== "Cancelled" && !s.excludedFromReports);
   const days = live.filter((s) => s.date >= today).map((s) => s.date).sort();
-  const day = days.includes(today) ? today : days[0];
+  const day = date ?? (days.includes(today) ? today : days[0]);
   if (!day) return [];
   return live.filter((x) => x.date === day).sort((a, b) => a.startTime.localeCompare(b.startTime))
     .map((s) => ({ key: s.id, brandId: s.brandId, brandName: s.brandName, platform: s.platform, live: s.status === "Live Now", start: s.startTime, session: s }));
 }
 
-export const ShiftBenchmarkBoard: React.FC<{ sessions: LiveSession[]; today: string; brands: Brand[] }> = ({ sessions, today, brands }) => {
-  const groups = useMemo(() => todayGroups(sessions, today), [sessions, today]);
-  const [pick, setPick] = useState<string | null>(null);
+/** Ca mặc định của phễu: ca đang live, không thì ca sớm nhất của ngày. */
+export const defaultBenchPick = (groups: Group[]): Group | undefined => groups.find((x) => x.live) ?? groups[0];
+
+export const ShiftBenchmarkBoard: React.FC<{
+  sessions: LiveSession[]; today: string; brands: Brand[];
+  /** Ngày cần xem (vắng = hôm nay). */
+  date?: string;
+  /** Ca đang chọn + bộ đổi — App/OpsBoard giữ để chip của Bản tin target điều khiển phễu. Vắng = tự giữ. */
+  pick?: string | null; onPick?: (id: string) => void;
+  /** Ẩn dải chip riêng (khi chip nằm ở Bản tin target). */
+  hideChips?: boolean;
+}> = ({ sessions, today, brands, date, pick: pickProp, onPick, hideChips }) => {
+  const groups = useMemo(() => todayGroups(sessions, today, date), [sessions, today, date]);
+  const [inner, setInner] = useState<string | null>(null);
+  const pick = pickProp !== undefined ? pickProp : inner;
   if (!groups.length) return null;
-  const g = groups.find((x) => x.key === pick) ?? groups.find((x) => x.live) ?? groups[0];
-  return <Body groups={groups} g={g} sessions={sessions} today={today} brands={brands} onPick={setPick} />;
+  const g = groups.find((x) => x.key === pick) ?? defaultBenchPick(groups)!;
+  return <Body groups={groups} g={g} sessions={sessions} today={today} brands={brands} onPick={onPick ?? setInner} hideChips={hideChips} />;
 };
 
 const monthsBack = (today: string, n: number) => {
@@ -229,7 +242,7 @@ async function readShot(file: Blob, onProgress: (p: number) => void): Promise<Da
 
 interface Shot { url: string; busy: boolean; progress: number; error: string | null; read: number }
 
-const Body: React.FC<{ groups: Group[]; g: Group; sessions: LiveSession[]; today: string; brands: Brand[]; onPick: (k: string) => void }> = ({ groups, g, sessions, today, brands, onPick }) => {
+const Body: React.FC<{ groups: Group[]; g: Group; sessions: LiveSession[]; today: string; brands: Brand[]; onPick: (k: string) => void; hideChips?: boolean }> = ({ groups, g, sessions, today, brands, onPick, hideChips }) => {
   const bench: ShiftBenchmark | null = useMemo(() => buildShiftBenchmark(sessions, g.brandId, g.platform, today), [sessions, g.brandId, g.platform, today]);
   const [hoursPick, setHoursPick] = useState<number>(1);
   const [minutes, setMinutes] = useState("");
@@ -333,9 +346,9 @@ const Body: React.FC<{ groups: Group[]; g: Group; sessions: LiveSession[]; today
   const avgChain = bench ? funnelChain(bench, () => true) : null;
   const showFields = manual;
   return (
-    <section className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 sm:p-4 space-y-3" aria-label="Benchmark theo ca">
-      <h2 className="text-sm font-black text-[var(--text)] flex items-center gap-2"><Gauge className="w-4 h-4 text-[var(--accent-text)]" aria-hidden />Phễu benchmark ca</h2>
-      <div className="grid gap-2 grid-cols-[repeat(auto-fill,minmax(230px,1fr))]" role="group" aria-label="Ca hôm nay">
+    <section id="shift-benchmark" className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 sm:p-4 space-y-3 scroll-mt-4" aria-label="Benchmark theo ca">
+      <h2 className="text-sm font-black text-[var(--text)] flex items-center gap-2"><Gauge className="w-4 h-4 text-[var(--accent-text)]" aria-hidden />Phễu benchmark ca{hideChips && <span className="font-bold text-[var(--text-muted)]"> · {g.brandName} {g.platform} {g.session.startTime}–{g.session.endTime}</span>}</h2>
+      {!hideChips && <div className="grid gap-2 grid-cols-[repeat(auto-fill,minmax(230px,1fr))]" role="group" aria-label="Ca hôm nay">
         {groups.map((x) => {
           const on = x.key === g.key, ss = x.session;
           return (
@@ -353,7 +366,7 @@ const Body: React.FC<{ groups: Group[]; g: Group; sessions: LiveSession[]; today
             </div>
           );
         })}
-      </div>
+      </div>}
 
       {!bench ? (
         <p className="text-xs text-[var(--text-muted)]">Chưa đủ lịch sử để lập benchmark cho {g.brandName} · {g.platform} (cần ít nhất 20 ca đã xong có số).</p>
