@@ -136,6 +136,7 @@ const TAB_CHUNKS: Record<string, { preload: () => void }[]> = {
   my_shifts: [TalentToday],
   talent_calendar: [TalentAgency, LiveCalendar],
   shift_scheduling: [TalentShiftSignup],
+  shift_registered: [TalentShiftSignup],
   month_plan: [MonthPlan],
   agency_overview: [AgencyDashboard],
   host_performance: [HostPerformance],
@@ -1572,7 +1573,7 @@ export default function App() {
   // "Nhân sự ca" (agency) đã bỏ 08/10 — chỉ còn "Đăng Ký Ca" của talent dùng id này. Link /nhan-su-ca và activeTab đã lưu của
   // ops/ceo/admin chuyển về Bảng Vận Hành (nơi chốt người), không rơi vào màn "Quyền Truy Cập Bị Hạn Chế".
   useEffect(() => {
-    if (profile && currentRole !== "talent" && activeTab === "shift_scheduling") setActiveTab("calendar");
+    if (profile && currentRole !== "talent" && (activeTab === "shift_scheduling" || activeTab === "shift_registered")) setActiveTab("calendar");
   }, [profile, currentRole, activeTab]);
 
   const firstAllowedTab = navItems.find((n) => !n.perm || checkPermission(n.perm))?.id;
@@ -2153,8 +2154,10 @@ export default function App() {
                   />
                 )}
 
-                {activeTab === "shift_scheduling" && currentRole === "talent" && (
+                {(activeTab === "shift_scheduling" || activeTab === "shift_registered") && currentRole === "talent" && (
                   <TalentShiftSignup
+                    mode={activeTab === "shift_registered" ? "registered" : "open"}
+                    onOpenTab={setActiveTab}
                     brands={brands}
                     shiftSlots={shiftSlots}
                     shiftRegistrations={shiftRegistrations}

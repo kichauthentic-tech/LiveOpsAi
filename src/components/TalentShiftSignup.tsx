@@ -15,7 +15,12 @@ import { PlatformLogo } from "./ui/PlatformLogo";
 // (SlotDetailModal + DB 0143 chặn chốt trùng người), màn này không khoá ô nào vì trùng. Chỉ hạn báo rảnh của trainer (0176, DB
 // chặn) là khoá. Ca đã chốt của mình chỉ là dòng "Bạn đã có: …" dưới tên ngày để tự cân nhắc.
 
+// Bản 3 (05/11, user: cần "Lịch đang mở" và "lịch đã đăng ký" riêng): cùng một màn, hai chế độ — "open" = ca còn mở MÀ MÌNH CHƯA
+// đăng ký (chạm để đăng ký, ca vừa đăng ký chuyển sang tab kia), "registered" = ca mình đã đăng ký và còn chờ trainer chốt (chạm để
+// huỷ trước hạn). Ca được chốt thì không còn "mở" nữa ⇒ rời khỏi tab này, sang "Ca của tôi".
 interface Props {
+  mode: "open" | "registered";
+  onOpenTab?: (tab: string) => void;
   brands: Brand[];
   shiftSlots: ShiftSlot[];
   shiftRegistrations: ShiftRegistration[];
@@ -45,7 +50,7 @@ const pill = (on: boolean) =>
     on ? "bg-[var(--accent)] border-[var(--accent)] text-white" : "bg-[var(--surface)] border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]"
   }`;
 
-export default function TalentShiftSignup({ brands, shiftSlots, shiftRegistrations, myTalentId, myShifts, onRegister, onUnregister }: Props) {
+export default function TalentShiftSignup({ mode, onOpenTab, brands, shiftSlots, shiftRegistrations, myTalentId, myShifts, onRegister, onUnregister }: Props) {
   const today = getTodayDate();
   const [busy, setBusy] = useState<string | null>(null);
   const brandById = useMemo(() => new Map(brands.map((b) => [b.id, b])), [brands]);
@@ -75,7 +80,8 @@ export default function TalentShiftSignup({ brands, shiftSlots, shiftRegistratio
     () => new Set(shiftRegistrations.filter((r) => !!myTalentId && r.talentId === myTalentId).map((r) => r.slotId)),
     [shiftRegistrations, myTalentId]
   );
-  const openSlots = useMemo(() => openSlotsFrom(shiftSlots, today), [shiftSlots, today]);
+  const allOpen = useMemo(() => openSlotsFrom(shiftSlots, today), [shiftSlots, today]);
+  const openSlots = useMemo(() => allOpen.filter((s) => mineBySlot.has(s.id) === (mode === "registered")), [allOpen, mineBySlot, mode]);
   const booked = useMemo(() => myShifts.filter((s) => s.status !== "Cancelled"), [myShifts]);
 
   // ---- Bộ lọc: Tháng → Tuần trong tháng → Buổi → Brand. Mỗi nút đếm số ca còn lại sau các lọc khác. ----
@@ -85,7 +91,6 @@ export default function TalentShiftSignup({ brands, shiftSlots, shiftRegistratio
   const [weekPick, setWeekPick] = useState<string>("all"); // "all" | weekStart (T2)
   const [part, setPart] = useState<DayPart | "all">("all");
   const [brandFilter, setBrandFilter] = useState("all");
-  const [onlyTodo, setOnlyTodo] = useState(false);
   const pickMonth = (m: string) => {
     setMonthPick(m);
     setWeekPick("all");
@@ -95,7 +100,6 @@ export default function TalentShiftSignup({ brands, shiftSlots, shiftRegistratio
   const byPart = (s: ShiftSlot) => part === "all" || dayPartOf(s.startTime) === part;
   const byBrand = (s: ShiftSlot) => brandFilter === "all" || s.brandName === brandFilter;
   const byWeek = (s: ShiftSlot) => weekPick === "all" || isoWeekStart(s.date) === weekPick;
-  const byTodo = (s: ShiftSlot) => !onlyTodo || !mineBySlot.has(s.id);
   const monthWeeks = [...new Set(inMonth.map((s) => isoWeekStart(s.date)))].sort();
   const weekRange = (ws: string) => {
     const from = ws < `${month}-01` ? `${month}-01` : ws;
@@ -105,15 +109,16 @@ export default function TalentShiftSignup({ brands, shiftSlots, shiftRegistratio
     return from === to ? `${weekday(from).replace("Chủ nhật", "CN").replace("Thứ ", "T")} ${dm(from)}` : `${dm(from)} – ${dm(to)}`;
   };
   const brandNames = [...new Set(inMonth.map((s) => s.brandName))].sort((a, b) => a.localeCompare(b, "vi"));
-  const shown = inMonth.filter((s) => byWeek(s) && byPart(s) && byBrand(s) && byTodo(s));
+  const shown = inMonth.filter((s) => byWeek(s) && byPart(s) && byBrand(s));
   const dates = [...new Set(shown.map((s) => s.date))].sort();
 
-  const registeredInMonth = inMonth.filter((s) => mineBySlot.has(s.id));
-  const bulkTargets = shown.filter((s) => !mineBySlot.has(s.id) && !closed(s.date));
+  const monthAll = allOpen.filter((s) => s.date.startsWith(month));
+  const registeredInMonth = monthAll.filter((s) => mineBySlot.has(s.id));
+  const bulkTargets = mode === "open" ? shown.filter((s) => !closed(s.date)) : [];
   // Theo NGÀY của ca (không theo thứ Hai đầu tuần): tuần 27/10–02/11 có thứ Hai thuộc tháng trước, hạn tháng phải lấy theo tháng của ca.
   const deadlines = [...new Set(inMonth.filter(byWeek).map((s) => deadlineOf(s.date)).filter((d): d is string => !!d))].sort();
   const nextDeadline = deadlines.find((d) => new Date(d) > new Date());
-  const filtered = weekPick !== "all" || part !== "all" || brandFilter !== "all" || onlyTodo;
+  const filtered = weekPick !== "all" || part !== "all" || brandFilter !== "all";
 
   const toggle = async (slot: ShiftSlot) => {
     if (!myTalentId || busy) return;
@@ -187,8 +192,12 @@ export default function TalentShiftSignup({ brands, shiftSlots, shiftRegistratio
   return (
     <div className="space-y-4 max-w-3xl lg:max-w-none">
       <div className="px-1">
-        <h2 className="text-lg font-black text-[var(--text)]">Đăng ký ca</h2>
-        <p className="text-sm text-[var(--text-muted)]">Chạm vào mọi ca bạn làm được để đăng ký — đăng ký càng nhiều càng dễ được xếp. Trainer / OP sẽ chốt người, ca chốt hiện ở "Ca của tôi".</p>
+        <h2 className="text-lg font-black text-[var(--text)]">{mode === "open" ? "Ca đang mở" : "Ca đã đăng ký"}</h2>
+        <p className="text-sm text-[var(--text-muted)]">
+          {mode === "open"
+            ? 'Chạm vào mọi ca bạn làm được để đăng ký — đăng ký càng nhiều càng dễ được xếp. Trainer / OP sẽ chốt người, ca chốt hiện ở "Ca của tôi".'
+            : 'Các ca bạn đã đăng ký và đang chờ trainer / OP chốt — chưa phải lịch chắc chắn. Chạm vào ca để huỷ trước hạn. Ca được chốt sẽ chuyển sang "Ca của tôi".'}
+        </p>
       </div>
 
       {!myTalentId && (
@@ -199,7 +208,20 @@ export default function TalentShiftSignup({ brands, shiftSlots, shiftRegistratio
 
       {openSlots.length === 0 ? (
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-6 text-center text-sm text-[var(--text-faint)]">
-          Hiện chưa có ca nào cần người. OP mở ca tháng sau khi chốt kế hoạch tháng — bạn sẽ nhận thông báo.
+          {mode === "open"
+            ? allOpen.length > 0
+              ? "Bạn đã đăng ký hết các ca đang mở."
+              : "Hiện chưa có ca nào cần người. OP mở ca tháng sau khi chốt kế hoạch tháng — bạn sẽ nhận thông báo."
+            : "Bạn chưa đăng ký ca nào đang chờ chốt."}
+          {onOpenTab && allOpen.length > 0 && (
+            <button
+              type="button"
+              onClick={() => onOpenTab(mode === "open" ? "shift_registered" : "shift_scheduling")}
+              className="block mx-auto mt-2 min-h-9 text-sm font-bold text-[var(--accent-text)]"
+            >
+              {mode === "open" ? "Xem ca đã đăng ký →" : "Xem ca đang mở →"}
+            </button>
+          )}
         </div>
       ) : (
         <>
@@ -215,7 +237,7 @@ export default function TalentShiftSignup({ brands, shiftSlots, shiftRegistratio
                   className={`px-4 py-2 min-h-12 rounded-2xl border text-left ${m === month ? "border-[var(--accent)] bg-[var(--accent)]/10" : "border-[var(--border)] bg-[var(--surface)]"}`}
                 >
                   <span className={`block text-base font-black ${m === month ? "text-[var(--accent-text)]" : "text-[var(--text)]"}`}>{monthLabel(m)}</span>
-                  <span className="block text-xs text-[var(--text-faint)]">{openSlots.filter((s) => s.date.startsWith(m)).length} ca cần người</span>
+                  <span className="block text-xs text-[var(--text-faint)]">{openSlots.filter((s) => s.date.startsWith(m)).length} {mode === "open" ? "ca cần người" : "ca chờ chốt"}</span>
                 </button>
               ))}
             </div>
@@ -223,7 +245,7 @@ export default function TalentShiftSignup({ brands, shiftSlots, shiftRegistratio
             <div className="flex-1 min-w-[14rem] rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 flex flex-wrap items-center gap-x-6 gap-y-2">
               <p className="text-sm text-[var(--text-muted)]">
                 {monthLabel(month)} bạn đã đăng ký{" "}
-                <b className="text-xl font-black text-[var(--text)]">{registeredInMonth.length}</b> / {inMonth.length} ca
+                <b className="text-xl font-black text-[var(--text)]">{registeredInMonth.length}</b> / {monthAll.length} ca
                 <span className="text-[var(--text-faint)]"> · {hoursText(registeredInMonth.reduce((a, s) => a + slotHours(s), 0))}</span>
               </p>
               {nextDeadline && (
@@ -268,10 +290,6 @@ export default function TalentShiftSignup({ brands, shiftSlots, shiftRegistratio
                   ))}
                 </select>
               )}
-              <label className="flex items-center gap-2 min-h-9 px-2 text-sm text-[var(--text-muted)] cursor-pointer">
-                <input type="checkbox" checked={onlyTodo} onChange={(e) => setOnlyTodo(e.target.checked)} className="w-4 h-4 accent-[var(--accent)]" />
-                Chỉ ca chưa đăng ký
-              </label>
               {filtered && (
                 <button
                   type="button"
@@ -279,7 +297,6 @@ export default function TalentShiftSignup({ brands, shiftSlots, shiftRegistratio
                     setWeekPick("all");
                     setPart("all");
                     setBrandFilter("all");
-                    setOnlyTodo(false);
                   }}
                   className="min-h-9 px-2 text-sm text-[var(--text-faint)] underline hover:text-[var(--text)]"
                 >
@@ -301,7 +318,7 @@ export default function TalentShiftSignup({ brands, shiftSlots, shiftRegistratio
 
           {dates.length === 0 ? (
             <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 text-center text-sm text-[var(--text-muted)]">
-              {onlyTodo && shown.length === 0 && inMonth.some((s) => mineBySlot.has(s.id)) ? "Bạn đã đăng ký hết các ca đang lọc." : "Không có ca nào khớp bộ lọc."}
+              Không có ca nào khớp bộ lọc.
             </div>
           ) : (
             // Mỗi ngày có ca một cột; cột không hẹp hơn 220px — màn rộng nhiều cột, điện thoại một cột.

@@ -94,16 +94,19 @@ export function agencyNavGroups(currentRole: UserRole): NavGroup[] {
   // Brand Workspace (Giai đoạn A, docs/WORKSPACE_HISTORY.md).
   const AGENCY_NAV_GROUPS: NavGroup[] = [
     // Tái cấu trúc 2026-09-21: tách LẬP KẾ HOẠCH (trước tháng) khỏi VẬN HÀNH (hằng ngày).
-    // App talent bản 2 (16/10): 4 tab — Ca Của Tôi (id cũ `my_shifts`: thông báo + localStorage trỏ vào), Cả Agency (theo ngày +
-    // LiveCalendar cách nhìn talent), Đăng Ký Ca (user chốt giữ tab riêng), Tôi. Điện thoại: thanh tab dưới đáy (TalentTabBar).
+    // App talent bản 2 (16/10): Ca Của Tôi (id cũ `my_shifts`: thông báo + localStorage trỏ vào), Cả Agency (theo ngày +
+    // LiveCalendar cách nhìn talent), Đăng Ký Ca (user chốt giữ tab riêng), Tôi. Bản 3 (05/11, user: "cần Lịch đang mở, lịch đã đăng ký,
+    // ca của tôi, lịch agency"): 5 tab — Đăng Ký Ca tách làm Đang mở (id cũ `shift_scheduling`, thông báo trỏ vào) + Đã đăng ký
+    // (`shift_registered`, ca đã báo rảnh, chờ trainer chốt). Điện thoại: thanh tab dưới đáy (TalentTabBar).
     ...(currentRole === "talent"
       ? [
           {
             label: "Của tôi",
             items: [
               { id: "my_shifts", label: "Ca của tôi", icon: CalendarCheck, perm: undefined },
-              { id: "talent_calendar", label: "Cả agency", icon: CalendarDays, perm: undefined },
-              { id: "shift_scheduling", label: "Đăng ký ca", icon: CalendarClock, perm: undefined },
+              { id: "shift_scheduling", label: "Ca đang mở", icon: CalendarClock, perm: undefined },
+              { id: "shift_registered", label: "Ca đã đăng ký", icon: CalendarCheck2, perm: undefined },
+              { id: "talent_calendar", label: "Lịch agency", icon: CalendarDays, perm: undefined },
               { id: "my_talent_profile", label: "Tôi", icon: User, perm: undefined }
             ]
           }

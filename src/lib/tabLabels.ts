@@ -26,13 +26,14 @@ export const AGENCY_TAB_LABELS: Record<string, string> = {
   ai_training: "AI Training Center",
   account_settings: "Tài Khoản Của Tôi",
   my_shifts: "Ca của tôi", // 11–16/10 là "Hôm Nay" (app talent T1); bản 2 16/10 về lại "Ca Của Tôi"
-  talent_calendar: "Cả agency",
+  shift_registered: "Ca đã đăng ký",
+  talent_calendar: "Lịch agency",
   my_talent_profile: "Tôi"
 };
 
 // Cùng id nhưng talent thấy tên khác (menu talent).
 export const TALENT_TAB_LABELS: Record<string, string> = {
-  shift_scheduling: "Đăng ký ca"
+  shift_scheduling: "Ca đang mở"
 };
 
 export const BRAND_TAB_LABELS: Record<string, string> = {

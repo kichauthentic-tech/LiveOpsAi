@@ -31,6 +31,7 @@ const AGENCY_TAB_SLUGS: Record<string, string> = {
   account_settings: "tai-khoan",
   // talent
   my_shifts: "ca-cua-toi",
+  shift_registered: "da-dang-ky",
   talent_calendar: "lich",
   my_talent_profile: "ho-so"
 };
