@@ -40,6 +40,7 @@ const BRAND_TAB_SLUGS: Record<string, string> = {
   brand_calendar: "lich",
   brand_sessions: "so-ca",
   brand_skus: "sku",
+  brand_live_basket: "gio-live",
   brand_monthly_report: "report-thang",
   brand_commitment_view: "cam-ket",
   brand_next_month_plan: "ke-hoach-thang-sau",

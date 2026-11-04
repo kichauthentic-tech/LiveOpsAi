@@ -1,5 +1,5 @@
 import React from "react";
-import { BookOpen, BrainCircuit, Calculator, ClipboardList, Briefcase, Building2, CalendarCheck, CalendarCheck2, CalendarDays, Clapperboard, CalendarClock, Calendar as CalendarIcon, CalendarRange, Database, DollarSign, FileSignature, FileText, LayoutDashboard, LayoutGrid, Link2, Megaphone, Package, ShieldCheck, TrendingUp, User, Users } from "lucide-react";
+import { BookOpen, BrainCircuit, Calculator, ClipboardList, Briefcase, Building2, CalendarCheck, CalendarCheck2, CalendarDays, Clapperboard, CalendarClock, Calendar as CalendarIcon, CalendarRange, Database, DollarSign, FileSignature, FileText, LayoutDashboard, LayoutGrid, Link2, Megaphone, Package, ShieldCheck, ShoppingBasket, TrendingUp, User, Users } from "lucide-react";
 import { PermissionKey, UserRole } from "../types";
 
 // Cấu hình sidebar + vài hằng số điều hướng, tách khỏi App.tsx 2026-10-01 (App.tsx 2.867 dòng).
@@ -31,6 +31,7 @@ export const TAB_CHANNEL_SCOPE: Record<string, "all" | "one"> = {
   brand_calendar: "all",
   brand_sessions: "all",
   brand_skus: "one",
+  brand_live_basket: "one",
   brand_monthly_report: "one",
   brand_commitment_view: "one",
   brand_next_month_plan: "one",
@@ -238,6 +239,7 @@ export function brandNavGroups(currentRole: UserRole): NavGroup[] {
         // 0105 (brand_month_plans_read_scoped); xác nhận đi qua RPC confirm_month_plan riêng.
         { id: "brand_next_month_plan", label: "Kế Hoạch Tháng Sau", icon: CalendarCheck2, perm: undefined },
         { id: "brand_skus", label: "Sản phẩm lên live", icon: Package, perm: undefined },
+        { id: "brand_live_basket", label: "Giỏ live đề xuất", icon: ShoppingBasket, perm: undefined },
         { id: "brand_monthly_report", label: "Report Tháng", icon: FileText, perm: undefined },
         // Trang Affiliate (2026-09-22) — bảng phân tích theo TỪNG PHIÊN của creator affiliate,
         // tách hẳn khỏi form Report Tháng (yêu cầu ops). Brand xem được (migration 0102 nới RLS

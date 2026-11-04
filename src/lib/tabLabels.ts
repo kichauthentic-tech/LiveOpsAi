@@ -40,6 +40,7 @@ export const BRAND_TAB_LABELS: Record<string, string> = {
   brand_calendar: "Lịch Vận Hành",
   brand_sessions: "Sổ Ca",
   brand_skus: "Sản phẩm lên live",
+  brand_live_basket: "Giỏ live đề xuất",
   brand_monthly_report: "Report Tháng",
   brand_commitment_view: "Hợp Đồng",
   brand_next_month_plan: "Kế Hoạch Tháng Sau",

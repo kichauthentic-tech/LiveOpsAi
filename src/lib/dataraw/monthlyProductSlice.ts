@@ -5,6 +5,7 @@ import { dedupeInFlight } from "../db/dedupeInFlight";
 import { fetchRowsPaged } from "./fetchRowsPaged";
 import { readShopDays } from "./shopAnalyticsDays";
 import { readAdsDays, type AdsDay } from "./adsCampaignOverview";
+import { periodKey, shopeePeriodInput, tiktokPeriodInput, type PeriodInput } from "../sku/skuHistory";
 import { buildProductListAgg, cleanProductName, findCol, isCurrentProductAgg, num, PRODUCT_AGG_VERSION, ProductListAgg } from "./productListAgg";
 
 // Deep Dive Report Tháng — Top SKU (product_list) + Top khuyến mãi (shop_promotion). Cả 2 report
@@ -96,17 +97,43 @@ export async function fetchProductListAggWithPeriod(
     periodEnd: best.period_end! > monthEnd ? monthEnd : best.period_end!
   };
 
-  const { data, error } = await supabase.from("brand_dataraw_imports").select("agg:summary->productAgg").eq("id", best.id).single();
+  return { agg: await readProductAggOfBatch(best.id), ...period };
+}
+
+// Bản tổng hợp của MỘT batch product_list (đọc `summary.productAgg`, thiếu/lệch version thì tính lại từ dòng gốc rồi ghi ngược).
+async function readProductAggOfBatch(batchId: string): Promise<ProductListAgg> {
+  const { data, error } = await supabase.from("brand_dataraw_imports").select("agg:summary->productAgg").eq("id", batchId).single();
   if (error) throw error;
   const stored = (data as { agg: unknown }).agg;
-  if (isCurrentProductAgg(stored)) return { agg: stored, ...period };
+  if (isCurrentProductAgg(stored)) return stored;
 
-  const { rows, columns } = await readBatch(best.id);
+  const { rows, columns } = await readBatch(batchId);
   const agg = buildProductListAgg(columns, rows);
-  const { data: cur } = await supabase.from("brand_dataraw_imports").select("summary").eq("id", best.id).single();
+  const { data: cur } = await supabase.from("brand_dataraw_imports").select("summary").eq("id", batchId).single();
   const summary = ((cur as { summary: Record<string, unknown> | null } | null)?.summary ?? {}) as Record<string, unknown>;
-  await supabase.from("brand_dataraw_imports").update({ summary: { ...summary, productAgg: agg } }).eq("id", best.id);
-  return { agg, ...period };
+  await supabase.from("brand_dataraw_imports").update({ summary: { ...summary, productAgg: agg } }).eq("id", batchId);
+  return agg;
+}
+
+/** Mọi kỳ file Sản Phẩm của một brand, theo sàn — nguồn dựng danh mục SKU + hiệu suất theo kỳ (lib/sku/skuHistory.ts).
+ *  Cùng một kỳ có nhiều lần tải thì lấy lần tải MỚI NHẤT (không cộng dồn: mỗi file đã là tổng cả kỳ). */
+export async function fetchSkuHistoryInputs(brandId: string): Promise<{ tiktok: PeriodInput[]; shopee: PeriodInput[] }> {
+  const pick = (all: DbImportLite[]) => {
+    const latest = new Map<string, DbImportLite>();
+    for (const i of all) {
+      if (!i.period_start || !i.period_end) continue;
+      const k = `${i.period_start}~${i.period_end}`;
+      const cur = latest.get(k);
+      if (!cur || (i.imported_at ?? "") > (cur.imported_at ?? "")) latest.set(k, i);
+    }
+    return [...latest.values()];
+  };
+  const [tt, sp] = await Promise.all([fetchImportsLite(brandId, "product_list"), fetchImportsLite(brandId, "shopee_product_list")]);
+  const [tiktok, shopee] = await Promise.all([
+    Promise.all(pick(tt).map(async (i) => tiktokPeriodInput(periodKey(i.period_start!, i.period_end!), await readProductAggOfBatch(i.id)))),
+    Promise.all(pick(sp).map(async (i) => shopeePeriodInput(periodKey(i.period_start!, i.period_end!), (await readBatch(i.id)).rows)))
+  ]);
+  return { tiktok, shopee };
 }
 
 export interface TopSkuRow {

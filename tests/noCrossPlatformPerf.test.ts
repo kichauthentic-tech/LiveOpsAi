@@ -84,6 +84,7 @@ const SUM_RE = new RegExp(`reduce\\s*[<(]|\\+=|\\+\\s*\\(?\\s*[\\w!?.]+\\.(${PER
  * Thêm file vào đây phải kèm lý do đó. Không chắc thì dùng sumByPlatform/sumGmvByPlatform của lib/platforms/perf.ts.
  */
 const SINGLE_PLATFORM_FILES: Record<string, string> = {
+  "lib/sku/skuHistory.ts": "mỗi SkuHistory dựng từ file Sản Phẩm của MỘT sàn (buildSkuHistory nhận `platform`); cộng theo kỳ trong cùng sàn",
   "lib/dailyTargetBrief.ts": "Bản tin target ngày: monthActual cộng theo TỪNG kênh brand × sàn (khoá `brand|platform`), tổng ngày tách TikTok/Shopee",
   "lib/performance/periodCompare.ts": "Dashboard so cùng kỳ: aggregate gọi assertOnePlatform; channelGph/indexBy chia theo TỪNG kênh brand × sàn",
   "components/dashboard/period/PlatformTab.tsx": "tab Toàn sàn nhận ca của MỘT sàn (AgencyDashboard lọc platformOf trước khi truyền)",

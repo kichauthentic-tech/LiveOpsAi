@@ -26,7 +26,7 @@ import { fetchShiftSlots, createShiftSlot, deleteShiftSlot } from "./lib/db/shif
 import { fetchShiftRegistrations, registerForSlot, unregisterFromSlot } from "./lib/db/shiftRegistrations";
 import { fetchTalentRateHistory } from "./lib/db/talentRateHistory";
 import { fetchBrandPlatformRateHistory } from "./lib/db/brandPlatformRateHistory";
-import { createBrandSku, updateBrandSku, deleteBrandSku } from "./lib/db/brandSkus";
+import { createBrandSku, importBrandSkus, updateBrandSku, deleteBrandSku } from "./lib/db/brandSkus";
 import { createPromoScheme, updatePromoScheme, deletePromoScheme } from "./lib/db/promoSchemes";
 import { fetchAllMonthlyReports } from "./lib/db/monthlyReports";
 import { fetchBoostTargets, fetchLockedPlanTargets } from "./lib/db/monthPlans";
@@ -83,6 +83,7 @@ import {
 
 // Mỗi tab một chunk riêng, tải khi mở tab (xem src/lib/lazyNamed.ts). Chỉ dùng bên trong <Suspense> của khu nội dung tab.
 const BrandCalendar = lazyNamed(() => import("./components/brand-workspace/BrandCalendar"), "BrandCalendar");
+const BrandLiveBasket = lazyNamed(() => import("./components/brand-workspace/BrandLiveBasket"), "BrandLiveBasket");
 const BrandSkuShowcase = lazyNamed(() => import("./components/brand-workspace/BrandSkuShowcase"), "BrandSkuShowcase");
 const BrandMonthlyReport = lazyNamed(() => import("./components/brand-workspace/BrandMonthlyReport"), "BrandMonthlyReport");
 const BrandDashboard = lazyNamed(() => import("./components/brand-workspace/BrandDashboard"), "default");
@@ -143,6 +144,7 @@ const TAB_CHUNKS: Record<string, { preload: () => void }[]> = {
   brand_calendar: [BrandCalendar],
   brand_sessions: [SessionLedger],
   brand_skus: [BrandSkuShowcase],
+  brand_live_basket: [BrandLiveBasket],
   brand_monthly_report: [BrandMonthlyReport],
   brand_commitment_view: [BrandCommitmentView],
   brand_next_month_plan: [BrandNextMonthPlan],
@@ -175,6 +177,7 @@ const TAB_DATA_PREFETCH: Record<string, (ctx: TabPrefetchCtx) => Promise<void>> 
   crm: (ctx) => import("./components/CrmProjects").then((m) => m.prefetchCrm(ctx)),
   brand_commitment_view: (ctx) => import("./components/brand-workspace/BrandCommitmentView").then((m) => m.prefetchBrandCommitmentView(ctx)),
   brand_next_month_plan: (ctx) => import("./components/brand-workspace/BrandNextMonthPlan").then((m) => m.prefetchBrandNextMonthPlan(ctx)),
+  brand_live_basket: (ctx) => import("./components/brand-workspace/BrandLiveBasket").then((m) => m.prefetchBrandLiveBasket(ctx)),
   brand_skus: (ctx) => import("./components/brand-workspace/BrandSkuShowcase").then((m) => m.prefetchBrandSkuShowcase(ctx)),
   brand_dataraw: (ctx) => import("./components/brand-workspace/BrandDataRaw").then((m) => m.prefetchBrandDataRaw(ctx))
 };
@@ -450,9 +453,15 @@ export default function App() {
     }
   }
 
-  async function handleAddBrandSku(sku: { brandId: string; name: string; skuCode: string; flashPrice: number; originalPrice: number }) {
+  async function handleAddBrandSku(sku: { brandId: string; platform: BrandSku["platform"]; name: string; skuCode: string; flashPrice: number; originalPrice: number }) {
     const created = await createBrandSku({ ...sku, createdBy: profile?.id });
     setBrandSkus((prev) => [...prev, created]);
+  }
+
+  async function handleImportBrandSkus(skus: Pick<BrandSku, "brandId" | "platform" | "name" | "flashPrice">[]) {
+    const created = await importBrandSkus(skus, profile?.id);
+    setBrandSkus((prev) => [...prev, ...created]);
+    return created.length;
   }
 
   async function handleUpdateBrandSku(
@@ -2300,9 +2309,21 @@ export default function App() {
                     brandId={currentBrandId!}
                     currentRole={currentRole}
                     brandSkus={brandSkus}
+                    platformScope={brandScope === "all" ? null : brandScope}
                     onAddSku={handleAddBrandSku}
+                    onImportSkus={handleImportBrandSkus}
                     onUpdateSku={handleUpdateBrandSku}
                     onDeleteSku={handleDeleteBrandSku}
+                  />
+                )}
+
+                {activeTab === "brand_live_basket" && effectiveWorkspace.type === "brand" && (
+                  <BrandLiveBasket
+                    brandId={currentBrandId!}
+                    currentRole={currentRole}
+                    brandSkus={brandSkus}
+                    platformScope={brandScope === "all" ? null : brandScope}
+                    onUpdateSku={handleUpdateBrandSku}
                   />
                 )}
 

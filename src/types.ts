@@ -607,6 +607,8 @@ export interface BrandPlatformRateHistoryEntry {
 export interface BrandSku {
   id: string;
   brandId: string;
+  /** Sàn của sản phẩm (0196) — hiệu suất mỗi sàn tính riêng, không cộng chung. */
+  platform: "TikTok" | "Shopee";
   name: string;
   skuCode: string;
   flashPrice: number;

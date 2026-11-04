@@ -70,7 +70,7 @@ test("sidebar: không nhóm có tiêu đề nào chỉ một mục (9 nhóm/19 m
   expect(brandNavGroups("ceo").filter((g) => g.items.length > 0)).toHaveLength(3);
   expect(brandNavGroups("brand").filter((g) => g.items.length > 0)).toHaveLength(2);
   // Mục nào cũng còn (chỉ đổi nhóm, không mất màn).
-  expect(brandNavGroups("ceo").flatMap((g) => g.items.map((i) => i.id))).toHaveLength(10);
+  expect(brandNavGroups("ceo").flatMap((g) => g.items.map((i) => i.id))).toHaveLength(11);
 });
 
 test("lịch tháng của brand và lưới Kế Hoạch Tháng bắt đầu Thứ 2 như Lịch & Studio / Điều Phối Lịch Live", () => {

@@ -262,7 +262,7 @@ export const PLATFORM_PROFILES: Record<ReportPlatform, PlatformProfile> = {
     wholeShopFiles: true,
     adsFileType: "shopee_ads",
     adsFileLabel: "Shopee Live Ads Report (một dòng mỗi chiến dịch)",
-    hiddenBrandTabs: ["brand_affiliate", "brand_skus"],
+    hiddenBrandTabs: ["brand_affiliate"],
     staleDataHint: "Tải file Live List từ Shopee Seller Centre rồi tải lên ở Dữ Liệu Gốc (chọn Shopee); cuối kỳ bấm Áp dụng đối soát ngay ở đó."
   }
 };
