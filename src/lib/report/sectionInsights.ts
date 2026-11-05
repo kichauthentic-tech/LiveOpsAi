@@ -29,6 +29,7 @@ import {
   type HostReliability,
   type MixRateSplit
 } from "./deepAnalysis";
+import { numLocale, t, monthShort } from "../displayLang";
 
 // Khung "Insight" đầu mỗi phần 3–7 của Report Tháng (2026-09-26, học từ deck report tháng của Crocs:
 // mỗi slide có 1 câu kết luận + 3–4 số chứng minh + 1 việc cần làm). Hàm thuần — tự sinh từ đúng các số
@@ -62,7 +63,7 @@ export function parseInsightText(text: string): SectionInsight | null {
 }
 
 const money = (v: number) => fmtVndShort(v);
-const pp = (v: number) => `${v >= 0 ? "+" : "−"}${Math.abs(v).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} điểm`;
+const pp = (v: number) => `${v >= 0 ? "+" : "−"}${Math.abs(v).toLocaleString(numLocale(), { maximumFractionDigits: 1 })} ${t("điểm", "pts")}`;
 const median = (xs: number[]) => {
   const s = [...xs].sort((a, b) => a - b);
   return s.length === 0 ? null : s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2;
@@ -99,7 +100,7 @@ export function shopInsight(i: ShopInsightInput): SectionInsight | null {
   const cur = i.mixes[n - 1];
   const prev = n > 1 ? i.mixes[n - 2] : null;
   if (!cur || !i.shopCur) return null;
-  const prevLabel = n > 1 ? i.labels?.[n - 2] ?? `tháng ${i.months[n - 2].slice(5)}` : "";
+  const prevLabel = n > 1 ? i.labels?.[n - 2] ?? t(`tháng ${i.months[n - 2].slice(5)}`, monthShort(i.months[n - 2])) : "";
 
   const agencyShare = (idx: number) => (i.mixes[idx] && i.mixes[idx]!.shopGmv > 0 && i.agencyGmv[idx] > 0 ? (i.agencyGmv[idx] / i.mixes[idx]!.shopGmv) * 100 : null);
   const aCur = agencyShare(n - 1);
@@ -107,7 +108,7 @@ export function shopInsight(i: ShopInsightInput): SectionInsight | null {
   const shopChg = i.shopPrev ? pctChange(i.shopPrev.gmv, i.shopCur.gmv) : null;
   const totalLine =
     `Total GMV ${money(i.shopCur.gmv)}${shopChg != null ? ` (${signed(shopChg)}, ${i.windowLabel})` : ""}` +
-    (aCur != null ? `; livestream YFB chiếm ${pctTxt(aCur)}${aPrev != null ? ` (${prevLabel}: ${pctTxt(aPrev)})` : ""}.` : ".");
+    (aCur != null ? `; ${t("livestream YFB chiếm", "YFB livestream share")} ${pctTxt(aCur)}${aPrev != null ? ` (${prevLabel}: ${pctTxt(aPrev)})` : ""}.` : ".");
 
   // controlLine đã là 1 câu của Kết luận ⇒ tiêu đề phần là nhóm ngày Kết luận CHƯA nói (CROCS T9: ngày camp —
   // thị trường −69%, agency −14%); không còn nhóm nào thì Total GMV. Bảng đối chứng ngay dưới vẫn có đủ 3 dòng.
@@ -117,7 +118,7 @@ export function shopInsight(i: ShopInsightInput): SectionInsight | null {
   for (const r of control) {
     const v = controlVerdict(r);
     if (!v || r.key === "all" || cLine?.includes(`(${controlLabel(r.key)})`)) continue;
-    groupLines.push(`${controlLabel(r.key)}: livestream YFB ${signed(r.liveChg!, 0)}, các kênh còn lại ${signed(r.restChg!, 0)} ⇒ ${VERDICT_TEXT[v]}.`);
+    groupLines.push(t(`${controlLabel(r.key)}: livestream YFB ${signed(r.liveChg!, 0)}, các kênh còn lại ${signed(r.restChg!, 0)} ⇒ ${VERDICT_TEXT[v]}.`, `${controlLabel(r.key)}: YFB livestream ${signed(r.liveChg!, 0)}, other channels ${signed(r.restChg!, 0)} ⇒ ${VERDICT_TEXT[v]}.`));
   }
   const [headline, ...points] = [...groupLines, totalLine];
   let affiliateDelta: number | null = null;
@@ -133,8 +134,8 @@ export function shopInsight(i: ShopInsightInput): SectionInsight | null {
     affiliateDelta = moves.find((m) => m.key === "affiliate")?.delta ?? null;
     const up = moves.filter((m) => m.delta >= 1).sort((a, b) => b.delta - a.delta)[0];
     const down = moves.filter((m) => m.delta <= -1).sort((a, b) => a.delta - b.delta)[0];
-    for (const m of [up, down]) if (m) points.push(`${m.label}: ${pctTxt(m.from)} → ${pctTxt(m.to)} tổng shop (${pp(m.delta)}).`);
-    if (!up && !down && moves.length > 0) points.push(`Cơ cấu kênh gần như giữ nguyên so với ${prevLabel} (không kênh nào lệch quá 1 điểm).`);
+    for (const m of [up, down]) if (m) points.push(`${m.label}: ${pctTxt(m.from)} → ${pctTxt(m.to)} ${t("tổng shop", "of shop total")} (${pp(m.delta)}).`);
+    if (!up && !down && moves.length > 0) points.push(t(`Cơ cấu kênh gần như giữ nguyên so với ${prevLabel} (không kênh nào lệch quá 1 điểm).`, `Channel mix is almost unchanged vs ${prevLabel} (no channel moved more than 1 pt).`));
   }
   const refundDelta = prev?.refundRate != null && cur.refundRate != null ? cur.refundRate - prev.refundRate : null;
   if (cur.refundRate != null && (cur.refundRate >= 15 || (refundDelta != null && Math.abs(refundDelta) >= 2))) {
@@ -143,11 +144,11 @@ export function shopInsight(i: ShopInsightInput): SectionInsight | null {
 
   const opsRow = control.find((r) => r.key !== "all" && controlVerdict(r) === "ops");
   const action = opsRow
-    ? `${controlLabel(opsRow.key)} giảm mạnh hơn các kênh còn lại (nhóm đối chứng gần đúng) nên cần rà soát vận hành livestream — xem trang Phân tích nguyên nhân để biết yếu tố nào giảm và điều chỉnh lịch tháng sau.`
+    ? t(`${controlLabel(opsRow.key)} giảm mạnh hơn các kênh còn lại (nhóm đối chứng gần đúng) nên cần rà soát vận hành livestream — xem trang Phân tích nguyên nhân để biết yếu tố nào giảm và điều chỉnh lịch tháng sau.`, `${controlLabel(opsRow.key)} fell more than the other channels (approximate control group), so livestream operations need review — see the Root-cause page for which factor declined and adjust next month's schedule.`)
     : affiliateDelta != null && affiliateDelta <= -1
-      ? "Tỷ trọng Affiliate LIVE giảm — rà lịch creator và gói hỗ trợ affiliate cho tháng sau."
+      ? t("Tỷ trọng Affiliate LIVE giảm — rà lịch creator và gói hỗ trợ affiliate cho tháng sau.", "Affiliate LIVE share fell — review the creator schedule and affiliate support package for next month.")
       : refundDelta != null && refundDelta >= 2
-        ? "Refund rate tăng — kiểm lý do hoàn của nhóm SKU chủ lực trước khi tăng thêm traffic."
+        ? t("Refund rate tăng — kiểm lý do hoàn của nhóm SKU chủ lực trước khi tăng thêm traffic.", "Refund rate rose — check return reasons for the hero SKUs before adding more traffic.")
         : null;
   return { headline, points, action };
 }
@@ -173,12 +174,12 @@ export function whyInsight(prev: LiveStats, cur: LiveStats, x: WhyExtras = {}): 
   const lv = Math.log(1 + ch.viewsPerHour / 100);
   const verdict =
     Math.sign(lv) === Math.sign(conv)
-      ? `cả traffic lẫn tỷ lệ chuyển đổi cùng ${gh < 0 ? "giảm" : "tăng"}`
+      ? t(`cả traffic lẫn tỷ lệ chuyển đổi cùng ${gh < 0 ? "giảm" : "tăng"}`, `traffic and conversion both ${gh < 0 ? "fell" : "rose"}`)
       : Math.abs(lv) >= Math.abs(conv)
-        ? `traffic là nguyên nhân chính khiến GMV/giờ ${gh < 0 ? "giảm" : "tăng"}, tỷ lệ chuyển đổi bù một phần`
-        : `tỷ lệ chuyển đổi là nguyên nhân chính khiến GMV/giờ ${gh < 0 ? "giảm" : "tăng"}, traffic bù một phần`;
+        ? t(`traffic là nguyên nhân chính khiến GMV/giờ ${gh < 0 ? "giảm" : "tăng"}, tỷ lệ chuyển đổi bù một phần`, `traffic is the main reason GMV/hour ${gh < 0 ? "fell" : "rose"}, partly offset by conversion`)
+        : t(`tỷ lệ chuyển đổi là nguyên nhân chính khiến GMV/giờ ${gh < 0 ? "giảm" : "tăng"}, traffic bù một phần`, `conversion is the main reason GMV/hour ${gh < 0 ? "fell" : "rose"}, partly offset by traffic`);
   const parts = RATE_FACTORS.filter((k) => ch[k] != null).map((k) => `${DRIVER_LABEL[k]} ${signed(ch[k]!, 0)}`);
-  const factorLine = `GMV/giờ ${signed(gh, 0)}: ${parts.join(", ")} — ${verdict}.`;
+  const factorLine = `${t("GMV/giờ", "GMV/hour")} ${signed(gh, 0)}: ${parts.join(", ")} — ${verdict}.`;
 
   // Thừa số quy ra tiền đã là câu 2 của Kết luận ⇒ khi ngày thường và ngày camp lệch nhau rõ (≥ 10 điểm), tiêu đề
   // là nhóm ngày kéo kết quả (Kết luận chưa nói), dòng thừa số lùi xuống số chứng minh.
@@ -193,13 +194,13 @@ export function whyInsight(prev: LiveStats, cur: LiveStats, x: WhyExtras = {}): 
   const points: string[] = [];
   if (dChg != null && cChg != null && Math.abs(dChg - cChg) >= 10) {
     const lead = gh < 0 ? (dChg < cChg ? "Daily" : "campaign") : dChg > cChg ? "Daily" : "campaign";
-    headline = `${gh < 0 ? "Mức giảm tập trung ở" : "Tăng chủ yếu nhờ"} ${lead}: GMV/giờ Daily ${signed(dChg, 0)}, campaign ${signed(cChg, 0)}.`;
+    headline = t(`${gh < 0 ? "Mức giảm tập trung ở" : "Tăng chủ yếu nhờ"} ${lead}: GMV/giờ Daily ${signed(dChg, 0)}, campaign ${signed(cChg, 0)}.`, `${gh < 0 ? "The decline is concentrated in" : "The increase comes mainly from"} ${lead}: GMV/hour Daily ${signed(dChg, 0)}, campaign ${signed(cChg, 0)}.`);
     points.push(factorLine);
   } else {
     const groupTxt = (k: DayGroup, label: string) => {
       const r = g(k);
       const c = chgOf(k);
-      return r && c != null ? `${label}: ${money(r.prev.gmvPerHour!)} → ${money(r.cur.gmvPerHour!)}/giờ (${signed(c, 0)})` : null;
+      return r && c != null ? `${label}: ${money(r.prev.gmvPerHour!)} → ${money(r.cur.gmvPerHour!)}/${t("giờ", "hour")} (${signed(c, 0)})` : null;
     };
     const groups = [groupTxt("daily", "Daily"), groupTxt("camp", "campaign")].filter(Boolean);
     if (groups.length) points.push(groups.join("; ") + ".");
@@ -207,11 +208,11 @@ export function whyInsight(prev: LiveStats, cur: LiveStats, x: WhyExtras = {}): 
   const mr = x.mixRate;
   if (mr && Math.abs(mr.delta) > 0) {
     // Làm tròn nghìn đồng — "−101.092,04 đ/giờ" chỉ làm rối câu.
-    const m = (v: number) => `${v >= 0 ? "+" : "−"}${money(Math.round(Math.abs(v) / 1000) * 1000)}/giờ`;
+    const m = (v: number) => `${v >= 0 ? "+" : "−"}${money(Math.round(Math.abs(v) / 1000) * 1000)}/${t("giờ", "hour")}`;
     points.push(
       Math.abs(mr.mix) < Math.abs(mr.delta) * 0.25
-        ? `Không phải do lịch campaign: thay đổi cơ cấu giờ live giữa các loại ngày chỉ giải thích ${m(mr.mix)}, hiệu suất trong từng loại ngày ${m(mr.rate)}.`
-        : `Một phần do lịch: cơ cấu giờ live giữa các loại ngày ${m(mr.mix)}, hiệu suất trong từng loại ngày ${m(mr.rate)}.`
+        ? t(`Không phải do lịch campaign: thay đổi cơ cấu giờ live giữa các loại ngày chỉ giải thích ${m(mr.mix)}, hiệu suất trong từng loại ngày ${m(mr.rate)}.`, `Not due to the campaign schedule: the shift in live-hour mix across day types explains only ${m(mr.mix)}; performance within day types ${m(mr.rate)}.`)
+        : t(`Một phần do lịch: cơ cấu giờ live giữa các loại ngày ${m(mr.mix)}, hiệu suất trong từng loại ngày ${m(mr.rate)}.`, `Partly due to the schedule: live-hour mix across day types ${m(mr.mix)}; performance within day types ${m(mr.rate)}.`)
     );
   }
   // Quà tặng: đã ở Kết luận + 2 dòng bảng Xu hướng 4 tháng — không nhắc lần thứ ba ở đây.
@@ -257,7 +258,7 @@ export function hostVsPeer(hosts: HostInsightRow[]): HostVsPeer[] {
   });
 }
 
-const borderlineTail = (r: HostReliability) => (isBorderline(r) ? " — sát ngưỡng, cần thêm dữ liệu tháng sau để kết luận" : "");
+const borderlineTail = (r: HostReliability) => (isBorderline(r) ? t(" — sát ngưỡng, cần thêm dữ liệu tháng sau để kết luận", " — borderline; next month's data is needed to conclude") : "");
 
 /** Kết luận về host chỉ dựa trên so mặt bằng GỘP 3–4 tháng có khoảng tin cậy (deepAnalysis.hostReliability):
  *  backtest CROCS T6–T9 cho thấy so mặt bằng từng tháng không dự báo được tháng sau (Spearman −0,04), nên
@@ -274,24 +275,27 @@ export function peopleInsight(hosts: HostInsightRow[], relAll: HostReliability[]
   const byName = new Map(rel.map((r) => [r.name, r]));
   const topRel = byName.get(top.name);
   const headline =
-    `${top.name} dẫn đầu GMV (${money(top.gmv)}, ${pctTxt((top.gmv / total) * 100, 0)} tổng host)` +
+    t(`${top.name} dẫn đầu GMV (${money(top.gmv)}, ${pctTxt((top.gmv / total) * 100, 0)} tổng host)`, `${top.name} leads GMV (${money(top.gmv)}, ${pctTxt((top.gmv / total) * 100, 0)} of all hosts)`) +
     (topRel && topRel.verdict === "above"
-      ? `; ${rel.filter((r) => r.verdict === "above").length > 1 ? "" : "là host duy nhất "}cao hơn trung bình có ý nghĩa thống kê (khoảng tin cậy 95%, ${topRel.sessions} phiên): ${reliabilityText(topRel)}${borderlineTail(topRel)}.`
+      ? t(
+          `; ${rel.filter((r) => r.verdict === "above").length > 1 ? "" : "là host duy nhất "}cao hơn trung bình có ý nghĩa thống kê (khoảng tin cậy 95%, ${topRel.sessions} phiên): ${reliabilityText(topRel)}${borderlineTail(topRel)}.`,
+          `; ${rel.filter((r) => r.verdict === "above").length > 1 ? "" : "the only host "}significantly above average (95% confidence interval, ${topRel.sessions} sessions): ${reliabilityText(topRel)}${borderlineTail(topRel)}.`
+        )
       : ".");
 
   const points: string[] = [];
   const above = rel.filter((r) => r.verdict === "above" && r.name !== top.name);
   const below = rel.filter((r) => r.verdict === "below");
-  for (const r of above) points.push(`${r.name}: cao hơn trung bình ${reliabilityText(r)} qua ${r.sessions} phiên${borderlineTail(r)}.`);
-  for (const r of below) points.push(`${r.name}: thấp hơn trung bình ${reliabilityText(r)} qua ${r.sessions} phiên${borderlineTail(r)}.`);
+  for (const r of above) points.push(t(`${r.name}: cao hơn trung bình ${reliabilityText(r)} qua ${r.sessions} phiên${borderlineTail(r)}.`, `${r.name}: above average ${reliabilityText(r)} over ${r.sessions} sessions${borderlineTail(r)}.`));
+  for (const r of below) points.push(t(`${r.name}: thấp hơn trung bình ${reliabilityText(r)} qua ${r.sessions} phiên${borderlineTail(r)}.`, `${r.name}: below average ${reliabilityText(r)} over ${r.sessions} sessions${borderlineTail(r)}.`));
   const unclear = rel.filter((r) => r.verdict === "unclear").length;
-  if (unclear > 0) points.push(`${unclear} host còn lại chưa khác biệt rõ so với trung bình (khoảng tin cậy còn cắt qua mức trung bình).`);
+  if (unclear > 0) points.push(t(`${unclear} host còn lại chưa khác biệt rõ so với trung bình (khoảng tin cậy còn cắt qua mức trung bình).`, `The other ${unclear} host(s) are not clearly different from average (the confidence interval still crosses the average).`));
 
   const medHours = median(live.map((h) => h.hours)) ?? 0;
   const underUsed = rel.find((r) => r.verdict === "above" && (live.find((h) => h.name === r.name)?.hours ?? Infinity) <= medHours);
   // Việc gửi brand chỉ nói phần tích cực (thêm phiên cho host tốt). Host thấp hơn trung bình là việc nội bộ: peopleOpsNote.
   const action = underUsed
-    ? `Cân nhắc thêm phiên cho ${underUsed.name} — cao hơn trung bình ${reliabilityText(underUsed)} nhưng tháng này live ít giờ hơn trung vị nhóm.`
+    ? t(`Cân nhắc thêm phiên cho ${underUsed.name} — cao hơn trung bình ${reliabilityText(underUsed)} nhưng tháng này live ít giờ hơn trung vị nhóm.`, `Consider more sessions for ${underUsed.name} — above average ${reliabilityText(underUsed)} but with fewer live hours than the group median this month.`)
     : null;
   return { headline, points, action };
 }
@@ -335,27 +339,31 @@ export function productsInsight(
   giftNote: string | null = null
 ): SectionInsight | null {
   if (!skus || skus.rows.length === 0) return null;
-  const chg = (r: SkuMove) => (r.gmvChange != null ? `GMV${skus.perDay ? " mỗi ngày" : ""} ${signed(r.gmvChange, 0)}` : null);
+  const chg = (r: SkuMove) => (r.gmvChange != null ? `GMV${skus.perDay ? t(" mỗi ngày", " per day") : ""} ${signed(r.gmvChange, 0)}` : null);
   const lead = skus.rows[0];
-  const leadRank = lead.prevRank == null ? "mới vào top, lên hạng 1" : lead.prevRank === 1 ? "giữ hạng 1" : `từ hạng ${lead.prevRank} lên hạng 1`;
+  const leadRank =
+    lead.prevRank == null ? t("mới vào top, lên hạng 1", "new to the top, now #1") : lead.prevRank === 1 ? t("giữ hạng 1", "stays #1") : t(`từ hạng ${lead.prevRank} lên hạng 1`, `up from #${lead.prevRank} to #1`);
   const top10 = skus.rows.reduce((a, r) => a + r.gmv, 0);
-  const headline = `${shortSku(lead.name)} ${leadRank} (${[money(lead.gmv), chg(lead)].filter(Boolean).join(", ")}) — chiếm ${pctTxt((lead.gmv / top10) * 100, 0)} GMV nhóm top ${skus.rows.length}.`;
+  const headline = t(
+    `${shortSku(lead.name)} ${leadRank} (${[money(lead.gmv), chg(lead)].filter(Boolean).join(", ")}) — chiếm ${pctTxt((lead.gmv / top10) * 100, 0)} GMV nhóm top ${skus.rows.length}.`,
+    `${shortSku(lead.name)} ${leadRank} (${[money(lead.gmv), chg(lead)].filter(Boolean).join(", ")}) — ${pctTxt((lead.gmv / top10) * 100, 0)} of top-${skus.rows.length} GMV.`
+  );
 
   const points: string[] = [];
-  const outside = skus.prevLimit != null ? `ngoài top ${skus.prevLimit}` : "chưa có hạng";
+  const outside = skus.prevLimit != null ? t(`ngoài top ${skus.prevLimit}`, `outside top ${skus.prevLimit}`) : t("chưa có hạng", "unranked");
   const risers = skus.rows
     .slice(1)
     .filter((r) => r.prevRank == null || r.prevRank - r.rank >= 2)
     .sort((a, b) => (b.prevRank ?? 99) - b.rank - ((a.prevRank ?? 99) - a.rank))
     .slice(0, 2);
-  if (risers.length) points.push(`Lên hạng: ${risers.map((r) => `${shortSku(r.name)} (${r.prevRank ?? outside} → ${r.rank}${chg(r) ? `, ${chg(r)}` : ""})`).join("; ")}.`);
+  if (risers.length) points.push(`${t("Lên hạng", "Moved up")}: ${risers.map((r) => `${shortSku(r.name)} (${r.prevRank ?? outside} → ${r.rank}${chg(r) ? `, ${chg(r)}` : ""})`).join("; ")}.`);
   // SKU dẫn đầu đã nằm ở câu kết luận — không nhắc lại ở dòng "Đi xuống", nhưng vẫn được chọn làm việc cần
   // làm nếu nó giảm mạnh nhất (CROCS T9: hero SKU GMV mỗi ngày −32%).
   const fallersAll = skus.rows
     .filter((r) => (r.prevRank != null && r.rank - r.prevRank >= 2) || (r.gmvChange != null && r.gmvChange <= -20))
     .sort((a, b) => (a.gmvChange ?? 0) - (b.gmvChange ?? 0));
   const fallers = fallersAll.filter((r) => r !== lead).slice(0, 2);
-  if (fallers.length) points.push(`Giảm hạng: ${fallers.map((r) => `${shortSku(r.name)} (${r.prevRank != null && r.prevRank !== r.rank ? `${r.prevRank} → ${r.rank}` : `hạng ${r.rank}`}${chg(r) ? `, ${chg(r)}` : ""})`).join("; ")}.`);
+  if (fallers.length) points.push(`${t("Giảm hạng", "Moved down")}: ${fallers.map((r) => `${shortSku(r.name)} (${r.prevRank != null && r.prevRank !== r.rank ? `${r.prevRank} → ${r.rank}` : `${t("hạng", "#")}${t(" ", "")}${r.rank}`}${chg(r) ? `, ${chg(r)}` : ""})`).join("; ")}.`);
 
   // Được bấm nhiều mà ít chốt: CTR ≥ trung vị top 10, CTOR ≤ 85% trung vị — nghẽn ở giá/voucher, không ở traffic.
   const withFunnel = skus.rows.filter((r) => r.ctr != null && r.ctor != null);
@@ -365,17 +373,18 @@ export function productsInsight(
     withFunnel.length >= 5 && mCtr != null && mCtor != null
       ? withFunnel.filter((r) => r.ctr! >= mCtr && r.ctor! <= mCtor * 0.85).sort((a, b) => a.ctor! - b.ctor!)[0]
       : undefined;
-  if (leaky) points.push(`${shortSku(leaky.name)} có Product CTR cao (${pctTxt(leaky.ctr!, 2)}) nhưng CTOR thấp ( ${pctTxt(leaky.ctor!, 2)}, trung vị top ${skus.rows.length}: ${pctTxt(mCtor!, 2)}).`);
-  if (promo && promo.gmv > 0) points.push(`Khuyến mãi mang GMV cao nhất: ${promo.name} (${money(promo.gmv)}, ${promo.orders.toLocaleString("vi-VN")} orders).`);
+  if (leaky)
+    points.push(t(`${shortSku(leaky.name)} có Product CTR cao (${pctTxt(leaky.ctr!, 2)}) nhưng CTOR thấp ( ${pctTxt(leaky.ctor!, 2)}, trung vị top ${skus.rows.length}: ${pctTxt(mCtor!, 2)}).`, `${shortSku(leaky.name)} has a high Product CTR (${pctTxt(leaky.ctr!, 2)}) but a low CTOR (${pctTxt(leaky.ctor!, 2)}; top-${skus.rows.length} median: ${pctTxt(mCtor!, 2)}).`));
+  if (promo && promo.gmv > 0) points.push(`${t("Khuyến mãi mang GMV cao nhất", "Promotion with the highest GMV")}: ${promo.name} (${money(promo.gmv)}, ${promo.orders.toLocaleString(numLocale())} orders).`);
   if (giftNote) points.push(giftNote);
 
   const f = fallersAll[0];
   const action = f
-    ? `Kiểm tra ${shortSku(f.name)}: tồn kho, giá và thời lượng giới thiệu trên live${chg(f) ? ` (${chg(f)})` : ""}.`
+    ? t(`Kiểm tra ${shortSku(f.name)}: tồn kho, giá và thời lượng giới thiệu trên live${chg(f) ? ` (${chg(f)})` : ""}.`, `Check ${shortSku(f.name)}: stock, pricing and airtime on live${chg(f) ? ` (${chg(f)})` : ""}.`)
     : leaky
-      ? `Kiểm giá và voucher của ${shortSku(leaky.name)} — Product CTR cao nhưng CTOR thấp.`
+      ? t(`Kiểm giá và voucher của ${shortSku(leaky.name)} — Product CTR cao nhưng CTOR thấp.`, `Check pricing and vouchers for ${shortSku(leaky.name)} — high Product CTR but low CTOR.`)
       : risers[0]
-        ? `Tăng thời lượng giới thiệu ${shortSku(risers[0].name)} trên live khi còn đang lên.`
+        ? t(`Tăng thời lượng giới thiệu ${shortSku(risers[0].name)} trên live khi còn đang lên.`, `Give ${shortSku(risers[0].name)} more airtime on live while it is rising.`)
         : null;
   return { headline, points, action };
 }
@@ -401,11 +410,12 @@ export interface AdsInsightInput {
 
 function adsLine(ads: AdsInsightInput): string {
   const costChg = pctChange(ads.prevCost, ads.cost);
-  const roiTxt = (v: number) => `${v.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}x`;
+  const roiTxt = (v: number) => `${v.toLocaleString(numLocale(), { maximumFractionDigits: 1 })}x`;
   return (
-    `Ads toàn cửa hàng: chi ${money(ads.cost)}${costChg != null ? ` (${signed(costChg, 0)} so với cùng kỳ)` : ""}` +
-    (ads.roi != null ? `, ROI ${roiTxt(ads.roi)}${ads.prevRoi != null ? ` (tháng trước ${roiTxt(ads.prevRoi)})` : ""}` : "") +
-    (ads.zeroOrderDays ? `; ${ads.zeroOrderDays} ngày có chi phí Ads nhưng không phát sinh đơn` : "") +
+    t(`Ads toàn cửa hàng: chi ${money(ads.cost)}`, `Shop-wide Ads: spent ${money(ads.cost)}`) +
+    (costChg != null ? ` (${signed(costChg, 0)} ${t("so với cùng kỳ", "vs the same period")})` : "") +
+    (ads.roi != null ? `, ROI ${roiTxt(ads.roi)}${ads.prevRoi != null ? ` (${t("tháng trước", "last month")} ${roiTxt(ads.prevRoi)})` : ""}` : "") +
+    (ads.zeroOrderDays ? t(`; ${ads.zeroOrderDays} ngày có chi phí Ads nhưng không phát sinh đơn`, `; ${ads.zeroOrderDays} day(s) with Ads spend but no orders`) : "") +
     "."
   );
 }
@@ -422,7 +432,10 @@ export function contextInsight(camps: CampCompareRow[], slots: SlotInsightRow[],
   const bestSlot = sorted[0], worstSlot = sorted[sorted.length - 1];
   const slotLine =
     bestSlot && worstSlot && bestSlot !== worstSlot
-      ? `Khung giờ bắt đầu phiên: ${bestSlot.label.toLowerCase()} hiệu quả nhất (${money(bestSlot.cur.gmvPerHour!)}/giờ), ${worstSlot.label.toLowerCase()} thấp nhất (${money(worstSlot.cur.gmvPerHour!)}/giờ, ${worstSlot.cur.n} phiên).`
+      ? t(
+          `Khung giờ bắt đầu phiên: ${bestSlot.label.toLowerCase()} hiệu quả nhất (${money(bestSlot.cur.gmvPerHour!)}/giờ), ${worstSlot.label.toLowerCase()} thấp nhất (${money(worstSlot.cur.gmvPerHour!)}/giờ, ${worstSlot.cur.n} phiên).`,
+          `Session start time: ${bestSlot.label.toLowerCase()} is the most effective (${money(bestSlot.cur.gmvPerHour!)}/hour), ${worstSlot.label.toLowerCase()} the lowest (${money(worstSlot.cur.gmvPerHour!)}/hour, ${worstSlot.cur.n} sessions).`
+        )
       : null;
   const points: string[] = [];
   if (hasAds) points.push(adsLine(ads!));
@@ -434,9 +447,12 @@ export function contextInsight(camps: CampCompareRow[], slots: SlotInsightRow[],
     .filter((x): x is { r: CampCompareRow; h: number } => x.h != null && x.h <= -10)
     .sort((a, b) => a.h - b.h)[0];
   const action = worstCamp
-    ? `Rà soát cách vận hành ${worstCamp.r.key === "daily" ? DAY_TYPE.daily : CAMP_SHORT[worstCamp.r.key]}: GMV/giờ ${signed(worstCamp.h, 0)} so với cùng ${worstCamp.r.key === "daily" ? "kỳ" : "khung"} tháng trước.`
+    ? t(
+        `Rà soát cách vận hành ${worstCamp.r.key === "daily" ? DAY_TYPE.daily : CAMP_SHORT[worstCamp.r.key]}: GMV/giờ ${signed(worstCamp.h, 0)} so với cùng ${worstCamp.r.key === "daily" ? "kỳ" : "khung"} tháng trước.`,
+        `Review how ${worstCamp.r.key === "daily" ? DAY_TYPE.daily : CAMP_SHORT[worstCamp.r.key]} is run: GMV/hour ${signed(worstCamp.h, 0)} vs the same ${worstCamp.r.key === "daily" ? "period" : "window"} last month.`
+      )
     : bestSlot && worstSlot && bestSlot !== worstSlot && worstSlot.cur.gmvPerHour! <= bestSlot.cur.gmvPerHour! * 0.8
-      ? `Cân nhắc dời bớt phiên ${worstSlot.label.toLowerCase()} sang ${bestSlot.label.toLowerCase()}.`
+      ? t(`Cân nhắc dời bớt phiên ${worstSlot.label.toLowerCase()} sang ${bestSlot.label.toLowerCase()}.`, `Consider moving some ${worstSlot.label.toLowerCase()} sessions to ${bestSlot.label.toLowerCase()}.`)
       : null;
   return { headline, points, action };
 }
@@ -451,13 +467,13 @@ export function sectionNextSteps(
   controlOpsGroup: "daily" | "camp" | null | undefined
 ): string[] {
   const out: string[] = [];
-  const add = (t: string | null | undefined) => {
-    if (t && !out.includes(t)) out.push(t);
+  const add = (s: string | null | undefined) => {
+    if (s && !out.includes(s)) out.push(s);
   };
   add(ins.products?.action);
   add(ins.people?.action);
   const ctx = ins.context?.action;
-  if (!(ctx && controlOpsGroup === "daily" && ctx.startsWith(`Rà soát cách vận hành ${DAY_TYPE.daily}:`))) add(ctx);
+  if (!(ctx && controlOpsGroup === "daily" && (ctx.startsWith(`Rà soát cách vận hành ${DAY_TYPE.daily}:`) || ctx.startsWith(`Review how ${DAY_TYPE.daily} is run:`)))) add(ctx);
   if (!controlOpsGroup) add(ins.shop?.action);
   return out;
 }

@@ -1,4 +1,5 @@
 import { PAL } from "../../components/brand-workspace/report/theme";
+import { displayLang, t } from "../displayLang";
 
 // Xuất Report Tháng ra MỘT file .html độc lập để gửi brand: giữ nguyên bố cục/biểu đồ của màn report, không còn tham chiếu
 // tới app (không URL, không script của app, không title/favicon của app). Nguồn là DOM đã vẽ của bản "forBrand" (xem
@@ -163,7 +164,7 @@ export function flattenWidthMedia(css: string, width: number): string {
 // Bản in: mỗi trang report = đúng 1 trang PDF cao vừa nội dung (khổ giấy riêng theo trang, đặt ở __preparePdf) nên không có chỗ ngắt
 // cắt ngang biểu đồ/bảng/khung Insight. Mọi tab của bảng có tab in nối tiếp (mỗi bản tự có hàng tab đang sáng làm nhãn).
 const PDF_RULES = `html,body{-webkit-print-color-adjust:exact;print-color-adjust:exact;margin:0}
-nav[aria-label="Các trang của report"],[data-pager]{display:none!important}
+nav[data-report-rail],[data-pager]{display:none!important}
 #report-root,.pdf-sections{padding:0!important;gap:0!important;max-width:none!important}
 section[id^=mr-]{display:block!important;margin:0 16px!important;padding-top:16px}
 [data-variant][hidden]{display:block!important}
@@ -274,8 +275,8 @@ function show(id,scroll){var i=ids.indexOf(id);if(i<0){id=ids[0];i=0;}
   secs.forEach(function(s){s.style.display=s.id==='mr-'+id?'':'none';});
   rail.forEach(function(b){var on=b.getAttribute('data-rail')===id;if(on)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');b.style.color=on?'${PAL.gold}':'${PAL.muted}';b.style.background=on?'${PAL.panel2}':'transparent';});
   pager.innerHTML='';var lab=function(j){return rail[j].textContent.replace(/^\\d+/,'').trim();};
-  if(i>0)pager.appendChild(btn('‹ Trang trước · '+lab(i-1),ids[i-1]));else pager.appendChild(document.createElement('span'));
-  if(i<ids.length-1)pager.appendChild(btn('Trang sau · '+lab(i+1)+' ›',ids[i+1]));
+  if(i>0)pager.appendChild(btn('‹ ${t("Trang trước", "Previous")} · '+lab(i-1),ids[i-1]));else pager.appendChild(document.createElement('span'));
+  if(i<ids.length-1)pager.appendChild(btn('${t("Trang sau", "Next")} · '+lab(i+1)+' ›',ids[i+1]));
   try{history.replaceState(null,'','#mr-'+id);}catch(e){}
   if(scroll)window.scrollTo(0,0);
   var cur=rail[i];if(cur&&cur.parentElement.scrollWidth>cur.parentElement.clientWidth)cur.parentElement.scrollTo({left:Math.max(0,cur.offsetLeft-12)});}
@@ -290,7 +291,7 @@ document.querySelectorAll('section[id^=mr-]').forEach(function(s){var n=s.id.sli
 st.remove();var p=document.createElement('style');p.textContent=css;document.head.appendChild(p);};`;
 
   return `<!doctype html>
-<html lang="vi">
+<html lang="${displayLang()}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -300,9 +301,9 @@ st.remove();var p=document.createElement('style');p.textContent=css;document.hea
 ${pdf ? flattenWidthMedia(collectCss(), PDF_PAGE_WIDTH) : collectCss()}
 html,body{margin:0;background:${PAL.bg};color:${PAL.cream};font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
 #report-root{max-width:1180px;margin:0 auto;padding:12px}
-nav[aria-label="Các trang của report"]{top:0!important}
+nav[data-report-rail]{top:0!important}
 svg.recharts-surface{width:100%;height:auto;max-width:100%}
-@media print{nav[aria-label="Các trang của report"]{position:static!important}section[id^=mr-]{display:block!important}}
+@media print{nav[data-report-rail]{position:static!important}section[id^=mr-]{display:block!important}}
 @media print{${PDF_RULES}}
 </style>
 </head>

@@ -6,6 +6,7 @@ import { adsDayPoints, adsPhaseRows, adsRoasRows, adsTypeRows, dayRuns } from ".
 import { fmtDateVn, fmtFixed, fmtVndShort } from "../../../lib/format";
 import { columns, fmtP, svg, tbl, TX } from "./demoCharts";
 import { DAY_TYPE_SHORT } from "./theme";
+import { monthLong, t } from "../../../lib/displayLang";
 
 // Trang Quảng cáo theo bản demo Report Tháng (scratchpad/build/template.html, #p7): bảng theo loại chi, bảng theo giai đoạn,
 // cột chồng chi theo ngày kèm vạch Target, ROAS Live theo loại ngày, Phương pháp. Markup/class lấy nguyên từ demo (demo.css, tiền tố .rt);
@@ -31,9 +32,9 @@ function dayChart(points: ReturnType<typeof adsDayPoints>, month: string): strin
   dayRuns(points, (p) => (p.bucket === "daily" ? null : p.bucket)).forEach((r) => {
     o += `<rect x="${X(r.from)}" y="${m.t}" width="${slot * (r.to - r.from + 1)}" height="${ph}" style="fill:var(--gold);fill-opacity:.09"/>` + TX(X(r.from) + (slot * (r.to - r.from + 1)) / 2, m.t - 8, DAY_TYPE_SHORT[r.label as CampDayBucket], { s: 11, c: "var(--gold)", w: 700 });
   });
-  dayRuns(points, (p) => (p.hasActual ? null : "chưa có số")).forEach((r) => {
+  dayRuns(points, (p) => (p.hasActual ? null : "-")).forEach((r) => {
     o += `<rect x="${X(r.from)}" y="${m.t}" width="${slot * (r.to - r.from + 1)}" height="${ph}" style="fill:#8a8a94;fill-opacity:.12"/>`;
-    if (r.to - r.from >= 1) o += TX(X(r.from) + (slot * (r.to - r.from + 1)) / 2, m.t - 8, "chưa có số", { s: 11 });
+    if (r.to - r.from >= 1) o += TX(X(r.from) + (slot * (r.to - r.from + 1)) / 2, m.t - 8, t("chưa có số", "no data"), { s: 11 });
   });
   for (let v = 0; v <= ymax; v += step) o += `<line x1="${m.l}" x2="${Wd - m.r}" y1="${Y(v)}" y2="${Y(v)}" style="stroke:var(--line)"/>` + TX(m.l - 6, Y(v) + 4, `${v}M`, { a: "end", s: 10 });
   points.forEach((p) => {
@@ -51,43 +52,43 @@ function dayChart(points: ReturnType<typeof adsDayPoints>, month: string): strin
     }
     if (p.target != null) o += `<line x1="${x - 2}" x2="${x + bw + 2}" y1="${Y(target)}" y2="${Y(target)}" style="stroke:var(--cream);stroke-width:2.2"/>`;
     o += TX(x + bw / 2, H - 14, String(p.day), { s: 10 });
-    const tip = `Ngày ${p.day}/${month.slice(5)} · Target ${p.target != null ? `${fmtFixed(target, 1)}M` : "—"}${p.hasActual ? ` · thực tế ${fmtFixed(mil(p.total), 1)}M (Live ${fmtFixed(mil(p.live), 1)} · Product ${fmtFixed(mil(p.product), 1)} · Creator ${fmtFixed(mil(p.creator), 1)})` : " · chưa có số thực tế"}`;
+    const tip = `${t("Ngày", "Day")} ${p.day}/${month.slice(5)} · Target ${p.target != null ? `${fmtFixed(target, 1)}M` : "—"}${p.hasActual ? ` · ${t("thực tế", "actual")} ${fmtFixed(mil(p.total), 1)}M (Live ${fmtFixed(mil(p.live), 1)} · Product ${fmtFixed(mil(p.product), 1)} · Creator ${fmtFixed(mil(p.creator), 1)})` : t(" · chưa có số thực tế", " · no actuals yet")}`;
     o += `<rect x="${X(p.day)}" y="${m.t}" width="${slot}" height="${ph}" style="fill:transparent"><title>${tip}</title></rect>`;
   });
-  o += TX(m.l + pw / 2, H - 1, `Ngày trong tháng ${month.slice(5)} (triệu đồng)`, { s: 11 });
+  o += TX(m.l + pw / 2, H - 1, t(`Ngày trong tháng ${month.slice(5)} (triệu đồng)`, `Day of ${monthLong(month)} (millions)`), { s: 11 });
   return svg(Wd, H, o);
 }
 
 export const AdsPlanPanel: React.FC<{ rows: AdsDayRow[]; s: AdsMonthSummary; month: string; bucketOf: (date: string) => CampDayBucket; hasCampaignFile?: boolean }> = ({ rows, s, month, bucketOf, hasCampaignFile = true }) => {
   const mm = month.slice(5);
-  const span = s.lastActual ? `1–${dm(s.lastActual)}` : `tháng ${mm}`;
+  const span = s.lastActual ? `1–${dm(s.lastActual)}` : t(`tháng ${mm}`, monthLong(month));
   const types = adsTypeRows(rows, month);
   const phases = adsPhaseRows(rows, month, bucketOf);
   const points = adsDayPoints(rows, month, bucketOf);
   const roas = adsRoasRows(s);
   const phaseLabel = (b: CampDayBucket) => {
-    if (b === "daily") return "Daily (ngoài Campaign)";
+    if (b === "daily") return t("Daily (ngoài Campaign)", "Daily (outside Campaign)");
     const runs = dayRuns(points, (p) => (p.bucket === b ? b : null));
     return `${DAY_TYPE_SHORT[b]}${runs.length ? ` (${runs.map((r) => (r.from === r.to ? `${r.from}` : `${r.from}–${r.to}`)).join(", ")}/${mm})` : ""}`;
   };
   const mtd = tbl(
-    ["Loại chi", "Target luỹ kế", "Thực tế luỹ kế", "Chênh lệch", "Target cả tháng", "% Target tháng"],
+    [t("Loại chi", "Spend type"), t("Target luỹ kế", "Target to date"), t("Thực tế luỹ kế", "Actual to date"), t("Chênh lệch", "Gap"), t("Target cả tháng", "Monthly target"), t("% Target tháng", "% of monthly target")],
     types.map((r) => {
       const row = [{ t: `<b>${r.label}</b>`, c: "" }, M1(r.mtdTarget), M1(r.mtdActual), dtd(r.delta), M1(r.monthTarget), { t: r.pctMonth == null ? "—" : fmtP(r.pctMonth, 1, false), c: "nt" }];
       return r.key === "total" ? { c: row, hl: true } : row;
     })
   );
   const phaseTbl = tbl(
-    ["Giai đoạn", "Số ngày", "Target", "Thực tế", "Chênh lệch", "% chi tháng"],
+    [t("Giai đoạn", "Phase"), t("Số ngày", "Days"), "Target", t("Thực tế", "Actual"), t("Chênh lệch", "Gap"), t("% chi tháng", "% of month spend")],
     phases.map((r) => [{ t: `<b>${phaseLabel(r.bucket)}</b>`, c: "" }, String(r.days), M1(r.target), M1(r.actual), dtd(r.delta), { t: r.share == null ? "—" : fmtP(r.share, 1, false), c: "nt" }])
   );
   const roasChart = columns(
     roas.map((r) => ({ l: DAY_TYPE_SHORT[r.bucket], v: [r.roas ?? 0], colors: s.liveRoas != null && r.roas != null ? [r.roas < s.liveRoas * 0.75 ? "var(--red)" : r.roas >= s.liveRoas * 1.25 ? "var(--green)" : "var(--gold)"] : undefined })),
     [{ color: "var(--gold)" }],
-    { min: 0, max: Math.max(1, Math.ceil(Math.max(...roas.map((r) => r.roas ?? 0), s.liveRoas ?? 0) * 1.2)), h: 250, ref: s.liveRoas ?? undefined, refLabel: s.liveRoas != null ? `Cả kỳ ${roasX(s.liveRoas)}` : "", fmt: (v: number) => roasX(v) }
+    { min: 0, max: Math.max(1, Math.ceil(Math.max(...roas.map((r) => r.roas ?? 0), s.liveRoas ?? 0) * 1.2)), h: 250, ref: s.liveRoas ?? undefined, refLabel: s.liveRoas != null ? `${t("Cả kỳ", "Whole period")} ${roasX(s.liveRoas)}` : "", fmt: (v: number) => roasX(v) }
   );
   const roasTbl = tbl(
-    ["Loại ngày", "Số ngày", "Ads Live", "LIVE GMV", "ROAS Live"],
+    [t("Loại ngày", "Day type"), t("Số ngày", "Days"), "Ads Live", "LIVE GMV", "ROAS Live"],
     roas.map((r) => {
       const tone = s.liveRoas != null && r.roas != null ? (r.roas < s.liveRoas * 0.75 ? "dn" : r.roas >= s.liveRoas * 1.25 ? "up" : "") : "";
       const row = [DAY_TYPE_SHORT[r.bucket], String(r.days), fmtVndShort(r.liveAds), fmtVndShort(r.liveGmv), tone ? { t: roasX(r.roas), c: tone } : roasX(r.roas)];
@@ -96,36 +97,46 @@ export const AdsPlanPanel: React.FC<{ rows: AdsDayRow[]; s: AdsMonthSummary; mon
   );
   return (
     <>
-      <div className="pn"><div className="pnh">{METRIC.adsCost} theo loại chi, {span}</div><div className="pns">Target và thực tế luỹ kế tới ngày có số ({s.lastActual ? dm(s.lastActual) : "chưa có"}). Target cả tháng gồm cả các ngày chưa tới. % Target tháng = thực tế luỹ kế ÷ Target cả tháng.</div><div className="tw"><table id="adsMtd" dangerouslySetInnerHTML={{ __html: mtd }} /></div></div>
-      {phases.length > 0 && <div className="pn"><div className="pnh">{METRIC.adsCost} theo giai đoạn</div><div className="pns">Daily = các ngày ngoài Campaign. % chi tháng = tỷ trọng trong tổng Ads cost thực tế luỹ kế.</div><div className="tw"><table id="adsPhase" dangerouslySetInnerHTML={{ __html: phaseTbl }} /></div></div>}
+      <div className="pn"><div className="pnh">{METRIC.adsCost} {t("theo loại chi", "by spend type")}, {span}</div><div className="pns">{t(`Target và thực tế luỹ kế tới ngày có số (${s.lastActual ? dm(s.lastActual) : "chưa có"}). Target cả tháng gồm cả các ngày chưa tới. % Target tháng = thực tế luỹ kế ÷ Target cả tháng.`, `Target and actual to the last day with data (${s.lastActual ? dm(s.lastActual) : "none yet"}). The monthly target includes days still to come. % of monthly target = actual to date ÷ monthly target.`)}</div><div className="tw"><table id="adsMtd" dangerouslySetInnerHTML={{ __html: mtd }} /></div></div>
+      {phases.length > 0 && <div className="pn"><div className="pnh">{METRIC.adsCost} {t("theo giai đoạn", "by phase")}</div><div className="pns">{t("Daily = các ngày ngoài Campaign. % chi tháng = tỷ trọng trong tổng Ads cost thực tế luỹ kế.", "Daily = days outside Campaign. % of month spend = share of total actual Ads cost to date.")}</div><div className="tw"><table id="adsPhase" dangerouslySetInnerHTML={{ __html: phaseTbl }} /></div></div>}
       <div className="pn">
-        <div className="pnh">{METRIC.adsCost} theo ngày, tháng {mm}</div>
-        <div className="pns">Cột chồng = thực tế Live, Product (GMV Max), Creator; vạch ngang = Target ngày (Total); nền vàng = ngày Campaign; nền xám = ngày chưa có số. Đơn vị: triệu đồng.</div>
-        <div id="c_adsday" role="img" aria-label={`Ads cost theo ngày tháng ${mm}: ${points.filter((p) => p.hasActual).length} ngày có số`} dangerouslySetInnerHTML={{ __html: dayChart(points, month) }} />
+        <div className="pnh">{METRIC.adsCost} {t(`theo ngày, tháng ${mm}`, `by day, ${monthLong(month)}`)}</div>
+        <div className="pns">{t("Cột chồng = thực tế Live, Product (GMV Max), Creator; vạch ngang = Target ngày (Total); nền vàng = ngày Campaign; nền xám = ngày chưa có số. Đơn vị: triệu đồng.", "Stacked bars = actual Live, Product (GMV Max), Creator; horizontal mark = daily Target (Total); gold background = Campaign days; grey = no data yet. Unit: millions.")}</div>
+        <div id="c_adsday" role="img" aria-label={t(`Ads cost theo ngày tháng ${mm}: ${points.filter((p) => p.hasActual).length} ngày có số`, `Daily Ads cost, ${monthLong(month)}: ${points.filter((p) => p.hasActual).length} days with data`)} dangerouslySetInnerHTML={{ __html: dayChart(points, month) }} />
         <div className="legend">
           <span><i style={{ background: "var(--gold)" }} />Live</span>
           <span><i style={{ background: "#7fb0e0" }} />Product (GMV Max)</span>
           <span><i style={{ background: "#e08a4b" }} />Creator</span>
-          <span><i style={{ background: "var(--cream)", height: 3, verticalAlign: 3 }} />Target ngày (Total)</span>
-          {s.offDays.length > 0 && <span>Ngày chi lệch Target từ 30%: {s.offDays.map((d) => `${dm(d.date)} ${fmtP(d.pct, 1)}`).join(" · ")}</span>}
+          <span><i style={{ background: "var(--cream)", height: 3, verticalAlign: 3 }} />{t("Target ngày (Total)", "Daily Target (Total)")}</span>
+          {s.offDays.length > 0 && <span>{t("Ngày chi lệch Target từ 30%", "Days ≥30% off Target")}: {s.offDays.map((d) => `${dm(d.date)} ${fmtP(d.pct, 1)}`).join(" · ")}</span>}
         </div>
       </div>
       {roas.length > 0 && (
         <div className="pn">
-          <div className="pnh">ROAS Live theo loại ngày</div>
-          <div className="pns">{METRIC.liveGmv} YFB ÷ Ads Live cùng ngày{s.liveRoas != null ? ` · đường nét đứt = ROAS Live cả kỳ (${roasX(s.liveRoas)})` : ""}. Ads Live của shop có thể chạy cho cả phiên ngoài YFB nên đây là ước tính.</div>
-          <div id="c_roas" role="img" aria-label={`ROAS Live theo loại ngày: ${roas.map((r) => `${DAY_TYPE_SHORT[r.bucket]} ${roasX(r.roas)}`).join(", ")}`} dangerouslySetInnerHTML={{ __html: roasChart }} />
+          <div className="pnh">{t("ROAS Live theo loại ngày", "ROAS Live by day type")}</div>
+          <div className="pns">
+            {t(
+              `${METRIC.liveGmv} YFB ÷ Ads Live cùng ngày${s.liveRoas != null ? ` · đường nét đứt = ROAS Live cả kỳ (${roasX(s.liveRoas)})` : ""}. Ads Live của shop có thể chạy cho cả phiên ngoài YFB nên đây là ước tính.`,
+              `YFB ${METRIC.liveGmv} ÷ same-day Ads Live${s.liveRoas != null ? ` · dashed line = whole-period ROAS Live (${roasX(s.liveRoas)})` : ""}. The shop's Live Ads may also run for sessions outside YFB, so this is an estimate.`
+            )}
+          </div>
+          <div id="c_roas" role="img" aria-label={`${t("ROAS Live theo loại ngày", "ROAS Live by day type")}: ${roas.map((r) => `${DAY_TYPE_SHORT[r.bucket]} ${roasX(r.roas)}`).join(", ")}`} dangerouslySetInnerHTML={{ __html: roasChart }} />
           {/* Bảng số tính ROAS gập lại: ROAS từng loại ngày đã ghi trên biểu đồ (audit trùng lặp 30/10). */}
           <details>
-            <summary>Ads Live và LIVE GMV từng loại ngày</summary>
+            <summary>{t("Ads Live và LIVE GMV từng loại ngày", "Ads Live and LIVE GMV by day type")}</summary>
             <div className="tw" style={{ marginTop: 10 }}><table id="roasTbl" dangerouslySetInnerHTML={{ __html: roasTbl }} /></div>
           </details>
         </div>
       )}
       <div className="pn">
         <details style={{ margin: 0, border: 0, padding: 0 }}>
-          <summary>Phương pháp</summary>
-          <p>Số Ads theo ngày lấy từ bảng Ads theo ngày của brand (Target và thực tế Live, Product, Creator do ops dán từ sheet){hasCampaignFile ? "" : `, chưa có file Campaign overview tháng ${mm}`}. ROAS Live = LIVE GMV YFB ÷ Ads Live cùng ngày. Chênh lệch = thực tế ÷ Target − 1.</p>
+          <summary>{t("Phương pháp", "Methodology")}</summary>
+          <p>
+            {t(
+              `Số Ads theo ngày lấy từ bảng Ads theo ngày của brand (Target và thực tế Live, Product, Creator do ops dán từ sheet)${hasCampaignFile ? "" : `, chưa có file Campaign overview tháng ${mm}`}. ROAS Live = LIVE GMV YFB ÷ Ads Live cùng ngày. Chênh lệch = thực tế ÷ Target − 1.`,
+              `Daily Ads figures come from the brand's daily Ads tracking sheet (Target and actual Live, Product, Creator)${hasCampaignFile ? "" : `; no Campaign overview file for ${monthLong(month)} yet`}. ROAS Live = YFB LIVE GMV ÷ same-day Ads Live. Gap = actual ÷ Target − 1.`
+            )}
+          </p>
         </details>
       </div>
     </>

@@ -2,6 +2,7 @@
 import { fmtFixed } from "../../../lib/format";
 
 import { PAL } from "./theme";
+import { numLocale, t } from "../../../lib/displayLang";
 
 // Định dạng + mốc tháng dùng riêng trong Report Tháng. Tách khỏi MonthlyReportTabs.tsx 2026-10-01.
 // Cố ý tách khỏi src/lib/format.ts dùng chung: mấy hàm này gắn với cách TRÌNH BÀY của riêng report
@@ -27,7 +28,7 @@ export function nextMonthStrLocal(month: string): string {
 }
 
 export function fmtInt(n: number): string {
-  return Math.round(n).toLocaleString("vi-VN");
+  return Math.round(n).toLocaleString(numLocale());
 }
 
 // recharts khai formatter của <Tooltip> nhận ValueType | undefined (string | number | mảng của
@@ -45,15 +46,15 @@ export function fmtPct(n: number | null): string {
 }
 
 export function fmtHours(n: number): string {
-  return `${n.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h`;
+  return `${n.toLocaleString(numLocale(), { maximumFractionDigits: 1 })}h`;
 }
 
 // Status khuyến mãi trong file thật là tiếng Anh nguyên văn (expired/deactivated) — "ongoing" đã
 // bị lọc khỏi Top khuyến mãi ở nguồn (monthlyProductSlice.ts) nên không cần map ở đây.
 export function promoStatusLabel(status: string): { label: string; color: string } {
   const s = status.toLowerCase();
-  if (s === "expired") return { label: "Đã Kết Thúc", color: PAL.gold };
-  if (s === "deactivated") return { label: "Đã Tắt", color: PAL.red };
+  if (s === "expired") return { label: t("Đã Kết Thúc", "Ended"), color: PAL.gold };
+  if (s === "deactivated") return { label: t("Đã Tắt", "Deactivated"), color: PAL.red };
   return { label: status, color: PAL.muted };
 }
 

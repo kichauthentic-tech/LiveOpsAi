@@ -4,6 +4,7 @@ import type { KeyMetricKey } from "./keyMetrics";
 import { keyMetricsTable, type KeyMetricsMonth, type KeyMetricsTab, type ScoreRow } from "./brandReport";
 import type { ChangeTone } from "./brandReport";
 import type { PlanRunRateSlot } from "../performance/planRunRate";
+import { t } from "../displayLang";
 
 // Số liệu thuần cho các biểu đồ/bảng GĐ2 của Report Tháng (cầu GMV, GMV/giờ kế hoạch, bảng dọc theo loại ngày, scatter SKU, cặp host).
 // Không import React — test được bằng vitest.
@@ -47,7 +48,7 @@ export function targetBridge(rows: ScoreRow[], labelOf: (k: CampDayBucket) => st
     sum += r.actual - base;
   }
   const rest = all.actual - start - sum;
-  if (Math.abs(rest) >= 1_000_000) steps.push({ label: "Ngoài lịch", delta: rest });
+  if (Math.abs(rest) >= 1_000_000) steps.push({ label: t("Ngoài lịch", "Unplanned"), delta: rest });
   return { start, end: all.actual, steps };
 }
 
@@ -177,7 +178,7 @@ export function median(xs: number[]): number | null {
 
 /** Huy hiệu hạng so với tháng trước: ▲ tăng, ▼ giảm, = giữ, "mới" khi tháng trước ngoài bảng. */
 export function rankBadge(prevRank: number | null, rank: number): { text: string; tone: "up" | "down" | "flat" | "new" } {
-  if (prevRank == null) return { text: "mới", tone: "new" };
+  if (prevRank == null) return { text: t("mới", "new"), tone: "new" };
   const d = prevRank - rank;
   if (d > 0) return { text: `▲ ${d}`, tone: "up" };
   if (d < 0) return { text: `▼ ${-d}`, tone: "down" };

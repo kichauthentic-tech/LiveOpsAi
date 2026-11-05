@@ -1,7 +1,10 @@
+import { isEn } from "../../../lib/displayLang";
 // Bộ dựng SVG/bảng của bản demo Report Tháng (scratchpad/build/template.html), chuyển nguyên văn sang hàm thuần trả chuỗi HTML.
 // Giữ y hệt demo — không tự chỉnh; muốn đổi giao diện thì đổi ở demo trước.
-export const fmtM = (v: number) => { const a = Math.abs(v); const s = v < 0 ? "−" : ""; if (a >= 1e9) return s + (a / 1e9).toFixed(2).replace(".", ",") + "B"; if (a >= 1e6) return s + (a / 1e6).toFixed(a >= 1e8 ? 0 : 1).replace(".", ",").replace(/,0$/, "") + "M"; return s + Math.round(a / 1e3) + "K"; };
-export const fmtP = (v: number, d = 0, sign = true) => (v < 0 ? "−" : sign && v > 0 ? "+" : "") + Math.abs(v).toFixed(d).replace(".", ",") + "%";
+// Dấu thập phân theo ngôn ngữ report: phẩy (Việt) / chấm (Anh) — lib/displayLang.ts.
+const dec = (x: string) => (isEn() ? x : x.replace(".", ","));
+export const fmtM = (v: number) => { const a = Math.abs(v); const s = v < 0 ? "−" : ""; if (a >= 1e9) return s + dec((a / 1e9).toFixed(2)) + "B"; if (a >= 1e6) return s + dec((a / 1e6).toFixed(a >= 1e8 ? 0 : 1)).replace(/[.,]0$/, "") + "M"; return s + Math.round(a / 1e3) + "K"; };
+export const fmtP = (v: number, d = 0, sign = true) => (v < 0 ? "−" : sign && v > 0 ? "+" : "") + dec(Math.abs(v).toFixed(d)) + "%";
 export const esc = (s: unknown) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c as "&" | "<" | ">"]));
 export const num = (s: unknown) => parseFloat(String(s).replace("−", "-").replace(/\./g, "").replace(",", ".").replace("%", "").replace("+", ""));
 
@@ -71,7 +74,7 @@ export function stack100(cols: any[], segs: any[], o: any): string {
     c.v.forEach((v: number, j: number) => {
       const hh = (v / tot) * ph; y -= hh;
       out += `<rect x="${x}" y="${y}" width="${bw}" height="${hh}" style="fill:${segs[j].color};stroke:var(--panel);stroke-width:1.5"/>`;
-      if (hh > 17) out += TX(x + bw / 2, y + hh / 2 + 4, ((v / tot) * 100).toFixed(1).replace(".", ",") + "%", { c: "#0b0b0d", w: 700, s: 11 });
+      if (hh > 17) out += TX(x + bw / 2, y + hh / 2 + 4, dec(((v / tot) * 100).toFixed(1)) + "%", { c: "#0b0b0d", w: 700, s: 11 });
     });
     out += TX(x + bw / 2, H - 9, c.l, { s: 11 });
   });

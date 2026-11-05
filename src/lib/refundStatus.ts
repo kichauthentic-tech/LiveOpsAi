@@ -1,3 +1,4 @@
+import { byLang, t } from "./displayLang";
 // Trạng thái hoàn/huỷ của MỘT tháng — một hàm thuần cho Report Tháng và Kế Toán (28/10).
 //
 // Vì sao có file này: Report tính Refund rate = Σ "Hoàn tiền" ÷ Σ GMV theo ngày, không hỏi tháng đã chốt chưa; Kế Toán chỉ
@@ -119,19 +120,19 @@ export function compareRefundRates(
 ): { comparable: boolean; delta: number | null; note: string | null } {
   if (cur.rate == null || prev.rate == null) return { comparable: false, delta: null, note: null };
   if (cur.template === "unknown" || prev.template === "unknown" || cur.template !== prev.template) {
-    return { comparable: false, delta: null, note: "chưa so sánh được — hai tháng xuất bằng mẫu file Shop Analytics khác nhau" };
+    return { comparable: false, delta: null, note: t("chưa so sánh được — hai tháng xuất bằng mẫu file Shop Analytics khác nhau", "not comparable — the two months were exported with different Shop Analytics file templates") };
   }
   return { comparable: true, delta: cur.rate - prev.rate, note: null };
 }
 
-export const REFUND_REASON_LABEL: Record<RefundReason, string> = {
-  no_gmv: "file chưa có GMV",
-  not_settled_yet: "sàn chưa chốt hoàn/huỷ (cuối tháng + 15 ngày)",
-  file_not_covering_month: "file chưa phủ hết tháng",
-  old_template: "file xuất bằng mẫu cũ (thiếu cột Tổng doanh thu)",
-  unknown_template: "không nhận diện được mẫu file",
-  definition_unverified: "chưa xác nhận cột Hoàn tiền của mẫu mới cùng định nghĩa mẫu cũ"
-};
+export const REFUND_REASON_LABEL: Record<RefundReason, string> = byLang(() => ({
+  no_gmv: t("file chưa có GMV", "file has no GMV yet"),
+  not_settled_yet: t("sàn chưa chốt hoàn/huỷ (cuối tháng + 15 ngày)", "the platform has not settled returns/cancellations yet (month end + 15 days)"),
+  file_not_covering_month: t("file chưa phủ hết tháng", "file does not cover the whole month"),
+  old_template: t("file xuất bằng mẫu cũ (thiếu cột Tổng doanh thu)", "file exported with the old template (no Gross revenue column)"),
+  unknown_template: t("không nhận diện được mẫu file", "file template not recognised"),
+  definition_unverified: t("chưa xác nhận cột Hoàn tiền của mẫu mới cùng định nghĩa mẫu cũ", "the new template's Refunds column is not yet confirmed to match the old definition")
+}));
 
 export const DEFINITION_WARNING =
   "Cột Hoàn tiền của mẫu file mới có thể được tính khác mẫu cũ (tỷ lệ nhảy từ ~15% lên ~37% đúng lúc đổi mẫu) — chưa được xác nhận.";
@@ -159,21 +160,21 @@ export function chooseNmvRate(
   contractExpected: number | null
 ): NmvRateChoice {
   if (status && status.status === "final" && status.rate != null) {
-    return { rate: status.rate, isEstimate: false, source: "settled_month", sourceMonth: status.month, label: `Refund rate đã chốt của tháng ${status.month}` };
+    return { rate: status.rate, isEstimate: false, source: "settled_month", sourceMonth: status.month, label: t(`Refund rate đã chốt của tháng ${status.month}`, `final refund rate for ${status.month}`) };
   }
   const latest = settledHistory
     .filter((s) => s.status === "final" && s.rate != null && (!status || s.month < status.month))
     .sort((a, b) => b.month.localeCompare(a.month))[0];
   if (latest) {
-    return { rate: latest.rate, isEstimate: true, source: "latest_settled_month", sourceMonth: latest.month, label: `ước tính — theo Refund rate đã chốt gần nhất (tháng ${latest.month})` };
+    return { rate: latest.rate, isEstimate: true, source: "latest_settled_month", sourceMonth: latest.month, label: t(`ước tính — theo Refund rate đã chốt gần nhất (tháng ${latest.month})`, `estimated — based on the latest final refund rate (${latest.month})`) };
   }
   if (contractExpected != null && contractExpected > 0) {
-    return { rate: contractExpected, isEstimate: true, source: "contract_expected", sourceMonth: null, label: "ước tính — theo % hoàn dự kiến trong hợp đồng" };
+    return { rate: contractExpected, isEstimate: true, source: "contract_expected", sourceMonth: null, label: t("ước tính — theo % hoàn dự kiến trong hợp đồng", "estimated — based on the return rate expected in the contract") };
   }
   // Chưa có tháng chốt và CRM chưa nhập % hoàn: dùng Refund rate tạm tính của chính tháng (audit 30/10 — mặc định 40% làm
   // NMV của VERA T10 "sụt" 419,8M → 180,5M trong khi Refund rate thực chỉ 16,9%).
   if (status && status.rate != null && status.rate > 0) {
-    return { rate: status.rate, isEstimate: true, source: "provisional_month", sourceMonth: status.month, label: "ước tính — theo Refund rate tạm tính của tháng (đơn còn trong thời gian hoàn trả)" };
+    return { rate: status.rate, isEstimate: true, source: "provisional_month", sourceMonth: status.month, label: t("ước tính — theo Refund rate tạm tính của tháng (đơn còn trong thời gian hoàn trả)", "estimated — based on the month's provisional refund rate (orders still within the return window)") };
   }
-  return { rate: DEFAULT_RETURN_RATE_ESTIMATE, isEstimate: true, source: "default_estimate", sourceMonth: null, label: `ước tính — % hoàn mặc định ${DEFAULT_RETURN_RATE_ESTIMATE}%` };
+  return { rate: DEFAULT_RETURN_RATE_ESTIMATE, isEstimate: true, source: "default_estimate", sourceMonth: null, label: t(`ước tính — % hoàn mặc định ${DEFAULT_RETURN_RATE_ESTIMATE}%`, `estimated — default return rate ${DEFAULT_RETURN_RATE_ESTIMATE}%`) };
 }

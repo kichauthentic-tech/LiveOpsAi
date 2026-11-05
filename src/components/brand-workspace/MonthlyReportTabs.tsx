@@ -54,8 +54,12 @@ import { AffiliateTrackPanel } from "./report/AffiliateTrackPanel";
 import { KeyMetricsDemoPage, NmvDemoPage, SummaryDemoPage, type NmvMonth } from "./report/DemoSummaryPages";
 import { REFUND_FINAL_DATE_KEY, decodeRefundFinalDate, encodeRefundFinalDate } from "../../lib/report/refundFinalDate";
 import { affiliateTrackColumns, affiliateTrackTotals } from "../../lib/report/affiliateTrack";
+import { byLang, t, monthShort, monthLong } from "../../lib/displayLang";
 
-const INSIGHT_PAGES: [InsightPage, string][] = [["summary", "Tổng quan"], ["keymetrics", "Key Metrics"], ["nmv", "NMV"], ["shop", "Toàn shop"], ["why", "Nguyên nhân"], ["products", "Sản phẩm"], ["people", "Host"], ["ads", "Quảng cáo"], ["affiliate", "Affiliate"], ["next", "Kế hoạch tháng sau"]];
+const INSIGHT_PAGES: [InsightPage, string][] = byLang(
+  () => [["summary", t("Tổng quan", "Overview")], ["keymetrics", "Key Metrics"], ["nmv", "NMV"], ["shop", t("Toàn shop", "Whole shop")], ["why", t("Nguyên nhân", "Root cause")], ["products", t("Sản phẩm", "Products")], ["people", "Host"], ["ads", t("Quảng cáo", "Advertising")], ["affiliate", "Affiliate"], ["next", t("Kế hoạch tháng sau", "Next month's plan")]],
+  []
+);
 
 // Report Tháng này là report của sàn TikTok (Shopee: ShopeeMonthlyReportTabs) — chỉ đọc ca TikTok.
 const REPORT_PLATFORM = PLATFORM_PROFILES.TikTok.id;
@@ -365,13 +369,16 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   const giftByMonth = useMemo(() => last4Months.map((m) => (hiddenMonths.has(m) ? null : giftStats(view.gifts?.[m] ?? null, view.shopDays[m] ?? null))), [last4Months, hiddenMonths, view]);
   const giftCur = giftByMonth[3];
   const giftPrev = giftByMonth[2];
-  const giftLineText = giftLine(giftPrev, giftCur, `T${Number(prevMonth.slice(5))}`);
+  const giftLineText = giftLine(giftPrev, giftCur, monthShort(prevMonth));
   const giftSliceCur = view.gifts?.[month] ?? null;
   const giftsMissing = canManage && !view.gifts?.[month];
   // Chỉ nêu khi tháng CÓ quà (SKU nào, bao nhiêu món). "Quà giảm/hết" đã ở Kết luận + bảng Xu hướng 4 tháng.
   const giftNote =
     giftSliceCur?.hasAnyBatch && giftSliceCur.giftItems > 0
-      ? `Quà tặng (dưới ${fmtVndShort(GIFT_MAX_PRICE)}/món): ${fmtInt(giftSliceCur.giftItems)} món ở ${giftSliceCur.giftSkus} SKU${giftSliceCur.top[0] ? `, nhiều nhất ${shortSku(giftSliceCur.top[0][0])}` : ""} — không tính vào UPT hàng bán thật.`
+      ? t(
+          `Quà tặng (dưới ${fmtVndShort(GIFT_MAX_PRICE)}/món): ${fmtInt(giftSliceCur.giftItems)} món ở ${giftSliceCur.giftSkus} SKU${giftSliceCur.top[0] ? `, nhiều nhất ${shortSku(giftSliceCur.top[0][0])}` : ""} — không tính vào UPT hàng bán thật.`,
+          `Free gifts (under ${fmtVndShort(GIFT_MAX_PRICE)} each): ${fmtInt(giftSliceCur.giftItems)} items across ${giftSliceCur.giftSkus} SKUs${giftSliceCur.top[0] ? `, mostly ${shortSku(giftSliceCur.top[0][0])}` : ""} — excluded from the UPT of items actually sold.`
+        )
       : null;
 
   // Ngày thường vs ngày camp, cơ cấu lịch vs hiệu suất.
@@ -488,9 +495,9 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   // Khung giờ bắt đầu ca — GMV/giờ, cùng kỳ 2 tháng.
   const slotRows = useMemo(() => {
     const buckets = [
-      { key: "morning", label: "Sáng (trước 12h)", test: (h: number) => h < 12 },
-      { key: "afternoon", label: "Chiều (12h–17h)", test: (h: number) => h >= 12 && h < 17 },
-      { key: "evening", label: "Tối (từ 17h)", test: (h: number) => h >= 17 }
+      { key: "morning", label: t("Sáng (trước 12h)", "Morning (before 12:00)"), test: (h: number) => h < 12 },
+      { key: "afternoon", label: t("Chiều (12h–17h)", "Afternoon (12:00–17:00)"), test: (h: number) => h >= 12 && h < 17 },
+      { key: "evening", label: t("Tối (từ 17h)", "Evening (from 17:00)"), test: (h: number) => h >= 17 }
     ];
     const hourOf = (iso: string) => (new Date(iso).getUTCHours() + 7) % 24;
     // Chỉ số khử loại ngày: GMV thực ÷ GMV kỳ vọng nếu mỗi phiên đạt GMV/giờ trung bình của loại ngày đó (1,00 = bằng trung bình).
@@ -615,7 +622,6 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   // Trang 6 — Refund rate tháng trước cùng cửa sổ với tháng này.
   // Không so Refund rate giữa hai mẫu file Shop Analytics khác nhau (cột Hoàn tiền có thể định nghĩa khác).
   const refundRateShopPrev = shopPrevSame && shopPrevSame.gmv > 0 && refundCompare?.comparable !== false ? (shopPrevSame.refunds / shopPrevSame.gmv) * 100 : null;
-  const monthShort = (m: string) => `T${Number(m.slice(5))}`;
 
   // Top SKU: hạng tháng trước → tháng này + phễu. Tháng trước bị che với brand thì không có hạng/so sánh.
   const skuRankCur = view.skuRank?.[month] ?? null;
@@ -627,7 +633,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   // GĐ2 — số cho biểu đồ mới (lib/report/reportVisuals.ts).
   const bridgeTarget = useMemo(() => {
     const b = targetBridge(scoreboard, (k) => DAY_TYPE_SHORT[k]);
-    return b ? bridgePoints(cmp.partial ? "Target tới nay" : "Target tháng", b.start, b.steps, `${METRIC.liveGmv} thực tế`, b.end) : null;
+    return b ? bridgePoints(cmp.partial ? t("Target tới nay", "Target to date") : t("Target tháng", "Monthly target"), b.start, b.steps, `${METRIC.liveGmv} ${t("thực tế", "actual")}`, b.end) : null;
   }, [scoreboard, cmp.partial]);
   const planHours = useMemo(
     () => (planRR ? planHourRows(planRR.rr.slots, planRR.rr.through, Object.fromEntries(campDetailRows.map((r) => [r.key, r.gmvPerHour != null && r.gmvPerHour > 0 ? r.gmvPerHour : null]))) : []),
@@ -637,8 +643,8 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     const row = control.find((r) => r.key === "all");
     const b = row ? trafficBridge(row) : null;
     if (!b) return null;
-    const lab = { visitors: "Lượt truy cập", cvr: "CVR shop", value: METRIC.aov } as const;
-    return { b, points: bridgePoints(cmp.partial ? `1–${Number(cmp.prevEnd.slice(8))}/${prevMonth.slice(5)}` : `T${Number(prevMonth.slice(5))}`, b.from, b.parts.map((p) => ({ label: lab[p.key === "aov" ? "value" : p.key], delta: p.value })), cmp.partial ? `1–${Number(cmp.curEnd.slice(8))}/${month.slice(5)}` : `T${Number(month.slice(5))}`, b.to) };
+    const lab = { visitors: t("Lượt truy cập", "Visits"), cvr: t("CVR shop", "Shop CVR"), value: METRIC.aov } as const;
+    return { b, points: bridgePoints(cmp.partial ? `1–${Number(cmp.prevEnd.slice(8))}/${prevMonth.slice(5)}` : monthShort(prevMonth), b.from, b.parts.map((p) => ({ label: lab[p.key === "aov" ? "value" : p.key], delta: p.value })), cmp.partial ? `1–${Number(cmp.curEnd.slice(8))}/${month.slice(5)}` : monthShort(month), b.to) };
   }, [control, cmp, month, prevMonth]);
   const skuPoints = useMemo<ScatterPoint[]>(
     () =>
@@ -698,7 +704,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     giftSlice: giftSliceCur,
     giftByMonth,
     giftMonthLabels: last4Months.map(trendColLabel),
-    giftPeriodLabel: trendDay ? `4 kỳ 1–${trendDay}` : "4 tháng",
+    giftPeriodLabel: trendDay ? t(`4 kỳ 1–${trendDay}`, `4 periods 1–${trendDay}`) : t("4 tháng", "4 months"),
     giftMaxPriceLabel: fmtVndShort(GIFT_MAX_PRICE),
     promo: topPromo,
     prevMonthNo: Number(prevMonth.slice(5)),
@@ -718,10 +724,10 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     }),
     spread,
     top: topSessions,
-    prevPeriod: cmp.partial ? `1–${Number(cmp.prevEnd.slice(8))}/${prevMonth.slice(5)}` : `T${Number(prevMonth.slice(5))}`,
-    curPeriod: cmp.partial ? `1–${Number(cmp.curEnd.slice(8))}/${month.slice(5)}` : `T${Number(month.slice(5))}`,
-    prevMonthLabel: `T${Number(prevMonth.slice(5))}`,
-    curMonthLabel: `T${Number(month.slice(5))}`
+    prevPeriod: cmp.partial ? `1–${Number(cmp.prevEnd.slice(8))}/${prevMonth.slice(5)}` : monthShort(prevMonth),
+    curPeriod: cmp.partial ? `1–${Number(cmp.curEnd.slice(8))}/${month.slice(5)}` : monthShort(month),
+    prevMonthLabel: monthShort(prevMonth),
+    curMonthLabel: monthShort(month)
   };
   const campDaysLabel = useMemo(() => {
     const { start, end } = monthRangeLocal(month);
@@ -783,8 +789,8 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     const liveRows =
       mixPrev && mixCur && yfbPrev != null && yfbCur != null
         ? [
-            { label: "Livestream YFB", delta: yfbCur - yfbPrev, yfb: true },
-            { label: scope.inhouseLive ? "Brand tự live" : "Seller LIVE khác", delta: Math.max(0, mixCur.liveLinked - yfbCur) - Math.max(0, mixPrev.liveLinked - yfbPrev) }
+            { label: t("Livestream YFB", "YFB livestream"), delta: yfbCur - yfbPrev, yfb: true },
+            { label: scope.inhouseLive ? t("Brand tự live", "Brand in-house live") : t("Seller LIVE khác", "Other Seller LIVE"), delta: Math.max(0, mixCur.liveLinked - yfbCur) - Math.max(0, mixPrev.liveLinked - yfbPrev) }
           ]
         : [chDelta(CHANNELS[0]?.label ?? "Seller LIVE", "liveLinked")];
     const chRows = [...liveRows, chDelta("Affiliate LIVE", "affiliate"), chDelta("Video", "video"), chDelta("Product card", "card")].filter((x): x is NonNullable<typeof x> => x !== null);
@@ -877,7 +883,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
         lowest: lowestCreator ? { creator: lowestCreator.creator, date: lowestCreator.date ? `${Number(lowestCreator.date.slice(8, 10))}/${Number(lowestCreator.date.slice(5, 7))}` : "", pct: lowestCreator.pctTarget! } : null
       }),
       next: nextBlocks({
-        nextLabel: `Tháng ${Number(nextMonth.slice(5))}`,
+        nextLabel: monthLong(nextMonth),
         hasLivePlan: !!nextPlan && nextPlan.targetGmv > 0 && nextPlan.slotCount > 0,
         hasCreatorPlan: (affiliate.next?.length ?? 0) > 0,
         withCreator: scope.affiliate
@@ -929,7 +935,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   );
   // Tiêu đề kết luận + hàng chỉ số đầu mỗi trang (tối đa 4 ô). Chỉ số lấy từ số đã tính cho phần thân trang; trang chưa đủ số thì bớt ô.
   const head = (id: InsightPage): { headline: string; metrics: PageMetric[] } => {
-    const fb = `${SECTIONS.find((x) => x.id === id)!.label}: chưa đủ số liệu để nêu kết luận.`;
+    const fb = `${SECTIONS.find((x) => x.id === id)!.label}: ${t("chưa đủ số liệu để nêu kết luận.", "not enough data to draw a conclusion yet.")}`;
     const scoreAll = scoreboard.find((r) => r.key === "all");
     const keyTable = keyMetricsTable(keyMonths, "all", sessionCv);
     const lastKey = keyMonths.length - 1;
@@ -944,9 +950,11 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
       label: shopCur && shopWin !== cmp ? `Total GMV · 1–${shopWin.curEnd.slice(8)}/${month.slice(5)}` : "Total GMV",
       value: shopCur ? fmtVndShort(shopCur.gmv) : "—",
       badge: shopKpi ? shopKpi.pct : null,
-      badgeLabel: shopKpi ? `${fmtFixed(shopKpi.pct, 0)}% KPI tháng` : undefined,
+      badgeLabel: shopKpi ? `${fmtFixed(shopKpi.pct, 0)}% ${t("KPI tháng", "monthly KPI")}` : undefined,
       change: shopCur && shopPrevSame ? pctChange(shopPrevSame.gmv, shopCur.gmv) : null,
-      note: shopKpi ? `KPI tháng ${fmtVndShort(shopKpi.target)}${shopKpi.partial ? ` · dự báo ${fmtPct(shopKpi.projectedPct)}` : ""}` : shopCur ? "Shop Analytics — mọi kênh" : canManage ? "chưa có file Shop Analytics" : "chưa có số liệu toàn shop"
+      note: shopKpi
+        ? `${t("KPI tháng", "Monthly KPI")} ${fmtVndShort(shopKpi.target)}${shopKpi.partial ? ` · ${t("dự báo", "projected")} ${fmtPct(shopKpi.projectedPct)}` : ""}`
+        : shopCur ? t("Shop Analytics — mọi kênh", "Shop Analytics — all channels") : canManage ? "chưa có file Shop Analytics" : t("chưa có số liệu toàn shop", "no whole-shop data yet")
     };
     const liveTargetNow = scoreAll ? scoreAll.targetToDate ?? scoreAll.target : null;
     const liveGmv: PageMetric = {
@@ -954,12 +962,21 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
       value: fmtVndShort(liveCurStats.gmv),
       // Cùng mẫu số với ô Total GMV: % target CẢ THÁNG (ô kia là KPI cả tháng); tiến độ so với target tới nay nằm ở ghi chú.
       badge: scoreAll?.target ? (liveCurStats.gmv / scoreAll.target) * 100 : null,
-      badgeLabel: scoreAll?.target ? `${fmtFixed((liveCurStats.gmv / scoreAll.target) * 100, 0)}% Target tháng` : undefined,
+      badgeLabel: scoreAll?.target ? `${fmtFixed((liveCurStats.gmv / scoreAll.target) * 100, 0)}% ${t("Target tháng", "of monthly Target")}` : undefined,
       change: pctChange(livePrevStats.gmv, liveCurStats.gmv),
-      note: [scoreAll?.target ? `Target tháng ${fmtVndShort(scoreAll.target)}` : null, liveTargetNow && scoreAll?.targetToDate != null ? `tới nay ${fmtVndShort(liveTargetNow)} (${fmtFixed((liveCurStats.gmv / liveTargetNow) * 100, 0)}%)` : null, liveShare != null ? `${fmtPct(liveShare)} tổng shop` : null, `${liveCurStats.sessions} phiên`].filter(Boolean).join(" · ")
+      note: [
+        scoreAll?.target ? `${t("Target tháng", "Monthly Target")} ${fmtVndShort(scoreAll.target)}` : null,
+        liveTargetNow && scoreAll?.targetToDate != null ? `${t("tới nay", "to date")} ${fmtVndShort(liveTargetNow)} (${fmtFixed((liveCurStats.gmv / liveTargetNow) * 100, 0)}%)` : null,
+        liveShare != null ? `${fmtPct(liveShare)} ${t("tổng shop", "of shop total")}` : null,
+        `${liveCurStats.sessions} ${t("phiên", "sessions")}`
+      ].filter(Boolean).join(" · ")
     };
-    const nmv: PageMetric = { label: nmvChoice.isEstimate ? "NMV (ước tính)" : "NMV (đã chốt)", value: nmvValue, note: nmvRate != null ? `trừ ${fmtPct(nmvRate)} — ${nmvSource}` : canManage ? "chưa có tỷ lệ hoàn hủy (CRM) / Refund rate (Shop Analytics)" : "chưa có Refund rate" };
-    const gmvPerHour: PageMetric = { label: "GMV/giờ", value: liveCurStats.gmvPerHour != null ? fmtVndShort(liveCurStats.gmvPerHour) : "—", change: pctChange(livePrevStats.gmvPerHour, liveCurStats.gmvPerHour), note: `${fmtHours(liveCurStats.hours)} giờ live · ${liveCurStats.sessions} phiên` };
+    const nmv: PageMetric = {
+      label: nmvChoice.isEstimate ? t("NMV (ước tính)", "NMV (estimated)") : t("NMV (đã chốt)", "NMV (final)"),
+      value: nmvValue,
+      note: nmvRate != null ? `${t("trừ", "less")} ${fmtPct(nmvRate)} — ${nmvSource}` : canManage ? "chưa có tỷ lệ hoàn hủy (CRM) / Refund rate (Shop Analytics)" : t("chưa có Refund rate", "no refund rate yet")
+    };
+    const gmvPerHour: PageMetric = { label: METRIC.gmvPerHour, value: liveCurStats.gmvPerHour != null ? fmtVndShort(liveCurStats.gmvPerHour) : "—", change: pctChange(livePrevStats.gmvPerHour, liveCurStats.gmvPerHour), note: `${fmtHours(liveCurStats.hours)} ${t("giờ live", "live")} · ${liveCurStats.sessions} ${t("phiên", "sessions")}` };
     const km = keyMonths[lastKey];
     const kmTarget = km?.targets?.all ?? null;
     const skuRows = skuMoveData?.rows ?? [];
@@ -968,11 +985,11 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     const adsCost = adsPlan?.mtdActual ?? adsCur?.cost ?? null;
     const gmvForecast: PageMetric[] = shopKpi?.partial
       ? [{
-          label: "Dự báo Total GMV cuối tháng",
+          label: t("Dự báo Total GMV cuối tháng", "Projected month-end Total GMV"),
           value: fmtVndShort(shopKpi.projected),
           badge: shopKpi.projectedPct,
           badgeLabel: `${fmtFixed(shopKpi.projectedPct, 0)}% KPI`,
-          note: `KPI ${fmtVndShort(shopKpi.target)} · ${shopKpi.projected >= shopKpi.target ? "vượt" : "thiếu"} ${fmtVndShort(Math.abs(shopKpi.projected - shopKpi.target))}`
+          note: `KPI ${fmtVndShort(shopKpi.target)} · ${shopKpi.projected >= shopKpi.target ? t("vượt", "above by") : t("thiếu", "short by")} ${fmtVndShort(Math.abs(shopKpi.projected - shopKpi.target))}`
         }]
       : [];
     const adsCreatorRow = adsPlan && adsPlanRows ? adsTypeRows(adsPlanRows.rows, month).find((r) => r.key === "creator") : undefined;
@@ -983,26 +1000,28 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
         { ...kmMetric("gmv"), badge: kmTarget ? (km.gmvForTarget.all / kmTarget) * 100 : null, note: kmTarget ? `Target ${fmtVndShort(kmTarget)}` : undefined },
         kmMetric("orders"),
         kmMetric("gmvPerHour"),
-        { ...kmMetric("hours"), change: null, note: `${liveCurStats.sessions} phiên` }
+        { ...kmMetric("hours"), change: null, note: `${liveCurStats.sessions} ${t("phiên", "sessions")}` }
       ],
       nmv: [{ ...totalGmv, badge: null, badgeLabel: undefined }, { label: "Refund rate", value: refundRateShop != null ? fmtPct(refundRateShop) : "—", note: refundRateShopPrev != null ? `${monthShort(prevMonth)}: ${fmtPct(refundRateShopPrev)}` : undefined }, nmv],
-      shop: [{ ...totalGmv, note: shopKpi ? `KPI tháng ${fmtVndShort(shopKpi.target)}` : totalGmv.note }, ...gmvForecast, { ...liveGmv, badge: null }, { label: "Tỷ trọng LIVE trong Total GMV", value: liveShare != null ? fmtPct(liveShare) : "—", note: shopWin.label }],
+      shop: [{ ...totalGmv, note: shopKpi ? `${t("KPI tháng", "Monthly KPI")} ${fmtVndShort(shopKpi.target)}` : totalGmv.note }, ...gmvForecast, { ...liveGmv, badge: null }, { label: t("Tỷ trọng LIVE trong Total GMV", "LIVE share of Total GMV"), value: liveShare != null ? fmtPct(liveShare) : "—", note: shopWin.label }],
       why: [gmvPerHour, kmMetric("viewsPerHour"), kmMetric("ctor"), kmMetric("aov")],
-      products: skuRows.length ? [{ label: `GMV top ${skuRows.length} SKU`, value: fmtVndShort(top10) }, { label: "SKU đứng đầu", value: top10 > 0 ? fmtPct((skuRows[0].gmv / top10) * 100) : "—", note: `${shortSku(skuRows[0].name)} · tỷ trọng trong top ${skuRows.length}` }] : [],
-      people: [{ label: "Host đã live", value: String(hostsLive.length), note: `${liveCurStats.sessions} phiên` }, { ...gmvPerHour, label: "GMV/giờ" }],
+      products: skuRows.length
+        ? [{ label: `GMV top ${skuRows.length} SKU`, value: fmtVndShort(top10) }, { label: t("SKU đứng đầu", "Top SKU"), value: top10 > 0 ? fmtPct((skuRows[0].gmv / top10) * 100) : "—", note: `${shortSku(skuRows[0].name)} · ${t("tỷ trọng trong top", "share of top")} ${skuRows.length}` }]
+        : [],
+      people: [{ label: t("Host đã live", "Hosts on live"), value: String(hostsLive.length), note: `${liveCurStats.sessions} ${t("phiên", "sessions")}` }, gmvPerHour],
       ads: adsPlan
         ? [
-            { label: `Ads cost${adsPlan.lastActual ? ` · 1–${Number(adsPlan.lastActual.slice(8))}/${month.slice(5)}` : ""}`, value: fmtVndShort(adsPlan.mtdActual), note: [adsPlan.mtdTarget > 0 ? `${fmtFixed((adsPlan.mtdActual / adsPlan.mtdTarget) * 100, 1)}% Target cùng kỳ` : null, adsPlan.spentOfMonth != null ? `${fmtFixed(adsPlan.spentOfMonth, 1)}% Target tháng ${fmtVndShort(adsPlan.monthTarget)}` : null].filter(Boolean).join(" · ") || undefined },
+            { label: `Ads cost${adsPlan.lastActual ? ` · 1–${Number(adsPlan.lastActual.slice(8))}/${month.slice(5)}` : ""}`, value: fmtVndShort(adsPlan.mtdActual), note: [adsPlan.mtdTarget > 0 ? `${fmtFixed((adsPlan.mtdActual / adsPlan.mtdTarget) * 100, 1)}% ${t("Target cùng kỳ", "of Target to date")}` : null, adsPlan.spentOfMonth != null ? `${fmtFixed(adsPlan.spentOfMonth, 1)}% ${t("Target tháng", "of monthly Target")} ${fmtVndShort(adsPlan.monthTarget)}` : null].filter(Boolean).join(" · ") || undefined },
             ...(adsPlan.liveRoas != null ? [{ label: "ROAS Live", value: `${fmtFixed(adsPlan.liveRoas, 1)}x` }] : []),
             ...(adsCreatorRow && adsCreatorRow.monthTarget > 0 ? [{ label: "Ads Creator · % Target", value: `${fmtFixed((adsCreatorRow.mtdActual / adsCreatorRow.monthTarget) * 100, 1)}%`, note: `${fmtVndShort(adsCreatorRow.mtdActual)} / ${fmtVndShort(adsCreatorRow.monthTarget)}` }] : []),
-            { label: "Ngày chi lệch Target từ 30%", value: String(adsPlan.offDays.length), note: adsPlan.offDays.length ? "ngày và mức lệch ở dưới biểu đồ theo ngày" : undefined }
+            { label: t("Ngày chi lệch Target từ 30%", "Days spending ≥30% off Target"), value: String(adsPlan.offDays.length), note: adsPlan.offDays.length ? t("ngày và mức lệch ở dưới biểu đồ theo ngày", "days and gaps are listed below the daily chart") : undefined }
           ]
         : adsCost != null ? [{ label: "Ads cost", value: fmtVndShort(adsCost) }] : [],
-      affiliate: trackSum.sessions > 0 ? [{ label: `GMV phiên · ${trackSum.sessions} phiên`, value: fmtVndShort(trackSum.directGmv) }, { label: `Target GMV · ${creatorRows.filter((r) => r.pctTarget != null).length}/${trackSum.sessions} phiên có Target`, value: trackSum.targetGmv > 0 ? fmtVndShort(trackSum.targetGmv) : "—", badge: trackSum.pctTarget, badgeLabel: trackSum.pctTarget != null ? `${fmtFixed(trackSum.pctTarget, 1)}% Target (phiên có Target)` : undefined }, { label: `${METRIC.gmvPerHour} · ${trackSum.sessions} phiên`, value: trackSum.gmvPerHour != null ? fmtVndShort(trackSum.gmvPerHour) : "—", note: trackSum.hours > 0 ? `${fmtVndShort(trackSum.directGmv)} ÷ ${fmtFixed(trackSum.hours, 1)} giờ` : undefined }, { label: METRIC.roas, value: trackSum.roas != null ? `${fmtFixed(trackSum.roas, 1)}x` : "—", note: trackSum.adsCost > 0 ? `${METRIC.adsCost} ${fmtVndShort(trackSum.adsCost)}` : undefined }] : [],
+      affiliate: trackSum.sessions > 0 ? [{ label: t(`GMV phiên · ${trackSum.sessions} phiên`, `Session GMV · ${trackSum.sessions} sessions`), value: fmtVndShort(trackSum.directGmv) }, { label: t(`Target GMV · ${creatorRows.filter((r) => r.pctTarget != null).length}/${trackSum.sessions} phiên có Target`, `Target GMV · ${creatorRows.filter((r) => r.pctTarget != null).length}/${trackSum.sessions} sessions with Target`), value: trackSum.targetGmv > 0 ? fmtVndShort(trackSum.targetGmv) : "—", badge: trackSum.pctTarget, badgeLabel: trackSum.pctTarget != null ? `${fmtFixed(trackSum.pctTarget, 1)}% ${t("Target (phiên có Target)", "of Target (sessions with Target)")}` : undefined }, { label: `${METRIC.gmvPerHour} · ${trackSum.sessions} ${t("phiên", "sessions")}`, value: trackSum.gmvPerHour != null ? fmtVndShort(trackSum.gmvPerHour) : "—", note: trackSum.hours > 0 ? `${fmtVndShort(trackSum.directGmv)} ÷ ${fmtFixed(trackSum.hours, 1)} ${t("giờ", "h")}` : undefined }, { label: METRIC.roas, value: trackSum.roas != null ? `${fmtFixed(trackSum.roas, 1)}x` : "—", note: trackSum.adsCost > 0 ? `${METRIC.adsCost} ${fmtVndShort(trackSum.adsCost)}` : undefined }] : [],
       next: [
-        { label: `Target Live tháng ${Number(nextMonth.slice(5))}`, value: nextPlan && nextPlan.targetGmv > 0 ? fmtVndShort(nextPlan.targetGmv) : "—", note: nextPlan && nextPlan.targetGmv > 0 ? `${nextPlan.slotCount} phiên trong Kế Hoạch Tháng` : "chưa nhập · bảng Kế hoạch Live" },
-        ...(scope.affiliate ? [{ label: `Target Creator tháng ${Number(nextMonth.slice(5))}`, value: bookingSum.target > 0 ? fmtVndShort(bookingSum.target) : "—", note: bookingSum.target > 0 ? "tổng Target lịch Booking" : "tổng Target lịch Booking, chưa nhập" },
-        { label: `Booking Creator tháng ${Number(nextMonth.slice(5))}`, value: `${bookingSum.sessions} phiên`, note: bookingSum.sessions > 0 ? `${fmtFixed(bookingSum.hours, 1)} giờ live` : `chưa có phiên nào trong tab Affiliate (T${Number(nextMonth.slice(5))})` }] : [])
+        { label: `Target Live ${t("tháng", "·")} ${t(String(Number(nextMonth.slice(5))), monthShort(nextMonth))}`, value: nextPlan && nextPlan.targetGmv > 0 ? fmtVndShort(nextPlan.targetGmv) : "—", note: nextPlan && nextPlan.targetGmv > 0 ? t(`${nextPlan.slotCount} phiên trong Kế Hoạch Tháng`, `${nextPlan.slotCount} sessions in the month plan`) : t("chưa nhập · bảng Kế hoạch Live", "not entered yet · Live plan table") },
+        ...(scope.affiliate ? [{ label: `Target Creator ${t("tháng", "·")} ${t(String(Number(nextMonth.slice(5))), monthShort(nextMonth))}`, value: bookingSum.target > 0 ? fmtVndShort(bookingSum.target) : "—", note: bookingSum.target > 0 ? t("tổng Target lịch Booking", "total Booking schedule Target") : t("tổng Target lịch Booking, chưa nhập", "total Booking schedule Target, not entered yet") },
+        { label: `Booking Creator ${t("tháng", "·")} ${t(String(Number(nextMonth.slice(5))), monthShort(nextMonth))}`, value: `${bookingSum.sessions} ${t("phiên", "sessions")}`, note: bookingSum.sessions > 0 ? `${fmtFixed(bookingSum.hours, 1)} ${t("giờ live", "live hours")}` : t(`chưa có phiên nào trong tab Affiliate (T${Number(nextMonth.slice(5))})`, `no sessions in the Affiliate tab yet (${monthShort(nextMonth)})`) }] : [])
       ]
     };
     const headline =
@@ -1054,8 +1073,8 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
       fmt: (v) => fmtKeyMetric(d, v),
       goodWhenUp: d.goodWhenUp
     })),
-    { label: "Quà tặng mỗi đơn (cả shop)", get: (_s, g) => g?.giftPerOrder ?? null, fmt: (v) => fmtFixed(v, 2), goodWhenUp: null },
-    { label: `${METRIC.upt} bỏ quà (cả shop)`, get: (_s, g) => g?.uptExGift ?? null, fmt: (v) => fmtFixed(v, 2), goodWhenUp: true }
+    { label: t("Quà tặng mỗi đơn (cả shop)", "Gifts per order (whole shop)"), get: (_s, g) => g?.giftPerOrder ?? null, fmt: (v) => fmtFixed(v, 2), goodWhenUp: null },
+    { label: `${METRIC.upt} ${t("bỏ quà (cả shop)", "excl. gifts (whole shop)")}`, get: (_s, g) => g?.uptExGift ?? null, fmt: (v) => fmtFixed(v, 2), goodWhenUp: true }
   ];
   const trendValues = (r: TrendRow) => trendStats.map((x, i) => r.get(x.stats, giftByMonth[i]));
 
@@ -1425,7 +1444,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             title={secTitle("why")}
             fallbackHeadline={head("why").headline}
             windowLabel={cmp.label}
-            prevShort={`Tháng ${Number(prevMonth.slice(5))}`}
+            prevShort={monthLong(prevMonth)}
             stats={{
               prev: { gmvPerHour: livePrevStats.gmvPerHour, viewsPerHour: keyMetricValue(livePrevStats, "viewsPerHour"), err: keyMetricValue(livePrevStats, "err"), ctor: keyMetricValue(livePrevStats, "ctor") },
               cur: { gmvPerHour: liveCurStats.gmvPerHour, viewsPerHour: keyMetricValue(liveCurStats, "viewsPerHour"), err: keyMetricValue(liveCurStats, "err"), ctor: keyMetricValue(liveCurStats, "ctor") }
@@ -1450,11 +1469,11 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             images={(name) => monthlyReportRow?.sectionNotes?.[skuImageKey(name)]?.text}
             canManage={canManage}
             onSaveImage={saveSkuImage}
-            curDaysLabel={skuMoveData?.curDays ? ` (${skuMoveData.curDays} ngày)` : ""}
+            curDaysLabel={skuMoveData?.curDays ? ` (${skuMoveData.curDays} ${t("ngày", "days")})` : ""}
             prevMonthLabel={prevMonth.slice(5)}
             empty={
               <p className="text-sm text-center py-6" style={{ color: PAL.muted }}>
-                {canManage ? "Chưa có file \"Product List\" nào được import trong Dữ Liệu Gốc cho tháng này." : "Chưa có số liệu sản phẩm tháng này."}
+                {canManage ? "Chưa có file \"Product List\" nào được import trong Dữ Liệu Gốc cho tháng này." : t("Chưa có số liệu sản phẩm tháng này.", "No product data for this month yet.")}
               </p>
             }
           />
@@ -1465,10 +1484,10 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
         {/* ===== Quảng cáo ===== */}
         {sectionShown.ads && (
         <section id="mr-ads" className="space-y-4 scroll-mt-16" style={secStyle("ads")}>
-          <PageHead {...head("ads")} no={secNo("ads")} title={secTitle("ads")} sub="Ads cost toàn cửa hàng (LIVE GMV Max + Product GMV Max) · ROI theo loại ngày · ngày có chi phí nhưng 0 đơn" />
+          <PageHead {...head("ads")} no={secNo("ads")} title={secTitle("ads")} sub={t("Ads cost toàn cửa hàng (LIVE GMV Max + Product GMV Max) · ROI theo loại ngày · ngày có chi phí nhưng 0 đơn", "Shop-wide Ads cost (LIVE GMV Max + Product GMV Max) · ROI by day type · days with spend but 0 orders")} />
             {adsPlan && adsPlanRows && <AdsPlanPanel rows={adsPlanRows.rows} s={adsPlan} month={month} bucketOf={bucketCur} hasCampaignFile={!!adsCur} />}
             {adsPlan ? null : adsCur ? (() => {
-              const prevLabel = adsCur.lastDate && adsCur.lastDate < end ? `1–${Number(adsCur.lastDate.slice(8))}/${prevMonth.slice(5)}` : `Tháng ${prevMonth.slice(5)}`;
+              const prevLabel = adsCur.lastDate && adsCur.lastDate < end ? `1–${Number(adsCur.lastDate.slice(8))}/${prevMonth.slice(5)}` : monthLong(prevMonth);
               const vsPrev = (cur: number | null, prev: number | null | undefined, fmt: (v: number) => string) => {
                 if (prev == null || cur == null) return undefined;
                 const c = pctChange(prev, cur);
@@ -1481,29 +1500,29 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
               if (ranked.length >= 2) {
                 const hi = ranked[0];
                 const lo = ranked[ranked.length - 1];
-                notes.push(`ROI cao nhất ở ${DAY_TYPE_SHORT[hi]} (${roiX(adsCur.byBucket![hi].roi)}), thấp nhất ở ${DAY_TYPE_SHORT[lo]} (${roiX(adsCur.byBucket![lo].roi)}).`);
+                notes.push(t(`ROI cao nhất ở ${DAY_TYPE_SHORT[hi]} (${roiX(adsCur.byBucket![hi].roi)}), thấp nhất ở ${DAY_TYPE_SHORT[lo]} (${roiX(adsCur.byBucket![lo].roi)}).`, `Highest ROI on ${DAY_TYPE_SHORT[hi]} (${roiX(adsCur.byBucket![hi].roi)}), lowest on ${DAY_TYPE_SHORT[lo]} (${roiX(adsCur.byBucket![lo].roi)}).`));
               }
               if (adsCur.zeroOrderDays.length) {
-                notes.push(`${adsCur.zeroOrderDays.length} ngày có chi phí Ads nhưng không phát sinh đơn (${adsCur.zeroOrderDays.map((d) => fmtDateVn(d.date, false)).join(", ")}) — ${fmtVndFull(adsCur.zeroOrderDays.reduce((a, d) => a + d.cost, 0))}.`);
+                notes.push(`${adsCur.zeroOrderDays.length} ${t("ngày có chi phí Ads nhưng không phát sinh đơn", "day(s) with Ads spend but no orders")} (${adsCur.zeroOrderDays.map((d) => fmtDateVn(d.date, false)).join(", ")}) — ${fmtVndFull(adsCur.zeroOrderDays.reduce((a, d) => a + d.cost, 0))}.`);
               }
               if (adsCur.lowRoiDays.length) {
-                notes.push(`Ngày ROI thấp nhất trong các ngày chi đáng kể: ${adsCur.lowRoiDays.map((d) => `${fmtDateVn(d.date, false)} (${roiX(d.roi)}, chi ${fmtVndShort(d.cost)})`).join("; ")}.`);
+                notes.push(`${t("Ngày ROI thấp nhất trong các ngày chi đáng kể", "Lowest-ROI days among significant spend days")}: ${adsCur.lowRoiDays.map((d) => `${fmtDateVn(d.date, false)} (${roiX(d.roi)}, ${t("chi", "spent")} ${fmtVndShort(d.cost)})`).join("; ")}.`);
               }
-              notes.push("Doanh thu gộp TikTok tính theo đơn gốc trước hủy/hoàn nên có thể lớn hơn GMV của shop — không dùng làm % GMV; ROI sau hủy/hoàn sẽ thấp hơn.");
+              notes.push(t("Doanh thu gộp TikTok tính theo đơn gốc trước hủy/hoàn nên có thể lớn hơn GMV của shop — không dùng làm % GMV; ROI sau hủy/hoàn sẽ thấp hơn.", "TikTok gross revenue counts original orders before cancellations/returns, so it can exceed shop GMV — not used as % of GMV; ROI after cancellations/returns will be lower."));
               const chartData = adsCur.days.map((d) => ({ day: Number(d.date.slice(8)), cost: d.cost, roi: d.cost > 0 ? d.revenue / d.cost : null }));
               return (
                 <Panel
-                  title="Ads toàn cửa hàng (TikTok Ads)"
+                  title={t("Ads toàn cửa hàng (TikTok Ads)", "Shop-wide Ads (TikTok Ads)")}
                   icon={<Megaphone className="w-4 h-4" />}
-                  sub={`File Campaign overview data · ${fmtDateVn(adsCur.firstDate!, false)}–${fmtDateVn(adsCur.lastDate!, false)} · gồm LIVE GMV Max và Product GMV Max · ROI = doanh thu gộp ÷ chi phí · so ${prevLabel}`}
+                  sub={t(`File Campaign overview data · ${fmtDateVn(adsCur.firstDate!, false)}–${fmtDateVn(adsCur.lastDate!, false)} · gồm LIVE GMV Max và Product GMV Max · ROI = doanh thu gộp ÷ chi phí · so ${prevLabel}`, `Campaign overview data file · ${fmtDateVn(adsCur.firstDate!, false)}–${fmtDateVn(adsCur.lastDate!, false)} · LIVE GMV Max and Product GMV Max · ROI = gross revenue ÷ cost · vs ${prevLabel}`)}
                 >
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-3 mb-4">
-                    <KpiTile frame="plain" label="Chi phí Ads" value={fmtVndShort(adsCur.cost)} note={planCur && planCur.plan.adsBudget > 0 ? `${fmtPct((adsCur.cost / planCur.plan.adsBudget) * 100)} ngân sách ${fmtVndShort(planCur.plan.adsBudget)}${adsPrev ? ` · ${vsPrev(adsCur.cost, adsPrev.cost, fmtVndShort)}` : ""}` : vsPrev(adsCur.cost, adsPrev?.cost, fmtVndShort)} />
+                    <KpiTile frame="plain" label={METRIC.adsCost} value={fmtVndShort(adsCur.cost)} note={planCur && planCur.plan.adsBudget > 0 ? `${fmtPct((adsCur.cost / planCur.plan.adsBudget) * 100)} ${t("ngân sách", "of budget")} ${fmtVndShort(planCur.plan.adsBudget)}${adsPrev ? ` · ${vsPrev(adsCur.cost, adsPrev.cost, fmtVndShort)}` : ""}` : vsPrev(adsCur.cost, adsPrev?.cost, fmtVndShort)} />
                     <KpiTile frame="plain" label="ROI" value={roiX(adsCur.roi)} change={pctChange(adsPrev?.roi, adsCur.roi)} note={adsPrev ? `${prevLabel}: ${roiX(adsPrev.roi)}` : undefined} />
-                    <KpiTile frame="plain" label="Chi phí / đơn SKU" value={adsCur.costPerOrder != null ? fmtVndFull(adsCur.costPerOrder) : "—"} note={`${fmtVndFull(adsCur.orders)} đơn${adsPrev?.costPerOrder != null ? ` · ${prevLabel}: ${fmtVndFull(adsPrev.costPerOrder)}` : ""}`} />
-                    <KpiTile frame="plain" label="Doanh thu gộp từ Ads" value={fmtVndShort(adsCur.revenue)} change={pctChange(adsPrev?.revenue, adsCur.revenue)} />
+                    <KpiTile frame="plain" label={t("Chi phí / đơn SKU", "Cost / SKU order")} value={adsCur.costPerOrder != null ? fmtVndFull(adsCur.costPerOrder) : "—"} note={`${fmtVndFull(adsCur.orders)} ${t("đơn", "orders")}${adsPrev?.costPerOrder != null ? ` · ${prevLabel}: ${fmtVndFull(adsPrev.costPerOrder)}` : ""}`} />
+                    <KpiTile frame="plain" label={t("Doanh thu gộp từ Ads", "Gross revenue from Ads")} value={fmtVndShort(adsCur.revenue)} change={pctChange(adsPrev?.revenue, adsCur.revenue)} />
                   </div>
-                  <ReportTable head={["Loại ngày", "Số ngày", "Chi phí", "Doanh thu gộp", "ROI", `ROI ${prevLabel}`, "Đơn SKU"]}>
+                  <ReportTable head={[t("Loại ngày", "Day type"), t("Số ngày", "Days"), t("Chi phí", "Cost"), t("Doanh thu gộp", "Gross revenue"), "ROI", `ROI ${prevLabel}`, t("Đơn SKU", "SKU orders")]}>
                     {buckets.map((b, idx) => {
                       const r = adsCur.byBucket![b];
                       const p = adsPrev?.byBucket?.[b];
@@ -1529,15 +1548,15 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                         <YAxis yAxisId="roi" orientation="right" stroke={PAL.muted} fontSize={11} tickFormatter={(v) => `${v}x`} width={40} />
                         <Tooltip
                           contentStyle={chartTooltipStyle}
-                          labelFormatter={(d) => `Ngày ${d}/${month.slice(5)}`}
+                          labelFormatter={(d) => `${t("Ngày", "Day")} ${d}/${month.slice(5)}`}
                           formatter={(v, name) => (name === "ROI" ? `${fmtFixed(chartNum(v), 1)}x` : fmtVndFull(chartNum(v)))}
                         />
-                        <Bar yAxisId="cost" dataKey="cost" name="Chi phí" fill={PAL.blue} radius={[3, 3, 0, 0]} />
+                        <Bar yAxisId="cost" dataKey="cost" name={t("Chi phí", "Cost")} fill={PAL.blue} radius={[3, 3, 0, 0]} />
                         <Line yAxisId="roi" dataKey="roi" name="ROI" stroke={PAL.gold} dot={false} strokeWidth={2} connectNulls={false} />
                       </ComposedChart>
                     </ResponsiveContainer>
                   </div>
-                  <ChartLegend items={[["Chi phí Ads theo ngày", PAL.blue], ["ROI theo ngày (trục phải)", PAL.gold]]} />
+                  <ChartLegend items={[[t("Chi phí Ads theo ngày", "Daily Ads cost"), PAL.blue], [t("ROI theo ngày (trục phải)", "Daily ROI (right axis)"), PAL.gold]]} />
                   <ul className="mt-3 space-y-1 text-[11px] list-disc pl-4" style={{ color: PAL.muted }}>
                     {notes.map((t) => <li key={t}>{t}</li>)}
                   </ul>
@@ -1616,7 +1635,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
         {/* ===== Affiliate ===== */}
         {sectionShown.affiliate && (
         <section id="mr-affiliate" className="space-y-4 scroll-mt-16" style={secStyle("affiliate")}>
-          <PageHead {...head("affiliate")} no={secNo("affiliate")} title={secTitle("affiliate")} sub="Phiên livestream của creator trong tháng · số liệu thực tế từ tab Affiliate" />
+          <PageHead {...head("affiliate")} no={secNo("affiliate")} title={secTitle("affiliate")} sub={t("Phiên livestream của creator trong tháng · số liệu thực tế từ tab Affiliate", "Creator livestream sessions this month · actuals from the Affiliate tab")} />
           {creatorRows.length > 0 ? (
             <AffiliateTrackPanel cols={trackCols} monthLabel={month.slice(5)} />
           ) : (
@@ -1628,7 +1647,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
 
         {/* ===== 7. Tháng sau ===== */}
         <section id="mr-next" className="space-y-4 scroll-mt-16" style={secStyle("next")}>
-          <PageHead {...head("next")} no={secNo("next")} title={secTitle("next")} sub={`Hành động tháng ${Number(nextMonth.slice(5))} + kế hoạch từ Kế Hoạch Tháng${scope.affiliate ? " và tab Affiliate" : ""}`} />
+          <PageHead {...head("next")} no={secNo("next")} title={secTitle("next")} sub={t(`Hành động tháng ${Number(nextMonth.slice(5))} + kế hoạch từ Kế Hoạch Tháng${scope.affiliate ? " và tab Affiliate" : ""}`, `${monthLong(nextMonth)} actions + plan from the month plan${scope.affiliate ? " and Affiliate tab" : ""}`)} />
           <NextLivePlanPanel
             nextMonth={nextMonth}
             curLabel={String(Number(month.slice(5)))}
@@ -1638,7 +1657,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
               const camp = campDetailRows.find((r) => r.key === key);
               return { key, name: DAY_TYPE_SHORT[key], achieved: camp?.cur.gmvPerHour ?? null, sessionsCur: camp?.cur.sessions ?? 0, plan: a ? { hours: a.hours, target: a.target, slots: a.slots } : undefined };
             })}
-            total={{ key: "all", name: "Cả tháng", achieved: liveCurStats.gmvPerHour, sessionsCur: liveCurStats.sessions }}
+            total={{ key: "all", name: t("Cả tháng", "Whole month"), achieved: liveCurStats.gmvPerHour, sessionsCur: liveCurStats.sessions }}
             saved={decodeLiveTarget(monthlyReportRow?.sectionNotes?.[LIVE_TARGET_MANUAL_KEY]?.text)}
             canEdit={canManage}
             onSave={async (m) => setMonthlyReportRow(await saveMonthlyReportSectionNote(brandId, `${month}-01`, LIVE_TARGET_MANUAL_KEY, encodeLiveTarget(m)))}

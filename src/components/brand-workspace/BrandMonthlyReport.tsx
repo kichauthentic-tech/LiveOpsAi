@@ -35,6 +35,7 @@ import { profileOf } from "../../lib/platforms/profiles";
 import { prefetchable, type TabPrefetchCtx } from "../../lib/db/prefetch";
 import { lazyNamed } from "../../lib/lazyNamed";
 import { buildStandaloneHtml, captureChartTooltips, captureTabVariants, downloadHtml, printStandaloneHtml, waitForRender } from "../../lib/report/exportStandaloneHtml";
+import { monthLong, setDisplayLang, t, type DisplayLang } from "../../lib/displayLang";
 
 // 7 phần của Report Tháng kéo theo recharts + d3 + redux = 364 KB, chiếm 2/3 chunk của tab này (đo
 // 2026-10-01: chunk BrandMonthlyReport 534 KB, riêng thư viện biểu đồ 364 KB). Phần đó chỉ render khi
@@ -129,6 +130,16 @@ function monthRange(month: string): { start: string; end: string } {
   return { start, end };
 }
 
+// Ngôn ngữ report (05/11): VI/EN, nhớ theo trình duyệt của người xem — chỉ là tiện ích, đọc/ghi lỗi thì về tiếng Việt.
+const LANG_KEY = "monthly_report_lang";
+const readLang = (): DisplayLang => {
+  try {
+    return localStorage.getItem(LANG_KEY) === "en" ? "en" : "vi";
+  } catch {
+    return "vi";
+  }
+};
+
 const fmtStamp = (iso: string) => {
   const d = new Date(iso);
   const p = (n: number) => String(n).padStart(2, "0");
@@ -146,6 +157,20 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
   const canManage = CAN_MANAGE_ROLES.includes(currentRole);
   const canViewWeekly = CAN_VIEW_WEEKLY_ROLES.includes(currentRole);
   const [viewMode, setViewMode] = useState<"month" | "week">("month");
+  const [lang, setLang] = useState<DisplayLang>(readLang);
+  const chooseLang = (l: DisplayLang) => {
+    setLang(l);
+    try {
+      localStorage.setItem(LANG_KEY, l);
+    } catch {
+      /* chế độ riêng tư: chỉ không nhớ lựa chọn */
+    }
+  };
+  // Tiếng Anh chỉ cho report gửi brand; Report Tuần (nội bộ ops) luôn tiếng Việt. Đặt ngay lúc render để cả cây report bên dưới
+  // dựng câu theo ngôn ngữ này (lib/displayLang.ts); App đặt lại "vi" ở đầu mỗi lần render nên màn khác không bị dính.
+  const shownLang: DisplayLang = viewMode === "month" ? lang : "vi";
+  setDisplayLang(shownLang);
+  useEffect(() => () => setDisplayLang("vi"), []);
   // Sàn của report (0139): TikTok và Shopee là hai report độc lập — phát hành, thu hồi, đóng sổ riêng, mỗi sàn một engine
   // (lib/report/reportEngines.ts) và một khung hiển thị (REPORT_VIEWS). Sàn chọn ở workspace (App) — một chỗ cho mọi tab.
   const engine = REPORT_ENGINES[platform];
@@ -350,13 +375,13 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
     setExportHost(host);
     try {
       await waitForRender(host);
-      const title = `Report Tháng ${Number(monthM)}/${monthY} · ${channelTitle(brandName, platform, false)}`;
+      const title = `${t("Report Tháng", "Monthly Report")} ${Number(monthM)}/${monthY} · ${channelTitle(brandName, platform, false)}`;
       // Tên file mặc định: brand_sàn_Report-Thang_MM-YYYY (xếp theo brand rồi theo tháng trong thư mục tải về). PDF lấy tên này làm tên gợi ý trong hộp thoại in.
-      const base = `${brandName}_${platform}_Report-Thang_${monthM}-${monthY}`.replace(/[^\p{L}\p{N}.-]+/gu, "_");
+      const base = `${brandName}_${platform}_${t("Report-Thang", "Monthly-Report")}_${monthM}-${monthY}`.replace(/[^\p{L}\p{N}.-]+/gu, "_");
       const tips = await captureChartTooltips(host);
       const variants = await captureTabVariants(host);
       if (kind === "pdf") {
-        await printStandaloneHtml(buildStandaloneHtml(host, title, variants, tips, true, `Report YFB x ${brandName} · Tháng ${Number(monthM)}/${monthY}`), base);
+        await printStandaloneHtml(buildStandaloneHtml(host, title, variants, tips, true, t(`Report YFB x ${brandName} · Tháng ${Number(monthM)}/${monthY}`, `YFB x ${brandName} Report · ${monthLong(Number(monthM))} ${monthY}`)), base);
       } else {
         downloadHtml(`${base}.html`, buildStandaloneHtml(host, title, variants, tips));
         showToast("Đã tải file HTML gửi brand.", "success");
@@ -416,6 +441,23 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
     </div>
   ) : null;
 
+  // VI / EN — mọi role (brand cũng tự chọn); file HTML/PDF xuất theo ngôn ngữ đang chọn.
+  const langSwitch =
+    viewMode === "month" ? (
+      <div className="inline-flex items-center gap-1 bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-1" role="group" aria-label="Ngôn ngữ report / Report language">
+        {(["vi", "en"] as const).map((l) => (
+          <button
+            key={l}
+            onClick={() => chooseLang(l)}
+            aria-pressed={lang === l}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${lang === l ? "seg-on" : "text-[var(--text-muted)] hover:bg-[var(--surface-elevated)]"}`}
+          >
+            {l === "vi" ? "Tiếng Việt" : "English"}
+          </button>
+        ))}
+      </div>
+    ) : null;
+
   // Audit UX 2026-09-29 (M1): trước đây 3 khối chồng nhau trước nội dung — thanh Tháng/Tuần, thẻ tiêu đề 24px, thanh
   // "Số liệu chốt lúc…" — mục lục report ở y=309px. Gộp về MỘT PageHeader: tiêu đề + chế độ + tháng + trạng thái + phát hành,
   // dòng bản chụp là hàng phụ bên dưới.
@@ -428,7 +470,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
         <>
       <PageHeader
         icon={FileText}
-        title={`Report Tháng ${Number(monthM)}/${monthY} · ${channelTitle(brandName, platform, false)}`}
+        title={`${t("Report Tháng", "Monthly Report")} ${Number(monthM)}/${monthY} · ${channelTitle(brandName, platform, false)}`}
         description={
           <>
             {engine.description.split("{ads}").map((part, i, all) => (
@@ -442,6 +484,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
         actions={
           <>
             {modeSwitch}
+            {langSwitch}
             <MonthPicker value={month} onChange={setMonth} />
             {report && (
               <span
@@ -452,7 +495,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
                 }`}
               >
                 {isPublished ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Clock className="w-3.5 h-3.5" />}
-                {isPublished ? `Đã Phát Hành ${report.publishedAt ? new Date(report.publishedAt).toLocaleDateString("vi-VN") : ""}` : "Bản Nháp"}
+                {isPublished ? `${t("Đã Phát Hành", "Published")} ${report.publishedAt ? fmtDateVn(new Date(report.publishedAt).toLocaleDateString("sv-SE")) : ""}` : t("Bản Nháp", "Draft")}
               </span>
             )}
             {canManage && stored && (
@@ -504,7 +547,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
         {stored && (canManage || isPublished) && !loading && !snapLoading && (
           <div className="border-t border-[var(--border)] pt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
             <span className="flex items-center gap-1.5 text-[var(--text)] font-semibold">
-              <Database className="w-3.5 h-3.5 text-[var(--accent-text)]" /> Số liệu chốt lúc {fmtStamp(stored.computedAt)}
+              <Database className="w-3.5 h-3.5 text-[var(--accent-text)]" /> {t("Số liệu chốt lúc", "Data as of")} {fmtStamp(stored.computedAt)}
             </span>
             <span className="text-[var(--text-muted)]">{engine.coverage(stored.snapshot as AnySnapshot)}</span>
             {canManage && (
@@ -570,7 +613,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
 
       {loading || snapLoading ? (
         <div className="flex items-center justify-center py-12 text-[var(--text-faint)] text-sm gap-2">
-          <Loader2 className="w-4 h-4 animate-spin" /> Đang tải report...
+          <Loader2 className="w-4 h-4 animate-spin" /> {t("Đang tải report...", "Loading report...")}
         </div>
       ) : (
         <>
@@ -604,11 +647,12 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
             fallback={
               <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-12 flex items-center justify-center gap-3 text-[var(--text-muted)]">
                 <Loader2 className="w-5 h-5 animate-spin" />
-                <span className="text-xs font-bold">Đang tải biểu đồ báo cáo...</span>
+                <span className="text-xs font-bold">{t("Đang tải biểu đồ báo cáo...", "Loading report charts...")}</span>
               </div>
             }
           >
             <View.Render
+              key={shownLang}
               brandId={brandId}
               brandName={brandName}
               month={month}
@@ -625,11 +669,11 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
             </>
           ) : isPublished ? (
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-8 text-center text-[var(--text-faint)] text-sm">
-              Report {platform} tháng {fmtMonth(month)} đã phát hành nhưng chưa có số liệu chốt — liên hệ Ops để cập nhật.
+              {t(`Report ${platform} tháng ${fmtMonth(month)} đã phát hành nhưng chưa có số liệu chốt — liên hệ Ops để cập nhật.`, `The ${platform} report for ${fmtMonth(month)} is published but has no data yet — please contact YFB Ops.`)}
             </div>
           ) : (
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-8 text-center text-[var(--text-faint)] text-sm">
-              Report {platform} tháng {fmtMonth(month)} chưa được phát hành. Số liệu vận hành sẽ hiển thị khi Ops/CEO/Admin phát hành report.
+              {t(`Report ${platform} tháng ${fmtMonth(month)} chưa được phát hành. Số liệu vận hành sẽ hiển thị khi Ops/CEO/Admin phát hành report.`, `The ${platform} report for ${fmtMonth(month)} has not been published yet. Figures will appear once YFB publishes the report.`)}
             </div>
           )}
 
@@ -640,7 +684,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
       {exportHost && stored &&
         createPortal(
           <Suspense fallback={null}>
-            <View.Render brandId={brandId} brandName={brandName} month={month} snapshot={stored.snapshot as AnySnapshot} report={report} canManage={false} forBrand onReportChange={setReport} liveSessions={sessions} shiftSlots={shiftSlots} scope={reportScope} />
+            <View.Render key={shownLang} brandId={brandId} brandName={brandName} month={month} snapshot={stored.snapshot as AnySnapshot} report={report} canManage={false} forBrand onReportChange={setReport} liveSessions={sessions} shiftSlots={shiftSlots} scope={reportScope} />
           </Suspense>,
           exportHost
         )}

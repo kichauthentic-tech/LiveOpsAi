@@ -11,6 +11,7 @@ import type { ReportSectionId } from "./theme";
 import { LINK_BTN, PAL, DRIVER_SHORT, chartTooltipStyle } from "./theme";
 import { chartNum } from "./format";
 import { STAT_LABEL_SHAPE } from "../../common/StatTile";
+import { t, monthLong } from "../../../lib/displayLang";
 
 // Bộ component trình bày của Report Tháng — khung panel, bảng, thẻ KPI, hộp Insight, biểu đồ thác,
 // ô sửa nhận xét. Tách khỏi MonthlyReportTabs.tsx 2026-10-01: toàn bộ chỗ này đã tự chứa sẵn (không
@@ -78,14 +79,14 @@ export interface WaterfallPoint {
 export function toWaterfall(b: DriverBreakdown | null, cmp: { partial: boolean; prevEnd: string; curEnd: string }, month: string, prevMonth: string): WaterfallPoint[] {
   if (!b) return [];
   const out: WaterfallPoint[] = [];
-  out.push({ label: cmp.partial ? `1–${Number(cmp.prevEnd.slice(8))}/${prevMonth.slice(5)}` : `Tháng ${prevMonth.slice(5)}`, base: 0, value: b.from, kind: "total", display: b.from });
+  out.push({ label: cmp.partial ? `1–${Number(cmp.prevEnd.slice(8))}/${prevMonth.slice(5)}` : monthLong(prevMonth), base: 0, value: b.from, kind: "total", display: b.from });
   let run = b.from;
   for (const p of b.parts) {
     const next = run + p.value;
     out.push({ label: DRIVER_SHORT[p.key], base: Math.min(run, next), value: Math.abs(p.value), kind: p.value >= 0 ? "up" : "down", display: p.value });
     run = next;
   }
-  out.push({ label: cmp.partial ? `1–${Number(cmp.curEnd.slice(8))}/${month.slice(5)}` : `Tháng ${month.slice(5)}`, base: 0, value: b.to, kind: "total", display: b.to });
+  out.push({ label: cmp.partial ? `1–${Number(cmp.curEnd.slice(8))}/${month.slice(5)}` : monthLong(month), base: 0, value: b.to, kind: "total", display: b.to });
   return out;
 }
 
@@ -136,7 +137,7 @@ export const SectionDetail: React.FC<{ open: boolean; onOpen: () => void; childr
       className="w-full flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-bold"
       style={{ background: PAL.panel2, border: `1px solid ${PAL.line}`, color: PAL.gold }}
     >
-      Xem chi tiết (biểu đồ, bảng) <ChevronDown className="w-3.5 h-3.5" />
+      {t("Xem chi tiết (biểu đồ, bảng)", "Show details (charts, tables)")} <ChevronDown className="w-3.5 h-3.5" />
     </button>
   );
 
@@ -190,7 +191,7 @@ export const PageMetricCard: React.FC<PageMetric> = ({ label, value, badge, badg
     </div>
     {change != null && (
       <div className="text-[11px] mt-1 font-bold" style={{ color: change >= 0 ? PAL.green : PAL.red }}>
-        {change >= 0 ? "▲" : "▼"} {fmtFixed(Math.abs(change), 1)}% cùng kỳ
+        {change >= 0 ? "▲" : "▼"} {fmtFixed(Math.abs(change), 1)}% {t("cùng kỳ", "vs same period")}
       </div>
     )}
     {note && (
@@ -216,7 +217,7 @@ export const PageHead: React.FC<{ no: string; title: string; sub?: string; headl
             {(m.badge != null || m.change != null || m.note) && (
               <div className="note">
                 {m.badge != null && <span className={`pc ${m.badge >= 100 ? "up" : m.badge >= 90 ? "am" : "dn"}`}>{m.badgeLabel ?? `${fmtFixed(m.badge, 0)}% Target`}</span>}
-                {m.change != null && <span className={m.change >= 0 ? "up" : "dn"}>{m.change >= 0 ? "▲" : "▼"} {fmtFixed(Math.abs(m.change), 1)}% cùng kỳ </span>}
+                {m.change != null && <span className={m.change >= 0 ? "up" : "dn"}>{m.change >= 0 ? "▲" : "▼"} {fmtFixed(Math.abs(m.change), 1)}% {t("cùng kỳ", "vs same period")} </span>}
                 {m.note}
               </div>
             )}
@@ -234,7 +235,8 @@ type RailItem = { id: ReportSectionId; label: string };
 export const PageRail = React.forwardRef<HTMLElement, { items: RailItem[]; current: ReportSectionId; onSelect: (id: ReportSectionId) => void; onExcel: () => void }>(({ items, current, onSelect, onExcel }, ref) => (
   <nav
     ref={ref}
-    aria-label="Các trang của report"
+    aria-label={t("Các trang của report", "Report pages")}
+    data-report-rail
     className="flex items-center gap-1 px-3 py-2 overflow-x-auto sticky -top-3 sm:-top-6 z-20 rounded-t-2xl"
     style={{ background: PAL.bg, borderBottom: `1px solid ${PAL.line}` }}
   >
@@ -254,11 +256,11 @@ export const PageRail = React.forwardRef<HTMLElement, { items: RailItem[]; curre
     <button
       onClick={onExcel}
       data-export-hide
-      title="Xuất toàn bộ Report Tháng ra 1 file Excel nhiều sheet"
+      title={t("Xuất toàn bộ Report Tháng ra 1 file Excel nhiều sheet", "Export the whole report to one multi-sheet Excel file")}
       className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap shrink-0"
       style={{ background: PAL.panel2, border: `1px solid ${PAL.line}`, color: PAL.gold }}
     >
-      <Download className="w-3.5 h-3.5" /> Xuất Excel
+      <Download className="w-3.5 h-3.5" /> {t("Xuất Excel", "Export Excel")}
     </button>
   </nav>
 ));
@@ -268,14 +270,14 @@ export const PagePager: React.FC<{ prev: RailItem | null; next: RailItem | null;
   <div className="flex items-center justify-between gap-3 pt-4" style={{ borderTop: `1px solid ${PAL.line}` }} data-export-hide>
     {prev ? (
       <button onClick={() => onSelect(prev.id)} className={`${LINK_BTN} no-underline gap-1`} style={{ color: PAL.gold }}>
-        <ChevronLeft className="w-4 h-4" /> Trang trước · {prev.label}
+        <ChevronLeft className="w-4 h-4" /> {t("Trang trước", "Previous")} · {prev.label}
       </button>
     ) : (
       <span />
     )}
     {next ? (
       <button onClick={() => onSelect(next.id)} className={`${LINK_BTN} no-underline gap-1`} style={{ color: PAL.gold }}>
-        Trang sau · {next.label} <ChevronRight className="w-4 h-4" />
+        {t("Trang sau", "Next")} · {next.label} <ChevronRight className="w-4 h-4" />
       </button>
     ) : (
       <span />
@@ -359,7 +361,7 @@ export const InsightBox: React.FC<{
               )}
             </>
           ) : (
-            <p className="text-[12px]" style={{ color: PAL.muted }}>Chưa đủ số để tự sinh Insight cho phần này.</p>
+            <p className="text-[12px]" style={{ color: PAL.muted }}>{t("Chưa đủ số để tự sinh Insight cho phần này.", "Not enough data to generate insights for this section.")}</p>
           )}
           {canManage && (
             <div className="flex flex-wrap items-center gap-3 pt-2 text-[11px]" style={{ borderTop: `1px solid ${PAL.line}`, color: PAL.muted }}>
@@ -402,7 +404,7 @@ export const KpiTile: React.FC<{ label: string; value: string; change?: number |
     </div>
     {change != null && (
       <div className="text-[11px] mt-1 font-bold" style={{ color: change >= 0 ? PAL.green : PAL.red }}>
-        {change >= 0 ? "▲" : "▼"} {fmtFixed(Math.abs(change), 1)}% cùng kỳ
+        {change >= 0 ? "▲" : "▼"} {fmtFixed(Math.abs(change), 1)}% {t("cùng kỳ", "vs same period")}
       </div>
     )}
     {note && (
@@ -415,7 +417,7 @@ export const KpiTile: React.FC<{ label: string; value: string; change?: number |
 
 // Giải thích cách tính dài của một khối — gập sau dòng "Cách tính" (bố cục 18/10 đợt 2). Số, kết luận và chú thích màu
 // vẫn hiện; chỉ phần nói phương pháp mới gập.
-export const MethodNote: React.FC<{ children: React.ReactNode; label?: string; className?: string }> = ({ children, label = "Cách tính", className = "mt-2" }) => (
+export const MethodNote: React.FC<{ children: React.ReactNode; label?: string; className?: string }> = ({ children, label = t("Cách tính", "Methodology"), className = "mt-2" }) => (
   <details className={`text-[11px] ${className}`} style={{ color: PAL.muted }}>
     <summary className="cursor-pointer min-h-6 py-1 font-bold w-fit">{label}</summary>
     <div className="leading-relaxed">{children}</div>

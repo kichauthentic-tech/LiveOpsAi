@@ -1,6 +1,7 @@
 import { CHANNEL, METRIC } from "../../../lib/metricGlossary";
 import { DriverKey } from "../../../lib/report/monthlyReportInsights";
 import { CampDayBucket } from "../../../lib/campaignDays";
+import { byLang, t } from "../../../lib/displayLang";
 
 
 // Skin đen-vàng CỐ ĐỊNH của Report Tháng + các bảng hằng số dùng chung. Tách khỏi MonthlyReportTabs.tsx
@@ -40,38 +41,44 @@ export type ReportSectionId = "summary" | "shop" | "why" | "products" | "ads" | 
 // Thứ tự trang (user chốt 28/10 theo demo Report Tháng): Tổng quan → Key Metrics (bảng tra cứu đứng ngay sau kết luận) → Hủy, hoàn & NMV
 // (tiền thật đặt sớm) → Toàn shop → Nguyên nhân → Sản phẩm → Host → Quảng cáo → Affiliate → Kế hoạch tháng sau.
 // MonthlyReportTabs dựng DOM theo thứ tự cũ và xếp lại bằng CSS `order` theo mảng này (secOrder) — đổi thứ tự chỉ cần sửa mảng.
-export const SECTIONS: { id: ReportSectionId; label: string; title: string }[] = [
-  { id: "summary", label: "Tổng quan", title: "Tổng quan & KPI" },
-  { id: "keymetrics", label: "Key Metrics", title: "Key Metrics" },
-  { id: "nmv", label: "NMV", title: "Hoàn & NMV ước tính" },
-  { id: "shop", label: "Toàn shop", title: "Toàn shop & đóng góp của livestream YFB" },
-  { id: "why", label: "Nguyên nhân", title: "Phân tích nguyên nhân" },
-  { id: "products", label: "Sản phẩm", title: "Sản phẩm & khuyến mãi" },
-  { id: "people", label: "Host", title: "Host & khung giờ" },
-  { id: "ads", label: "Ads", title: "Quảng cáo" },
-  { id: "affiliate", label: "Affiliate", title: "Affiliate" },
-  { id: "next", label: "Tháng sau", title: "Kế hoạch tháng sau & hành động" }
-];
+export const SECTIONS: { id: ReportSectionId; label: string; title: string }[] = byLang(
+  () => [
+    { id: "summary", label: t("Tổng quan", "Overview"), title: t("Tổng quan & KPI", "Overview & KPI") },
+    { id: "keymetrics", label: "Key Metrics", title: "Key Metrics" },
+    { id: "nmv", label: "NMV", title: t("Hoàn & NMV ước tính", "Refunds & estimated NMV") },
+    { id: "shop", label: t("Toàn shop", "Whole shop"), title: t("Toàn shop & đóng góp của livestream YFB", "Whole shop & YFB livestream contribution") },
+    { id: "why", label: t("Nguyên nhân", "Root cause"), title: t("Phân tích nguyên nhân", "Root-cause analysis") },
+    { id: "products", label: t("Sản phẩm", "Products"), title: t("Sản phẩm & khuyến mãi", "Products & promotions") },
+    { id: "people", label: "Host", title: t("Host & khung giờ", "Hosts & time slots") },
+    { id: "ads", label: "Ads", title: t("Quảng cáo", "Advertising") },
+    { id: "affiliate", label: "Affiliate", title: "Affiliate" },
+    { id: "next", label: t("Tháng sau", "Next month"), title: t("Kế hoạch tháng sau & hành động", "Next month's plan & actions") }
+  ],
+  []
+);
 
 // 4 kênh — màu phân loại theo thứ tự cố định (blue/orange/aqua/yellow, bước tối của bảng màu đã kiểm
 // mù màu cho các cặp kề nhau). Kênh luôn giữ một màu, không đổi theo thứ hạng.
-export const CHANNELS: { key: "liveLinked" | "affiliate" | "video" | "card"; label: string; color: string }[] = [
-  // "Linked account" = MỌI live trên tài khoản shop, không chỉ ca agency (tỷ trọng agency ở bảng chi tiết).
-  { key: "liveLinked", label: `${CHANNEL.sellerLive} (cả tài khoản shop)`, color: "#3987e5" },
-  { key: "affiliate", label: CHANNEL.affiliateLive, color: "#d95926" },
-  { key: "video", label: CHANNEL.video, color: "#199e70" },
-  { key: "card", label: CHANNEL.productCard, color: "#c98500" }
-];
+export const CHANNELS: { key: "liveLinked" | "affiliate" | "video" | "card"; label: string; color: string }[] = byLang(
+  () => [
+    // "Linked account" = MỌI live trên tài khoản shop, không chỉ ca agency (tỷ trọng agency ở bảng chi tiết).
+    { key: "liveLinked", label: `${CHANNEL.sellerLive} ${t("(cả tài khoản shop)", "(whole shop account)")}`, color: "#3987e5" },
+    { key: "affiliate", label: CHANNEL.affiliateLive, color: "#d95926" },
+    { key: "video", label: CHANNEL.video, color: "#199e70" },
+    { key: "card", label: CHANNEL.productCard, color: "#c98500" }
+  ],
+  []
+);
 
 // Nhãn ngắn loại ngày cho tiêu đề cột bảng host (bỏ phần "(13-15)" — khoảng camp có thể bị ghi đè).
 export const DAY_TYPE_SHORT: Record<CampDayBucket, string> = { daily: "Daily", dday: "D-Day", midmonth: "Mid-Month", payday: "Pay Day" };
 
 // Nhãn trục ngắn — 2 biểu đồ đứng cạnh nhau, nhãn đầy đủ (DRIVER_LABEL) dính vào nhau. Nhãn đầy đủ vẫn ở
 // các ô chú thích bên dưới biểu đồ.
-export const DRIVER_SHORT: Record<DriverKey, string> = {
+export const DRIVER_SHORT: Record<DriverKey, string> = byLang(() => ({
   hours: METRIC.liveHours,
   viewsPerHour: METRIC.viewsPerHour,
   liveCtr: METRIC.liveCtr,
   ctor: METRIC.ctor,
   aov: METRIC.aov
-};
+}));

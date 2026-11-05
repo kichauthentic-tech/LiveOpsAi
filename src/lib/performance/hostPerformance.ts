@@ -7,6 +7,7 @@ import { METRIC } from "../metricGlossary";
 import { assertOnePlatform } from "../platforms/perf";
 import { addKeyInput, emptyKeyCounts, keyInputFromSession, keyMetrics, type KeyCounts, type KeyMetrics } from "../report/keyMetrics";
 import { dataSourceTier, hasHandoverOrBetter } from "../dataSource";
+import { byLang, t } from "../displayLang";
 
 // Giai đoạn 3 của tầng dữ liệu gốc mới: đọc ra hiệu suất thật để làm nền cho việc SẮP LỊCH.
 // Chỉ tổng hợp, không tự xếp lịch — ops vẫn là người quyết, đúng tinh thần đã chốt (tránh lặp lại
@@ -180,7 +181,7 @@ export function splitUnassignedHost(rows: PerfRow[]): { ranked: PerfRow[]; unass
 
 export function byHost(sessions: LiveSession[]): PerfRow[] {
   assertOnePlatform(sessions, "byHost");
-  return groupBy(expandHostPortions(sessions), hostKey, (s) => ({ label: s.hostName || "Chưa gán host" }));
+  return groupBy(expandHostPortions(sessions), hostKey, (s) => ({ label: s.hostName || t("Chưa gán host", "Unassigned host") }));
 }
 
 export const WEEKDAY_LABELS = ["Chủ nhật", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"];
@@ -336,12 +337,12 @@ export const DAY_TYPE_DIFF_THRESHOLD = 5;
 
 export const GMV_PER_HOUR_DRIVERS = ["viewsPerHour", "liveCtr", "ctor", "aov"] as const;
 export type GmvPerHourDriver = (typeof GMV_PER_HOUR_DRIVERS)[number];
-export const DRIVER_LABEL: Record<GmvPerHourDriver, string> = {
+export const DRIVER_LABEL: Record<GmvPerHourDriver, string> = byLang(() => ({
   viewsPerHour: METRIC.viewsPerHour,
   liveCtr: METRIC.liveCtr,
   ctor: METRIC.ctor,
   aov: METRIC.aov
-};
+}));
 
 /** % lệch so với Cả team; null khi thiếu số hoặc ô có quá ít ca để so. */
 export function vsTeam(host: DayTypeMetrics, team: DayTypeMetrics, key: "gmvPerHour" | GmvPerHourDriver): number | null {

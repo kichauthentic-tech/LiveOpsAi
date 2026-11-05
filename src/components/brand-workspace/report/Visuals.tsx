@@ -11,6 +11,7 @@ import type { CampDayBucket } from "../../../lib/campaignDays";
 import { chartTooltipStyle, DAY_TYPE_SHORT, PAL } from "./theme";
 import { chartNum } from "./format";
 import { MethodNote, Panel, ReportTable } from "./ui";
+import { numLocale } from "../../../lib/displayLang";
 
 // Khối biểu đồ/bảng GĐ2 của Report Tháng (demo CROCS T10 28/10): cầu GMV, GMV/giờ kế hoạch, bảng dọc theo loại ngày,
 // scatter SKU + ảnh SKU, so sánh cặp chỉ số của host. Tính số nằm ở lib/report/reportVisuals.ts.
@@ -320,7 +321,7 @@ export const SkuThumb: React.FC<{ name: string; src?: string; editable: boolean;
 type HostPair = { key: string; name: string; x: ScatterAxis; y: ScatterAxis; pick: (m: ReturnType<typeof dayTypeMetrics>) => [number | null, number | null]; cap: string };
 
 const HOST_PAIRS: HostPair[] = [
-  { key: "traffic", name: `${METRIC.viewsPerHour} × ${METRIC.gmvPerHour}`, x: { title: METRIC.viewsPerHour, fmt: (v) => Math.round(v).toLocaleString("vi-VN") }, y: { title: METRIC.gmvPerHour, fmt: fmtVndShort }, pick: (m) => [m.viewsPerHour, m.gmvPerHour], cap: "Host ở góc trên-phải kéo được cả traffic lẫn doanh thu mỗi giờ." },
+  { key: "traffic", name: `${METRIC.viewsPerHour} × ${METRIC.gmvPerHour}`, x: { title: METRIC.viewsPerHour, fmt: (v) => Math.round(v).toLocaleString(numLocale()) }, y: { title: METRIC.gmvPerHour, fmt: fmtVndShort }, pick: (m) => [m.viewsPerHour, m.gmvPerHour], cap: "Host ở góc trên-phải kéo được cả traffic lẫn doanh thu mỗi giờ." },
   { key: "conv", name: `${METRIC.liveCtr} × ${METRIC.ctor}`, x: { title: METRIC.liveCtr, fmt: (v) => `${fmtFixed(v, 1)}%` }, y: { title: METRIC.ctor, fmt: pct2 }, pick: (m) => [m.liveCtr, m.ctor], cap: "LIVE CTR đo khả năng giữ người xem vào phiên; CTOR đo khả năng chuyển lượt nhấp thành đơn." },
   { key: "basket", name: `${METRIC.ctor} × ${METRIC.aov}`, x: { title: METRIC.ctor, fmt: pct2 }, y: { title: METRIC.aov, fmt: fmtVndShort }, pick: (m) => [m.ctor, m.aov], cap: "Host chốt đơn nhiều nhưng giá trị đơn thấp (góc trên-trái) cần thử bán combo." }
 ];

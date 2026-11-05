@@ -23,6 +23,7 @@ import { fmtFixed, fmtVndShort } from "../../../lib/format";
 import { DAY_TYPE_SHORT, PAL } from "./theme";
 import { fmtHours, fmtPct } from "./format";
 import { KpiTile, MethodNote, Panel, ReportTable } from "./ui";
+import { numLocale } from "../../../lib/displayLang";
 
 // Các khối MỚI của Report Tháng 10 trang (user duyệt demo CROCS T9, 24/10/2026): bảng điểm, bảng nhiệt loại ngày, Key Metrics
 // 3 tháng × 5 bảng, affiliate theo phiên creator, lịch creator tháng sau, hủy/hoàn & NMV. Số tính ở lib/report/brandReport.ts;
@@ -316,7 +317,7 @@ export const CreatorPlanPanel: React.FC<{ rows: CreatorPlanRow[]; monthLabel: st
     return big && total.target > 0 ? { row: big, share: ((big.target ?? 0) / total.target) * 100 } : null;
   })();
   return (
-    <Panel title={`Lịch livestream affiliate creator ${monthLabel}`} icon={<CalendarRange className="w-4 h-4" />} sub={`Tab Affiliate → Kế hoạch · Target (USD) = Target GMV ÷ tỷ giá ${fxRate.toLocaleString("vi-VN")} · so GMV/giờ mục tiêu với phiên tốt nhất của creator ở ${curLabel}`}>
+    <Panel title={`Lịch livestream affiliate creator ${monthLabel}`} icon={<CalendarRange className="w-4 h-4" />} sub={`Tab Affiliate → Kế hoạch · Target (USD) = Target GMV ÷ tỷ giá ${fxRate.toLocaleString(numLocale())} · so GMV/giờ mục tiêu với phiên tốt nhất của creator ở ${curLabel}`}>
       <div className="overflow-x-auto -mx-1">
         <table className="w-full text-xs min-w-[880px]">
           <thead>
@@ -338,7 +339,7 @@ export const CreatorPlanPanel: React.FC<{ rows: CreatorPlanRow[]; monthLabel: st
                   <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{r.hours != null ? fmtHours(r.hours) : "—"}</td>
                   <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>{r.target ? fmtVndShort(r.target) : "—"}</td>
                   <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.cream }}>{r.requiredGmvPerHour != null ? fmtVndShort(r.requiredGmvPerHour) : "—"}</td>
-                  <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{r.target && fxRate > 0 ? `$${Math.round(r.target / fxRate).toLocaleString("vi-VN")}` : "—"}</td>
+                  <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{r.target && fxRate > 0 ? `$${Math.round(r.target / fxRate).toLocaleString(numLocale())}` : "—"}</td>
                   <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{r.budgetAds != null ? fmtVndShort(r.budgetAds) : "—"}</td>
                   <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{r.bestGmvPerHour != null ? fmtVndShort(r.bestGmvPerHour) : "—"}</td>
                   <td className="py-2 px-3 whitespace-nowrap font-bold" style={{ color: tone }}>{r.ratio != null ? `gấp ${fmtFixed(r.ratio, 1)} lần` : "chưa có phiên"}</td>
@@ -351,7 +352,7 @@ export const CreatorPlanPanel: React.FC<{ rows: CreatorPlanRow[]; monthLabel: st
               <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.cream }}>{fmtHours(total.hours)}</td>
               <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>{fmtVndShort(total.target)}</td>
               <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.cream }}>{total.hours > 0 ? fmtVndShort(total.target / total.hours) : "—"}</td>
-              <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{fxRate > 0 ? `$${Math.round(total.target / fxRate).toLocaleString("vi-VN")}` : "—"}</td>
+              <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{fxRate > 0 ? `$${Math.round(total.target / fxRate).toLocaleString(numLocale())}` : "—"}</td>
               <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.cream }}>{fmtVndShort(total.ads)}</td>
               <td colSpan={3} className="py-2 px-3 font-mono" style={{ color: PAL.muted }}>{total.target > 0 ? `Ads = ${fmtFixed((total.ads / total.target) * 100, 1)}% target` : ""}</td>
             </tr>

@@ -3,6 +3,7 @@ import type { CreatorLivePerfRow } from "../dataraw/creatorLivePerfSlice";
 import { fmtFixed, fmtVndShort } from "../format";
 import { METRIC } from "../metricGlossary";
 import { assertOnePlatform } from "../platforms/perf";
+import { byLang, numLocale, t } from "../displayLang";
 
 // Key Metrics — MỘT bộ chỉ số live cho mọi report (user chốt 2026-09-29): Report Tháng (xu hướng, host, Excel),
 // Report Tuần, Dashboard brand, cửa sổ ca, Hiệu Suất Host, Bản Tin CEO đều hiện đủ 18 chỉ số theo đúng thứ tự dưới,
@@ -156,12 +157,15 @@ type Kind = "money" | "int" | "dec2" | "pct1" | "pct2" | "sec" | "hours";
  */
 export type KeyMetricGroup = "result" | "traffic" | "conversion" | "basket";
 
-export const KEY_METRIC_GROUPS: { group: KeyMetricGroup; label: string; hint: string }[] = [
-  { group: "result", label: "Kết quả", hint: "GMV và sản lượng trên số giờ live." },
-  { group: "traffic", label: "Lưu lượng", hint: "TikTok phân phối phiên tới bao nhiêu người và giữ họ ở lại bao lâu." },
-  { group: "conversion", label: "Chuyển đổi", hint: "Người xem thấy giỏ hàng, bấm vào, rồi chốt đơn." },
-  { group: "basket", label: "Giỏ hàng", hint: "Một đơn gồm mấy sản phẩm, giá bao nhiêu." }
-];
+export const KEY_METRIC_GROUPS: { group: KeyMetricGroup; label: string; hint: string }[] = byLang(
+  () => [
+    { group: "result", label: t("Kết quả", "Results"), hint: t("GMV và sản lượng trên số giờ live.", "GMV and volume over live hours.") },
+    { group: "traffic", label: t("Lưu lượng", "Traffic"), hint: t("TikTok phân phối phiên tới bao nhiêu người và giữ họ ở lại bao lâu.", "How many people TikTok shows the session to and how long they stay.") },
+    { group: "conversion", label: t("Chuyển đổi", "Conversion"), hint: t("Người xem thấy giỏ hàng, bấm vào, rồi chốt đơn.", "Viewers see the cart, click, then order.") },
+    { group: "basket", label: t("Giỏ hàng", "Basket"), hint: t("Một đơn gồm mấy sản phẩm, giá bao nhiêu.", "How many items per order, at what price.") }
+  ],
+  []
+);
 
 export interface KeyMetricDef {
   key: KeyMetricKey;
@@ -176,7 +180,7 @@ export interface KeyMetricDef {
 }
 
 /** 18 chỉ số đúng thứ tự user chốt 2026-09-29, rồi AOV (bổ sung). */
-export const KEY_METRICS: KeyMetricDef[] = [
+export const KEY_METRICS: KeyMetricDef[] = byLang(() => [
   { key: "gmv", label: METRIC.gmv, kind: "money", goodWhenUp: true, group: "result" },
   { key: "itemsSold", label: METRIC.itemsSold, kind: "int", goodWhenUp: true, group: "result" },
   { key: "orders", label: METRIC.orders, kind: "int", goodWhenUp: true, group: "result" },
@@ -197,7 +201,7 @@ export const KEY_METRICS: KeyMetricDef[] = [
   { key: "impressionsPerHour", label: METRIC.impressionsPerHour, kind: "int", goodWhenUp: true, group: "traffic" },
   { key: "gmvPerHour", label: METRIC.gmvPerHour, kind: "money", goodWhenUp: true, group: "result" },
   { key: "aov", label: METRIC.aov, kind: "money", goodWhenUp: true, group: "basket", extra: true }
-];
+], []);
 
 /** Giá trị của một chỉ số; kỳ không có ca ⇒ null (không hiện "0" cho kỳ trống). */
 export function keyMetricValue(m: KeyMetrics, key: KeyMetricKey): number | null {
@@ -210,12 +214,12 @@ export function fmtKeyMetric(kind: Kind | KeyMetricDef, v: number | null | undef
   if (v == null || Number.isNaN(v)) return "—";
   switch (k) {
     case "money": return fmtVndShort(v);
-    case "int": return Math.round(v).toLocaleString("vi-VN");
+    case "int": return Math.round(v).toLocaleString(numLocale());
     case "dec2": return fmtFixed(v, 2);
     case "pct1": return `${fmtFixed(v, 1)}%`;
     case "pct2": return `${fmtFixed(v, 2)}%`;
     case "sec": return `${Math.round(v)}s`;
-    case "hours": return `${v.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h`;
+    case "hours": return `${v.toLocaleString(numLocale(), { maximumFractionDigits: 1 })}h`;
   }
 }
 

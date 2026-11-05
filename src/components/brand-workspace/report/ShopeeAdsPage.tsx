@@ -7,6 +7,7 @@ import type { PageMetric } from "./ui";
 import { DemoLegend, DemoPanel, DemoTable } from "./DemoBlocks";
 import { columns, fmtM, hbars, pill, tbl } from "./demoCharts";
 import { fmtInt } from "./format";
+import { t as tr } from "../../../lib/displayLang";
 
 // Trang Quảng cáo Report Shopee khi shop có Shop+ Ads / Product Ads (31/10, Franklin whole shop). Số cả tháng theo chiến dịch /
 // sản phẩm, không có theo ngày. Phân tích lấy từ lib/report/shopeeAdsInsight.ts (cùng nguồn với Insight).
@@ -21,10 +22,10 @@ export function shopeeAdsMetrics(a: ShopeeAdsSuite): PageMetric[] {
   const z = analyzeShopeeAds(a);
   const t = z.totals;
   return [
-    { label: METRIC.expense, value: fmtVndShort(t.expense), note: `${z.types.length} loại Ads: ${z.types.map((x) => x.label).join(", ")}` },
-    { label: "Doanh số từ Ads", value: fmtVndShort(t.gmv), note: `${METRIC.roas} ${x1(t.roas)} · đơn trực tiếp ${fmtVndShort(t.gmvDirect)} (${x1(t.roasDirect)})` },
-    { label: METRIC.acos, value: pc(t.acos), note: "Expense ÷ doanh số từ Ads" },
-    { label: `${METRIC.expense} / lượt chuyển đổi`, value: t.costPerConversion != null ? fmtVndShort(t.costPerConversion) : "—", note: `${fmtInt(t.conversions)} lượt chuyển đổi` }
+    { label: METRIC.expense, value: fmtVndShort(t.expense), note: `${z.types.length} ${tr("loại Ads", "Ads types")}: ${z.types.map((x) => x.label).join(", ")}` },
+    { label: tr("Doanh số từ Ads", "Sales from Ads"), value: fmtVndShort(t.gmv), note: `${METRIC.roas} ${x1(t.roas)} · ${tr("đơn trực tiếp", "direct orders")} ${fmtVndShort(t.gmvDirect)} (${x1(t.roasDirect)})` },
+    { label: METRIC.acos, value: pc(t.acos), note: tr("Expense ÷ doanh số từ Ads", "Expense ÷ sales from Ads") },
+    { label: `${METRIC.expense} / ${tr("lượt chuyển đổi", "conversion")}`, value: t.costPerConversion != null ? fmtVndShort(t.costPerConversion) : "—", note: `${fmtInt(t.conversions)} ${tr("lượt chuyển đổi", "conversions")}` }
   ];
 }
 
@@ -49,11 +50,11 @@ export const ShopeeAdsPage: React.FC<{ ads: ShopeeAdsSuite }> = ({ ads }) => {
 
   return (
     <>
-      <DemoPanel title="Chi phí và doanh số theo loại Ads" sub="Cột xám = Expense, cột vàng = doanh số Shopee ghi nhận cho quảng cáo. Doanh số các loại có thể trùng đơn với nhau.">
+      <DemoPanel title={tr("Chi phí và doanh số theo loại Ads", "Spend and sales by Ads type")} sub={tr("Cột xám = Expense, cột vàng = doanh số Shopee ghi nhận cho quảng cáo. Doanh số các loại có thể trùng đơn với nhau.", "Grey bar = Expense, gold bar = sales Shopee attributes to the ads. Sales of different types may overlap.")}>
         <div dangerouslySetInnerHTML={{ __html: chart }} />
         <DemoLegend>
           {z.types.map((t) => (
-            <span key={t.kind}>{t.label}: {fmtFixed(t.expenseShare, 0)}% chi phí → {fmtFixed(t.gmvShare, 1)}% doanh số</span>
+            <span key={t.kind}>{t.label}: {fmtFixed(t.expenseShare, 0)}% {tr("chi phí", "of spend")} → {fmtFixed(t.gmvShare, 1)}% {tr("doanh số", "of sales")}</span>
           ))}
         </DemoLegend>
       </DemoPanel>
@@ -68,26 +69,26 @@ export const ShopeeAdsPage: React.FC<{ ads: ShopeeAdsSuite }> = ({ ads }) => {
 
           {cur === "live" && ads.live && (
             <>
-              <div className="pnh">Livestream Ads · theo chiến dịch</div>
-              {z.liveDrag && <div className="pns">{`Chiến dịch "${z.liveDrag.name}" chi ${fmtVndShort(z.liveDrag.expense)}, doanh số ${fmtVndShort(z.liveDrag.gmv)} — ${fmtFixed(z.liveDrag.shareOfLive, 0)}% chi phí Livestream Ads.`}</div>}
+              <div className="pnh">Livestream Ads · {tr("theo chiến dịch", "by campaign")}</div>
+              {z.liveDrag && <div className="pns">{tr(`Chiến dịch "${z.liveDrag.name}" chi ${fmtVndShort(z.liveDrag.expense)}, doanh số ${fmtVndShort(z.liveDrag.gmv)} — ${fmtFixed(z.liveDrag.shareOfLive, 0)}% chi phí Livestream Ads.`, `Campaign "${z.liveDrag.name}" spent ${fmtVndShort(z.liveDrag.expense)} for ${fmtVndShort(z.liveDrag.gmv)} in sales — ${fmtFixed(z.liveDrag.shareOfLive, 0)}% of Livestream Ads spend.`)}</div>}
               <DemoTable
                 html={tbl(
-                  ["Chiến dịch", METRIC.views, METRIC.orders, METRIC.expense, "Doanh số", METRIC.roas],
+                  [tr("Chiến dịch", "Campaign"), METRIC.views, METRIC.orders, METRIC.expense, tr("Doanh số", "Sales"), METRIC.roas],
                   ads.live.campaigns.map((c) => [`${c.name}<br><small>${c.objective}</small> ${status(c.status)}`, fmtInt(c.views), fmtInt(c.orders), fmtVndFull(c.expense), fmtVndFull(c.gmv), roasCell(c.roas)]),
                   [0]
                 )}
               />
-              <div className="legend">{METRIC.orders} có thể ghi 0 dù có doanh số: Shopee tính doanh số theo cửa sổ quy đổi, không khớp từng đơn trong file này.</div>
+              <div className="legend">{tr(`${METRIC.orders} có thể ghi 0 dù có doanh số: Shopee tính doanh số theo cửa sổ quy đổi, không khớp từng đơn trong file này.`, `${METRIC.orders} may show 0 despite sales: Shopee attributes sales over a conversion window that does not match individual orders in this file.`)}</div>
             </>
           )}
 
           {cur === "shop" && ads.shop && (
             <>
-              <div className="pnh">Shop+ Ads · tìm kiếm từ khoá / ngành hàng</div>
-              {z.searchManual && z.searchAuto && <div className="pns">{`Thủ công ${x1(z.searchManual.roas)} so với tự động ${x1(z.searchAuto.roas)}. Chiến dịch tự động chỉ có số từ ngày bắt đầu, so sánh theo ROAS chứ không theo tổng chi phí.`}</div>}
+              <div className="pnh">Shop+ Ads · {tr("tìm kiếm từ khoá / ngành hàng", "keyword / category search")}</div>
+              {z.searchManual && z.searchAuto && <div className="pns">{tr(`Thủ công ${x1(z.searchManual.roas)} so với tự động ${x1(z.searchAuto.roas)}. Chiến dịch tự động chỉ có số từ ngày bắt đầu, so sánh theo ROAS chứ không theo tổng chi phí.`, `Manual ${x1(z.searchManual.roas)} vs automatic ${x1(z.searchAuto.roas)}. Automatic campaigns only have data from their start date, so compare by ROAS rather than total spend.`)}</div>}
               <DemoTable
                 html={tbl(
-                  ["Chiến dịch", "Đấu thầu", "Từ khoá", "Bắt đầu", METRIC.expense, "Doanh số", "Doanh số trực tiếp", METRIC.roas, METRIC.acos, "Tỷ lệ click", "Chi phí / chuyển đổi"],
+                  [tr("Chiến dịch", "Campaign"), tr("Đấu thầu", "Bidding"), tr("Từ khoá", "Keyword"), tr("Bắt đầu", "Start"), METRIC.expense, tr("Doanh số", "Sales"), tr("Doanh số trực tiếp", "Direct sales"), METRIC.roas, METRIC.acos, tr("Tỷ lệ click", "Click rate"), tr("Chi phí / chuyển đổi", "Cost / conversion")],
                   ads.shop.rows.map((r) => [
                     r.name, r.bidding, r.keyword, r.startDate, fmtVndFull(r.expense), fmtVndFull(r.gmv), fmtVndFull(r.gmvDirect), roasCell(r.expense > 0 ? r.gmv / r.expense : null),
                     pc(r.gmv > 0 ? (r.expense / r.gmv) * 100 : null), pc(r.views > 0 ? (r.clicks / r.views) * 100 : null, 2), r.conversions > 0 ? fmtVndFull(r.expense / r.conversions) : "—"
@@ -126,7 +127,7 @@ const ProductTab: React.FC<{ ads: ShopeeAdsSuite; z: ReturnType<typeof analyzeSh
         <ul style={{ margin: "6px 0 0", paddingLeft: 16, fontSize: 12 }}>
           {rows.map((p) => (
             <li key={p.productId || p.name}>
-              {shortAdName(p.name, 46)}: chi {fmtVndShort(p.expense)}, {p.gmv > 0 ? `${METRIC.roas} ${x1(p.roas)}, trực tiếp ${x1(p.roasDirect)}` : "không ra doanh số"}
+              {shortAdName(p.name, 46)}: {tr("chi", "spent")} {fmtVndShort(p.expense)}, {p.gmv > 0 ? `${METRIC.roas} ${x1(p.roas)}, ${tr("trực tiếp", "direct")} ${x1(p.roasDirect)}` : tr("không ra doanh số", "no sales")}
             </li>
           ))}
         </ul>
@@ -135,28 +136,28 @@ const ProductTab: React.FC<{ ads: ShopeeAdsSuite; z: ReturnType<typeof analyzeSh
   );
   return (
     <>
-      <div className="pnh">Product Ads · theo sản phẩm</div>
+      <div className="pnh">Product Ads · {tr("theo sản phẩm", "by product")}</div>
       <div className="pns">
-        {z.productRunning ? `${z.productRunning.count} sản phẩm đang chạy ${x1(z.productRunning.roas)}` : "Không có sản phẩm đang chạy"}
-        {z.productPaused ? `; ${z.productPaused.count} sản phẩm tạm dừng ${x1(z.productPaused.roas)}` : ""}
-        {z.noSales.count > 0 ? `. ${z.noSales.count} sản phẩm chi ${fmtVndShort(z.noSales.expense)} mà không ra doanh số.` : "."}
+        {z.productRunning ? tr(`${z.productRunning.count} sản phẩm đang chạy ${x1(z.productRunning.roas)}`, `${z.productRunning.count} running products ${x1(z.productRunning.roas)}`) : tr("Không có sản phẩm đang chạy", "No running products")}
+        {z.productPaused ? tr(`; ${z.productPaused.count} sản phẩm tạm dừng ${x1(z.productPaused.roas)}`, `; ${z.productPaused.count} paused products ${x1(z.productPaused.roas)}`) : ""}
+        {z.noSales.count > 0 ? tr(`. ${z.noSales.count} sản phẩm chi ${fmtVndShort(z.noSales.expense)} mà không ra doanh số.`, `. ${z.noSales.count} products spent ${fmtVndShort(z.noSales.expense)} without any sales.`) : "."}
       </div>
       <DemoLegend>
-        <span>Thanh = Expense, số cuối dòng = Expense · ROAS</span>
-        <span>● đang chạy</span>
-        <span>xanh: ROAS ≥ 10x</span>
-        <span>đỏ: dưới 3x</span>
+        <span>{tr("Thanh = Expense, số cuối dòng = Expense · ROAS", "Bar = Expense, figures at the end = Expense · ROAS")}</span>
+        <span>● {tr("đang chạy", "running")}</span>
+        <span>{tr("xanh: ROAS ≥ 10x", "blue: ROAS ≥ 10x")}</span>
+        <span>{tr("đỏ: dưới 3x", "red: below 3x")}</span>
       </DemoLegend>
       <div className="hb" dangerouslySetInnerHTML={{ __html: bars }} />
       <div className="g2" style={{ marginTop: 12 }}>
-        {list("Chi nhiều, ROAS thấp", z.weak, "Không có sản phẩm chi từ 400.000 mà ROAS dưới 7x.")}
-        {list("Đáng tăng ngân sách (đang chạy, ROAS từ 10x)", z.strong, "Không có sản phẩm đang chạy đạt ROAS 10x.")}
+        {list(tr("Chi nhiều, ROAS thấp", "High spend, low ROAS"), z.weak, tr("Không có sản phẩm chi từ 400.000 mà ROAS dưới 7x.", "No product spending 400,000+ with ROAS below 7x."))}
+        {list(tr("Đáng tăng ngân sách (đang chạy, ROAS từ 10x)", "Worth more budget (running, ROAS 10x+)"), z.strong, tr("Không có sản phẩm đang chạy đạt ROAS 10x.", "No running product reaches ROAS 10x."))}
       </div>
       <details style={{ marginTop: 12 }}>
-        <summary style={{ cursor: "pointer", fontSize: 12 }}>Bảng đầy đủ {z.products.length} sản phẩm</summary>
+        <summary style={{ cursor: "pointer", fontSize: 12 }}>{tr(`Bảng đầy đủ ${z.products.length} sản phẩm`, `Full table of ${z.products.length} products`)}</summary>
         <DemoTable
           html={tbl(
-            ["Sản phẩm", "Trạng thái", METRIC.views, "Click", "Thêm vào giỏ", "Chuyển đổi", METRIC.expense, "Doanh số", "Doanh số trực tiếp", METRIC.roas, "ROAS trực tiếp", METRIC.acos],
+            [tr("Sản phẩm", "Product"), tr("Trạng thái", "Status"), METRIC.views, "Click", tr("Thêm vào giỏ", "Add to cart"), tr("Chuyển đổi", "Conversions"), METRIC.expense, tr("Doanh số", "Sales"), tr("Doanh số trực tiếp", "Direct sales"), METRIC.roas, tr("ROAS trực tiếp", "Direct ROAS"), METRIC.acos],
             [...z.products].sort((a, b) => b.expense - a.expense).map((p) => [
               shortAdName(p.name, 60), status(p.status), fmtInt(p.views), fmtInt(p.clicks), fmtInt(p.addToCart), fmtInt(p.conversions), fmtVndFull(p.expense), fmtVndFull(p.gmv), fmtVndFull(p.gmvDirect),
               roasCell(p.roas), x1(p.roasDirect), pc(p.gmv > 0 ? (p.expense / p.gmv) * 100 : null)

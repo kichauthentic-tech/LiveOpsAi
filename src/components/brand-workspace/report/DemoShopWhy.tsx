@@ -14,6 +14,7 @@ import { KEY_METRICS, fmtKeyMetric } from "../../../lib/report/keyMetrics";
 import { fmtFixed } from "../../../lib/format";
 import { DAY_TYPE_SHORT } from "./theme";
 import { type AttributionByType, type AttributionMonth } from "../../../lib/report/liveAttribution";
+import { numLocale, byLang, t } from "../../../lib/displayLang";
 
 const BLUE = "#7fb0e0";
 import { W, ch, columns, fmtM, fmtP, heat, hbars, pill, stack100, tbl, waterfall } from "./demoCharts";
@@ -102,7 +103,7 @@ export const DemoInsight: React.FC<{
   return (
     <>
       <div className="insbar">
-        <span>Insight tổng hợp</span>
+        <span>{t("Insight tổng hợp", "Key insights")}</span>
         <span className="st" aria-live="polite">{msg ?? (note && note.savedAt < computedAt && edited ? "Số liệu đã cập nhật sau lần sửa — đọc lại cho khớp" : "")}</span>
         <span className="sp" />
         {canManage && (
@@ -184,11 +185,11 @@ export interface DemoShopProps {
   fallbackHeadline: string;
   insight: React.ReactNode;
 }
-const VERDICT: Record<ControlVerdict, [string, string]> = {
-  agency_better: ["suy giảm thấp hơn các kênh còn lại", "g"],
-  ops: ["kém hơn các kênh còn lại", "r"],
-  market: ["tương đương các kênh còn lại", "m"]
-};
+const VERDICT: Record<ControlVerdict, [string, string]> = byLang(() => ({
+  agency_better: [t("suy giảm thấp hơn các kênh còn lại", "declined less than other channels"), "g"],
+  ops: [t("kém hơn các kênh còn lại", "worse than other channels"), "r"],
+  market: [t("tương đương các kênh còn lại", "in line with other channels"), "m"]
+}));
 export const DemoShopPage: React.FC<DemoShopProps> = ({ no, title, control, mixes, mixLabels, attribution, attributionTypes, yfbGmv, shopCur, shopPrev, window: w, traffic, inhouseLive = false, liveOnly = false, fallbackHeadline, insight }) => {
   const rows = (["daily", "camp", "all"] as const).map((k) => control.find((r) => r.key === k)).filter((r): r is ControlRow => !!r);
   const all = control.find((r) => r.key === "all");
@@ -204,22 +205,22 @@ export const DemoShopPage: React.FC<DemoShopProps> = ({ no, title, control, mixe
   const own = all ? [Math.max(0, all.shopLivePrev - all.livePrev), Math.max(0, all.shopLiveCur - all.liveCur)] as const : null;
   const ownChg = own ? pctOf(own[0], own[1]) : null;
   const kpis: DemoKpi[] = [
-    { label: `Total GMV · ${curLbl}`, value: shopCur ? fmtM(shopCur.gmv) : "—", note: shopChg != null ? `${fmtP(shopChg, 1)} so với ${prevLbl}` : "chưa có số kỳ trước" },
-    { label: "Tỷ trọng livestream YFB", value: shareCur != null ? fmtP(shareCur, 1, false) : "—", note: sharePrev != null && shareCur != null ? `${prevLbl}: ${fmtP(sharePrev, 1, false)} (${shareCur - sharePrev < 0 ? "−" : "+"}${fmtFixed(Math.abs(shareCur - sharePrev), 1)} điểm)` : "" },
-    { label: `Lượt truy cập shop · ${visRow ? controlLabel(visRow.key) : ""}`, value: visRow?.visitorsChg != null ? fmtP(visRow.visitorsChg) : "—", note: visRow?.cvrPrev != null && visRow.cvrCur != null ? `CVR shop ${fmtP(visRow.cvrPrev, 2, false)} → ${fmtP(visRow.cvrCur, 2, false)}` : "", color: visRow?.visitorsChg != null ? (visRow.visitorsChg >= 0 ? "green" : "red") : undefined },
+    { label: `Total GMV · ${curLbl}`, value: shopCur ? fmtM(shopCur.gmv) : "—", note: shopChg != null ? `${fmtP(shopChg, 1)} ${t("so với", "vs")} ${prevLbl}` : t("chưa có số kỳ trước", "no previous-period data") },
+    { label: t("Tỷ trọng livestream YFB", "YFB livestream share"), value: shareCur != null ? fmtP(shareCur, 1, false) : "—", note: sharePrev != null && shareCur != null ? `${prevLbl}: ${fmtP(sharePrev, 1, false)} (${shareCur - sharePrev < 0 ? "−" : "+"}${fmtFixed(Math.abs(shareCur - sharePrev), 1)} ${t("điểm", "pts")})` : "" },
+    { label: `${t("Lượt truy cập shop", "Shop visits")} · ${visRow ? controlLabel(visRow.key) : ""}`, value: visRow?.visitorsChg != null ? fmtP(visRow.visitorsChg) : "—", note: visRow?.cvrPrev != null && visRow.cvrCur != null ? `${t("CVR shop", "Shop CVR")} ${fmtP(visRow.cvrPrev, 2, false)} → ${fmtP(visRow.cvrCur, 2, false)}` : "", color: visRow?.visitorsChg != null ? (visRow.visitorsChg >= 0 ? "green" : "red") : undefined },
     inhouseLive
-      ? { label: "Brand tự live (Seller LIVE ngoài phiên YFB)", value: own ? fmtM(own[1]) : "—", note: own ? `${prevLbl}: ${fmtM(own[0])}${ownChg != null ? ` (${fmtP(ownChg)})` : ""}` : "" }
+      ? { label: t("Brand tự live (Seller LIVE ngoài phiên YFB)", "Brand in-house live (Seller LIVE outside YFB sessions)"), value: own ? fmtM(own[1]) : "—", note: own ? `${prevLbl}: ${fmtM(own[0])}${ownChg != null ? ` (${fmtP(ownChg)})` : ""}` : "" }
       : { label: "Affiliate LIVE", value: affChg != null ? fmtP(affChg) : "—", note: aff[0] != null && aff[1] != null ? `${m1(aff[0])} → ${m1(aff[1])}` : "", color: affChg != null ? (affChg >= 0 ? "green" : "red") : undefined }
   ];
   const headline = rows.length
     ? rows
         .filter((r) => r.key !== "all" && r.liveChg != null && r.restChg != null)
-        .map((r) => `${controlLabel(r.key)}: livestream YFB ${fmtP(r.liveChg!)}, các kênh còn lại ${fmtP(r.restChg!)}`)
+        .map((r) => t(`${controlLabel(r.key)}: livestream YFB ${fmtP(r.liveChg!)}, các kênh còn lại ${fmtP(r.restChg!)}`, `${controlLabel(r.key)}: YFB livestream ${fmtP(r.liveChg!)}, other channels ${fmtP(r.restChg!)}`))
         .join(". ") || fallbackHeadline
     : fallbackHeadline;
 
   // biểu đồ tăng trưởng
-  const grp = rows.map((r) => ({ l: `${controlLabel(r.key)} · ${r.days} ngày`, v: [r.liveChg, r.restChg, r.visitorsChg] }));
+  const grp = rows.map((r) => ({ l: `${controlLabel(r.key)} · ${r.days} ${t("ngày", "days")}`, v: [r.liveChg, r.restChg, r.visitorsChg] }));
   const vals = grp.flatMap((g) => g.v).filter((v): v is number => v != null);
   const cmpHtml = grp.length ? columns(grp, [{ color: "var(--gold)" }, { color: BLUE }, { color: "#8a8a94" }], { min: Math.floor(Math.min(0, ...vals) - 6), max: Math.ceil(Math.max(0, ...vals) + 8), h: 260, fmt: (v: number) => fmtP(v) }) : "";
 
@@ -228,24 +229,24 @@ export const DemoShopPage: React.FC<DemoShopProps> = ({ no, title, control, mixe
   const split = (c: ShopMonthMix, i: number) => (!inhouseLive ? [c.liveLinked] : yfbGmv[i] != null ? [Math.min(yfbGmv[i]!, c.liveLinked), Math.max(0, c.liveLinked - yfbGmv[i]!)] : [c.liveLinked, 0]);
   const mixCols = mixes.map((c, i) => (c ? { l: mixLabels[i], v: [...split(c, i), c.affiliate, c.video, c.card ?? 0] } : null)).filter((x): x is NonNullable<typeof x> => !!x);
   const segs = [
-    { name: inhouseLive ? "Livestream YFB" : "Seller LIVE", color: "#e0b43c" },
-    ...(inhouseLive ? [{ name: "Brand tự live", color: "#a8822a" }] : []),
+    { name: inhouseLive ? t("Livestream YFB", "YFB livestream") : "Seller LIVE", color: "#e0b43c" },
+    ...(inhouseLive ? [{ name: t("Brand tự live", "Brand in-house live"), color: "#a8822a" }] : []),
     { name: "Affiliate LIVE", color: "#d95926" }, { name: "Video", color: "#199e70" }, { name: "Product card", color: "#3987e5" }
   ];
   const mixHtml = mixCols.length ? stack100(mixCols, segs, { h: 260 }) : "";
 
   // bảng so sánh
-  const mktHead = ["Loại ngày", "Livestream YFB", "Các kênh còn lại", "Lượt truy cập shop", "CVR shop", "Đánh giá"];
+  const mktHead = [t("Loại ngày", "Day type"), t("Livestream YFB", "YFB livestream"), t("Các kênh còn lại", "Other channels"), t("Lượt truy cập shop", "Shop visits"), t("CVR shop", "Shop CVR"), t("Đánh giá", "Assessment")];
   const mktRows = rows.map((r) => {
     const v = controlVerdict(r);
-    const [t, k] = v ? VERDICT[v] : ["chưa đủ số", "m"];
+    const [verdict, k] = v ? VERDICT[v] : [t("chưa đủ số", "not enough data"), "m"];
     return [
-      `${controlLabel(r.key)} · ${r.days} ngày`,
+      `${controlLabel(r.key)} · ${r.days} ${t("ngày", "days")}`,
       r.liveChg != null ? ch(fmtP(r.liveChg), 10) : "—",
       r.restChg != null ? ch(fmtP(r.restChg), 10) : "—",
       r.visitorsChg != null ? ch(fmtP(r.visitorsChg), 10) : "—",
       r.cvrPrev != null && r.cvrCur != null ? `${fmtP(r.cvrPrev, 2, false)} → ${fmtP(r.cvrCur, 2, false)}` : "—",
-      W(pill(t, k))
+      W(pill(verdict, k))
     ];
   });
 
@@ -254,9 +255,9 @@ export const DemoShopPage: React.FC<DemoShopProps> = ({ no, title, control, mixe
   const shift = (cur: AttributionMonth | null | undefined, before: AttributionMonth | null | undefined): any => {
     if (!cur || !before) return "—";
     const d = cur.indirectPct - before.indirectPct;
-    return { t: `${d < 0 ? "−" : "+"}${fmtFixed(Math.abs(d), 1)} điểm`, c: Math.abs(d) < 5 ? "nt" : d > 0 ? "dn" : "up" };
+    return { t: `${d < 0 ? "−" : "+"}${fmtFixed(Math.abs(d), 1)} ${t("điểm", "pts")}`, c: Math.abs(d) < 5 ? "nt" : d > 0 ? "dn" : "up" };
   };
-  const attrHead = ["Tháng", "Direct GMV", "Indirect GMV", "Attributed GMV", "Indirect %", "So tháng trước"];
+  const attrHead = [t("Tháng", "Month"), "Direct GMV", "Indirect GMV", "Attributed GMV", "Indirect %", t("So tháng trước", "vs last month")];
   const attrRows = attribution.map((x, i) => [
     mixLabels[i],
     x ? fmtM(x.direct) : "—",
@@ -268,7 +269,7 @@ export const DemoShopPage: React.FC<DemoShopProps> = ({ no, title, control, mixe
   // Chi tiết theo loại ngày của tháng gần nhất, đặt cạnh tháng trước.
   const lastIdx = attributionTypes.length - 1;
   const typeKeys = (["daily", "dday", "midmonth", "payday"] as const).filter((k) => attributionTypes[lastIdx]?.[k]);
-  const typeHead = ["Loại ngày", "Số ngày", "Direct GMV", "Indirect GMV", "Attributed GMV", "Indirect %", "So tháng trước"];
+  const typeHead = [t("Loại ngày", "Day type"), t("Số ngày", "Days"), "Direct GMV", "Indirect GMV", "Attributed GMV", "Indirect %", t("So tháng trước", "vs last month")];
   const typeRows = typeKeys.map((k) => {
     const x = attributionTypes[lastIdx][k]!;
     return [DAY_TYPE_SHORT[k], `${x.days}`, fmtM(x.direct), fmtM(x.indirect), fmtM(x.attributed), fmtP(x.indirectPct, 1, false), shift(x, attributionTypes[lastIdx - 1]?.[k])];
@@ -286,7 +287,7 @@ export const DemoShopPage: React.FC<DemoShopProps> = ({ no, title, control, mixe
     const steps = [dYfb, dLive - dYfb, dAff, dVid, dCard];
     const ax = axis(a.shopGmv, steps);
     br3Axis = ax.min;
-    const lab = ["Livestream\nYFB", inhouseLive ? "Brand\ntự live" : "Seller LIVE\nkhác", "Affiliate\nLIVE", "Video", "Product\ncard"];
+    const lab = [t("Livestream\nYFB", "YFB\nlivestream"), inhouseLive ? t("Brand\ntự live", "Brand\nin-house") : t("Seller LIVE\nkhác", "Other\nSeller LIVE"), "Affiliate\nLIVE", "Video", "Product\ncard"];
     br3 = waterfall(
       [
         { l: `Total GMV\n${prevLbl}`, v: a.shopGmv, t: "total", txt: fmtM(a.shopGmv) },
@@ -303,7 +304,7 @@ export const DemoShopPage: React.FC<DemoShopProps> = ({ no, title, control, mixe
     const steps = traffic.parts.map((p) => p.value);
     const ax = axis(traffic.from, steps);
     br4Axis = ax.min;
-    const names: Record<string, string> = { visitors: "Lượt truy cập\nshop", cvr: "CVR shop", aov: `${METRIC.aov}\n(suy ra)` };
+    const names: Record<string, string> = { visitors: t("Lượt truy cập\nshop", "Shop\nvisits"), cvr: t("CVR shop", "Shop CVR"), aov: `${METRIC.aov}\n${t("(suy ra)", "(derived)")}` };
     br4 = waterfall(
       [
         { l: `Total GMV\n${prevLbl}`, v: traffic.from, t: "total", txt: fmtM(traffic.from) },
@@ -313,7 +314,7 @@ export const DemoShopPage: React.FC<DemoShopProps> = ({ no, title, control, mixe
       { min: ax.min, max: ax.max, h: 270 }
     );
     const [pv, pc, pa] = traffic.parts;
-    br4Legend = `Lượt truy cập ${fmtP(pv.change, 0)} · CVR shop ${all?.cvrPrev != null && all.cvrCur != null ? `${fmtP(all.cvrPrev, 2, false)} → ${fmtP(all.cvrCur, 2, false)} ` : ""}(${fmtP(pc.change, 1)}) · ${METRIC.aov} suy ra ${fmtP(pa.change, 1)}`;
+    br4Legend = `${t("Lượt truy cập", "Visits")} ${fmtP(pv.change, 0)} · ${t("CVR shop", "Shop CVR")} ${all?.cvrPrev != null && all.cvrCur != null ? `${fmtP(all.cvrPrev, 2, false)} → ${fmtP(all.cvrCur, 2, false)} ` : ""}(${fmtP(pc.change, 1)}) · ${METRIC.aov} ${t("suy ra", "derived")} ${fmtP(pa.change, 1)}`;
   }
 
   return (
@@ -321,63 +322,77 @@ export const DemoShopPage: React.FC<DemoShopProps> = ({ no, title, control, mixe
       <DemoHead no={no} title={title} headline={headline} kpis={kpis} />
       <div className="stk">
         <div className="pn">
-          <div className="pnh">Tăng trưởng GMV: livestream YFB, các kênh còn lại và lượt truy cập shop</div>
+          <div className="pnh">{t("Tăng trưởng GMV: livestream YFB, các kênh còn lại và lượt truy cập shop", "GMV growth: YFB livestream, other channels and shop visits")}</div>
           <div className="pns">
-            {curLbl} so với {prevLbl}.{" "}
+            {curLbl} {t("so với", "vs")} {prevLbl}.{" "}
             {liveOnly
-              ? "Các kênh còn lại (Affiliate LIVE, Video, Product card) là nhóm đối chứng: YFB chỉ vận hành livestream, không tác động các kênh này."
-              : "Các kênh còn lại (Affiliate LIVE, Video, Product card) là nhóm đối chứng gần đúng: YFB không vận hành trực tiếp nhưng có đặt lịch creator và chạy Ads cho Product, Creator."}
-            {inhouseLive ? " Phiên brand tự live không tính vào bên nào." : ""}
+              ? t("Các kênh còn lại (Affiliate LIVE, Video, Product card) là nhóm đối chứng: YFB chỉ vận hành livestream, không tác động các kênh này.", "The other channels (Affiliate LIVE, Video, Product card) are the control group: YFB runs livestream only and does not influence them.")
+              : t("Các kênh còn lại (Affiliate LIVE, Video, Product card) là nhóm đối chứng gần đúng: YFB không vận hành trực tiếp nhưng có đặt lịch creator và chạy Ads cho Product, Creator.", "The other channels (Affiliate LIVE, Video, Product card) are an approximate control group: YFB does not run them directly but books creators and runs Product and Creator Ads.")}
+            {inhouseLive ? t(" Phiên brand tự live không tính vào bên nào.", " Brand in-house live sessions are counted on neither side.") : ""}
           </div>
           <Html html={cmpHtml} />
           <div className="legend">
-            <span><i style={{ background: "var(--gold)" }} />Livestream YFB</span>
-            <span><i style={{ background: BLUE }} />Các kênh còn lại</span>
-            <span><i style={{ background: "#8a8a94" }} />Lượt truy cập shop</span>
+            <span><i style={{ background: "var(--gold)" }} />{t("Livestream YFB", "YFB livestream")}</span>
+            <span><i style={{ background: BLUE }} />{t("Các kênh còn lại", "Other channels")}</span>
+            <span><i style={{ background: "#8a8a94" }} />{t("Lượt truy cập shop", "Shop visits")}</span>
           </div>
         </div>
         <div className="pn">
-          <div className="pnh">Cơ cấu Total GMV theo kênh</div>
-          <div className="pns">Tỷ trọng, {/^1–\d+\//.test(mixLabels[3] ?? "") ? `${mixLabels[3].replace(/\/\d+$/, "")} mỗi tháng` : "cả tháng"}. {inhouseLive ? "Seller LIVE của tài khoản shop tách thành phiên YFB và phiên brand tự live." : "Seller LIVE gồm mọi phiên trên tài khoản shop."}</div>
+          <div className="pnh">{t("Cơ cấu Total GMV theo kênh", "Total GMV mix by channel")}</div>
+          <div className="pns">
+            {t("Tỷ trọng", "Share")}, {/^1–\d+\//.test(mixLabels[3] ?? "") ? `${mixLabels[3].replace(/\/\d+$/, "")} ${t("mỗi tháng", "of each month")}` : t("cả tháng", "full month")}.{" "}
+            {inhouseLive ? t("Seller LIVE của tài khoản shop tách thành phiên YFB và phiên brand tự live.", "The shop account's Seller LIVE is split into YFB sessions and brand in-house sessions.") : t("Seller LIVE gồm mọi phiên trên tài khoản shop.", "Seller LIVE includes every session on the shop account.")}
+          </div>
           <Html html={mixHtml} />
           <div className="legend">{segs.map((s) => <span key={s.name}><i style={{ background: s.color }} />{s.name}</span>)}</div>
         </div>
       </div>
       {inhouseLive ? null : attribution.some(Boolean) ? (
         <div className="pn">
-          <div className="pnh">Direct GMV và Indirect GMV qua các tháng</div>
-          <div className="pns">Direct = đơn chốt ngay trong phiên; Indirect = đơn về sau từ người đã xem phiên. Số của mọi phiên trên tài khoản shop, cùng số ngày mỗi tháng. Tô màu khi Indirect đổi từ 5 điểm trở lên so với tháng trước.</div>
+          <div className="pnh">{t("Direct GMV và Indirect GMV qua các tháng", "Direct GMV and Indirect GMV by month")}</div>
+          <div className="pns">{t("Direct = đơn chốt ngay trong phiên; Indirect = đơn về sau từ người đã xem phiên. Số của mọi phiên trên tài khoản shop, cùng số ngày mỗi tháng. Tô màu khi Indirect đổi từ 5 điểm trở lên so với tháng trước.", "Direct = orders placed during the session; Indirect = later orders from people who watched. Covers every session on the shop account, same days each month. Highlighted when Indirect moves 5 pts or more vs last month.")}</div>
           <Tbl html={tbl(attrHead, attrRows)} />
           {typeRows.length > 0 && (
             <>
-              <div className="pnh" style={{ marginTop: 14 }}>Chi tiết theo loại ngày · {mixLabels[lastIdx]}</div>
-              <div className="pns">{DAY_TYPE.daily} và từng loại ngày {DAY_TYPE.campaign} (D-Day, Mid-Month, Pay Day), khung Campaign theo từng tháng. Mỗi loại chỉ vài ngày nên số dao động mạnh.</div>
+              <div className="pnh" style={{ marginTop: 14 }}>{t("Chi tiết theo loại ngày", "Detail by day type")} · {mixLabels[lastIdx]}</div>
+              <div className="pns">{t(`${DAY_TYPE.daily} và từng loại ngày ${DAY_TYPE.campaign} (D-Day, Mid-Month, Pay Day), khung Campaign theo từng tháng. Mỗi loại chỉ vài ngày nên số dao động mạnh.`, `${DAY_TYPE.daily} and each ${DAY_TYPE.campaign} day type (D-Day, Mid-Month, Pay Day), using each month's Campaign windows. Each type covers only a few days, so figures swing widely.`)}</div>
               <Tbl html={tbl(typeHead, typeRows)} />
             </>
           )}
         </div>
       ) : (
         <div className="pn">
-          <div className="pnh">Direct GMV và Indirect GMV qua các tháng</div>
-          <div className="pns">Chưa có số: thiếu file Shop Analytics hoặc bản chụp cũ chưa lưu cột Direct/Indirect. Bấm Cập nhật số liệu để tải lại.</div>
+          <div className="pnh">{t("Direct GMV và Indirect GMV qua các tháng", "Direct GMV and Indirect GMV by month")}</div>
+          <div className="pns">{t("Chưa có số: thiếu file Shop Analytics hoặc bản chụp cũ chưa lưu cột Direct/Indirect. Bấm Cập nhật số liệu để tải lại.", "No data yet: the Shop Analytics file is missing or the data snapshot predates the Direct/Indirect columns.")}</div>
         </div>
       )}
       <div className="pn">
-        <div className="pnh">So sánh livestream YFB với các kênh còn lại</div>
-        <div className="pns">Chênh lệch từ 10 điểm phần trăm trở lên mới xem là khác xu hướng chung của shop (15 điểm khi nhóm 4–6 ngày, 20 điểm khi dưới 4 ngày).</div>
+        <div className="pnh">{t("So sánh livestream YFB với các kênh còn lại", "YFB livestream vs other channels")}</div>
+        <div className="pns">{t("Chênh lệch từ 10 điểm phần trăm trở lên mới xem là khác xu hướng chung của shop (15 điểm khi nhóm 4–6 ngày, 20 điểm khi dưới 4 ngày).", "Only a gap of 10 percentage points or more counts as differing from the shop's overall trend (15 pts for groups of 4–6 days, 20 pts under 4 days).")}</div>
         <Tbl html={tbl(mktHead, mktRows, [5])} />
       </div>
       {br3 && (
         <div className="pn">
-          <div className="pnh">Đóng góp của từng kênh vào thay đổi Total GMV</div>
-          <div className="pns">{prevLbl} → {curLbl}. {inhouseLive ? "Brand tự live" : "Seller LIVE khác"} = phần Seller LIVE của tài khoản shop ngoài các phiên YFB, Product card là số ước tính từ số làm tròn; hai cột này sai lệch vài chục triệu. Trục bắt đầu từ {fmtM(br3Axis!)}.</div>
+          <div className="pnh">{t("Đóng góp của từng kênh vào thay đổi Total GMV", "Each channel's contribution to the Total GMV change")}</div>
+          <div className="pns">
+            {prevLbl} → {curLbl}.{" "}
+            {t(
+              `${inhouseLive ? "Brand tự live" : "Seller LIVE khác"} = phần Seller LIVE của tài khoản shop ngoài các phiên YFB, Product card là số ước tính từ số làm tròn; hai cột này sai lệch vài chục triệu. Trục bắt đầu từ ${fmtM(br3Axis!)}.`,
+              `${inhouseLive ? "Brand in-house live" : "Other Seller LIVE"} = the shop account's Seller LIVE outside YFB sessions; Product card is estimated from rounded figures, so these two bars may be off by tens of millions. Axis starts at ${fmtM(br3Axis!)}.`
+            )}
+          </div>
           <Html html={br3} />
         </div>
       )}
       {br4 && (
         <div className="pn">
-          <div className="pnh">Phân rã Total GMV: lượt truy cập shop × CVR shop × {METRIC.aov}</div>
-          <div className="pns">Cả kỳ {curLbl} so với {prevLbl}. {METRIC.aov} được suy ra từ ba số còn lại nên là ước tính; lượt truy cập làm tròn đến 1% nên mỗi phần có thể lệch vài chục triệu. Trục bắt đầu từ {fmtM(br4Axis!)}.</div>
+          <div className="pnh">{t(`Phân rã Total GMV: lượt truy cập shop × CVR shop × ${METRIC.aov}`, `Total GMV breakdown: shop visits × shop CVR × ${METRIC.aov}`)}</div>
+          <div className="pns">
+            {t(
+              `Cả kỳ ${curLbl} so với ${prevLbl}. ${METRIC.aov} được suy ra từ ba số còn lại nên là ước tính; lượt truy cập làm tròn đến 1% nên mỗi phần có thể lệch vài chục triệu. Trục bắt đầu từ ${fmtM(br4Axis!)}.`,
+              `Whole period ${curLbl} vs ${prevLbl}. ${METRIC.aov} is derived from the other three figures, so it is an estimate; visits are rounded to 1%, so each part may be off by tens of millions. Axis starts at ${fmtM(br4Axis!)}.`
+            )}
+          </div>
           <Html html={br4} />
           <div className="legend"><span>{br4Legend}</span></div>
         </div>
@@ -406,7 +421,7 @@ export interface DemoWhyProps {
   monthShort: (m: string) => string;
   insight: React.ReactNode;
 }
-const nf = (v: number) => Math.round(v).toLocaleString("vi-VN");
+const nf = (v: number) => Math.round(v).toLocaleString(numLocale());
 const pct1 = (v: number) => fmtP(v, 2, false);
 const FACTOR_ORDER = DAY_TYPE_FACTORS;
 const TAB_CLS: Record<string, string> = { daily: "g-daily", dday: "g-dday", midmonth: "g-mm", payday: "g-pd" };
@@ -438,7 +453,7 @@ const FunnelPanel: React.FC<{ funnel: NonNullable<DemoWhyProps["funnel"]>; band:
     Math.max(120, Math.ceil(Math.max(...[im, vw, pi, pc, od].map(idx)) / 10) * 10 + 7)
   );
   const tableHtml = tbl(
-    ["Tỷ lệ", prevShort, "Tháng này", "±"],
+    [t("Tỷ lệ", "Rate"), prevShort, t("Tháng này", "This month"), "±"],
     [
       [`${METRIC.err} (Views ÷ LIVE impressions)`, pct1(ratio[0].p ?? 0), { t: pct1(ratio[0].c ?? 0), c: chgCls(ratio[0].chg, false) }, { t: sgn(ratio[0].chg), c: chgCls(ratio[0].chg, false) }],
       ["Product CTR", pct1(rate(pc.prev, pi.prev) ?? 0), pct1(rate(pc.cur, pi.cur) ?? 0), { t: sgn(rate(pc.prev, pi.prev) && rate(pc.cur, pi.cur) ? ((rate(pc.cur, pi.cur) as number) / (rate(pc.prev, pi.prev) as number) - 1) * 100 : null), c: "nt" }],
@@ -447,11 +462,11 @@ const FunnelPanel: React.FC<{ funnel: NonNullable<DemoWhyProps["funnel"]>; band:
   );
   return (
     <div className="pn">
-      <div className="pnh">Phễu LIVE</div>
-      <div className="pns">Hai cách xem: chuỗi chuyển đổi (số tuyệt đối và tỷ lệ giữa các bậc) hoặc chỉ số hoá (tháng trước = 100, vạch trắng = tháng trước).</div>
+      <div className="pnh">{t("Phễu LIVE", "LIVE funnel")}</div>
+      <div className="pns">{t("Hai cách xem: chuỗi chuyển đổi (số tuyệt đối và tỷ lệ giữa các bậc) hoặc chỉ số hoá (tháng trước = 100, vạch trắng = tháng trước).", "Two views: conversion chain (absolute numbers and step rates) or indexed (last month = 100, white mark = last month).")}</div>
       <div className="tabs" id="funnelMode">
-        <button type="button" className={mode === "p" ? "seg-on" : ""} onClick={() => setMode("p")}>Chuỗi chuyển đổi</button>
-        <button type="button" className={mode === "i" ? "seg-on" : ""} onClick={() => setMode("i")}>Chỉ số hoá ({prevShort} = 100)</button>
+        <button type="button" className={mode === "p" ? "seg-on" : ""} onClick={() => setMode("p")}>{t("Chuỗi chuyển đổi", "Conversion chain")}</button>
+        <button type="button" className={mode === "i" ? "seg-on" : ""} onClick={() => setMode("i")}>{t("Chỉ số hoá", "Indexed")} ({prevShort} = 100)</button>
       </div>
       {mode === "p" ? (
         <div className="pipe" style={{ display: "flex" }}>
@@ -473,7 +488,7 @@ const FunnelPanel: React.FC<{ funnel: NonNullable<DemoWhyProps["funnel"]>; band:
                     <div className="rt">{fmtP(r.c ?? 0, i === 1 ? 1 : 2, false)}</div>
                     <div className="ar">→</div>
                     <div>{prevShort}: {fmtP(r.p ?? 0, i === 1 ? 1 : 2, false)}</div>
-                    <div className={rs ? "dn" : (r.chg ?? 0) > 0 ? "up" : "nt"} style={{ fontWeight: 700 }}>{sgn(r.chg)}{rs ? " · vượt ngưỡng" : ""}</div>
+                    <div className={rs ? "dn" : (r.chg ?? 0) > 0 ? "up" : "nt"} style={{ fontWeight: 700 }}>{sgn(r.chg)}{rs ? t(" · vượt ngưỡng", " · beyond range") : ""}</div>
                   </div>
                 )}
               </React.Fragment>
@@ -496,15 +511,15 @@ export const DemoWhyPage: React.FC<DemoWhyProps> = ({ no, title, fallbackHeadlin
   const sig = (v: number | null) => v != null && band != null && Math.abs(v) > band;
   const col = (v: number | null): "red" | "green" | undefined => (v == null ? undefined : v < 0 ? "red" : "green");
   const kpis: DemoKpi[] = [
-    { label: METRIC.gmvPerHour, value: stats.cur.gmvPerHour != null ? fmtM(stats.cur.gmvPerHour) : "—", note: `${sgn(gph)} so với ${prevShort}`, color: col(gph) },
-    { label: METRIC.viewsPerHour, value: stats.cur.viewsPerHour != null ? nf(stats.cur.viewsPerHour) : "—", note: `${sgn(vph)}${band != null ? ` · ngưỡng ±${Math.round(band)}%` : ""}`, color: col(vph) },
-    { label: METRIC.err, value: stats.cur.err != null ? pct1(stats.cur.err) : "—", note: `${sgn(err)}${sig(err) ? (err! < 0 ? " · giảm có ý nghĩa" : " · tăng có ý nghĩa") : ""}`, color: col(err) },
-    { label: METRIC.ctor, value: stats.cur.ctor != null ? pct1(stats.cur.ctor) : "—", note: `${sgn(ctor)} so với ${stats.prev.ctor != null ? pct1(stats.prev.ctor) : "—"}`, color: col(ctor) }
+    { label: METRIC.gmvPerHour, value: stats.cur.gmvPerHour != null ? fmtM(stats.cur.gmvPerHour) : "—", note: `${sgn(gph)} ${t("so với", "vs")} ${prevShort}`, color: col(gph) },
+    { label: METRIC.viewsPerHour, value: stats.cur.viewsPerHour != null ? nf(stats.cur.viewsPerHour) : "—", note: `${sgn(vph)}${band != null ? ` · ${t("ngưỡng", "range")} ±${Math.round(band)}%` : ""}`, color: col(vph) },
+    { label: METRIC.err, value: stats.cur.err != null ? pct1(stats.cur.err) : "—", note: `${sgn(err)}${sig(err) ? (err! < 0 ? t(" · giảm có ý nghĩa", " · significant decline") : t(" · tăng có ý nghĩa", " · significant increase")) : ""}`, color: col(err) },
+    { label: METRIC.ctor, value: stats.cur.ctor != null ? pct1(stats.cur.ctor) : "—", note: `${sgn(ctor)} ${t("so với", "vs")} ${stats.prev.ctor != null ? pct1(stats.prev.ctor) : "—"}`, color: col(ctor) }
   ];
   // tiêu đề kết luận: bước nghẽn = yếu tố đóng góp âm lớn nhất
   const worst = drivers ? [...drivers.parts].filter((x) => x.key !== "hours").sort((x, y) => x.value - y.value)[0] : null;
   const headline = drivers && worst && worst.value < 0
-    ? `${METRIC.gmvPerHour} ${sgn(gph)}: yếu tố hiệu suất kéo giảm nhiều nhất là ${DRIVER_LABEL[worst.key]} (${fmtP(worst.change)}, ${M(worst.value)})`
+    ? t(`${METRIC.gmvPerHour} ${sgn(gph)}: yếu tố hiệu suất kéo giảm nhiều nhất là ${DRIVER_LABEL[worst.key]} (${fmtP(worst.change)}, ${M(worst.value)})`, `${METRIC.gmvPerHour} ${sgn(gph)}: the performance factor pulling it down most is ${DRIVER_LABEL[worst.key]} (${fmtP(worst.change)}, ${M(worst.value)})`)
     : fallbackHeadline;
 
   let bridge = "";
@@ -524,19 +539,24 @@ export const DemoWhyPage: React.FC<DemoWhyProps> = ({ no, title, fallbackHeadlin
   // Thay đổi các yếu tố theo loại ngày
   const dayHtml = dayRows.length
     ? tbl(
-        ["Loại ngày", METRIC.liveHours, METRIC.viewsPerHour, METRIC.liveCtr, METRIC.ctor, METRIC.aov, METRIC.gmvPerHour, "Ngưỡng", "Đánh giá"],
+        [t("Loại ngày", "Day type"), METRIC.liveHours, METRIC.viewsPerHour, METRIC.liveCtr, METRIC.ctor, METRIC.aov, METRIC.gmvPerHour, t("Ngưỡng", "Range"), t("Đánh giá", "Assessment")],
         dayRows.map((r) => {
           const gp = r.change.gmvPerHour;
-          const [t, k] = r.band == null ? ["chưa đủ phiên", "m"] : r.significant ? [(gp ?? 0) < 0 ? "giảm có ý nghĩa" : "tăng có ý nghĩa", (gp ?? 0) < 0 ? "r" : "g"] : ["trong ngưỡng dao động", "m"];
+          const [verdict, k] =
+            r.band == null
+              ? [t("chưa đủ phiên", "not enough sessions"), "m"]
+              : r.significant
+                ? [(gp ?? 0) < 0 ? t("giảm có ý nghĩa", "significant decline") : t("tăng có ý nghĩa", "significant increase"), (gp ?? 0) < 0 ? "r" : "g"]
+                : [t("trong ngưỡng dao động", "within normal range"), "m"];
           return [
-            `${DAY_TYPE_SHORT[r.key]}<br><span class="nt" style="font-size:11px">${r.sessionsPrev} → ${r.sessionsCur} phiên</span>`,
+            `${DAY_TYPE_SHORT[r.key]}<br><span class="nt" style="font-size:11px">${r.sessionsPrev} → ${r.sessionsCur} ${t("phiên", "sessions")}</span>`,
             ...FACTOR_ORDER.map((f, i) => {
               const v = r.change[f];
               if (v == null) return "—";
               return { t: fmtP(v), c: "hm", s: (i === 0 ? heat(v, 40, BLUE, BLUE) : heat(v, 30)) + (i > 0 && r.band != null && Math.abs(v) > r.band ? ";box-shadow:inset 0 0 0 1.5px var(--cream);font-weight:800" : "") };
             }),
             r.band != null ? `±${Math.round(r.band)}%` : "—",
-            W(pill(t, k))
+            W(pill(verdict, k))
           ];
         }),
         [8]
@@ -552,7 +572,7 @@ export const DemoWhyPage: React.FC<DemoWhyProps> = ({ no, title, fallbackHeadlin
     const ordered = ABS_ORDER.filter((k) => DAY_ABS_METRICS.includes(k as never)).map((k) => rows.find((r) => r.key === k)!).filter(Boolean);
     const nM = keyMonths.length;
     absHtml =
-      `<thead><tr><th rowspan="2">Chỉ số</th>${tabs.map((t) => `<th class="grpH gs ${TAB_CLS[t]}" colspan="${nM}">${DAY_TYPE_SHORT[t]}</th>`).join("")}</tr><tr>${tabs.map((t) => keyMonths.map((m, i) => `<th class="sub${i === 0 ? " gs" : ""} ${TAB_CLS[t]}">${monthShort(m.month)}</th>`).join("")).join("")}</tr></thead><tbody>` +
+      `<thead><tr><th rowspan="2">${t("Chỉ số", "Metric")}</th>${tabs.map((t) => `<th class="grpH gs ${TAB_CLS[t]}" colspan="${nM}">${DAY_TYPE_SHORT[t]}</th>`).join("")}</tr><tr>${tabs.map((t) => keyMonths.map((m, i) => `<th class="sub${i === 0 ? " gs" : ""} ${TAB_CLS[t]}">${monthShort(m.month)}</th>`).join("")).join("")}</tr></thead><tbody>` +
       ordered
         .map(
           (r) =>
@@ -581,30 +601,42 @@ export const DemoWhyPage: React.FC<DemoWhyProps> = ({ no, title, fallbackHeadlin
       <DemoHead no={no} title={title} headline={headline} kpis={kpis} />
       <div className="stk">
         <div className="pn">
-          <div className="pnh">Đóng góp của từng yếu tố vào thay đổi LIVE GMV</div>
-          <div className="pns">GMV = {METRIC.liveHours} × {METRIC.viewsPerHour} × {METRIC.liveCtr} × {METRIC.ctor} × {METRIC.aov} · {windowLabel} · 5 phần cộng đúng mức thay đổi.</div>
-          {bridge ? <Html html={bridge} /> : <p className="pns">Chưa đủ số của cả 2 kỳ (Giờ live, Views, Product clicks, Orders) để tách nguyên nhân.</p>}
+          <div className="pnh">{t("Đóng góp của từng yếu tố vào thay đổi LIVE GMV", "Each factor's contribution to the LIVE GMV change")}</div>
+          <div className="pns">GMV = {METRIC.liveHours} × {METRIC.viewsPerHour} × {METRIC.liveCtr} × {METRIC.ctor} × {METRIC.aov} · {windowLabel} · {t("5 phần cộng đúng mức thay đổi.", "the 5 parts add up exactly to the change.")}</div>
+          {bridge ? <Html html={bridge} /> : <p className="pns">{t("Chưa đủ số của cả 2 kỳ (Giờ live, Views, Product clicks, Orders) để tách nguyên nhân.", "Not enough data in both periods (live hours, Views, Product clicks, Orders) to separate causes.")}</p>}
         </div>
         {funnel && <FunnelPanel funnel={funnel} band={band} prevShort={prevShort} />}
       </div>
       {dayHtml && (
         <div className="pn">
-          <div className="pnh">Thay đổi các yếu tố theo loại ngày</div>
-          <div className="pns">% thay đổi tháng này so với tháng trước; mỗi loại ngày so với chính nó theo lịch Campaign. Viền sáng = vượt ngưỡng dao động.</div>
+          <div className="pnh">{t("Thay đổi các yếu tố theo loại ngày", "Factor changes by day type")}</div>
+          <div className="pns">{t("% thay đổi tháng này so với tháng trước; mỗi loại ngày so với chính nó theo lịch Campaign. Viền sáng = vượt ngưỡng dao động.", "% change this month vs last month; each day type compared with itself per the Campaign calendar. Bright border = beyond normal range.")}</div>
           <Tbl html={dayHtml} />
-          <div className="legend"><span>Màu xanh: tăng · màu đỏ: giảm · màu xanh dương: {METRIC.liveHours} (do lịch quyết định, không đánh giá tốt hay xấu)</span></div>
+          <div className="legend"><span>{t(`Màu xanh: tăng · màu đỏ: giảm · màu xanh dương: ${METRIC.liveHours} (do lịch quyết định, không đánh giá tốt hay xấu)`, `Green: up · red: down · blue: ${METRIC.liveHours} (set by the schedule, not rated good or bad)`)}</span></div>
         </div>
       )}
       {absHtml && (
         <div className="pn">
-          <div className="pnh">Số đo từng loại ngày</div>
-          <div className="pns">Mỗi ô tô màu theo mức thay đổi so với tháng trước (xanh tăng, đỏ giảm, đậm hơn khi thay đổi lớn); viền sáng = vượt ngưỡng dao động. Mỗi loại ngày là một nhóm cột {keyMonths.map((m) => monthShort(m.month)).join(", ")} cùng màu nhận diện.</div>
+          <div className="pnh">{t("Số đo từng loại ngày", "Measures by day type")}</div>
+          <div className="pns">
+            {t(
+              `Mỗi ô tô màu theo mức thay đổi so với tháng trước (xanh tăng, đỏ giảm, đậm hơn khi thay đổi lớn); viền sáng = vượt ngưỡng dao động. Mỗi loại ngày là một nhóm cột ${keyMonths.map((m) => monthShort(m.month)).join(", ")} cùng màu nhận diện.`,
+              `Each cell is coloured by its change vs last month (green up, red down, darker for larger changes); bright border = beyond normal range. Each day type is a group of ${keyMonths.map((m) => monthShort(m.month)).join(", ")} columns in its own colour.`
+            )}
+          </div>
           <div className="tw"><table id="dayAbs" className="vt" dangerouslySetInnerHTML={{ __html: absHtml }} /></div>
-          <div className="legend"><span>{keyMonths[1] ? monthShort(keyMonths[1].month) : ""} tô màu theo thay đổi so với {first}, {keyMonths[2] ? `${monthShort(keyMonths[2].month)} theo thay đổi so với ${monthShort(keyMonths[1].month)}` : ""} · {first} là mốc, không tô · viền sáng = vượt ngưỡng dao động · xanh dương = {METRIC.liveHours}</span></div>
+          <div className="legend">
+            <span>
+              {t(
+                `${keyMonths[1] ? monthShort(keyMonths[1].month) : ""} tô màu theo thay đổi so với ${first}, ${keyMonths[2] ? `${monthShort(keyMonths[2].month)} theo thay đổi so với ${monthShort(keyMonths[1].month)}` : ""} · ${first} là mốc, không tô · viền sáng = vượt ngưỡng dao động · xanh dương = ${METRIC.liveHours}`,
+                `${keyMonths[1] ? monthShort(keyMonths[1].month) : ""} coloured by change vs ${first}${keyMonths[2] ? `, ${monthShort(keyMonths[2].month)} by change vs ${monthShort(keyMonths[1].month)}` : ""} · ${first} is the baseline, not coloured · bright border = beyond normal range · blue = ${METRIC.liveHours}`
+              )}
+            </span>
+          </div>
           <details>
-            <summary>Ghi chú</summary>
-            <p>UPT và Avg. price có thể gồm quà tặng kèm của các chương trình trong kỳ. Report chưa tách quà tặng theo loại ngày.</p>
-            <p>Tách cơ cấu và hiệu suất: hiệu ứng cơ cấu = thay đổi tỷ trọng Giờ live giữa Daily và các đợt Campaign; hiệu ứng hiệu suất = thay đổi GMV/giờ trong từng loại ngày.</p>
+            <summary>{t("Ghi chú", "Notes")}</summary>
+            <p>{t("UPT và Avg. price có thể gồm quà tặng kèm của các chương trình trong kỳ. Report chưa tách quà tặng theo loại ngày.", "UPT and Avg. price may include free gifts from the period's promotions. The report does not yet separate gifts by day type.")}</p>
+            <p>{t("Tách cơ cấu và hiệu suất: hiệu ứng cơ cấu = thay đổi tỷ trọng Giờ live giữa Daily và các đợt Campaign; hiệu ứng hiệu suất = thay đổi GMV/giờ trong từng loại ngày.", "Mix vs performance: the mix effect = change in the share of live hours between Daily and Campaign periods; the performance effect = change in GMV/hour within each day type.")}</p>
           </details>
         </div>
       )}

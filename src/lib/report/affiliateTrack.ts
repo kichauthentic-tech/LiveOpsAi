@@ -1,5 +1,6 @@
 import type { AffiliateActualEntry } from "../../types";
 import { entryStatus, parseDayLabel, planBudget, planHours, sortPlanRows } from "../affiliate/plan";
+import { t } from "../displayLang";
 
 // Bảng dọc "Theo dõi" của trang Affiliate trong Report Tháng (demo CROCS T10 28/10): mỗi phiên là một cột, hàng xếp theo phễu live,
 // cùng tên hàng với tab Theo dõi của app (BrandAffiliateTable). Chỉ phiên đã live của tháng report; số tính một chỗ ở đây.
@@ -135,41 +136,41 @@ export const pctTargetTone = (p: number | null): TrackTone => (p == null ? undef
 export function affiliateTrackGroups(f: TrackFmt): TrackGroup[] {
   return [
     {
-      group: "Kế hoạch",
+      group: t("Kế hoạch", "Plan"),
       rows: [
         { label: "Camp", cell: (c) => ({ text: c.camp || "—" }) },
-        { label: "Kế hoạch", cell: (c) => ({ text: c.hasPlan ? c.planTimeline || "—" : "Ngoài kế hoạch", tone: c.hasPlan ? undefined : "warn" }) },
-        { label: "Giờ kế hoạch", cell: (c) => opt(c.planHours, (v) => f.fixed(v, 1)) },
+        { label: t("Kế hoạch", "Plan"), cell: (c) => ({ text: c.hasPlan ? c.planTimeline || "—" : t("Ngoài kế hoạch", "Unplanned"), tone: c.hasPlan ? undefined : "warn" }) },
+        { label: t("Giờ kế hoạch", "Planned hours"), cell: (c) => opt(c.planHours, (v) => f.fixed(v, 1)) },
         { label: "Budget Ads", cell: (c) => opt(c.budgetAds, f.money) }
       ]
     },
     {
-      group: "Kết quả",
+      group: t("Kết quả", "Results"),
       rows: [
         { label: "Target GMV", key: true, cell: (c) => opt(c.targetGmv, f.money) },
         { label: "Direct GMV", key: true, cell: (c) => opt(c.directGmv, f.money) },
         { label: "% Target", key: true, cell: (c) => (c.pctTarget == null ? dash : { text: `${f.fixed(c.pctTarget, 1)}%`, tone: pctTargetTone(c.pctTarget) }) },
-        { label: "Giờ live", cell: (c) => opt(c.hours, (v) => f.fixed(v, 1)) },
-        { label: "Giờ live thực tế", cell: (c) => ({ text: c.timeline || "—" }) },
-        { label: "GMV/giờ", key: true, cell: (c) => opt(c.gmvPerHour ?? undefined, f.money) }
+        { label: t("Giờ live", "Live hours"), cell: (c) => opt(c.hours, (v) => f.fixed(v, 1)) },
+        { label: t("Giờ live thực tế", "Actual live time"), cell: (c) => ({ text: c.timeline || "—" }) },
+        { label: t("GMV/giờ", "GMV/hour"), key: true, cell: (c) => opt(c.gmvPerHour ?? undefined, f.money) }
       ]
     },
     {
-      group: "Lưu lượng",
+      group: t("Lưu lượng", "Traffic"),
       rows: [
         { label: "LIVE impressions", cell: (c) => opt(c.impressions, f.int) },
         { label: "Viewers", cell: (c) => opt(c.viewers, f.int) }
       ]
     },
     {
-      group: "Chuyển đổi",
+      group: t("Chuyển đổi", "Conversion"),
       rows: [
         { label: "LIVE CTR", cell: (c) => opt(c.ctr, (v) => `${f.fixed(v, 2)}%`) },
         { label: "CTOR", cell: (c) => opt(c.ctor, (v) => `${f.fixed(v, 2)}%`) }
       ]
     },
     {
-      group: "Giỏ hàng",
+      group: t("Giỏ hàng", "Basket"),
       rows: [
         { label: "Orders", cell: (c) => opt(c.orders, f.int) },
         { label: "Items sold", cell: (c) => opt(c.items, f.int) },
@@ -177,7 +178,7 @@ export function affiliateTrackGroups(f: TrackFmt): TrackGroup[] {
       ]
     },
     {
-      group: "Chi phí Ads",
+      group: t("Chi phí Ads", "Ads cost"),
       rows: [
         { label: "Ads cost", cell: (c) => opt(c.adsCost, f.money) },
         { label: "Ads / Budget", cell: (c) => (c.adsOverBudget == null ? dash : { text: `${f.fixed(c.adsOverBudget, 0)}%`, tone: c.adsOverBudget > 100 ? "bad" : undefined }) },

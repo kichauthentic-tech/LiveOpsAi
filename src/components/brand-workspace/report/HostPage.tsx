@@ -9,6 +9,7 @@ import { DAY_TYPE_SHORT } from "./theme";
 import { fmtHours, fmtInt, fmtPct, fmtSessionStart } from "./format";
 import { ch, columns, scatter, tbl } from "./demoCharts";
 import type { PageMetric } from "./ui";
+import { numLocale, t as tr } from "../../../lib/displayLang";
 
 // Trang 6 "Host & khung giờ" dựng theo demo (scratchpad/build/template.html, #p6): KPI → hồ sơ host (4 cặp chỉ số) + GMV/giờ theo khung giờ
 // → Host PFM cả tháng → Host PFM theo loại ngày (tab) → phân bố GMV/giờ + bảng khung giờ → Top phiên. Markup/class lấy nguyên từ demo.
@@ -16,7 +17,7 @@ import type { PageMetric } from "./ui";
 /** Tên chỉ số theo sàn của trang (Shopee: doanh số là "Sales"). */
 const metricOf = (d: { variant?: string }): typeof BASE_METRIC => (d.variant === "shopee" ? METRIC_SHOPEE : BASE_METRIC);
 const esc = (s: unknown) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c as "&" | "<" | ">" | '"']));
-const dec = (v: number, d: number) => v.toLocaleString("vi-VN", { minimumFractionDigits: d, maximumFractionDigits: d });
+const dec = (v: number, d: number) => v.toLocaleString(numLocale(), { minimumFractionDigits: d, maximumFractionDigits: d });
 const M1 = (v: number) => dec(v / 1e6, 1) + "M";
 const pctSigned = (v: number, d = 0) => `${v >= 0 ? "+" : "−"}${dec(Math.abs(v), d)}%`;
 const GREY = "#8a8a94";
@@ -85,16 +86,16 @@ export function hostKpis(d: HostPageData): PageMetric[] {
     out.push({
       label: `${d.shortName(best.name)} · ${METRIC.gmvPerHour}`,
       value: fmtVndShort(best.m.gmvPerHour),
-      note: `${r ? `${reliabilityText({ ratio: r.ratio, lo: null, hi: null })} so với trung bình ${d.relMonths} tháng · ` : ""}${best.m.sessions} phiên`
+      note: `${r ? `${reliabilityText({ ratio: r.ratio, lo: null, hi: null })} ${tr(`so với trung bình ${d.relMonths} tháng`, `vs the ${d.relMonths}-month average`)} · ` : ""}${best.m.sessions} ${tr("phiên", "sessions")}`
     });
   }
   const t = teamAll(d.team);
-  if (t.sessions > 0 && t.gmvPerHour != null) out.push({ label: `Trung bình team · ${METRIC.gmvPerHour}`, value: fmtVndShort(t.gmvPerHour), note: `${t.sessions} phiên · ${dec(t.hours, 1)} giờ` });
+  if (t.sessions > 0 && t.gmvPerHour != null) out.push({ label: `${tr("Trung bình team", "Team average")} · ${METRIC.gmvPerHour}`, value: fmtVndShort(t.gmvPerHour), note: `${t.sessions} ${tr("phiên", "sessions")} · ${dec(t.hours, 1)} ${tr("giờ", "h")}` });
   const slot = [...d.slots].filter((s) => s.cur != null).sort((a, b) => Math.abs(b.change ?? 0) / (b.band || 100) - Math.abs(a.change ?? 0) / (a.band || 100))[0];
   if (slot && slot.cur != null) {
-    out.push({ label: slot.label, value: fmtVndShort(slot.cur), note: slot.change != null ? `${pctSigned(slot.change)}${slot.band != null ? ` · ngưỡng ±${dec(slot.band, 0)}%` : ""}` : undefined });
+    out.push({ label: slot.label, value: fmtVndShort(slot.cur), note: slot.change != null ? `${pctSigned(slot.change)}${slot.band != null ? ` · ${tr("ngưỡng", "range")} ±${dec(slot.band, 0)}%` : ""}` : undefined });
   }
-  if (d.spread) out.push({ label: `Trung vị ${METRIC.gmvPerHour} mỗi phiên`, value: fmtVndShort(d.spread.median), note: `nửa giữa: ${fmtVndShort(d.spread.p25)}–${fmtVndShort(d.spread.p75)}` });
+  if (d.spread) out.push({ label: tr(`Trung vị ${METRIC.gmvPerHour} mỗi phiên`, `Median ${METRIC.gmvPerHour} per session`), value: fmtVndShort(d.spread.median), note: `${tr("nửa giữa", "middle half")}: ${fmtVndShort(d.spread.p25)}–${fmtVndShort(d.spread.p75)}` });
   return out;
 }
 
@@ -103,13 +104,14 @@ type PairKey = "a" | "b" | "c" | "d";
 
 function pairHtml(k: PairKey, hs: HostAll[], t: DayTypeMetrics, shortName: (n: string) => string, viewsLabel: string = BASE_METRIC.viewsPerHour, METRIC: typeof BASE_METRIC = BASE_METRIC) {
   const f2 = (v: number) => dec(v, 2) + "%";
-  const num0 = (v: number) => Math.round(v).toLocaleString("vi-VN");
+  const num0 = (v: number) => Math.round(v).toLocaleString(numLocale());
   const gph = (h: HostAll) => (h.m.gmvPerHour ?? 0) / 1e6;
+  const lo = tr("thấp", "low"), hi = tr("cao", "high");
   const spec = {
-    a: { name: `${viewsLabel} × ${METRIC.ctor}`, title: `Traffic và chuyển đổi: ${viewsLabel} × ${METRIC.ctor}`, sub: `Host nào kéo nhiều người xem, host nào chuyển đơn tốt. Đường nét đứt = trung bình team.`, x: (h: HostAll) => h.m.viewsPerHour, y: (h: HostAll) => h.m.ctor, xf: num0, yf: f2, xl: viewsLabel, yl: METRIC.ctor, vx: t.viewsPerHour, vy: t.ctor, quad: [`${viewsLabel} thấp · ${METRIC.ctor} cao`, `${viewsLabel} cao · ${METRIC.ctor} thấp`] as [string, string] },
-    b: { name: `${viewsLabel} × ${METRIC.gmvPerHour}`, title: `Traffic và doanh thu: ${viewsLabel} × ${METRIC.gmvPerHour}`, sub: `${METRIC.gmvPerHour} đi theo ${viewsLabel} ra sao. Đường nét đứt = trung bình team.`, x: (h: HostAll) => h.m.viewsPerHour, y: (h: HostAll) => gph(h), xf: num0, yf: (v: number) => dec(v, 0) + "M", xl: viewsLabel, yl: `${METRIC.gmvPerHour} (triệu)`, vx: t.viewsPerHour, vy: (t.gmvPerHour ?? 0) / 1e6, quad: [`${viewsLabel} thấp · ${METRIC.gmvPerHour} cao`, `${viewsLabel} cao · ${METRIC.gmvPerHour} thấp`] as [string, string] },
-    c: { name: `${METRIC.liveCtr} × ${METRIC.ctor}`, title: `Hai bước chuyển đổi: ${METRIC.liveCtr} × ${METRIC.ctor}`, sub: `${METRIC.liveCtr} = Product clicks ÷ Views; ${METRIC.ctor} = Orders ÷ Product clicks. Đường nét đứt = trung bình team.`, x: (h: HostAll) => h.m.liveCtr, y: (h: HostAll) => h.m.ctor, xf: (v: number) => dec(v, 0) + "%", yf: f2, xl: METRIC.liveCtr, yl: METRIC.ctor, vx: t.liveCtr, vy: t.ctor, quad: [`${METRIC.liveCtr} thấp · ${METRIC.ctor} cao`, `${METRIC.liveCtr} cao · ${METRIC.ctor} thấp`] as [string, string] },
-    d: { name: `${METRIC.liveHours} × ${METRIC.gmvPerHour}`, title: `Quy mô và hiệu suất: ${METRIC.liveHours} × ${METRIC.gmvPerHour}`, sub: `Host làm nhiều giờ có giữ được hiệu suất không. Host dưới ${MIN_RANK_SESSIONS} phiên để màu xám. Đường nét đứt = ${METRIC.gmvPerHour} trung bình team.`, x: (h: HostAll) => h.m.hours, y: (h: HostAll) => gph(h), xf: (v: number) => dec(v, 0) + "h", yf: (v: number) => dec(v, 0) + "M", xl: METRIC.liveHours, yl: `${METRIC.gmvPerHour} (triệu)`, vx: null as number | null, vy: (t.gmvPerHour ?? 0) / 1e6, quad: ["Ít giờ · " + METRIC.gmvPerHour + " cao", "Nhiều giờ · " + METRIC.gmvPerHour + " thấp"] as [string, string] }
+    a: { name: `${viewsLabel} × ${METRIC.ctor}`, title: `${tr("Traffic và chuyển đổi", "Traffic and conversion")}: ${viewsLabel} × ${METRIC.ctor}`, sub: tr("Host nào kéo nhiều người xem, host nào chuyển đơn tốt. Đường nét đứt = trung bình team.", "Which hosts draw the most viewers and which convert best. Dashed line = team average."), x: (h: HostAll) => h.m.viewsPerHour, y: (h: HostAll) => h.m.ctor, xf: num0, yf: f2, xl: viewsLabel, yl: METRIC.ctor, vx: t.viewsPerHour, vy: t.ctor, quad: [`${viewsLabel} ${lo} · ${METRIC.ctor} ${hi}`, `${viewsLabel} ${hi} · ${METRIC.ctor} ${lo}`] as [string, string] },
+    b: { name: `${viewsLabel} × ${METRIC.gmvPerHour}`, title: `${tr("Traffic và doanh thu", "Traffic and revenue")}: ${viewsLabel} × ${METRIC.gmvPerHour}`, sub: tr(`${METRIC.gmvPerHour} đi theo ${viewsLabel} ra sao. Đường nét đứt = trung bình team.`, `How ${METRIC.gmvPerHour} follows ${viewsLabel}. Dashed line = team average.`), x: (h: HostAll) => h.m.viewsPerHour, y: (h: HostAll) => gph(h), xf: num0, yf: (v: number) => dec(v, 0) + "M", xl: viewsLabel, yl: `${METRIC.gmvPerHour} (${tr("triệu", "M")})`, vx: t.viewsPerHour, vy: (t.gmvPerHour ?? 0) / 1e6, quad: [`${viewsLabel} ${lo} · ${METRIC.gmvPerHour} ${hi}`, `${viewsLabel} ${hi} · ${METRIC.gmvPerHour} ${lo}`] as [string, string] },
+    c: { name: `${METRIC.liveCtr} × ${METRIC.ctor}`, title: `${tr("Hai bước chuyển đổi", "Two conversion steps")}: ${METRIC.liveCtr} × ${METRIC.ctor}`, sub: `${METRIC.liveCtr} = Product clicks ÷ Views; ${METRIC.ctor} = Orders ÷ Product clicks. ${tr("Đường nét đứt = trung bình team.", "Dashed line = team average.")}`, x: (h: HostAll) => h.m.liveCtr, y: (h: HostAll) => h.m.ctor, xf: (v: number) => dec(v, 0) + "%", yf: f2, xl: METRIC.liveCtr, yl: METRIC.ctor, vx: t.liveCtr, vy: t.ctor, quad: [`${METRIC.liveCtr} ${lo} · ${METRIC.ctor} ${hi}`, `${METRIC.liveCtr} ${hi} · ${METRIC.ctor} ${lo}`] as [string, string] },
+    d: { name: `${METRIC.liveHours} × ${METRIC.gmvPerHour}`, title: `${tr("Quy mô và hiệu suất", "Scale and performance")}: ${METRIC.liveHours} × ${METRIC.gmvPerHour}`, sub: tr(`Host làm nhiều giờ có giữ được hiệu suất không. Host dưới ${MIN_RANK_SESSIONS} phiên để màu xám. Đường nét đứt = ${METRIC.gmvPerHour} trung bình team.`, `Do hosts with more hours keep their performance? Hosts with fewer than ${MIN_RANK_SESSIONS} sessions are grey. Dashed line = team average ${METRIC.gmvPerHour}.`), x: (h: HostAll) => h.m.hours, y: (h: HostAll) => gph(h), xf: (v: number) => dec(v, 0) + "h", yf: (v: number) => dec(v, 0) + "M", xl: METRIC.liveHours, yl: `${METRIC.gmvPerHour} (${tr("triệu", "M")})`, vx: null as number | null, vy: (t.gmvPerHour ?? 0) / 1e6, quad: [`${tr("Ít giờ", "Few hours")} · ${METRIC.gmvPerHour} ${hi}`, `${tr("Nhiều giờ", "Many hours")} · ${METRIC.gmvPerHour} ${lo}`] as [string, string] }
   }[k];
   const raw = hs.map((h) => ({ h, x: spec.x(h), y: spec.y(h) })).filter((p): p is { h: HostAll; x: number; y: number } => p.x != null && p.y != null);
   const extent = (a: number[], extra: (number | null)[], step: number, forceZero = false) => {
@@ -137,18 +139,27 @@ function pairHtml(k: PairKey, hs: HostAll[], t: DayTypeMetrics, shortName: (n: s
     if (k === "a") {
       const v = top((h) => h.m.viewsPerHour);
       const c = top((h) => h.m.ctor);
-      cap = `${nm(v)} kéo nhiều người xem nhất (${num0(v.m.viewsPerHour!)} ${viewsLabel}) với ${METRIC.ctor} ${f2(v.m.ctor ?? 0)}, trung bình team ${f2(t.ctor ?? 0)}; ${nm(c)} có ${METRIC.ctor} cao nhất (${f2(c.m.ctor!)}).`;
+      cap = tr(
+        `${nm(v)} kéo nhiều người xem nhất (${num0(v.m.viewsPerHour!)} ${viewsLabel}) với ${METRIC.ctor} ${f2(v.m.ctor ?? 0)}, trung bình team ${f2(t.ctor ?? 0)}; ${nm(c)} có ${METRIC.ctor} cao nhất (${f2(c.m.ctor!)}).`,
+        `${nm(v)} draws the most viewers (${num0(v.m.viewsPerHour!)} ${viewsLabel}) with ${METRIC.ctor} ${f2(v.m.ctor ?? 0)} vs a team average of ${f2(t.ctor ?? 0)}; ${nm(c)} has the highest ${METRIC.ctor} (${f2(c.m.ctor!)}).`
+      );
     } else if (k === "b") {
       const g = top((h) => h.m.gmvPerHour);
       const v = top((h) => h.m.viewsPerHour, -1);
-      cap = `${nm(g)} có ${METRIC.gmvPerHour} cao nhất (${M1(g.m.gmvPerHour!)}); ${nm(v)} có ${viewsLabel} thấp nhất (${num0(v.m.viewsPerHour!)}), ${METRIC.gmvPerHour} ${M1(v.m.gmvPerHour ?? 0)}.`;
+      cap = tr(
+        `${nm(g)} có ${METRIC.gmvPerHour} cao nhất (${M1(g.m.gmvPerHour!)}); ${nm(v)} có ${viewsLabel} thấp nhất (${num0(v.m.viewsPerHour!)}), ${METRIC.gmvPerHour} ${M1(v.m.gmvPerHour ?? 0)}.`,
+        `${nm(g)} has the highest ${METRIC.gmvPerHour} (${M1(g.m.gmvPerHour!)}); ${nm(v)} has the lowest ${viewsLabel} (${num0(v.m.viewsPerHour!)}), ${METRIC.gmvPerHour} ${M1(v.m.gmvPerHour ?? 0)}.`
+      );
     } else if (k === "c") {
       const l = top((h) => h.m.liveCtr);
       const c = top((h) => h.m.ctor);
-      cap = `${nm(l)} có ${METRIC.liveCtr} cao nhất (${dec(l.m.liveCtr!, 1)}%); ${nm(c)} có ${METRIC.ctor} cao nhất (${f2(c.m.ctor!)}).`;
+      cap = tr(`${nm(l)} có ${METRIC.liveCtr} cao nhất (${dec(l.m.liveCtr!, 1)}%); ${nm(c)} có ${METRIC.ctor} cao nhất (${f2(c.m.ctor!)}).`, `${nm(l)} has the highest ${METRIC.liveCtr} (${dec(l.m.liveCtr!, 1)}%); ${nm(c)} has the highest ${METRIC.ctor} (${f2(c.m.ctor!)}).`);
     } else {
       const h = top((x) => x.m.hours);
-      cap = `${nm(h)} có nhiều ${METRIC.liveHours} nhất (${dec(h.m.hours, 1)}) với ${METRIC.gmvPerHour} ${M1(h.m.gmvPerHour ?? 0)}. Host dưới ${MIN_RANK_SESSIONS} phiên chưa đủ mẫu để kết luận.`;
+      cap = tr(
+        `${nm(h)} có nhiều ${METRIC.liveHours} nhất (${dec(h.m.hours, 1)}) với ${METRIC.gmvPerHour} ${M1(h.m.gmvPerHour ?? 0)}. Host dưới ${MIN_RANK_SESSIONS} phiên chưa đủ mẫu để kết luận.`,
+        `${nm(h)} has the most ${METRIC.liveHours} (${dec(h.m.hours, 1)}) with ${METRIC.gmvPerHour} ${M1(h.m.gmvPerHour ?? 0)}. Hosts with fewer than ${MIN_RANK_SESSIONS} sessions are too small a sample to conclude.`
+      );
     }
   }
   return { name: spec.name, title: spec.title, sub: spec.sub, svg, cap };
@@ -163,12 +174,12 @@ function hostTableHtml(d: HostPageData, hs: HostAll[]): string {
   const sorted = [...hs].sort((a, b) => (b.m.gmvPerHour ?? 0) - (a.m.gmvPerHour ?? 0));
   return tbl(
     shopee
-      ? ["Host", `${METRIC.liveHours} · phiên`, METRIC.gmv, METRIC.gmvPerHour, METRIC.viewersPerHour, METRIC.upt, `So trung bình ${d.relMonths} tháng`, "So trung bình tháng này"]
-      : ["Host", `${METRIC.liveHours} · phiên`, METRIC.gmv, METRIC.gmvPerHour, METRIC.viewsPerHour, METRIC.liveCtr, METRIC.ctor, METRIC.upt, `So trung bình ${d.relMonths} tháng`, "So trung bình tháng này"],
+      ? ["Host", `${METRIC.liveHours} · ${tr("phiên", "sessions")}`, METRIC.gmv, METRIC.gmvPerHour, METRIC.viewersPerHour, METRIC.upt, tr(`So trung bình ${d.relMonths} tháng`, `vs ${d.relMonths}-month average`), tr("So trung bình tháng này", "vs this month's average")]
+      : ["Host", `${METRIC.liveHours} · ${tr("phiên", "sessions")}`, METRIC.gmv, METRIC.gmvPerHour, METRIC.viewsPerHour, METRIC.liveCtr, METRIC.ctor, METRIC.upt, tr(`So trung bình ${d.relMonths} tháng`, `vs ${d.relMonths}-month average`), tr("So trung bình tháng này", "vs this month's average")],
     sorted.map((h) => {
       const r = d.reliability.get(h.key);
       const vp = d.vsPeer.get(h.key);
-      const rel = r ? { t: `${reliabilityText({ ratio: r.ratio, lo: null, hi: null })} · ${r.sessions} phiên`, c: r.verdict === "above" ? "up" : r.verdict === "below" ? "dn" : "" } : "—";
+      const rel = r ? { t: `${reliabilityText({ ratio: r.ratio, lo: null, hi: null })} · ${r.sessions} ${tr("phiên", "sessions")}`, c: r.verdict === "above" ? "up" : r.verdict === "below" ? "dn" : "" } : "—";
       return {
         c: [
           esc(d.shortName(h.name)),
@@ -200,10 +211,10 @@ function hostDayTableHtml(d: HostPageData, b: CampDayBucket): string {
   const rowOf = (label: string, f: (m: DayTypeMetrics) => string, key?: "gmvPerHour" | "viewsPerHour" | "liveCtr" | "ctor") => [label, f(t), ...hs.map((h) => cell(f(h.m), h, key))];
   const shopee = d.variant === "shopee";
   return tbl(
-    ["Chỉ số", "Cả team", ...hs.map((h) => esc(`${d.shortName(h.name)}${h.m.sessions < MIN_SESSIONS_TO_COMPARE ? ` · ${h.m.sessions}` : ""}`))],
+    [tr("Chỉ số", "Metric"), tr("Cả team", "Whole team"), ...hs.map((h) => esc(`${d.shortName(h.name)}${h.m.sessions < MIN_SESSIONS_TO_COMPARE ? ` · ${h.m.sessions}` : ""}`))],
     [
       rowOf(METRIC.gmv, (m) => fmtVndShort(m.gmv)),
-      rowOf(`${METRIC.liveHours} · phiên`, (m) => `${fmtHours(m.hours)} · ${m.sessions}`),
+      rowOf(`${METRIC.liveHours} · ${tr("phiên", "sessions")}`, (m) => `${fmtHours(m.hours)} · ${m.sessions}`),
       rowOf(METRIC.gmvPerHour, (m) => M1(m.gmvPerHour ?? 0), "gmvPerHour"),
       rowOf(shopee ? METRIC.viewersPerHour : METRIC.viewsPerHour, (m) => fmtInt(m.viewsPerHour ?? 0), "viewsPerHour"),
       ...(shopee
@@ -216,11 +227,11 @@ function hostDayTableHtml(d: HostPageData, b: CampDayBucket): string {
 function spreadHtml(s: SessionSpread): string {
   const max = Math.max(10, Math.ceil((s.best * 1.1) / 1e6 / 5) * 5);
   const sc = (v: number) => (v / 1e6 / max) * 100;
-  const pts: [number, string][] = [[s.worst, `Thấp nhất ${M1(s.worst)}`], [s.p25, `P25 ${M1(s.p25)}`], [s.p75, `P75 ${M1(s.p75)}`], [s.best, `Cao nhất ${M1(s.best)}`]];
+  const pts: [number, string][] = [[s.worst, `${tr("Thấp nhất", "Lowest")} ${M1(s.worst)}`], [s.p25, `P25 ${M1(s.p25)}`], [s.p75, `P75 ${M1(s.p75)}`], [s.best, `${tr("Cao nhất", "Highest")} ${M1(s.best)}`]];
   return (
     `<div class="ln" style="left:${sc(s.worst)}%;width:${sc(s.best) - sc(s.worst)}%"></div><div class="box" style="left:${sc(s.p25)}%;width:${sc(s.p75) - sc(s.p25)}%"></div><div class="med" style="left:${sc(s.median)}%"></div>` +
     pts.map((p, i) => `<span class="lb${i % 2 ? " b" : ""}" style="left:${sc(p[0])}%">${p[1]}</span>`).join("") +
-    `<span class="lb b" style="left:${sc(s.median)}%;color:var(--cream)">Trung vị ${M1(s.median)}</span>`
+    `<span class="lb b" style="left:${sc(s.median)}%;color:var(--cream)">${tr("Trung vị", "Median")} ${M1(s.median)}</span>`
   );
 }
 
@@ -241,7 +252,7 @@ export const HostPageBody: React.FC<{ data: HostPageData; children?: React.React
   const pairNames = PAIR_KEYS.map((k) => ({ k, name: hs.length >= 3 ? pairHtml(k, hs, team, d.shortName, viewsLabel, METRIC).name : "" }));
   const slotMax = Math.max(5, Math.ceil((Math.max(...d.slots.flatMap((s) => [s.prev ?? 0, s.cur ?? 0])) / 1e6) * 1.25 / 5) * 5);
   const slotChart = columns(
-    d.slots.map((s) => ({ l: `${s.label}\n${s.curN} phiên`, v: [s.prev != null ? s.prev / 1e6 : null, s.cur != null ? s.cur / 1e6 : null] })),
+    d.slots.map((s) => ({ l: `${s.label}\n${s.curN} ${tr("phiên", "sessions")}`, v: [s.prev != null ? s.prev / 1e6 : null, s.cur != null ? s.cur / 1e6 : null] })),
     [{ color: "var(--blue)" }, { color: "var(--gold)" }],
     { min: 0, max: slotMax, h: 260, fmt: (v: number) => dec(v, 1) + "M" }
   );
@@ -264,8 +275,8 @@ export const HostPageBody: React.FC<{ data: HostPageData; children?: React.React
         )}
         {d.slots.some((s) => s.cur != null || s.prev != null) && (
           <div className="pn">
-            <div className="pnh">{METRIC.gmvPerHour} theo khung giờ bắt đầu phiên</div>
-            <div className="pns">{`${d.prevPeriod} so với ${d.curPeriod}. Chỉ có ý nghĩa khi vượt ngưỡng dao động.`}</div>
+            <div className="pnh">{tr(`${METRIC.gmvPerHour} theo khung giờ bắt đầu phiên`, `${METRIC.gmvPerHour} by session start time`)}</div>
+            <div className="pns">{tr(`${d.prevPeriod} so với ${d.curPeriod}. Chỉ có ý nghĩa khi vượt ngưỡng dao động.`, `${d.prevPeriod} vs ${d.curPeriod}. Only meaningful beyond the normal range.`)}</div>
             <div dangerouslySetInnerHTML={{ __html: slotChart }} />
             <div className="legend">
               <span><i style={{ background: "var(--blue)" }} />{d.prevPeriod}</span>
@@ -276,39 +287,39 @@ export const HostPageBody: React.FC<{ data: HostPageData; children?: React.React
       </div>
       {hs.length > 0 && (
         <div className="pn">
-          <div className="pnh">Host PFM · cả tháng</div>
-          <div className="pns">{`So với trung bình các host cùng loại ngày, cùng buổi; gộp ${d.relMonths} tháng, khoảng tin cậy 95%.`}</div>
+          <div className="pnh">Host PFM · {tr("cả tháng", "full month")}</div>
+          <div className="pns">{tr(`So với trung bình các host cùng loại ngày, cùng buổi; gộp ${d.relMonths} tháng, khoảng tin cậy 95%.`, `Vs the average of hosts on the same day type and time of day; pooled over ${d.relMonths} months, 95% confidence interval.`)}</div>
           <div className="tw"><table dangerouslySetInnerHTML={{ __html: hostTableHtml(d, hs) }} /></div>
         </div>
       )}
       {activeDay && (
         <div className="pn">
-          <div className="pnh">Host PFM · theo loại ngày</div>
+          <div className="pnh">Host PFM · {tr("theo loại ngày", "by day type")}</div>
           <div className="tabs">
             {dayTabs.map((b) => (
-              <button key={b} type="button" className={b === activeDay ? "seg-on" : ""} onClick={() => setDayTab(b)}>{`${DAY_TYPE_SHORT[b]} · ${d.team[b].sessions} phiên`}</button>
+              <button key={b} type="button" className={b === activeDay ? "seg-on" : ""} onClick={() => setDayTab(b)}>{`${DAY_TYPE_SHORT[b]} · ${d.team[b].sessions} ${tr("phiên", "sessions")}`}</button>
             ))}
           </div>
           <div className="tw"><table dangerouslySetInnerHTML={{ __html: hostDayTableHtml(d, activeDay) }} /></div>
-          <div className="legend"><span>▲ ▼ = cao hơn / thấp hơn trung bình team có ý nghĩa trong loại ngày đó</span></div>
+          <div className="legend"><span>{tr("▲ ▼ = cao hơn / thấp hơn trung bình team có ý nghĩa trong loại ngày đó", "▲ ▼ = significantly above / below the team average for that day type")}</span></div>
         </div>
       )}
       <div className="stk">
         {d.spread && (
           <div className="pn">
-            <div className="pnh">{`Phân bố ${METRIC.gmvPerHour} của ${d.spread.count} phiên`}</div>
-            <div className="pns">Bỏ phiên dưới 6 phút. Vạch trắng = trung vị.</div>
+            <div className="pnh">{tr(`Phân bố ${METRIC.gmvPerHour} của ${d.spread.count} phiên`, `${METRIC.gmvPerHour} distribution across ${d.spread.count} sessions`)}</div>
+            <div className="pns">{tr("Bỏ phiên dưới 6 phút. Vạch trắng = trung vị.", "Sessions under 6 minutes excluded. White mark = median.")}</div>
             <div className="bx" dangerouslySetInnerHTML={{ __html: spreadHtml(d.spread) }} />
           </div>
         )}
         {d.slots.some((s) => s.cur != null || s.prev != null) && (
           <div className="pn">
-            <div className="pnh">{METRIC.gmvPerHour} theo khung giờ</div>
+            <div className="pnh">{tr(`${METRIC.gmvPerHour} theo khung giờ`, `${METRIC.gmvPerHour} by time slot`)}</div>
             <div className="tw">
               <table
                 dangerouslySetInnerHTML={{
                   __html: tbl(
-                    ["Khung giờ", "Phiên", d.prevMonthLabel, d.curMonthLabel, "±", "Ngưỡng"],
+                    [tr("Khung giờ", "Time slot"), tr("Phiên", "Sessions"), d.prevMonthLabel, d.curMonthLabel, "±", tr("Ngưỡng", "Range")],
                     d.slots.map((s) => [
                       esc(s.label),
                       `${s.prevN} → ${s.curN}`,
@@ -325,12 +336,12 @@ export const HostPageBody: React.FC<{ data: HostPageData; children?: React.React
         )}
       </div>
       <div className="pn">
-        <div className="pnh">{`Top ${d.top.length} phiên theo ${METRIC.gmv}`}</div>
+        <div className="pnh">{tr(`Top ${d.top.length} phiên theo ${METRIC.gmv}`, `Top ${d.top.length} sessions by ${METRIC.gmv}`)}</div>
         <div className="tw">
           <table
             dangerouslySetInnerHTML={{
               __html: tbl(
-                ["#", "Bắt đầu", "Giờ", METRIC.gmv, METRIC.gmvPerHour, "Orders", shopee ? METRIC.viewers : "Views", shopee ? METRIC.atcRate : METRIC.productCtr, shopee ? `${METRIC.orders}/${METRIC.atc}` : METRIC.ctor],
+                ["#", tr("Bắt đầu", "Start"), tr("Giờ", "Hours"), METRIC.gmv, METRIC.gmvPerHour, "Orders", shopee ? METRIC.viewers : "Views", shopee ? METRIC.atcRate : METRIC.productCtr, shopee ? `${METRIC.orders}/${METRIC.atc}` : METRIC.ctor],
                 d.top.map((s, i) => [String(i + 1), fmtSessionStart(s.startTime), dec(s.hours, 1), fmtVndShort(s.gmv), fmtVndShort(s.gmvPerHour), fmtInt(s.orders), fmtInt(s.views), s.ctr != null ? fmtPct(s.ctr) : "—", s.ctor != null ? { t: fmtPct(s.ctor), c: !shopee && s.ctor >= 1.6 ? "up" : "" } : "—"])
               )
             }}

@@ -8,22 +8,25 @@
 //   - thiếu số thì "—".
 // `toFixed` vẫn đúng cho dữ liệu máy đọc: toạ độ SVG, giá trị ô input, cột số trong file Excel.
 // tests/uiReadability.test.ts chặn toFixed quay lại chữ hiển thị.
+// Locale lấy từ displayLang: luôn vi-VN, trừ lúc Report Tháng bật tiếng Anh (en-US: "1.2B", "4.5%").
+
+import { numLocale } from "./displayLang";
 
 /** Số với đúng `digits` chữ số thập phân (thay `n.toFixed(digits)` trong chữ hiển thị). */
 export function fmtFixed(n: number, digits = 0): string {
-  return n.toLocaleString("vi-VN", { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  return n.toLocaleString(numLocale(), { minimumFractionDigits: digits, maximumFractionDigits: digits });
 }
 
 /** Số với tối đa `digits` chữ số thập phân, bỏ số 0 thừa (1,5 chứ không 1,50). */
 export function fmtNum(n: number | null | undefined, digits = 1): string {
   if (n == null || Number.isNaN(n)) return "—";
-  return n.toLocaleString("vi-VN", { maximumFractionDigits: digits });
+  return n.toLocaleString(numLocale(), { maximumFractionDigits: digits });
 }
 
 /** Tiền đầy đủ, không đơn vị: 53733488 → "53.733.488". */
 export function fmtVndFull(n: number | null | undefined): string {
   if (n == null || Number.isNaN(n)) return "—";
-  return Math.round(n).toLocaleString("vi-VN");
+  return Math.round(n).toLocaleString(numLocale());
 }
 
 const SHORT_STEPS = [
@@ -44,11 +47,11 @@ export function fmtVndShort(n: number | null | undefined): string {
     // 999.960.000 làm tròn ra "1.000M" — đẩy lên bậc trên cho gọn ("1B").
     if (i > 0 && Math.round(Math.abs(scaled) * factor) / factor >= 1000) {
       const up = SHORT_STEPS[i - 1];
-      return `${(n / up.at).toLocaleString("vi-VN", { maximumFractionDigits: up.digits })}${up.suffix}`;
+      return `${(n / up.at).toLocaleString(numLocale(), { maximumFractionDigits: up.digits })}${up.suffix}`;
     }
-    return `${scaled.toLocaleString("vi-VN", { maximumFractionDigits: digits })}${suffix}`;
+    return `${scaled.toLocaleString(numLocale(), { maximumFractionDigits: digits })}${suffix}`;
   }
-  return Math.round(n).toLocaleString("vi-VN");
+  return Math.round(n).toLocaleString(numLocale());
 }
 
 /**

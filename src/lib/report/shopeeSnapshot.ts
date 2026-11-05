@@ -12,6 +12,7 @@ import type { ShopeeShopMonth, ShopeeShopSnapshot } from "./shopeeShopReport";
 import { hasShopeeAds, shopeeAdsTotals, type ShopeeAdsStats, type ShopeeAdsSuite } from "../dataraw/shopeeAds";
 import { PLATFORM_PROFILES } from "../platforms/profiles";
 import { platformOf } from "../reportPlatform";
+import { numLocale } from "../displayLang";
 
 // Bản chụp Report Tháng SHOPEE (migration 0139, 2026-10-06). Hàm thuần — không import supabaseClient nên test được không
 // cần .env. Cùng nguyên tắc với report TikTok: dựng MỘT lần khi ops bấm "Tạo/Cập nhật", mở report chỉ đọc bản chụp.
@@ -285,7 +286,7 @@ const slotHoursOf = (startTime: string, endTime: string) => {
 };
 
 const fmtM = (v: number) => fmtVndShort(v);
-const pct = (v: number, d = 1) => `${v.toLocaleString("vi-VN", { maximumFractionDigits: d })}%`;
+const pct = (v: number, d = 1) => `${v.toLocaleString(numLocale(), { maximumFractionDigits: d })}%`;
 const dm = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 
 export function buildShopeeSnapshot(input: ShopeeSnapshotInput): ShopeeReportSnapshot {
@@ -422,8 +423,8 @@ export function shopeeInsights(s: ShopeeReportSnapshot): Record<ShopeeSection, S
   if (h.gmv > 0) {
     const points: string[] = [];
     if (h.confirmed > 0) points.push(`${METRIC.salesConfirmed} (thực nhận, đã trừ đơn huỷ) ${fmtM(h.confirmed)} — đơn huỷ chiếm ${pct((1 - h.confirmed / h.gmv) * 100)} giá trị.`);
-    if (h.liveHours > 0) points.push(`${h.liveSessions} phiên live, ${h.liveHours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })} giờ → ${SM.gmvPerHour} ${fmtM(h.gmvPerHour ?? 0)}.`);
-    let headline = `Sales Shopee ${fmtM(h.gmv)} từ ${h.orders.toLocaleString("vi-VN")} ${METRIC.orders}.`;
+    if (h.liveHours > 0) points.push(`${h.liveSessions} phiên live, ${h.liveHours.toLocaleString(numLocale(), { maximumFractionDigits: 1 })} giờ → ${SM.gmvPerHour} ${fmtM(h.gmvPerHour ?? 0)}.`);
+    let headline = `Sales Shopee ${fmtM(h.gmv)} từ ${h.orders.toLocaleString(numLocale())} ${METRIC.orders}.`;
     if (s.prev && s.prev.gmv > 0) {
       const d = (h.gmv / s.prev.gmv - 1) * 100;
       headline = `Sales Shopee ${fmtM(h.gmv)}, ${d >= 0 ? "tăng" : "giảm"} ${pct(Math.abs(d))} so với tháng trước (${fmtM(s.prev.gmv)}).`;
@@ -431,11 +432,11 @@ export function shopeeInsights(s: ShopeeReportSnapshot): Record<ShopeeSection, S
     }
     if (hasShopeeAds(s.adsSuite) && (s.adsSuite!.shop || s.adsSuite!.product)) {
       const t = shopeeAdsTotals(s.adsSuite!);
-      points.push(`Ads Shopee (${[s.adsSuite!.live && "Livestream", s.adsSuite!.shop && "Shop+", s.adsSuite!.product && "Product"].filter(Boolean).join(" + ")}): ${METRIC.expense} ${fmtM(t.expense)}, doanh số ghi nhận ${fmtM(t.gmv)} (${METRIC.roas} ${t.roas != null ? t.roas.toLocaleString("vi-VN", { maximumFractionDigits: 1 }) : "—"}x, đơn trực tiếp ${t.roasDirect != null ? t.roasDirect.toLocaleString("vi-VN", { maximumFractionDigits: 1 }) : "—"}x).`);
+      points.push(`Ads Shopee (${[s.adsSuite!.live && "Livestream", s.adsSuite!.shop && "Shop+", s.adsSuite!.product && "Product"].filter(Boolean).join(" + ")}): ${METRIC.expense} ${fmtM(t.expense)}, doanh số ghi nhận ${fmtM(t.gmv)} (${METRIC.roas} ${t.roas != null ? t.roas.toLocaleString(numLocale(), { maximumFractionDigits: 1 }) : "—"}x, đơn trực tiếp ${t.roasDirect != null ? t.roasDirect.toLocaleString(numLocale(), { maximumFractionDigits: 1 }) : "—"}x).`);
     } else if (s.ads && s.ads.expense > 0) {
-      points.push(`Ads Shopee Live: ${METRIC.expense} ${fmtM(s.ads.expense)}, Sales từ Ads ${fmtM(s.ads.gmv)} (${METRIC.roas} ${s.ads.roas != null ? s.ads.roas.toLocaleString("vi-VN", { maximumFractionDigits: 1 }) : "—"}x)${s.ads.costPerOrder != null ? `, ${fmtM(s.ads.costPerOrder)}/${METRIC.orders}` : ""} — Sales từ Ads chiếm ${pct((s.ads.gmv / h.gmv) * 100)} Sales live.`);
+      points.push(`Ads Shopee Live: ${METRIC.expense} ${fmtM(s.ads.expense)}, Sales từ Ads ${fmtM(s.ads.gmv)} (${METRIC.roas} ${s.ads.roas != null ? s.ads.roas.toLocaleString(numLocale(), { maximumFractionDigits: 1 }) : "—"}x)${s.ads.costPerOrder != null ? `, ${fmtM(s.ads.costPerOrder)}/${METRIC.orders}` : ""} — Sales từ Ads chiếm ${pct((s.ads.gmv / h.gmv) * 100)} Sales live.`);
     }
-    if (s.promo && s.promo.coins > 0) points.push(`${METRIC.coinsClaimed} ${s.promo.coins.toLocaleString("vi-VN")} (≈ ${fmtM(s.promo.coins)}, ${pct((s.promo.coins / h.gmv) * 100, 2)} Sales).`);
+    if (s.promo && s.promo.coins > 0) points.push(`${METRIC.coinsClaimed} ${s.promo.coins.toLocaleString(numLocale())} (≈ ${fmtM(s.promo.coins)}, ${pct((s.promo.coins / h.gmv) * 100, 2)} Sales).`);
     out.summary = { headline, points, action: null };
   }
   if (s.days.length > 0) {
@@ -449,9 +450,9 @@ export function shopeeInsights(s: ShopeeReportSnapshot): Record<ShopeeSection, S
   if (o && o.views > 0) {
     const best = [...o.sources].filter((x) => x.salesPlaced > 0).sort((a, b) => b.salesPlaced - a.salesPlaced)[0];
     const points: string[] = [];
-    if (o.productImpressions > 0) points.push(`Product Impressions ${o.productImpressions.toLocaleString("vi-VN")} → Product Clicks ${o.productClicks.toLocaleString("vi-VN")} (${METRIC.ctr} ${pct(o.ctrPct, 2)}) → ${METRIC.orders} ${o.ordersPlaced.toLocaleString("vi-VN")} (${METRIC.orderRate} ${pct(o.orderRatePlacedPct, 2)}).`);
+    if (o.productImpressions > 0) points.push(`Product Impressions ${o.productImpressions.toLocaleString(numLocale())} → Product Clicks ${o.productClicks.toLocaleString(numLocale())} (${METRIC.ctr} ${pct(o.ctrPct, 2)}) → ${METRIC.orders} ${o.ordersPlaced.toLocaleString(numLocale())} (${METRIC.orderRate} ${pct(o.orderRatePlacedPct, 2)}).`);
     if (best) points.push(`Traffic Source mang nhiều Sales nhất: ${best.key} (${METRIC.salesRatio} ${pct(best.salesRatioPct, 0)}).`);
-    out.funnel = { headline: `${o.viewers.toLocaleString("vi-VN")} ${METRIC.viewers}, ${o.views.toLocaleString("vi-VN")} ${METRIC.views}; ${METRIC.engagedViewers} ${o.engaged.toLocaleString("vi-VN")} (${pct(o.viewers > 0 ? (o.engaged / o.viewers) * 100 : 0)} ${METRIC.viewers}).`, points, action: null };
+    out.funnel = { headline: `${o.viewers.toLocaleString(numLocale())} ${METRIC.viewers}, ${o.views.toLocaleString(numLocale())} ${METRIC.views}; ${METRIC.engagedViewers} ${o.engaged.toLocaleString(numLocale())} (${pct(o.viewers > 0 ? (o.engaged / o.viewers) * 100 : 0)} ${METRIC.viewers}).`, points, action: null };
   }
   if (s.slots.length > 0 || s.camps.length > 0) {
     // Khung giờ chỉ được nêu khi đủ mẫu (một phiên marathon 16 giờ không đại diện cho cả khung).
@@ -460,7 +461,7 @@ export function shopeeInsights(s: ShopeeReportSnapshot): Record<ShopeeSection, S
     const points: string[] = [];
     if (bestSlot) points.push(`Khung ${bestSlot.label} hiệu quả nhất: ${fmtM(bestSlot.gmvPerHour ?? 0)}/giờ (${bestSlot.sessions} phiên).`);
     if (bestCamp) points.push(`${bestCamp.label}: ${fmtM(bestCamp.gmvPerHour ?? 0)}/giờ, chiếm ${pct((bestCamp.share ?? 0) * 100)} Sales.`);
-    if (s.plan.hours > 0 && h.liveHours > 0) points.push(`Giờ live thực tế ${h.liveHours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h so với ${s.plan.hours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h theo lịch đã lên.`);
+    if (s.plan.hours > 0 && h.liveHours > 0) points.push(`Giờ live thực tế ${h.liveHours.toLocaleString(numLocale(), { maximumFractionDigits: 1 })}h so với ${s.plan.hours.toLocaleString(numLocale(), { maximumFractionDigits: 1 })}h theo lịch đã lên.`);
     out.schedule = { headline: bestSlot ? `Khung giờ ${bestSlot.label} cho Sales/giờ cao nhất.` : "Lịch live theo khung giờ và loại ngày (khung nào cũng dưới 3 phiên nên chưa so được).", points, action: null };
   }
   const rankable = s.hosts.filter((x) => x.sessions >= 2);
@@ -469,7 +470,7 @@ export function shopeeInsights(s: ShopeeReportSnapshot): Record<ShopeeSection, S
   } else if (rankable.length > 0) {
     const [first] = rankable;
     out.people = {
-      headline: `${first.name} dẫn đầu Sales/giờ: ${fmtM(first.gmvPerHour ?? 0)} (${first.sessions} phiên, ${first.hours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h).`,
+      headline: `${first.name} dẫn đầu Sales/giờ: ${fmtM(first.gmvPerHour ?? 0)} (${first.sessions} phiên, ${first.hours.toLocaleString(numLocale(), { maximumFractionDigits: 1 })}h).`,
       // Số tạm / đối soát là việc nội bộ — nằm ở ghi chú chỉ ops (shopeeNotes "ops"), không vào nhận xét gửi brand.
       points: [],
       action: null

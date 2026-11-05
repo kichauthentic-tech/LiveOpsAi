@@ -7,6 +7,7 @@ import { fmtVndShort } from "../format";
 import { coHostKey, hostKey, isCountable, sessionHours, UNASSIGNED_HOST_KEY } from "../performance/hostPerformance";
 import type { LiveSession } from "../../types";
 import { liveStatsFromRows, pctChange, signed, type CompareWindow, type LiveStats } from "./monthlyReportInsights";
+import { byLang, numLocale, t } from "../displayLang";
 
 // Report Tháng chuyên sâu (2026-09-26, user chọn sau đề xuất https://claude.ai/artifact/SmokGAGp1J9dPzmyj788Lt).
 // Bốn phép phân tích, mỗi phép sinh ra từ một lỗi đo được trên số thật CROCS T6–T9:
@@ -85,16 +86,19 @@ export function giftStats(gift: GiftSlice | null | undefined, shop: ShopDaysMont
   };
 }
 
-const dec2 = (v: number) => v.toLocaleString("vi-VN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const dec2 = (v: number) => v.toLocaleString(numLocale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 /** Một câu khi lượng quà mỗi đơn đổi ≥ 0,1 món — lúc đó UPT live đổi theo quà, không phải theo cách bán. */
 export function giftLine(prev: GiftStats | null, cur: GiftStats | null, prevLabel: string): string | null {
   if (!prev || !cur || Math.abs(cur.giftPerOrder - prev.giftPerOrder) < 0.1) return null;
   const down = cur.giftPerOrder < prev.giftPerOrder;
   const dir = down ? "giảm" : "tăng";
-  return (
+  return t(
     `Quà tặng kèm (sản phẩm giá dưới ${fmtVndShort(GIFT_MAX_PRICE)}) ${dir} từ ${dec2(prev.giftPerOrder)} ${down ? "xuống" : "lên"} ${dec2(cur.giftPerOrder)} món mỗi đơn toàn shop (${prevLabel} → nay)` +
-    ` — đây là lý do chính UPT ${dir}; không tính quà tặng, UPT toàn shop ${dec2(prev.uptExGift)} → ${dec2(cur.uptExGift)}.`
+      ` — đây là lý do chính UPT ${dir}; không tính quà tặng, UPT toàn shop ${dec2(prev.uptExGift)} → ${dec2(cur.uptExGift)}.`,
+    // "fell from" là dấu hiệu autoNextSteps dò để gợi ý hỏi brand về quà tặng.
+    `Free gifts (items priced under ${fmtVndShort(GIFT_MAX_PRICE)}) ${down ? "fell" : "rose"} from ${dec2(prev.giftPerOrder)} to ${dec2(cur.giftPerOrder)} per order shop-wide (${prevLabel} → now)` +
+      ` — the main reason UPT ${down ? "fell" : "rose"}; excluding gifts, shop-wide UPT went ${dec2(prev.uptExGift)} → ${dec2(cur.uptExGift)}.`
   );
 }
 
@@ -288,17 +292,17 @@ export function controlVerdict(r: ControlRow | undefined): ControlVerdict | null
   return gap <= -need ? "ops" : gap >= need ? "agency_better" : "market";
 }
 
-const GROUP_LABEL: Record<ControlRow["key"], string> = { daily: "Daily", camp: "Campaign", all: "Cả kỳ" };
+const GROUP_LABEL: Record<ControlRow["key"], string> = byLang(() => ({ daily: "Daily", camp: "Campaign", all: t("Cả kỳ", "Whole period") }));
 
 export function controlLabel(key: ControlRow["key"]): string {
   return GROUP_LABEL[key];
 }
 
-export const VERDICT_TEXT: Record<ControlVerdict, string> = {
-  ops: "livestream YFB giảm mạnh hơn các kênh còn lại, cần rà soát vận hành livestream",
-  agency_better: "các kênh còn lại giảm mạnh hơn, livestream YFB giữ tốt hơn",
-  market: "livestream đi cùng các kênh còn lại"
-};
+export const VERDICT_TEXT: Record<ControlVerdict, string> = byLang(() => ({
+  ops: t("livestream YFB giảm mạnh hơn các kênh còn lại, cần rà soát vận hành livestream", "YFB livestream fell more than the other channels; livestream operations need review"),
+  agency_better: t("các kênh còn lại giảm mạnh hơn, livestream YFB giữ tốt hơn", "the other channels fell more; YFB livestream held up better"),
+  market: t("livestream đi cùng các kênh còn lại", "livestream moved in line with the other channels")
+}));
 
 /** Một câu cho phần Kết luận: ưu tiên nhóm ngày có kết luận "vận hành" (việc agency tự sửa được), rồi tới cả kỳ. */
 export function controlLine(rows: ControlRow[]): string | null {
@@ -306,8 +310,11 @@ export function controlLine(rows: ControlRow[]): string | null {
   const r = ordered[0];
   const v = controlVerdict(r);
   if (!r || !v) return null;
-  const vis = r.visitorsChg != null ? `, lượt truy cập shop ${signed(r.visitorsChg, 0)}` : "";
-  return `So với các kênh còn lại của shop (${GROUP_LABEL[r.key]}): livestream YFB ${signed(r.liveChg!, 0)}, các kênh còn lại ${signed(r.restChg!, 0)}${vis} ⇒ ${VERDICT_TEXT[v]}.`;
+  const vis = r.visitorsChg != null ? `, ${t("lượt truy cập shop", "shop visits")} ${signed(r.visitorsChg, 0)}` : "";
+  return t(
+    `So với các kênh còn lại của shop (${GROUP_LABEL[r.key]}): livestream YFB ${signed(r.liveChg!, 0)}, các kênh còn lại ${signed(r.restChg!, 0)}${vis} ⇒ ${VERDICT_TEXT[v]}.`,
+    `Vs the shop's other channels (${GROUP_LABEL[r.key]}): YFB livestream ${signed(r.liveChg!, 0)}, other channels ${signed(r.restChg!, 0)}${vis} ⇒ ${VERDICT_TEXT[v]}.`
+  );
 }
 
 // ---------- 4. Độ tin cậy so sánh host ----------
@@ -398,7 +405,7 @@ export function isBorderline(r: Pick<HostReliability, "lo" | "hi" | "verdict">):
 export function reliabilityText(r: Pick<HostReliability, "ratio" | "lo" | "hi">): string {
   const p = (x: number) => {
     const v = Math.abs((x - 1) * 100);
-    return `${x >= 1 ? "+" : "−"}${v < 1 ? v.toLocaleString("vi-VN", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : Math.round(v)}%`;
+    return `${x >= 1 ? "+" : "−"}${v < 1 ? v.toLocaleString(numLocale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : Math.round(v)}%`;
   };
   return r.lo != null && r.hi != null ? `${p(r.ratio)} (${p(r.lo)} … ${p(r.hi)})` : p(r.ratio);
 }
@@ -415,5 +422,9 @@ export function dailyGap(g: DayGroupStats | undefined): number | null {
 export function dailyGapLine(g: DayGroupStats | undefined): string | null {
   const gap = dailyGap(g);
   if (gap == null || !g) return null;
-  return `Nếu Daily giữ GMV/giờ kỳ trước (${money(g.prev.gmvPerHour!)}/giờ, nay ${money(g.cur.gmvPerHour!)}/giờ) với ${g.cur.hours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })} giờ live đã thực hiện, LIVE GMV có thêm ~${money(gap)}.`;
+  const h = g.cur.hours.toLocaleString(numLocale(), { maximumFractionDigits: 1 });
+  return t(
+    `Nếu Daily giữ GMV/giờ kỳ trước (${money(g.prev.gmvPerHour!)}/giờ, nay ${money(g.cur.gmvPerHour!)}/giờ) với ${h} giờ live đã thực hiện, LIVE GMV có thêm ~${money(gap)}.`,
+    `If Daily had kept last period's GMV/hour (${money(g.prev.gmvPerHour!)}/hour, now ${money(g.cur.gmvPerHour!)}/hour) over the ${h} live hours delivered, LIVE GMV would be ~${money(gap)} higher.`
+  );
 }

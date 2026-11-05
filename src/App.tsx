@@ -69,6 +69,7 @@ import { createBrandChannel, updateBrandChannel } from "./lib/db/brandChannels";
 import { lazyNamed } from "./lib/lazyNamed";
 import { dropPrefetched, type TabPrefetchCtx } from "./lib/db/prefetch";
 import { useWorkspaceData } from "./hooks/useWorkspaceData";
+import { setDisplayLang } from "./lib/displayLang";
 import {
   CALENDAR_TABS,
   TABS_NEEDING_SHELL_ONLY,
@@ -208,6 +209,9 @@ export default function App() {
   const { showToast } = useToast();
 
   const currentRole: UserRole = profile?.role ?? "talent";
+  // Report Tháng bật tiếng Anh thì đặt displayLang = "en" lúc nó render; mọi lần App render (đổi tab…) trả về tiếng Việt
+  // trước khi dựng màn khác — rời report là các màn còn lại không bị dính chữ/số kiểu Anh (lib/displayLang.ts).
+  setDisplayLang("vi");
 
   // Audit 2026-09-22 (#2.10): mọi effect nạp dữ liệu dưới đây chạy cho MỌI role đã đăng nhập, kể cả
   // talent và brand — app kéo về danh sách tài khoản, audit log, thiết bị, tham số engine... cho

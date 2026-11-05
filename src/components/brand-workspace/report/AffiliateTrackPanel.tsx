@@ -2,6 +2,7 @@ import React from "react";
 import { affiliateTrackGroups, type AffiliateTrackColumn } from "../../../lib/report/affiliateTrack";
 import { fmtFixed, fmtVndFull, fmtVndShort } from "../../../lib/format";
 import { esc, hbars } from "./demoCharts";
+import { monthLong, t } from "../../../lib/displayLang";
 
 // Trang Affiliate theo bản demo Report Tháng (#p8): thanh Direct GMV so với Target từng phiên, rồi MỘT bảng dọc "Theo dõi"
 // (mỗi phiên là một cột, hàng xếp theo phễu live). Markup/class nguyên từ demo.css; số tính ở lib/report/affiliateTrack.ts.
@@ -23,7 +24,7 @@ export const AffiliateTrackPanel: React.FC<{ cols: AffiliateTrackColumn[]; month
     .sort((a, b) => ((b.hours ?? 0) >= 1 ? 1 : 0) - ((a.hours ?? 0) >= 1 ? 1 : 0) || (b.date ?? "").localeCompare(a.date ?? ""))
     .map((c) => ({
       name: `${c.creator} · ${dm(c.date)}${c.camp ? ` ${c.camp}` : ""}`,
-      sub: [c.hours != null ? `${fmtFixed(c.hours, 1)} giờ` : null, c.gmvPerHour != null ? `${fmtVndShort(c.gmvPerHour)}/giờ` : null, c.roas != null ? `ROAS ${fmtFixed(c.roas, 1)}x` : null].filter(Boolean).join(" · "),
+      sub: [c.hours != null ? `${fmtFixed(c.hours, 1)} ${t("giờ", "h")}` : null, c.gmvPerHour != null ? `${fmtVndShort(c.gmvPerHour)}/${t("giờ", "hour")}` : null, c.roas != null ? `ROAS ${fmtFixed(c.roas, 1)}x` : null].filter(Boolean).join(" · "),
       value: mil(c.directGmv!),
       mark: mil(c.targetGmv!),
       text: `${fmtVndShort(c.directGmv)} / ${fmtVndShort(c.targetGmv)}`,
@@ -38,18 +39,18 @@ export const AffiliateTrackPanel: React.FC<{ cols: AffiliateTrackColumn[]; month
     <>
       {bars.length > 0 && (
         <div className="pn">
-          <div className="pnh">GMV phiên so với Target từng phiên creator</div>
-          <div className="pns">Thanh = GMV phiên creator · vạch trắng = Target của phiên.</div>
+          <div className="pnh">{t("GMV phiên so với Target từng phiên creator", "Session GMV vs Target for each creator session")}</div>
+          <div className="pns">{t("Thanh = GMV phiên creator · vạch trắng = Target của phiên.", "Bar = creator session GMV · white mark = session Target.")}</div>
           <div className="hb" id="c_aff" dangerouslySetInnerHTML={{ __html: hbars(bars) }} />
         </div>
       )}
       <div className="pn">
-        <div className="pnh">Theo dõi phiên Affiliate</div>
-        <div className="pns">Mỗi phiên là một cột, cùng định dạng tab Theo dõi của app. Tháng {monthLabel}, {cols.length} phiên, lấy từ tab Affiliate trong app.</div>
+        <div className="pnh">{t("Theo dõi phiên Affiliate", "Affiliate session tracking")}</div>
+        <div className="pns">{t(`Mỗi phiên là một cột, cùng định dạng tab Theo dõi của app. Tháng ${monthLabel}, ${cols.length} phiên, lấy từ tab Affiliate trong app.`, `One column per session. ${monthLong(Number(monthLabel))}, ${cols.length} sessions.`)}</div>
         <div className="tw">
           <table id="affTrack">
             <thead>
-              <tr><th rowSpan={2} className="lh">Tháng</th><th colSpan={cols.length} className="mh m10">Tháng {monthLabel} · app</th></tr>
+              <tr><th rowSpan={2} className="lh">{t("Tháng", "Month")}</th><th colSpan={cols.length} className="mh m10">{t(`Tháng ${monthLabel} · app`, monthLong(Number(monthLabel)))}</th></tr>
               <tr>{cols.map((c) => <th key={c.key} className="sh">{c.creator}<br /><span className="nt" style={{ fontWeight: 500 }}>{dm(c.date)}</span></th>)}</tr>
             </thead>
             <tbody>
@@ -69,7 +70,7 @@ export const AffiliateTrackPanel: React.FC<{ cols: AffiliateTrackColumn[]; month
             </tbody>
           </table>
         </div>
-        <div className="legend"><span>% Target: xanh từ 100%, đỏ dưới 50%.</span></div>
+        <div className="legend"><span>{t("% Target: xanh từ 100%, đỏ dưới 50%.", "% Target: green from 100%, red below 50%.")}</span></div>
       </div>
     </>
   );

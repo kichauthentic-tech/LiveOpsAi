@@ -4,6 +4,7 @@ import { fmtVndShort } from "../format";
 import { METRIC } from "../metricGlossary";
 import { assertOnePlatform } from "../platforms/perf";
 import { logShareBreakdown, type DriverBreakdown } from "./monthlyReportInsights";
+import { byLang, numLocale, t } from "../displayLang";
 
 // Key Metrics SHOPEE (user chốt 07/10): file Shopee khác bản chất file TikTok — không có LIVE impressions / ERR / LIVE CTR /
 // CTOR / CVR / UPT / AOV. Nên Dashboard / Report Tuần / Hiệu Suất Host / Bản Tin CEO của sàn Shopee đọc bộ này, KHÔNG đọc
@@ -116,10 +117,13 @@ type Kind = "money" | "int" | "hours";
  *  Product Clicks, CTR, Order Rate, GPM…) chỉ có cho cả tháng/cả ngày ở Report Tháng Shopee. */
 export type ShopeeMetricGroup = "result" | "traffic";
 
-export const SHOPEE_METRIC_GROUPS: { group: ShopeeMetricGroup; label: string; hint: string }[] = [
-  { group: "result", label: "Kết quả", hint: "Sales trên số giờ live. Orders, ABS, Items Sold có sau khi đối soát bằng Live List." },
-  { group: "traffic", label: "Viewers và ATC", hint: "Shopee phân phối bao nhiêu người vào phiên live và bao nhiêu lần họ thêm vào giỏ (ATC có sau khi đối soát bằng Live List)." }
-];
+export const SHOPEE_METRIC_GROUPS: { group: ShopeeMetricGroup; label: string; hint: string }[] = byLang(
+  () => [
+    { group: "result", label: t("Kết quả", "Results"), hint: t("Sales trên số giờ live. Orders, ABS, Items Sold có sau khi đối soát bằng Live List.", "Sales over live hours. Orders, ABS and Items Sold are available after reconciliation with the Live List.") },
+    { group: "traffic", label: t("Viewers và ATC", "Viewers and ATC"), hint: t("Shopee phân phối bao nhiêu người vào phiên live và bao nhiêu lần họ thêm vào giỏ (ATC có sau khi đối soát bằng Live List).", "How many people Shopee brings into the live session and how often they add to cart (ATC is available after reconciliation with the Live List).") }
+  ],
+  []
+);
 
 export interface ShopeeMetricDef {
   key: ShopeeMetricKey;
@@ -133,7 +137,7 @@ export interface ShopeeMetricDef {
 // Bộ hiển thị theo ca: chỉ số có thật trong Live List (GMV = Sales(Placed Order), Orders, Items Sold, ABS, Viewers, ATC) + hai số
 // chia theo giờ là cách agency đo năng suất (GMV/giờ, Viewers/giờ). Bỏ CO, Xu, GPM, Orders/ATC, ATC/giờ — không có trong file Shopee
 // theo phiên (GPM của Shopee chia cho Total Views, Live List không có).
-export const SHOPEE_METRICS: ShopeeMetricDef[] = [
+export const SHOPEE_METRICS: ShopeeMetricDef[] = byLang(() => [
   { key: "gmv", label: SM.gmv, kind: "money", goodWhenUp: true, group: "result" },
   { key: "gmvPerHour", label: SM.gmvPerHour, kind: "money", goodWhenUp: true, group: "result" },
   { key: "hours", label: METRIC.liveHours, kind: "hours", goodWhenUp: null, group: "result" },
@@ -143,7 +147,7 @@ export const SHOPEE_METRICS: ShopeeMetricDef[] = [
   { key: "viewers", label: METRIC.viewers, kind: "int", goodWhenUp: true, group: "traffic" },
   { key: "viewersPerHour", label: METRIC.viewersPerHour, kind: "int", goodWhenUp: true, group: "traffic" },
   { key: "atc", label: METRIC.atc, kind: "int", goodWhenUp: true, group: "traffic" }
-];
+], []);
 
 /** Giá trị một chỉ số; kỳ không có ca ⇒ null. Chỉ số cộng dồn của trường thiếu hẳn (0 ca khai) cũng ⇒ null, không hiện "0". */
 export function shopeeMetricValue(m: ShopeeKeyMetrics, key: ShopeeMetricKey): number | null {
@@ -165,20 +169,20 @@ export function fmtShopeeMetric(kind: Kind | ShopeeMetricDef, v: number | null |
   if (v == null || Number.isNaN(v)) return "—";
   switch (k) {
     case "money": return fmtVndShort(v);
-    case "int": return Math.round(v).toLocaleString("vi-VN");
-    case "hours": return `${v.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h`;
+    case "int": return Math.round(v).toLocaleString(numLocale());
+    case "hours": return `${v.toLocaleString(numLocale(), { maximumFractionDigits: 1 })}h`;
   }
 }
 
 // ---------- tách nguyên nhân ----------
 
 export type ShopeeDriverKey = "hours" | "viewersPerHour" | "atcRate" | "gmvPerAtc";
-export const SHOPEE_DRIVER_LABEL: Record<ShopeeDriverKey, string> = {
+export const SHOPEE_DRIVER_LABEL: Record<ShopeeDriverKey, string> = byLang(() => ({
   hours: METRIC.liveHours,
   viewersPerHour: METRIC.viewersPerHour,
   atcRate: METRIC.atcRate,
   gmvPerAtc: SM.gmvPerAtc
-};
+}));
 
 /**
  * GMV = Giờ live × Viewers/giờ × ATC/Viewer × GMV/ATC (giờ × viewers/giờ = viewers; × ATC/viewer = ATC; × GMV/ATC = GMV).

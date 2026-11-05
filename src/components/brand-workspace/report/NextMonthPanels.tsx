@@ -5,6 +5,7 @@ import { Panel, ReportTable } from "./ui";
 import { fmtFixed, fmtVndShort } from "../../../lib/format";
 import { errorMessage } from "../../../lib/errorMessage";
 import { salesTerm } from "../../../lib/metricGlossary";
+import { monthLong, monthShort, t as tr } from "../../../lib/displayLang";
 import { noiseBand } from "../../../lib/report/brandReport";
 import { parseRatePct, type RefundTrackRow } from "../../../lib/report/nextMonthPlan";
 
@@ -57,9 +58,9 @@ export interface LivePlanRow {
 }
 
 function liveVerdict(d: number | null, band: number | null) {
-  if (d == null) return <span className="pill m">chưa nhập</span>;
-  if (band == null || Math.abs(d) <= band) return <span className="pill g">trong ngưỡng dao động</span>;
-  return d > 0 ? <span className="pill r">vượt ngưỡng: cần tăng hiệu suất</span> : <span className="pill y">thấp hơn đáng kể mức đã đạt</span>;
+  if (d == null) return <span className="pill m">{tr("chưa nhập", "not entered")}</span>;
+  if (band == null || Math.abs(d) <= band) return <span className="pill g">{tr("trong ngưỡng dao động", "within normal range")}</span>;
+  return d > 0 ? <span className="pill r">{tr("vượt ngưỡng: cần tăng hiệu suất", "beyond range: performance must improve")}</span> : <span className="pill y">{tr("thấp hơn đáng kể mức đã đạt", "well below the level achieved")}</span>;
 }
 
 export type LiveTargetTyped = Record<string, { h?: string; t?: string }>;
@@ -81,6 +82,8 @@ export function decodeLiveTarget(text: string | undefined | null): LiveTargetTyp
  *  `cv`: độ lệch GMV/giờ một phiên đo trên brand (estimateSessionCv) — cùng hệ số với ngưỡng ở trang Nguyên nhân và Key Metrics. */
 export const NextLivePlanPanel: React.FC<{ nextMonth: string; curLabel: string; nextLabel: string; rows: LivePlanRow[]; total: LivePlanRow; saved?: LiveTargetTyped; onSave?: (m: LiveTargetTyped) => Promise<void>; canEdit?: boolean; cv?: number; platform?: "Shopee" }> = ({ nextMonth, curLabel, nextLabel, rows, total, saved, onSave, canEdit = true, cv, platform }) => {
   const S = salesTerm(platform); // tên doanh số theo sàn: TikTok "GMV", Shopee "Sales"
+  const perH = tr("giờ", "hour");
+  const cT = monthShort(Number(curLabel)), nT = monthShort(Number(nextLabel));
   const [localTyped, saveLocal] = useLocalDraft<LiveTargetTyped>(`liveops-report-live-plan-${nextMonth}`, {});
   const [draft, setDraft] = useState<LiveTargetTyped | null>(null);
   const typed = onSave ? draft ?? saved ?? {} : localTyped;
@@ -120,19 +123,35 @@ export const NextLivePlanPanel: React.FC<{ nextMonth: string; curLabel: string; 
   };
   const cell = (key: string, f: "h" | "t", ph: string, label: string) =>
     canEdit ? <input className="rr" inputMode="decimal" placeholder={ph} value={typed[key]?.[f] ?? ""} onChange={(e) => set(key, f, e.target.value)} onBlur={commit} aria-label={label} /> : <>{typed[key]?.[f] || "—"}</>;
-  const bands = [...body.map((x) => `${x.r.name} ±${x.band != null ? fmtFixed(x.band, 0) : "—"}%`), `cả tháng ±${totCalc?.band != null ? fmtFixed(totCalc.band, 0) : (noiseBand(total.sessionsCur, total.sessionsCur, cv) != null ? fmtFixed(noiseBand(total.sessionsCur, total.sessionsCur, cv)!, 0) : "—")}%`];
+  const bands = [...body.map((x) => `${x.r.name} ±${x.band != null ? fmtFixed(x.band, 0) : "—"}%`), `${tr("cả tháng", "whole month")} ±${totCalc?.band != null ? fmtFixed(totCalc.band, 0) : (noiseBand(total.sessionsCur, total.sessionsCur, cv) != null ? fmtFixed(noiseBand(total.sessionsCur, total.sessionsCur, cv)!, 0) : "—")}%`];
   // Brand chưa có kế hoạch Chốt và ops chưa lưu số tự điền nào ⇒ chỉ còn hàng "—" / "chưa nhập", không có gì để đọc.
   if (!fromApp && !canEdit && filled.length === 0) return null;
   return (
     <div className="pn">
-      <div className="pnh">1 · Kế hoạch Target Live (YFB vận hành)</div>
+      <div className="pnh">{tr("1 · Kế hoạch Target Live (YFB vận hành)", "1 · Target Live plan (run by YFB)")}</div>
       <div className="pns">
-        {fromApp ? `Giờ live và Target ${S} cộng từ các phiên trong Kế Hoạch Tháng ${nextLabel}. ` : `Tự điền Giờ live và Target ${S} cho từng loại ngày (chưa có Kế Hoạch Tháng chốt). `}
-        Bảng tính {S}/giờ yêu cầu và so với {S}/giờ đã đạt tháng {curLabel}; đánh giá theo ngưỡng dao động của từng loại ngày.{fromApp ? "" : onSave ? " Số tự điền lưu cùng report." : " Giá trị nhập lưu trong trình duyệt này."}
+        {fromApp
+          ? tr(`Giờ live và Target ${S} cộng từ các phiên trong Kế Hoạch Tháng ${nextLabel}. `, `Live hours and Target ${S} summed from the sessions in the ${monthLong(Number(nextLabel))} month plan. `)
+          : tr(`Tự điền Giờ live và Target ${S} cho từng loại ngày (chưa có Kế Hoạch Tháng chốt). `, `Live hours and Target ${S} entered per day type (no locked month plan yet). `)}
+        {tr(
+          `Bảng tính ${S}/giờ yêu cầu và so với ${S}/giờ đã đạt tháng ${curLabel}; đánh giá theo ngưỡng dao động của từng loại ngày.`,
+          `The table calculates the required ${S}/hour and compares it with the ${S}/hour achieved in ${monthLong(Number(curLabel))}, assessed against each day type's normal range.`
+        )}
+        {fromApp ? "" : onSave ? tr(" Số tự điền lưu cùng report.", " Entered figures are saved with the report.") : " Giá trị nhập lưu trong trình duyệt này."}
       </div>
       <div className="tw">
         <table id="t11Tbl">
-          <thead><tr><th>Loại ngày</th><th>{S}/giờ đạt T{curLabel}</th><th>Giờ live T{nextLabel}</th><th>Target {S} T{nextLabel} (triệu)</th><th>{S}/giờ yêu cầu</th><th>So với đạt T{curLabel}</th><th className="w">Đánh giá</th></tr></thead>
+          <thead>
+            <tr>
+              <th>{tr("Loại ngày", "Day type")}</th>
+              <th>{tr(`${S}/giờ đạt ${cT}`, `${S}/hour achieved ${cT}`)}</th>
+              <th>{tr(`Giờ live ${nT}`, `Live hours ${nT}`)}</th>
+              <th>{tr(`Target ${S} ${nT} (triệu)`, `Target ${S} ${nT} (M)`)}</th>
+              <th>{tr(`${S}/giờ yêu cầu`, `Required ${S}/hour`)}</th>
+              <th>{tr(`So với đạt ${cT}`, `vs achieved ${cT}`)}</th>
+              <th className="w">{tr("Đánh giá", "Assessment")}</th>
+            </tr>
+          </thead>
           <tbody>
             {body.map((x) => (
               <tr key={x.r.key}>
@@ -146,19 +165,22 @@ export const NextLivePlanPanel: React.FC<{ nextMonth: string; curLabel: string; 
               </tr>
             ))}
             <tr className="hl">
-              <td><b>Cả tháng</b></td>
+              <td><b>{tr("Cả tháng", "Whole month")}</b></td>
               <td>{mvn(total.achieved)}</td>
               <td>{all ? fmtFixed(sumH, 1) : "—"}</td>
               <td>{all ? fmtFixed(Math.round(sumT / 1e6), 0) : "—"}</td>
               <td>{mvn(totCalc?.req ?? null)}</td>
               <td className={cls(totCalc?.d ?? null, totCalc?.band ?? null)}>{sd(totCalc?.d ?? null)}</td>
-              <td className="w">{all ? liveVerdict(totCalc?.d ?? null, totCalc?.band ?? null) : <span className="pill m">nhập đủ {rows.length} loại ngày</span>}</td>
+              <td className="w">{all ? liveVerdict(totCalc?.d ?? null, totCalc?.band ?? null) : <span className="pill m">{tr(`nhập đủ ${rows.length} loại ngày`, `enter all ${rows.length} day types`)}</span>}</td>
             </tr>
           </tbody>
         </table>
       </div>
       <div className="legend">
-        <span>{fromApp ? "" : "Target nhập theo triệu đồng (ví dụ 2300 = 2,3B). "}{S}/giờ yêu cầu = Target ÷ Giờ live. Ngưỡng dao động: {bands.join(", ")}.</span>
+        <span>
+          {fromApp ? "" : tr("Target nhập theo triệu đồng (ví dụ 2300 = 2,3B). ", "Target in millions (e.g. 2300 = 2.3B). ")}
+          {tr(`${S}/giờ yêu cầu = Target ÷ Giờ live. Ngưỡng dao động: ${bands.join(", ")}.`, `Required ${S}/${perH} = Target ÷ live hours. Normal range: ${bands.join(", ")}.`)}
+        </span>
         <span className="st" aria-live="polite">{status}</span>
       </div>
     </div>
@@ -211,19 +233,31 @@ export const BookingPlanPanel: React.FC<{
   const vs = (a: number | null, b: number | null) => (a != null && b ? (a / b - 1) * 100 : null);
   const patch = (i: number, p: TypedBooking) => commit(typed.map((r, k) => (k === i ? { ...r, ...p } : r)));
   const dmy = (d: string | null) => (d ? `${d.slice(8)}/${d.slice(5, 7)}` : "—");
+  const cT = monthShort(Number(curLabel)), cL = monthLong(Number(curLabel)), nL = monthLong(Number(nextLabel));
   if (!fromApp && !canEdit) return null;
   if (!fromApp && !canEdit) return null;
   return (
     <div className="pn">
-      <div className="pnh">2 · Kế hoạch Booking Creator và Target Creator</div>
+      <div className="pnh">{tr("2 · Kế hoạch Booking Creator và Target Creator", "2 · Creator Booking plan and Creator Target")}</div>
       <div className="pns">
-        <b style={{ color: "var(--gold)" }}>Nguồn trong app: tab Affiliate → Kế hoạch (dán từ Google Sheet), không nhập lại.</b>{" "}
-        {fromApp ? `Tháng ${nextLabel} có ${planRows.length} phiên trong tab Affiliate. ` : `Tháng ${nextLabel} hiện chưa có kế hoạch nào trong tab Affiliate; bảng dưới cho nhập tay chỉ để xem cách tính. `}
-        Target Creator của tháng là tổng Target các phiên. GMV/giờ và ROAS yêu cầu tự tính; cột tham chiếu là GMV/giờ tốt nhất của creator trong tháng {curLabel} (nếu có); dòng tổng so với tháng {curLabel} ({cur.sessions} phiên, {fmtFixed(cur.hours, 1)} giờ, {mvn(cur.gmv)}, {mvn(cur.gmvPerHour)}/giờ, ROAS {cur.roas != null ? `${fmtFixed(cur.roas, 1)}x` : "—"}).
+        <b style={{ color: "var(--gold)" }}>{tr("Nguồn trong app: tab Affiliate → Kế hoạch (dán từ Google Sheet), không nhập lại.", "Source: the Affiliate plan in the app.")}</b>{" "}
+        {fromApp
+          ? tr(`Tháng ${nextLabel} có ${planRows.length} phiên trong tab Affiliate. `, `${nL} has ${planRows.length} sessions planned. `)
+          : tr(`Tháng ${nextLabel} hiện chưa có kế hoạch nào trong tab Affiliate; bảng dưới cho nhập tay chỉ để xem cách tính. `, `${nL} has no affiliate plan yet; the table below is for illustration only. `)}
+        {tr(
+          `Target Creator của tháng là tổng Target các phiên. GMV/giờ và ROAS yêu cầu tự tính; cột tham chiếu là GMV/giờ tốt nhất của creator trong tháng ${curLabel} (nếu có); dòng tổng so với tháng ${curLabel} (${cur.sessions} phiên, ${fmtFixed(cur.hours, 1)} giờ, ${mvn(cur.gmv)}, ${mvn(cur.gmvPerHour)}/giờ, ROAS ${cur.roas != null ? `${fmtFixed(cur.roas, 1)}x` : "—"}).`,
+          `The month's Creator Target is the sum of session Targets. Required GMV/hour and ROAS are calculated; the reference column is the creator's best GMV/hour in ${cL} (if any); the total row compares with ${cL} (${cur.sessions} sessions, ${fmtFixed(cur.hours, 1)} hours, ${mvn(cur.gmv)}, ${mvn(cur.gmvPerHour)}/hour, ROAS ${cur.roas != null ? `${fmtFixed(cur.roas, 1)}x` : "—"}).`
+        )}
       </div>
       <div className="tw">
         <table id="bkTbl">
-          <thead><tr><th>Ngày</th><th>Creator</th><th>Loại ngày</th><th>Khung giờ</th><th>Giờ live</th><th>Target GMV (triệu)</th><th>Budget Ads (triệu)</th><th>GMV/giờ yêu cầu</th><th>ROAS yêu cầu</th><th>GMV/giờ T{curLabel} (so)</th><th></th></tr></thead>
+          <thead>
+            <tr>
+              <th>{tr("Ngày", "Date")}</th><th>Creator</th><th>{tr("Loại ngày", "Day type")}</th><th>{tr("Khung giờ", "Time slot")}</th><th>{tr("Giờ live", "Live hours")}</th>
+              <th>{tr("Target GMV (triệu)", "Target GMV (M)")}</th><th>{tr("Budget Ads (triệu)", "Ads budget (M)")}</th><th>{tr("GMV/giờ yêu cầu", "Required GMV/hour")}</th><th>{tr("ROAS yêu cầu", "Required ROAS")}</th>
+              <th>{tr(`GMV/giờ ${cT} (so)`, `GMV/hour ${cT} (vs)`)}</th><th></th>
+            </tr>
+          </thead>
           <tbody>
             {rows.map((r) => {
               const g = r.hours && r.target ? r.target / r.hours : null;
@@ -254,11 +288,11 @@ export const BookingPlanPanel: React.FC<{
         <span>
           {n ? (
             <>
-              <b style={{ color: "var(--cream)" }}>{n} phiên · {fmtFixed(hours, 1)} giờ · Target {mvn(target)} · Ads {mvn(ads)}{roas != null ? ` · ROAS ${fmtFixed(roas, 1)}x` : ""}</b>
-              {gph != null && <> · GMV/giờ yêu cầu {mvn(gph)} <span className={cur.gmvPerHour && gph > cur.gmvPerHour ? "dn" : "up"}>({sd(vs(gph, cur.gmvPerHour))} so với tháng {curLabel}: {mvn(cur.gmvPerHour)})</span></>}
-              {roas != null && cur.roas != null && <> · ROAS <span className={roas > cur.roas ? "up" : "dn"}>{sd(vs(roas, cur.roas))}</span> so với {fmtFixed(cur.roas, 1)}x</>}
+              <b style={{ color: "var(--cream)" }}>{n} {tr("phiên", "sessions")} · {fmtFixed(hours, 1)} {tr("giờ", "hours")} · Target {mvn(target)} · Ads {mvn(ads)}{roas != null ? ` · ROAS ${fmtFixed(roas, 1)}x` : ""}</b>
+              {gph != null && <> · {tr("GMV/giờ yêu cầu", "Required GMV/hour")} {mvn(gph)} <span className={cur.gmvPerHour && gph > cur.gmvPerHour ? "dn" : "up"}>({sd(vs(gph, cur.gmvPerHour))} {tr(`so với tháng ${curLabel}`, `vs ${cL}`)}: {mvn(cur.gmvPerHour)})</span></>}
+              {roas != null && cur.roas != null && <> · ROAS <span className={roas > cur.roas ? "up" : "dn"}>{sd(vs(roas, cur.roas))}</span> {tr("so với", "vs")} {fmtFixed(cur.roas, 1)}x</>}
             </>
-          ) : "Chưa có phiên nào có Target"}
+          ) : tr("Chưa có phiên nào có Target", "No sessions with a Target yet")}
         </span>
         <span className="st" aria-live="polite">{status}</span>
         {draftNote && <span style={{ color: "var(--gold)" }}>{draftNote}</span>}

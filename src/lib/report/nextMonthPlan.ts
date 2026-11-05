@@ -1,5 +1,6 @@
 import { noiseBand } from "./brandReport";
 import type { RefundMonthStatus } from "../refundStatus";
+import { byLang, t } from "../displayLang";
 
 // Trang "Kế hoạch tháng sau" của Report Tháng (GĐ4, 28/10/2026, demo scratchpad/report_t10_v3.html): hàm thuần cho
 //  (a) Target Live theo loại ngày so với GMV/giờ đã đạt, kèm dải nhiễu; (b) Booking Creator (đọc từ tab Affiliate) so với tháng này;
@@ -31,12 +32,12 @@ export function liveRequirement(requiredGmvPerHour: number | null, actualGmvPerH
   return { gapPct, band, tone };
 }
 
-export const LIVE_TONE_LABEL: Record<LiveRequirementTone, string> = {
-  reach: "thấp hơn mức đã đạt",
-  stretch: "cao hơn, trong dải nhiễu",
-  beyond: "cao hơn, vượt dải nhiễu",
-  nodata: "chưa đủ số"
-};
+export const LIVE_TONE_LABEL: Record<LiveRequirementTone, string> = byLang(() => ({
+  reach: t("thấp hơn mức đã đạt", "below the level achieved"),
+  stretch: t("cao hơn, trong dải nhiễu", "higher, within the noise band"),
+  beyond: t("cao hơn, vượt dải nhiễu", "higher, beyond the noise band"),
+  nodata: t("chưa đủ số", "not enough data")
+}));
 
 // ---------- (b) Booking Creator so với tháng này ----------
 
@@ -70,10 +71,10 @@ export function bookingVsCurrent(planned: BookingTotals, actual: { sessions: num
   return {
     empty: planned.sessions === 0,
     rows: [
-      mk("sessions", "Số phiên", planned.sessions, actual.sessions),
-      mk("hours", "Giờ live", planned.hours > 0 ? planned.hours : null, actual.hours > 0 ? actual.hours : null),
+      mk("sessions", t("Số phiên", "Sessions"), planned.sessions, actual.sessions),
+      mk("hours", t("Giờ live", "Live hours"), planned.hours > 0 ? planned.hours : null, actual.hours > 0 ? actual.hours : null),
       mk("gmv", "Target Creator / Direct GMV", planned.target > 0 ? planned.target : null, actual.gmv > 0 ? actual.gmv : null),
-      mk("gmvPerHour", "GMV/giờ", pGph, actual.gmvPerHour),
+      mk("gmvPerHour", t("GMV/giờ", "GMV/hour"), pGph, actual.gmvPerHour),
       mk("roas", "ROAS", pRoas, actual.roas)
     ]
   };

@@ -8,6 +8,7 @@ import { vnDateOf } from "../dataraw/vnDate";
 import { fmtVndShort } from "../format";
 import { sessionDurationHours } from "../pnl";
 import { addKeyInput, emptyKeyCounts, keyInputFromRow, keyMetrics, type KeyMetrics } from "./keyMetrics";
+import { byLang, monthLong, numLocale, t } from "../displayLang";
 
 // Report Tháng 8 phần (user chốt 2026-09-25) — các phép tính MỚI của bố cục mới, tách khỏi component
 // để test được: so cùng số ngày, tách nguyên nhân GMV thay đổi, tổng shop theo kênh, dấu hiệu xu hướng
@@ -54,7 +55,7 @@ export function compareWindow(month: string, through: string | null): CompareWin
     prevStart: `${prev}-01`,
     prevEnd: `${prev}-${dd(prevDay)}`,
     partial,
-    label: partial ? `1–${day}/${month.slice(5)} so với 1–${prevDay}/${prev.slice(5)}` : `tháng ${month.slice(5)} so với tháng ${prev.slice(5)}`
+    label: partial ? t(`1–${day}/${month.slice(5)} so với 1–${prevDay}/${prev.slice(5)}`, `1–${day}/${month.slice(5)} vs 1–${prevDay}/${prev.slice(5)}`) : t(`tháng ${month.slice(5)} so với tháng ${prev.slice(5)}`, `${monthLong(month)} vs ${monthLong(prev)}`)
   };
 }
 
@@ -93,13 +94,13 @@ export function pctChange(from: number | null | undefined, to: number | null | u
 // ---------- tách nguyên nhân ----------
 
 export type DriverKey = "hours" | "viewsPerHour" | "liveCtr" | "ctor" | "aov";
-export const DRIVER_LABEL: Record<DriverKey, string> = {
+export const DRIVER_LABEL: Record<DriverKey, string> = byLang(() => ({
   hours: METRIC.liveHours,
   viewsPerHour: METRIC.viewsPerHour,
   liveCtr: METRIC.liveCtr,
   ctor: METRIC.ctor,
   aov: METRIC.aov
-};
+}));
 
 export interface DriverBreakdown<K extends string = DriverKey> {
   from: number;
@@ -401,12 +402,12 @@ export interface NarrativeInput {
 }
 
 const money = (v: number) => fmtVndShort(v);
-export const pctTxt = (v: number, digits = 1) => `${v.toLocaleString("vi-VN", { minimumFractionDigits: digits, maximumFractionDigits: digits })}%`;
+export const pctTxt = (v: number, digits = 1) => `${v.toLocaleString(numLocale(), { minimumFractionDigits: digits, maximumFractionDigits: digits })}%`;
 export const signed = (v: number, digits = 1) => `${v >= 0 ? "+" : "−"}${pctTxt(Math.abs(v), digits)}`;
 const dayMonth = (iso: string) => `${Number(iso.slice(8, 10))}/${iso.slice(5, 7)}`;
 
 // Tên chỉ số chuẩn (Views/giờ, UPT, Avg. price…) giữ nguyên hoa/thường giữa câu; chỉ "Giờ live" là chữ Việt.
-const lowerFirst = (t: string) => (t === METRIC.liveHours ? "giờ live" : t);
+const lowerFirst = (s: string) => (s === METRIC.liveHours ? t("giờ live", "live hours") : s);
 
 /** 4 thừa số của GMV/giờ — phần agency điều khiển được (giờ live là quyết định lịch, không phải hiệu suất). */
 export const RATE_FACTORS = ["viewsPerHour", "liveCtr", "ctor", "aov"] as const;
@@ -415,18 +416,18 @@ export type RateFactor = (typeof RATE_FACTORS)[number];
 export function factorValueText(key: RateFactor, s: LiveStats): string {
   const v = s[key];
   if (v == null) return "—";
-  if (key === "viewsPerHour") return Math.round(v).toLocaleString("vi-VN");
+  if (key === "viewsPerHour") return Math.round(v).toLocaleString(numLocale());
   if (key === "liveCtr") return pctTxt(v);
   if (key === "ctor") return pctTxt(v, 2);
   return fmtVndShort(v);
 }
 
-export const FACTOR_ACTION: Record<RateFactor, string> = {
-  viewsPerHour: "Điểm nghẽn ở traffic vào phiên live — xem lại khung giờ, thumbnail, tiêu đề phiên và ngân sách Ads cho live.",
-  liveCtr: "Điểm nghẽn ở tỷ lệ click sản phẩm — ghim sản phẩm và nhắc mở giỏ hàng thường xuyên hơn trong live.",
-  ctor: "Điểm nghẽn ở bước chốt đơn — rà giá, voucher và cách chốt của nhóm SKU chủ lực.",
-  aov: "Giá trị mỗi đơn giảm — thử combo hoặc ưu đãi theo ngưỡng AOV."
-};
+export const FACTOR_ACTION: Record<RateFactor, string> = byLang(() => ({
+  viewsPerHour: t("Điểm nghẽn ở traffic vào phiên live — xem lại khung giờ, thumbnail, tiêu đề phiên và ngân sách Ads cho live.", "The bottleneck is traffic into the live session — review time slots, thumbnail, session title and the live Ads budget."),
+  liveCtr: t("Điểm nghẽn ở tỷ lệ click sản phẩm — ghim sản phẩm và nhắc mở giỏ hàng thường xuyên hơn trong live.", "The bottleneck is product click-through — pin products and prompt viewers to open the cart more often during live."),
+  ctor: t("Điểm nghẽn ở bước chốt đơn — rà giá, voucher và cách chốt của nhóm SKU chủ lực.", "The bottleneck is order closing — review pricing, vouchers and the closing script for the hero SKUs."),
+  aov: t("Giá trị mỗi đơn giảm — thử combo hoặc ưu đãi theo ngưỡng AOV.", "Order value fell — try bundles or AOV-threshold offers.")
+}));
 
 export function autoSummary(i: NarrativeInput): string[] {
   const out: string[] = [];
@@ -437,15 +438,27 @@ export function autoSummary(i: NarrativeInput): string[] {
 
   const head = i.shopCur
     ? shopShort
-      ? `Tới ${dayMonth(through)}, livestream YFB vận hành mang về ${money(i.liveCur.gmv)}. File shop mới tới ${dayMonth(shopThrough!)}: shop đạt ${money(i.shopCur.gmv)} GMV${liveShare != null ? `, livestream YFB chiếm ${pctTxt(liveShare)} cùng kỳ` : ""}.`
-      : `Tới ${dayMonth(through)}, shop đạt ${money(i.shopCur.gmv)} GMV; livestream YFB vận hành mang về ${money(i.liveCur.gmv)}${liveShare != null ? ` (${pctTxt(liveShare)} tổng shop)` : ""}.`
-    : `Tới ${dayMonth(through)}, livestream YFB vận hành đạt ${money(i.liveCur.gmv)} GMV qua ${i.liveCur.sessions} phiên.`;
-  const target = i.targetGmv && i.targetGmv > 0 ? ` Đạt ${pctTxt((i.liveCur.gmv / i.targetGmv) * 100, 0)} target tháng (${money(i.targetGmv)}).` : "";
+      ? t(
+          `Tới ${dayMonth(through)}, livestream YFB vận hành mang về ${money(i.liveCur.gmv)}. File shop mới tới ${dayMonth(shopThrough!)}: shop đạt ${money(i.shopCur.gmv)} GMV${liveShare != null ? `, livestream YFB chiếm ${pctTxt(liveShare)} cùng kỳ` : ""}.`,
+          `Through ${dayMonth(through)}, YFB-run livestream brought in ${money(i.liveCur.gmv)}. The shop file runs through ${dayMonth(shopThrough!)}: the shop reached ${money(i.shopCur.gmv)} GMV${liveShare != null ? `, with YFB livestream at ${pctTxt(liveShare)} for the same period` : ""}.`
+        )
+      : t(
+          `Tới ${dayMonth(through)}, shop đạt ${money(i.shopCur.gmv)} GMV; livestream YFB vận hành mang về ${money(i.liveCur.gmv)}${liveShare != null ? ` (${pctTxt(liveShare)} tổng shop)` : ""}.`,
+          `Through ${dayMonth(through)}, the shop reached ${money(i.shopCur.gmv)} GMV; YFB-run livestream brought in ${money(i.liveCur.gmv)}${liveShare != null ? ` (${pctTxt(liveShare)} of the shop total)` : ""}.`
+        )
+    : t(`Tới ${dayMonth(through)}, livestream YFB vận hành đạt ${money(i.liveCur.gmv)} GMV qua ${i.liveCur.sessions} phiên.`, `Through ${dayMonth(through)}, YFB-run livestream reached ${money(i.liveCur.gmv)} GMV over ${i.liveCur.sessions} sessions.`);
+  const target = i.targetGmv && i.targetGmv > 0 ? t(` Đạt ${pctTxt((i.liveCur.gmv / i.targetGmv) * 100, 0)} target tháng (${money(i.targetGmv)}).`, ` ${pctTxt((i.liveCur.gmv / i.targetGmv) * 100, 0)} of the monthly target (${money(i.targetGmv)}).`) : "";
   const k = i.shopKpi;
   const kpi = k
     ? k.partial
-      ? ` Total GMV đạt ${pctTxt(k.pct, 0)} KPI ${money(k.target)}; ${k.method === "prev" ? "theo tốc độ cùng kỳ tháng trước" : "chia đều theo ngày"}, dự báo cuối tháng ~${money(k.projected)} (${pctTxt(k.projectedPct, 0)} KPI).`
-      : ` Total GMV đạt ${pctTxt(k.pct, 0)} KPI ${money(k.target)}${k.pct >= 100 ? ` (vượt ${money(k.actual - k.target)})` : ` (thiếu ${money(k.target - k.actual)})`}.`
+      ? t(
+          ` Total GMV đạt ${pctTxt(k.pct, 0)} KPI ${money(k.target)}; ${k.method === "prev" ? "theo tốc độ cùng kỳ tháng trước" : "chia đều theo ngày"}, dự báo cuối tháng ~${money(k.projected)} (${pctTxt(k.projectedPct, 0)} KPI).`,
+          ` Total GMV is at ${pctTxt(k.pct, 0)} of the ${money(k.target)} KPI; ${k.method === "prev" ? "at last month's same-period pace" : "spread evenly by day"}, month-end is projected at ~${money(k.projected)} (${pctTxt(k.projectedPct, 0)} of KPI).`
+        )
+      : t(
+          ` Total GMV đạt ${pctTxt(k.pct, 0)} KPI ${money(k.target)}${k.pct >= 100 ? ` (vượt ${money(k.actual - k.target)})` : ` (thiếu ${money(k.target - k.actual)})`}.`,
+          ` Total GMV reached ${pctTxt(k.pct, 0)} of the ${money(k.target)} KPI${k.pct >= 100 ? ` (${money(k.actual - k.target)} above)` : ` (${money(k.target - k.actual)} short)`}.`
+        )
     : "";
   out.push(head + target + kpi);
 
@@ -453,7 +466,7 @@ export function autoSummary(i: NarrativeInput): string[] {
   const ghChg = pctChange(i.livePrev.gmvPerHour, i.liveCur.gmvPerHour);
   if (gmvChg != null) {
     const hChg = pctChange(i.livePrev.hours, i.liveCur.hours);
-    const parts = [hChg != null ? `giờ live ${signed(hChg)}` : null, ghChg != null ? `GMV/giờ ${signed(ghChg)}` : null].filter(Boolean).join(", ");
+    const parts = [hChg != null ? `${t("giờ live", "live hours")} ${signed(hChg)}` : null, ghChg != null ? `${METRIC.gmvPerHour} ${signed(ghChg)}` : null].filter(Boolean).join(", ");
     const lbl = i.window.label.charAt(0).toUpperCase() + i.window.label.slice(1);
     let txt = `${lbl}: LIVE GMV ${signed(gmvChg)}${parts ? ` (${parts})` : ""}.`;
     const d = i.drivers;
@@ -463,8 +476,9 @@ export function autoSummary(i: NarrativeInput): string[] {
       const offset = rate.filter((p) => Math.sign(p.value) !== Math.sign(ghChg)).sort((a, b) => Math.abs(b.value) - Math.abs(a.value))[0];
       const amt = (v: number) => `${v >= 0 ? "+" : "−"}${money(Math.abs(v))}`;
       if (same.length) {
-        txt += ` GMV/giờ ${ghChg < 0 ? "giảm" : "tăng"} chủ yếu do ${same.map((p) => `${lowerFirst(DRIVER_LABEL[p.key])} (${signed(p.change, 0)}, ${amt(p.value)})`).join(" và ")}`;
-        txt += offset && Math.abs(offset.value) >= Math.abs(d.delta) * 0.1 ? `; ${DRIVER_LABEL[offset.key]} ${signed(offset.change, 0)} bù lại ${money(Math.abs(offset.value))}.` : ".";
+        const why = same.map((p) => `${lowerFirst(DRIVER_LABEL[p.key])} (${signed(p.change, 0)}, ${amt(p.value)})`).join(t(" và ", " and "));
+        txt += t(` GMV/giờ ${ghChg < 0 ? "giảm" : "tăng"} chủ yếu do ${why}`, ` GMV/hour ${ghChg < 0 ? "fell" : "rose"} mainly due to ${why}`);
+        txt += offset && Math.abs(offset.value) >= Math.abs(d.delta) * 0.1 ? t(`; ${DRIVER_LABEL[offset.key]} ${signed(offset.change, 0)} bù lại ${money(Math.abs(offset.value))}.`, `; ${DRIVER_LABEL[offset.key]} ${signed(offset.change, 0)} offset ${money(Math.abs(offset.value))}.`) : ".";
       }
     }
     out.push(txt);
@@ -476,8 +490,14 @@ export function autoSummary(i: NarrativeInput): string[] {
   const worst = i.drivers?.parts
     .filter((p): p is typeof p & { key: RateFactor } => (RATE_FACTORS as readonly string[]).includes(p.key) && p.value < 0)
     .sort((a, b) => a.value - b.value)[0];
-  if (i.dailyGap && (!worst || i.dailyGap.value >= -worst.value)) out.push(`Cơ hội lớn nhất: ${i.dailyGap.line.charAt(0).toLowerCase()}${i.dailyGap.line.slice(1)}`);
-  else if (worst) out.push(`Cơ hội lớn nhất: đưa ${DRIVER_LABEL[worst.key]} về mức kỳ trước (${factorValueText(worst.key, i.livePrev)}, nay ${factorValueText(worst.key, i.liveCur)}) — LIVE GMV thêm ~${money(-worst.value)}.`);
+  if (i.dailyGap && (!worst || i.dailyGap.value >= -worst.value)) out.push(`${t("Cơ hội lớn nhất", "Biggest opportunity")}: ${i.dailyGap.line.charAt(0).toLowerCase()}${i.dailyGap.line.slice(1)}`);
+  else if (worst)
+    out.push(
+      t(
+        `Cơ hội lớn nhất: đưa ${DRIVER_LABEL[worst.key]} về mức kỳ trước (${factorValueText(worst.key, i.livePrev)}, nay ${factorValueText(worst.key, i.liveCur)}) — LIVE GMV thêm ~${money(-worst.value)}.`,
+        `Biggest opportunity: bring ${DRIVER_LABEL[worst.key]} back to last period's level (${factorValueText(worst.key, i.livePrev)}, now ${factorValueText(worst.key, i.liveCur)}) — about ${money(-worst.value)} more LIVE GMV.`
+      )
+    );
 
   if (i.giftLine) out.push(i.giftLine);
   return out;
@@ -488,20 +508,23 @@ export function autoNextSteps(i: NarrativeInput): string[] {
   const worst = RATE_FACTORS.map((k) => ({ k, c: pctChange(i.livePrev[k], i.liveCur[k]) }))
     .filter((x): x is { k: RateFactor; c: number } => x.c != null && x.c <= -5)
     .sort((a, b) => a.c - b.c)[0];
-  if (worst) out.push(`${DRIVER_LABEL[worst.k]} ${signed(worst.c, 0)} so với cùng kỳ. ${FACTOR_ACTION[worst.k]}`);
+  if (worst) out.push(`${DRIVER_LABEL[worst.k]} ${signed(worst.c, 0)} ${t("so với cùng kỳ", "vs the same period")}. ${FACTOR_ACTION[worst.k]}`);
   if (i.controlOpsGroup) {
     out.push(
-      `${i.controlOpsGroup === "daily" ? "Daily" : "Campaign"} là chỗ giảm của riêng livestream (giảm mạnh hơn các kênh còn lại của shop) — xem lại khung giờ, host và kịch bản các phiên ${i.controlOpsGroup === "daily" ? "Daily" : "campaign"} trước khi chốt lịch tháng ${i.nextMonth.slice(5)}.`
+      t(
+        `${i.controlOpsGroup === "daily" ? "Daily" : "Campaign"} là chỗ giảm của riêng livestream (giảm mạnh hơn các kênh còn lại của shop) — xem lại khung giờ, host và kịch bản các phiên ${i.controlOpsGroup === "daily" ? "Daily" : "campaign"} trước khi chốt lịch tháng ${i.nextMonth.slice(5)}.`,
+        `${i.controlOpsGroup === "daily" ? "Daily" : "Campaign"} is where livestream alone declined (more than the shop's other channels) — review time slots, hosts and scripts of ${i.controlOpsGroup === "daily" ? "Daily" : "campaign"} sessions before locking the ${monthLong(i.nextMonth)} schedule.`
+      )
     );
   }
-  if (i.giftLine && /giảm từ/.test(i.giftLine)) {
-    out.push("Hỏi brand về chương trình quà tặng kèm đã giảm — nếu quà tặng từng giúp tăng CVR, đề xuất chạy lại cho các ngày campaign.");
+  if (i.giftLine && /giảm từ|fell from/.test(i.giftLine)) {
+    out.push(t("Hỏi brand về chương trình quà tặng kèm đã giảm — nếu quà tặng từng giúp tăng CVR, đề xuất chạy lại cho các ngày campaign.", "Ask the brand about the reduced gift-with-purchase programme — if gifts used to lift CVR, propose running them again on campaign days."));
   }
   const hChg = pctChange(i.livePrev.hours, i.liveCur.hours);
   const ghChg = pctChange(i.livePrev.gmvPerHour, i.liveCur.gmvPerHour);
-  if (hChg != null && ghChg != null && hChg > 5 && ghChg <= -10) out.push(`Tăng giờ live nhưng GMV/giờ giảm — ưu tiên phân bổ giờ vào khung giờ và ngày Campaign có GMV/giờ cao nhất thay vì kéo dài phiên.`);
-  for (const t of i.sectionSteps ?? []) if (!out.includes(t)) out.push(t);
+  if (hChg != null && ghChg != null && hChg > 5 && ghChg <= -10) out.push(t("Tăng giờ live nhưng GMV/giờ giảm — ưu tiên phân bổ giờ vào khung giờ và ngày Campaign có GMV/giờ cao nhất thay vì kéo dài phiên.", "Live hours rose but GMV/hour fell — prioritise hours in the time slots and Campaign days with the highest GMV/hour rather than longer sessions."));
+  for (const s of i.sectionSteps ?? []) if (!out.includes(s)) out.push(s);
   // Có kế hoạch thì target + số ca đã ở 2 ô ngay dưới danh sách — không viết lại thành 1 việc.
-  if (!i.nextPlan) out.push(`Chốt target và lịch live tháng ${i.nextMonth.slice(5)}.`);
+  if (!i.nextPlan) out.push(t(`Chốt target và lịch live tháng ${i.nextMonth.slice(5)}.`, `Lock the target and live schedule for ${monthLong(i.nextMonth)}.`));
   return out;
 }

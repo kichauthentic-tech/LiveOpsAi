@@ -10,12 +10,13 @@ import { fmtInt, fmtPct } from "./format";
 import { downscaleImage } from "./Visuals";
 import { fmtP, heat, scatter, tbl } from "./demoCharts";
 import type { PageMetric } from "./ui";
+import { numLocale, t as tr } from "../../../lib/displayLang";
 
 // Trang 5 "Sản phẩm & khuyến mãi" dựng theo demo (scratchpad/build/template.html, #p5): KPI → phân tán + quà tặng → bảng Top SKU (ảnh tải lên)
 // → bảng khuyến mãi. Markup/class lấy nguyên từ demo (demo.css, tiền tố .rt); số lấy từ bản chụp tháng.
 
 const esc = (s: unknown) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c as "&" | "<" | ">" | '"']));
-const dec = (v: number, d: number) => v.toLocaleString("vi-VN", { minimumFractionDigits: d, maximumFractionDigits: d });
+const dec = (v: number, d: number) => v.toLocaleString(numLocale(), { minimumFractionDigits: d, maximumFractionDigits: d });
 const disp = (n: string) => shortSku(n).replace(/ - /g, " ");
 const signed = (v: number, d = 1) => fmtP(v, d);
 const TONE_VAR = { up: "var(--green)", down: "var(--red)", flat: "var(--gold)" } as const;
@@ -43,10 +44,12 @@ export function productsKpis(d: ProductsPageData): PageMetric[] {
   const out: PageMetric[] = [];
   // Top 1 SKU (dòng 1 bảng Top 10) và quà tặng/đơn (dòng của bảng Quà tặng kèm và UPT) không lặp thành ô — audit trùng lặp 30/10.
   if (d.skuRank?.skusFor80Pct != null && d.skuRank.sellingSkus > 0) {
-    out.push({ label: "Độ tập trung SKU", value: `${fmtInt(d.skuRank.skusFor80Pct)} / ${fmtInt(d.skuRank.sellingSkus)}`, note: `SKU đầu bảng tạo 80% ${platformText("GMV", d.variant === "shopee" ? "Shopee" : "TikTok")} (${fmtFixed((d.skuRank.skusFor80Pct / d.skuRank.sellingSkus) * 100, 0)}%)` });
+    const g = platformText("GMV", d.variant === "shopee" ? "Shopee" : "TikTok");
+    const share = fmtFixed((d.skuRank.skusFor80Pct / d.skuRank.sellingSkus) * 100, 0);
+    out.push({ label: tr("Độ tập trung SKU", "SKU concentration"), value: `${fmtInt(d.skuRank.skusFor80Pct)} / ${fmtInt(d.skuRank.sellingSkus)}`, note: tr(`SKU đầu bảng tạo 80% ${g} (${share}%)`, `top SKUs making 80% of ${g} (${share}%)`) });
   }
   if (d.promo?.totalDiscount != null && d.promo.totalDiscount > 0) {
-    out.push({ label: "Tiền giảm giá khuyến mãi", value: fmtVndShort(d.promo.totalDiscount), note: `${d.promo.items.length} chương trình chạy trọn tháng` });
+    out.push({ label: tr("Tiền giảm giá khuyến mãi", "Promotion discounts"), value: fmtVndShort(d.promo.totalDiscount), note: tr(`${d.promo.items.length} chương trình chạy trọn tháng`, `${d.promo.items.length} programmes running the full month`) });
   }
   return out;
 }
@@ -92,15 +95,15 @@ export function skuScatterHtml(points: ScatterPoint[], axes: { xl: string; yl: s
       const a = px > 520 ? "end" : px < 110 ? "start" : "middle";
       return { x: p.x, y: p.y, r: Math.max(r, 3), color: TONE_VAR[p.tone], l: esc(chartSkuLabel(p.label)), dx: a === "end" ? -4 : a === "start" ? 4 : 0, dy: clash ? r + 13 : -r - 5, a };
     });
-  return scatter(pts, { ...o, quad: [{ x: 56, y: 28, t: `${axes.xl} thấp · ${axes.yl} cao` }, { x: 628, y: 292, t: `${axes.xl} cao · ${axes.yl} thấp`, a: "end" }] });
+  return scatter(pts, { ...o, quad: [{ x: 56, y: 28, t: `${axes.xl} ${tr("thấp", "low")} · ${axes.yl} ${tr("cao", "high")}` }, { x: 628, y: 292, t: `${axes.xl} ${tr("cao", "high")} · ${axes.yl} ${tr("thấp", "low")}`, a: "end" }] });
 }
 
 // ---- Bảng Top SKU ----
 const rankCell = (rank: number, prevRank: number | null) => {
   const b = rankBadge(prevRank, rank);
-  if (b.tone === "new") return `<b>${rank}</b> <span class="rk nt" title="Ngoài bảng tháng trước">mới</span>`;
-  if (b.tone === "flat") return `<b>${rank}</b> <span class="rk nt" title="Giữ hạng so với tháng trước">=</span>`;
-  return `<b>${rank}</b> <span class="rk ${b.tone === "up" ? "up" : "dn"}" title="Hạng tháng trước: ${prevRank}">${b.text}</span>`;
+  if (b.tone === "new") return `<b>${rank}</b> <span class="rk nt" title="${tr("Ngoài bảng tháng trước", "Not in last month's table")}">${b.text}</span>`;
+  if (b.tone === "flat") return `<b>${rank}</b> <span class="rk nt" title="${tr("Giữ hạng so với tháng trước", "Same rank as last month")}">=</span>`;
+  return `<b>${rank}</b> <span class="rk ${b.tone === "up" ? "up" : "dn"}" title="${tr("Hạng tháng trước", "Last month's rank")}: ${prevRank}">${b.text}</span>`;
 };
 
 const thumbCell = (name: string, src: string | undefined, editable: boolean) => {
@@ -108,16 +111,16 @@ const thumbCell = (name: string, src: string | undefined, editable: boolean) => 
   const inner = img
     ? `<img src="${img}" alt="${esc(name)}">${editable ? '<button type="button" class="rm" aria-label="Xoá ảnh" data-rm="1">×</button>' : ""}`
     : editable
-      ? "<span>+<br>Tải ảnh</span>"
+      ? `<span>+<br>${tr("Tải ảnh", "Upload")}</span>`
       : "<span>—</span>";
-  return { t: `<div class="thumb" data-n="${esc(name)}"${editable ? ' tabindex="0" role="button"' : ""} aria-label="${editable ? "Tải ảnh cho " : "Ảnh "}${esc(name)}">${inner}${editable ? '<input type="file" accept="image/*" hidden>' : ""}</div>`, c: "imgc" };
+  return { t: `<div class="thumb" data-n="${esc(name)}"${editable ? ' tabindex="0" role="button"' : ""} aria-label="${editable ? tr("Tải ảnh cho ", "Upload image for ") : tr("Ảnh ", "Image of ")}${esc(name)}">${inner}${editable ? '<input type="file" accept="image/*" hidden>' : ""}</div>`, c: "imgc" };
 };
 
 export function skuTableHtml(sku: SkuMoves, images: (name: string) => string | undefined, editable: boolean, variant?: "shopee"): string {
-  const prevLabel = "so với tháng trước";
+  const prevLabel = tr("so với tháng trước", "vs last month");
   if (variant === "shopee") {
     return tbl(
-      ["Ảnh sản phẩm", `Hạng · ${prevLabel}`, "Sản phẩm", METRIC_SHOPEE.gmv, sku.perDay ? `± ${METRIC_SHOPEE.gmv}/ngày` : `± ${METRIC_SHOPEE.gmv}`, "Orders", METRIC.itemsSoldShopee, SHOPEE_CONV],
+      [tr("Ảnh sản phẩm", "Image"), `${tr("Hạng", "Rank")} · ${prevLabel}`, tr("Sản phẩm", "Product"), METRIC_SHOPEE.gmv, sku.perDay ? `± ${METRIC_SHOPEE.gmv}/${tr("ngày", "day")}` : `± ${METRIC_SHOPEE.gmv}`, "Orders", METRIC.itemsSoldShopee, SHOPEE_CONV],
       sku.rows.map((r) => [
         thumbCell(r.name, images(r.name), editable),
         { t: rankCell(r.rank, r.prevRank), c: "hm" },
@@ -132,7 +135,7 @@ export function skuTableHtml(sku: SkuMoves, images: (name: string) => string | u
     );
   }
   return tbl(
-    ["Ảnh sản phẩm", `Hạng · ${prevLabel}`, "Sản phẩm", "GMV", sku.perDay ? "± GMV/ngày" : "± GMV", "Tỷ trọng Seller LIVE", "Orders", "Items sold", METRIC.productCtr, METRIC.ctor],
+    [tr("Ảnh sản phẩm", "Image"), `${tr("Hạng", "Rank")} · ${prevLabel}`, tr("Sản phẩm", "Product"), "GMV", sku.perDay ? tr("± GMV/ngày", "± GMV/day") : "± GMV", tr("Tỷ trọng Seller LIVE", "Seller LIVE share"), "Orders", "Items sold", METRIC.productCtr, METRIC.ctor],
     sku.rows.map((r) => [
       thumbCell(r.name, images(r.name), editable),
       { t: rankCell(r.rank, r.prevRank), c: "hm" },
@@ -152,7 +155,7 @@ export function skuTableHtml(sku: SkuMoves, images: (name: string) => string | u
 // ---- Bảng khuyến mãi ----
 export function promoTableHtml(promo: PromotionMonthSlice): string {
   return tbl(
-    ["Chương trình", "GMV", "Orders", "AOV", "Giảm giá", "ROI"],
+    [tr("Chương trình", "Programme"), "GMV", "Orders", "AOV", tr("Giảm giá", "Discount"), "ROI"],
     promo.items.map((p) => [esc(p.name), fmtVndShort(p.gmv), fmtInt(p.orders), fmtVndShort(p.aov), p.discount != null ? fmtVndShort(p.discount) : "—", p.roi != null && p.roi > 0 ? { t: dec(p.roi, 2), c: p.roi < 2 ? "dn" : "" } : "—"])
   );
 }
@@ -192,29 +195,38 @@ export const ProductsPageBody: React.FC<{
   };
   const thumbOf = (t: EventTarget | null) => (t instanceof Element ? (t.closest(".thumb") as HTMLElement | null) : null);
   const giftRows: [string, (g: GiftStats) => number][] = [
-    ["Quà tặng mỗi đơn (toàn shop)", (g) => g.giftPerOrder],
-    [`${METRIC.upt} toàn shop`, (g) => g.uptShop],
-    [`${METRIC.upt} không tính quà tặng`, (g) => g.uptExGift]
+    [tr("Quà tặng mỗi đơn (toàn shop)", "Gifts per order (whole shop)"), (g) => g.giftPerOrder],
+    [`${METRIC.upt} ${tr("toàn shop", "whole shop")}`, (g) => g.uptShop],
+    [`${METRIC.upt} ${tr("không tính quà tặng", "excluding gifts")}`, (g) => g.uptExGift]
   ];
   return (
     <>
       <div className="stk">
         {data.points.length >= 3 && (
           <div className="pn">
-            <div className="pnh">{shopee ? `Tỷ trọng Product Clicks và ${SHOPEE_CONV} của Top ${data.points.length} sản phẩm` : `${METRIC.productCtr} và ${METRIC.ctor} của Top ${data.points.length} SKU`}</div>
-            <div className="pns">{`${shopee ? "Tỷ trọng Product Clicks = Product Clicks của sản phẩm ÷ tổng của nhóm · " : ""}Kích thước điểm = ${shopee ? METRIC_SHOPEE.gmv : METRIC.gmv} · màu = thay đổi hạng so với tháng ${data.prevMonthNo} · đường nét đứt = trung vị Top ${data.points.length}.`}</div>
-            <div dangerouslySetInnerHTML={{ __html: shopee ? skuScatterHtml(data.points, { xl: "Tỷ trọng Product Clicks", yl: SHOPEE_CONV }) : skuScatterHtml(data.points) }} />
+            <div className="pnh">
+              {shopee
+                ? tr(`Tỷ trọng Product Clicks và ${SHOPEE_CONV} của Top ${data.points.length} sản phẩm`, `Product Clicks share and ${SHOPEE_CONV} of the top ${data.points.length} products`)
+                : tr(`${METRIC.productCtr} và ${METRIC.ctor} của Top ${data.points.length} SKU`, `${METRIC.productCtr} and ${METRIC.ctor} of the top ${data.points.length} SKUs`)}
+            </div>
+            <div className="pns">
+              {tr(
+                `${shopee ? "Tỷ trọng Product Clicks = Product Clicks của sản phẩm ÷ tổng của nhóm · " : ""}Kích thước điểm = ${shopee ? METRIC_SHOPEE.gmv : METRIC.gmv} · màu = thay đổi hạng so với tháng ${data.prevMonthNo} · đường nét đứt = trung vị Top ${data.points.length}.`,
+                `${shopee ? "Product Clicks share = the product's Product Clicks ÷ the group total · " : ""}Dot size = ${shopee ? METRIC_SHOPEE.gmv : METRIC.gmv} · colour = rank change vs month ${data.prevMonthNo} · dashed line = top-${data.points.length} median.`
+              )}
+            </div>
+            <div dangerouslySetInnerHTML={{ __html: shopee ? skuScatterHtml(data.points, { xl: tr("Tỷ trọng Product Clicks", "Product Clicks share"), yl: SHOPEE_CONV }) : skuScatterHtml(data.points) }} />
             <div className="legend">
-              <span><i style={{ background: "var(--green)" }} />tăng hạng</span>
-              <span><i style={{ background: "var(--red)" }} />giảm hạng</span>
-              <span><i style={{ background: "var(--gold)" }} />giữ hạng</span>
+              <span><i style={{ background: "var(--green)" }} />{tr("tăng hạng", "moved up")}</span>
+              <span><i style={{ background: "var(--red)" }} />{tr("giảm hạng", "moved down")}</span>
+              <span><i style={{ background: "var(--gold)" }} />{tr("giữ hạng", "same rank")}</span>
             </div>
           </div>
         )}
         {giftHas && (
           <div className="pn">
-            <div className="pnh">{`Quà tặng kèm và ${METRIC.upt}, ${data.giftPeriodLabel}`}</div>
-            <div className="pns">{`Quà tặng: sản phẩm giá dưới ${data.giftMaxPriceLabel}/món. ${METRIC.upt} không tính quà tặng phản ánh cách bán thực.`}</div>
+            <div className="pnh">{tr(`Quà tặng kèm và ${METRIC.upt}, ${data.giftPeriodLabel}`, `Free gifts and ${METRIC.upt}, ${data.giftPeriodLabel}`)}</div>
+            <div className="pns">{tr(`Quà tặng: sản phẩm giá dưới ${data.giftMaxPriceLabel}/món. ${METRIC.upt} không tính quà tặng phản ánh cách bán thực.`, `Gifts: items priced under ${data.giftMaxPriceLabel}. ${METRIC.upt} excluding gifts reflects actual selling.`)}</div>
             <div className="tw">
               <table
                 dangerouslySetInnerHTML={{
@@ -230,8 +242,13 @@ export const ProductsPageBody: React.FC<{
       </div>
       {sku ? (
         <div className="pn">
-          <div className="pnh">{`Top ${sku.rows.length} SKU theo ${shopee ? METRIC_SHOPEE.gmv : METRIC.gmv}`}</div>
-          <div className="pns">{`Nguồn file ${shopee ? "Product List của Shopee Live · Sales(Placed Order)" : "Sản Phẩm"}${curDaysLabel} · hạng so với tháng ${data.prevMonthNo}${sku.perDay ? ` · % tính trên ${shopee ? METRIC_SHOPEE.gmv : METRIC.gmv} mỗi ngày` : ""}.`}</div>
+          <div className="pnh">{tr(`Top ${sku.rows.length} SKU theo ${shopee ? METRIC_SHOPEE.gmv : METRIC.gmv}`, `Top ${sku.rows.length} SKUs by ${shopee ? METRIC_SHOPEE.gmv : METRIC.gmv}`)}</div>
+          <div className="pns">
+            {tr(
+              `Nguồn file ${shopee ? "Product List của Shopee Live · Sales(Placed Order)" : "Sản Phẩm"}${curDaysLabel} · hạng so với tháng ${data.prevMonthNo}${sku.perDay ? ` · % tính trên ${shopee ? METRIC_SHOPEE.gmv : METRIC.gmv} mỗi ngày` : ""}.`,
+              `Source: ${shopee ? "Shopee Live Product List · Sales(Placed Order)" : "Product file"}${curDaysLabel} · rank vs month ${data.prevMonthNo}${sku.perDay ? ` · % based on ${shopee ? METRIC_SHOPEE.gmv : METRIC.gmv} per day` : ""}.`
+            )}
+          </div>
           <div
             className="tw"
             onClick={(e) => {
@@ -284,8 +301,8 @@ export const ProductsPageBody: React.FC<{
       )}
       {data.promo && data.promo.items.length > 0 && (
         <div className="pn">
-          <div className="pnh">Top chương trình khuyến mãi</div>
-          <div className="pns">Chỉ các chương trình chạy trọn tháng · ROI = GMV ÷ tiền giảm giá · chương trình tặng quà có tiền giảm giá bằng 0 vì là quà tặng.</div>
+          <div className="pnh">{tr("Top chương trình khuyến mãi", "Top promotions")}</div>
+          <div className="pns">{tr("Chỉ các chương trình chạy trọn tháng · ROI = GMV ÷ tiền giảm giá · chương trình tặng quà có tiền giảm giá bằng 0 vì là quà tặng.", "Only programmes running the full month · ROI = GMV ÷ discount · gift programmes show zero discount because the item is a gift.")}</div>
           <div className="tw">
             <table dangerouslySetInnerHTML={{ __html: promoTableHtml(data.promo) }} />
           </div>

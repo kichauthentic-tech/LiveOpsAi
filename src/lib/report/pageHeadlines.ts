@@ -1,4 +1,5 @@
 import { fmtVndShort } from "../format";
+import { t } from "../displayLang";
 import type { InsightBlocks } from "./pageInsights";
 
 // Tiêu đề kết luận (action title) đặt trên hàng chỉ số của mỗi trang Report Tháng. Câu mẫu có chỗ trống, điền từ cùng số
@@ -17,14 +18,17 @@ export interface SummaryHeadlineInput {
 
 export function summaryHeadline(i: SummaryHeadlineInput): string {
   const g = i.gmvLabel ?? "LIVE GMV";
-  if (i.liveTarget == null || i.liveTarget <= 0) return `${g} ${fmtVndShort(i.liveActual)}; tháng này chưa có Target${i.gmvLabel ? "" : " LIVE"} nên chưa đánh giá được kết quả.`;
+  if (i.liveTarget == null || i.liveTarget <= 0)
+    return t(`${g} ${fmtVndShort(i.liveActual)}; tháng này chưa có Target${i.gmvLabel ? "" : " LIVE"} nên chưa đánh giá được kết quả.`, `${g} ${fmtVndShort(i.liveActual)}; no${i.gmvLabel ? "" : " LIVE"} Target this month, so results cannot be assessed yet.`);
   const p = (i.liveActual / i.liveTarget) * 100;
-  const head = `${g} đạt ${pct(p)} Target (${fmtVndShort(i.liveActual)} so với ${fmtVndShort(i.liveTarget)})`;
+  const head = t(`${g} đạt ${pct(p)} Target (${fmtVndShort(i.liveActual)} so với ${fmtVndShort(i.liveTarget)})`, `${g} reached ${pct(p)} of Target (${fmtVndShort(i.liveActual)} vs ${fmtVndShort(i.liveTarget)})`);
   const withT = i.days.filter((d) => d.target != null && d.target > 0).map((d) => ({ label: d.label, p: (d.actual / d.target!) * 100, gap: d.actual - d.target! }));
   if (withT.length === 0) return `${head}.`;
   // Loại ngày thiếu nhiều tiền nhất (cùng tiêu chí Insight trang 1, audit 30/10) — không phải loại ngày % thấp nhất.
   const worst = [...withT].filter((d) => d.gap < 0).sort((a, b) => a.gap - b.gap)[0];
-  return worst ? `${head}; ${worst.label} thiếu nhiều nhất (−${fmtVndShort(-worst.gap)}, đạt ${pct(worst.p)} Target).` : `${head}; mọi loại ngày đều đạt Target.`;
+  return worst
+    ? t(`${head}; ${worst.label} thiếu nhiều nhất (−${fmtVndShort(-worst.gap)}, đạt ${pct(worst.p)} Target).`, `${head}; ${worst.label} has the largest gap (−${fmtVndShort(-worst.gap)}, ${pct(worst.p)} of Target).`)
+    : t(`${head}; mọi loại ngày đều đạt Target.`, `${head}; every day type met Target.`);
 }
 
 export interface KeyMetricsHeadlineInput {
@@ -34,21 +38,22 @@ export interface KeyMetricsHeadlineInput {
 
 export function keyMetricsHeadline(i: KeyMetricsHeadlineInput): string {
   const rows = i.rows.filter((r) => r.change != null);
-  if (rows.length === 0) return "Chưa có tháng trước để so sánh chỉ số.";
+  if (rows.length === 0) return t("Chưa có tháng trước để so sánh chỉ số.", "No previous month to compare metrics with.");
   const down = rows.filter((r) => r.tone === "down");
   const up = rows.filter((r) => r.tone === "up");
-  if (down.length === 0 && up.length === 0) return `Cả tháng so với ${i.prevLabel}: không chỉ số nào đổi vượt ngưỡng dao động, chưa có thay đổi nổi bật.`;
+  if (down.length === 0 && up.length === 0)
+    return t(`Cả tháng so với ${i.prevLabel}: không chỉ số nào đổi vượt ngưỡng dao động, chưa có thay đổi nổi bật.`, `Full month vs ${i.prevLabel}: no metric moved beyond its normal range; no notable change.`);
   const first = down.find((r) => !r.result) ?? down[0];
   const parts: string[] = [];
-  if (down.length) parts.push(`${down.length} chỉ số suy giảm vượt ngưỡng (đầu tiên trong phễu: ${first.label} ${Math.round(first.change!)}%)`);
-  if (up.length) parts.push(`${up.length} chỉ số cải thiện vượt ngưỡng`);
-  return `Cả tháng so với ${i.prevLabel}: ${parts.join(", ")}.`;
+  if (down.length) parts.push(t(`${down.length} chỉ số suy giảm vượt ngưỡng (đầu tiên trong phễu: ${first.label} ${Math.round(first.change!)}%)`, `${down.length} metric(s) declined beyond range (first in the funnel: ${first.label} ${Math.round(first.change!)}%)`));
+  if (up.length) parts.push(t(`${up.length} chỉ số cải thiện vượt ngưỡng`, `${up.length} metric(s) improved beyond range`));
+  return t(`Cả tháng so với ${i.prevLabel}: ${parts.join(", ")}.`, `Full month vs ${i.prevLabel}: ${parts.join(", ")}.`);
 }
 
 /** Trang khác: câu đầu của khối Quan sát (đã là câu có số); trang chưa đủ số thì nói thẳng. */
 export function observeHeadline(b: InsightBlocks, fallback: string): string {
   const first = b.observe.split(/(?<=[.!?])\s+(?=[A-ZÀ-Ỵ0-9])/)[0]?.trim();
-  if (!first || /^Chưa đủ số liệu/.test(first)) return fallback;
+  if (!first || /^(Chưa đủ số liệu|Not enough data)/.test(first)) return fallback;
   return first;
 }
 

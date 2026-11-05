@@ -13,6 +13,23 @@
 
 ## 1. Giai đoạn hiện tại (cập nhật 2026-10-31; mục KH Tháng bản gọn 27/10)
 
+- **05/11: REPORT THÁNG SONG NGỮ VI/EN (chưa commit, KHÔNG migration)** — user: "Report Tháng cần có tiếng Anh". Nút **Tiếng Việt / English**
+  ở đầu Report Tháng (mọi role, brand cũng bấm; nhớ theo trình duyệt `localStorage.monthly_report_lang`); file HTML/PDF gửi brand xuất theo
+  ngôn ngữ đang chọn; Report Tuần (ops) luôn tiếng Việt. **Lõi:** `src/lib/displayLang.ts` — một biến module (`setDisplayLang`, `t(vi, en)`,
+  `numLocale()`, `monthShort/monthLong`, `byLang(() => bảng)` = Proxy đọc bảng hằng theo ngôn ngữ). BrandMonthlyReport đặt ngôn ngữ lúc render
+  + `key={lang}` cho cả cây report (mọi useMemo tính lại); **App đặt lại "vi" đầu mỗi lần render** nên rời report các màn khác không dính.
+  `lib/format.ts` đọc `numLocale()` (EN: 1.2B · 4.5%); `metricGlossary` METRIC/METRIC_SHOPEE/SHOPEE_SHOP/METRIC_HINT là `byLang` (EN: GMV/hour,
+  Live hours, Sales/hour…). Đã dịch: câu Insight 4 khối 10 trang (`pageInsights`), tiêu đề trang (`pageHeadlines`), `monthlyReportInsights`,
+  `deepAnalysis`, `sectionInsights`, nhãn nguồn NMV (`refundStatus`), mọi trang TikTok (DemoSummaryPages/DemoShopWhy/ProductsPage/HostPage/
+  NextMonthPanels/AdsPlanPanel/AffiliateTrackPanel/ui/theme) và Shopee (ShopeeMonthlyReportTabs, ShopeeShopPages, ShopeeAdsPage, shopeePages,
+  shopeeAdsInsight, shopeeKeyMetrics). **Insight ops sửa tay lưu riêng theo ngôn ngữ** (`pageNoteKey` EN = `pg_<trang>_en`). **Cố ý giữ tiếng
+  Việt:** nút/ghi chú chỉ ops thấy (Sửa insight, cảnh báo vàng), file Excel xuất từ report, dữ liệu gốc từ file sàn (tên host, chương trình
+  khuyến mãi, nguồn traffic/trạng thái Shopee). Bỏ qua code chết không render: `report/BrandPages.tsx`, `report/Visuals.tsx` (trừ downscaleImage),
+  `RefundTrackPanel`, `ActionPlan`, `shopeeSnapshot.shopeeInsights`. Verify: tsc sạch (trừ lỗi sẵn ở tests/shopeeFiles.test.ts), vitest 1377 pass
+  / 3 fail sẵn có từ trước (bundleSplit, platformProfiles, uiReadability cỡ chữ PlanMonthGrid), eslint không thêm lỗi; app thật (dev, admin):
+  CROCS TikTok T10 9 trang + Franklin Shopee T10 11 trang ở EN — quét chữ có dấu chỉ còn mục cố ý giữ; về VI vẫn nguyên; rời sang Dashboard vẫn
+  định dạng Việt. Chưa thử: bấm xuất HTML/PDF bản EN, role brand đăng nhập thật.
+
 - **05/11: AUDIT BẢO MẬT TÀI CHÍNH / RATE TRƯỚC LAUNCH (chưa commit, `0197` CHƯA CHẠY)** — replay 0001→0196 có quyền mặc định Supabase, thử đọc/ghi
   bằng 10 danh tính (anon, ceo, admin, ops, trainer, talent, brand A, brand chưa gắn brand, talent chưa gắn hồ sơ, đăng nhập không có profile).
   **Ổn:** anon 0 bảng; production `disable_signup: true` (đọc `/auth/v1/settings` — bắt buộc giữ, vì tài khoản tự đăng ký luôn vào role `talent`);
@@ -305,6 +322,14 @@
 6. **Thông báo** (`notifications`, 0083/0116): trigger DB ghi, client poll 45s + khi focus; chuông gate theo `session`.
 
 ## 5. Quy ước kỹ thuật bắt buộc
+
+### 5.0b Ngôn ngữ Report Tháng (05/11)
+
+Chữ brand thấy trong Report Tháng (component `report/*`, `*MonthlyReportTabs`, câu tự sinh ở `lib/report/*`) viết **cặp tại chỗ**
+`t("…Việt…", "…English…")` từ `lib/displayLang.ts` — không chuỗi Việt trơn. Bảng hằng cấp module có nhãn/tên chỉ số ⇒ bọc `byLang(() => …)`
+(tính lúc nạp module thì kẹt ngôn ngữ cũ). Số hiển thị đi qua `lib/format`/`numLocale()` (không `toLocaleString("vi-VN")`, không
+`.replace(".", ",")` — dùng `dec()` ở demoCharts). Tháng: `monthShort`/`monthLong`, không tự ghép `T${m}`/`Tháng ${m}`. File có biến cục bộ tên
+`t` thì import `t as tr`. Chữ chỉ ops thấy giữ tiếng Việt.
 
 ### 5.0 Thuật ngữ theo sàn (02/11)
 - Mọi chữ "GMV" hiển thị phải đi qua `platformText(text, platform)` khi biết sàn (TikTok = GMV, Shopee = Sales); biết nhiều sàn → `"all"`. Không gõ cứng "GMV" trong file thuần Shopee (test `platformTerms` chặn).
