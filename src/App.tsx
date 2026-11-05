@@ -10,7 +10,7 @@ import { ErrorBoundary } from "./lib/errorReporting";
 import { fetchTalents, updateTalent, updateMyTalentProfile, deleteTalent } from "./lib/db/talents";
 import { createStudio, updateStudio, deleteStudio } from "./lib/db/studios";
 import { createEquipment, updateEquipment, deleteEquipment } from "./lib/db/equipments";
-import { fetchSessions, finalizeShiftSlot, updateSession, deleteSession, cancelSession, setSessionExcluded, setSessionStaffSegments } from "./lib/db/sessions";
+import { fetchSessions, finalizeShiftSlot, updateSession, switchSessionPlatform, deleteSession, cancelSession, setSessionExcluded, setSessionStaffSegments } from "./lib/db/sessions";
 import { SessionActionsContext } from "./lib/sessionActionsContext";
 import { CLOSED_MONTH_NOTICE, isSessionMonthClosed } from "./lib/closedMonth";
 import { createBrand, updateBrand, deleteBrand } from "./lib/db/brands";
@@ -1164,6 +1164,27 @@ export default function App() {
       return false;
     }
   };
+  // Kéo ca sang phòng của sàn kia (0199): DB đổi sàn + tách/gắn kế hoạch ⇒ nạp lại ca chờ và target kế hoạch.
+  const handleSwitchSessionPlatform = async (session: LiveSession, platform: LiveSession["platform"], studioId: string): Promise<boolean> => {
+    if (isSessionMonthClosed(monthlyReports, session)) {
+      showToast(`Không thể đổi sàn của ca: ${CLOSED_MONTH_NOTICE}`);
+      return false;
+    }
+    try {
+      const saved = await switchSessionPlatform(session.id, platform, studioId);
+      setSessions((prev) => prev.map((s) => (s.id === saved.id ? saved : s)));
+      await reloadShiftSlots();
+      await pushAuditLog({
+        action: "Đổi sàn của ca",
+        details: `Ca ${session.date} ${session.startTime}-${session.endTime} (${session.brandName}): ${session.platform} → ${platform}, phòng ${session.studioName || "—"} → ${saved.studioName || "—"}.`,
+        category: "Security Alert"
+      });
+      return true;
+    } catch (e) {
+      showToast(`Không thể đổi sàn của ca: ${errorMessage(e)}`);
+      return false;
+    }
+  };
   // Đổi người giữa ca (0138): ghi đoạn giờ từng người, RPC tự đồng bộ người chính của ca → state lấy lại bản ca đầy đủ.
   const handleSetStaffSegments = async (session: LiveSession, segments: Parameters<typeof setSessionStaffSegments>[1], reason: string): Promise<boolean> => {
     if (isSessionMonthClosed(monthlyReports, session)) {
@@ -2089,6 +2110,7 @@ export default function App() {
                     brands={brands}
                     brandStudios={brandStudios}
                     onUpdateSession={handleUpdateSession}
+                    onSwitchSessionPlatform={handleSwitchSessionPlatform}
                     onCreateSlot={handleCreateShiftSlot}
                     onDeleteSlot={handleDeleteShiftSlot}
                     onRegisterSlot={handleRegisterSlot}

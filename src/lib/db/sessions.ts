@@ -561,6 +561,14 @@ export async function updateSession(session: LiveSession, base?: LiveSession): P
   return assembleSessions([row], reports, segments, checkpoints)[0];
 }
 
+/** Đổi sàn của ca (0199) — kéo ca sang phòng của brand ở sàn kia. DB tách ca khỏi kế hoạch sàn cũ, gắn vào ca kế hoạch sàn
+ *  mới đúng giờ nếu còn trống, chặn ca đã có số. */
+export async function switchSessionPlatform(sessionId: string, platform: LiveSession["platform"], studioId: string): Promise<LiveSession> {
+  const { error } = await supabase.rpc("switch_session_platform", { p_session_id: sessionId, p_platform: platform, p_studio_id: studioId });
+  if (error) throw error;
+  return fetchSessionById(sessionId);
+}
+
 /** Ops gõ tay "Thực tế" của ca (0152): GMV + giờ live thật (HH:MM, cả hai hoặc không). DB chỉ nhận khi ca chưa có số từ
  *  file/giao ca/đối soát — file up sau tự ghi đè. */
 export async function setSessionActuals(sessionId: string, v: { gmv: number; liveStart?: string; liveEnd?: string }): Promise<LiveSession> {

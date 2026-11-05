@@ -30,6 +30,17 @@
   CROCS TikTok T10 9 trang + Franklin Shopee T10 11 trang ở EN — quét chữ có dấu chỉ còn mục cố ý giữ; về VI vẫn nguyên; rời sang Dashboard vẫn
   định dạng Việt. Chưa thử: bấm xuất HTML/PDF bản EN, role brand đăng nhập thật.
 
+- **06/11: KÉO CA SANG PHÒNG SÀN KIA THÌ ĐỔI SÀN (`0199` ĐÃ CHẠY 06/11, đã push)** — user kéo ca Franklin Shopee 19–22 (05/11) từ
+  FRANKLIN SPE xuống FRANKLIN: trước đây chỉ đổi phòng (update_session_fields 0178 không ghi sàn), ca vẫn Shopee + vẫn gắn Kế Hoạch Tháng
+  Shopee. `0199_switch_session_platform.sql`: RPC security definer (ceo/admin/ops) đổi sàn + phòng; chặn ca huỷ/ca có số/phòng không phải
+  `brand_studios` của brand ở sàn mới/sàn mới đã có ca trùng giờ; tách `brand_month_plan_slots.slot_id` khỏi kế hoạch sàn cũ; sàn mới có ca
+  chờ (open) đúng giờ ⇒ chốt ca chờ đó vào ca, huỷ shift_slot cũ; không thì đổi sàn shift_slot cũ + gắn ca kế hoạch đã chốt đúng giờ còn
+  trống (không có ⇒ trigger 0186 tự thêm dòng ca tăng cường, target đề xuất). Client: `LiveCalendar.handleDropOnStudioRow` tra `brandStudios` (thả lại tại chỗ cũng đổi được khi sàn lệch phòng), hỏi
+  `useConfirm`, `App.handleSwitchSessionPlatform` nạp lại ca chờ + target kế hoạch, ghi nhật ký. Verify: replay 0001→0199 sạch + 5 tình
+  huống trên DB tạm (talent chặn, phòng sai, ca có số, chuyển kế hoạch, chốt ca chờ). App thật 06/11 (dev, admin): ca Franklin 05/11 19–22
+  kéo FRANKLIN SPE → FRANKLIN ⇒ hộp xác nhận ⇒ ca + shift_slot thành TikTok/FRANKLIN, ca kế hoạch Shopee 4,5M thành "chưa có ca", ca tăng
+  cường TikTok 10,5M (đề xuất), nhật ký "Đổi sàn của ca".
+
 - **05/11: AUDIT BẢO MẬT TÀI CHÍNH / RATE TRƯỚC LAUNCH (chưa commit, `0197` CHƯA CHẠY)** — replay 0001→0196 có quyền mặc định Supabase, thử đọc/ghi
   bằng 10 danh tính (anon, ceo, admin, ops, trainer, talent, brand A, brand chưa gắn brand, talent chưa gắn hồ sơ, đăng nhập không có profile).
   **Ổn:** anon 0 bảng; production `disable_signup: true` (đọc `/auth/v1/settings` — bắt buộc giữ, vì tài khoản tự đăng ký luôn vào role `talent`);
@@ -204,6 +215,7 @@
 ## 2. Việc còn treo
 
 **Cần user làm:**
+- **Đổi sàn khi kéo ca (06/11, `0199` đã chạy, đã push):** deploy client.
 - **0197 + 0198 (05/11):** chạy `0197_rate_privacy.sql` rồi `0198_talent_read_scope.sql` ở SQL Editor TRƯỚC khi phát tài khoản cho host
   (client lùi về bảng `brands` nếu chưa có view nên thứ tự với deploy không quan trọng). Kiểm: ops → Điều Phối "Chi phí người" = chưa tính
   được; host đăng nhập → lịch agency vẫn có tên brand + tên host.

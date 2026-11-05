@@ -29,6 +29,7 @@ import { Calendar as CalendarIcon, Building2, User, Plus, AlertTriangle, CheckCi
 
 import { fmtDateVn, fmtVndShort } from "../lib/format";
 import { PageHeader } from "./common/PageHeader";
+import { useConfirm } from "../hooks/useConfirm";
 import { talentRoleLabel } from "../lib/talentName";
 import { platformsWithValue, sumByPlatform } from "../lib/platforms/perf";
 interface LiveCalendarProps {
@@ -42,6 +43,8 @@ interface LiveCalendarProps {
   /** Kênh brand × sàn (0149) — form mở ca chọn kênh. */
   channels: BrandChannel[];
   onUpdateSession?: (updatedSession: LiveSession) => Promise<boolean>;
+  /** 0199 — thả ca vào phòng của brand ở sàn kia ⇒ đổi sàn của ca (DB tách/gắn kế hoạch tháng theo sàn). */
+  onSwitchSessionPlatform?: (session: LiveSession, platform: LiveSession["platform"], studioId: string) => Promise<boolean>;
   onCreateSlot?: (slot: ShiftSlot) => Promise<boolean>;
   onDeleteSlot?: (id: string) => Promise<void>;
   onRegisterSlot?: (slotId: string, talentId: string) => Promise<boolean>;
@@ -88,6 +91,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   brandStudios = [],
   channels,
   onUpdateSession,
+  onSwitchSessionPlatform,
   onCreateSlot,
   onDeleteSlot,
   onRegisterSlot,
@@ -152,6 +156,8 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   // Q2: form duy nhất là "Mở ca chờ đăng ký" (OpenSlotModal); prefill ngày/phòng/giờ từ ô được bấm.
   const [slotModal, setSlotModal] = useState<{ date: string; studioId?: string; start?: string; end?: string } | null>(null);
 
+  const confirm = useConfirm();
+
   // Drag and Drop State
   const [draggedSessionId, setDraggedSessionId] = useState<string | null>(null);
   const [dragOverCellKey, setDragOverCellKey] = useState<string | null>(null);
@@ -195,6 +201,8 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   };
 
   // Q3: thả thẻ ca vào hàng phòng khác → chỉ đổi phòng, giữ nguyên giờ (giờ là cam kết với brand).
+  // 0199 (05/11): phòng đích là phòng của CÙNG brand ở sàn kia ("Phòng live mặc định", brand_studios) ⇒ đổi luôn sàn của ca —
+  // trước đây kéo ca Franklin Shopee xuống phòng FRANKLIN (TikTok) thì thẻ vẫn mang logo Shopee.
   const handleDropOnStudioRow = async (e: React.DragEvent, targetStudio: Studio) => {
     e.preventDefault();
     setDragOverCellKey(null);
@@ -202,7 +210,10 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
     if (!sessionId) return;
     const session = sessions.find((s) => s.id === sessionId);
     if (!session) return;
-    if (session.studioId === targetStudio.id) {
+    const targetPlatform = brandStudios.find((b) => b.brandId === session.brandId && b.studioId === targetStudio.id)?.platform;
+    const switchPlatform = !!targetPlatform && targetPlatform !== session.platform;
+    // Cùng phòng mà sàn lệch phòng (ca đã kéo sang trước khi có 0199) ⇒ thả lại tại chỗ cũng đổi được sàn.
+    if (session.studioId === targetStudio.id && !switchPlatform) {
       setDraggedSessionId(null);
       return;
     }
@@ -214,6 +225,21 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
       return;
     }
     setDraggedSessionId(null);
+    if (switchPlatform && targetPlatform) {
+      if (!onSwitchSessionPlatform) return;
+      if (hasSessionData(session)) {
+        showToast(`Không đổi sàn được: ca đã có số liệu ${session.platform}. Đổi phòng thì thả vào phòng ${session.platform} khác.`, "warning");
+        return;
+      }
+      if (!(await confirm(
+        `Phòng ${targetStudio.name} là phòng ${targetPlatform} của ${session.brandName}. Đổi ca ${session.startTime}–${session.endTime} từ ${session.platform} sang ${targetPlatform}?\n\n` +
+        `Ca rời Kế Hoạch Tháng ${session.platform} (ca kế hoạch đó thành "chưa có ca"); nếu Kế Hoạch Tháng ${targetPlatform} có ca đúng giờ còn trống thì ca nhận target của ca đó, không thì thành ca tăng cường (target đề xuất, không cộng vào target tháng).`,
+        { confirmLabel: `Đổi sang ${targetPlatform}` }
+      ))) return;
+      const ok = await onSwitchSessionPlatform(session, targetPlatform, targetStudio.id);
+      if (ok) showToast(`Đã chuyển "${session.brandName}" ${session.startTime}–${session.endTime} sang ${targetStudio.name} · sàn ${targetPlatform}.`, "success");
+      return;
+    }
     if (!onUpdateSession) return;
     const ok = await onUpdateSession({ ...session, studioId: targetStudio.id, studioName: targetStudio.name });
     if (ok) showToast(`Đã chuyển "${session.brandName}" ${session.startTime}–${session.endTime} sang ${targetStudio.name}.`, "success");
@@ -1227,7 +1253,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                 <Building2 className="w-5 h-5 text-[var(--accent-text)] shrink-0" /> Phòng Studio theo giờ — {fmtDateVn(selectedDate)} ({getDayOfWeekName(selectedDate)})
               </h3>
               <p className="text-xs text-[var(--text-muted)]">
-                {daySessions.length} ca đã chốt · {daySlots.length} ca chờ đăng ký · {totalHours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h live.{canEdit ? " Kéo thẻ ca sang hàng phòng khác để đổi phòng (giữ giờ)." : ""}
+                {daySessions.length} ca đã chốt · {daySlots.length} ca chờ đăng ký · {totalHours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h live.{canEdit ? " Kéo thẻ ca sang hàng phòng khác để đổi phòng (giữ giờ) — phòng sàn kia của cùng brand thì đổi luôn sàn." : ""}
               </p>
             </div>
             <SessionCardLegend showTiming />
