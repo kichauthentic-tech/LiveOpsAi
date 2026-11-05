@@ -616,6 +616,21 @@ html:not(.dark) [class~="border-slate-700"], html:not(.dark) [class~="border-sla
   .sc.sc-fill { align-items: center; }
 }
 .sc-actual { font-size: 11px; font-weight: 700; }
+/* Bản tin target (05/11): target là thứ cần đạt nên nổi nhất — chân thẻ ca thành dải màu brand đặc với số to,
+   target ngày của brand là ô màu nhấn đặc (DailyTargetBriefCard). Chỉ áp trong .sc-brief, lịch/bảng khác giữ viên thuốc nhỏ. */
+.sc-brief .sc-foot .sc-pill { background: transparent; color: var(--pfg); font-family: inherit; font-size: 19px; font-weight: 900; line-height: 1.1; padding: 0; font-variant-numeric: tabular-nums; }
+.sc-brief .sc-foot::before { content: "Target"; font-size: 11px; font-weight: 700; color: var(--pfg); opacity: .85; }
+.sc-brief .sc-foot { background: var(--pbg); }
+@container (max-width: 459px) {
+  .sc-brief .sc { padding-bottom: 0; overflow: hidden; }
+  .sc-brief .sc .sc-foot { margin: 0 -7px; padding: 5px 7px; }
+}
+@container (min-width: 460px) {
+  .sc-brief .sc .sc-foot { padding: 3px 10px; border-radius: 8px; flex: none; }
+}
+.sc-brief-day { display: inline-flex; align-items: baseline; gap: 8px; padding: 3px 12px; border-radius: 10px; background: var(--accent); color: var(--accent-contrast); white-space: nowrap; }
+.sc-brief-day > span { font-size: 12px; font-weight: 700; }
+.sc-brief-day > b { font-size: 22px; font-weight: 900; line-height: 1.1; font-variant-numeric: tabular-nums; }
 @container (min-width: 200px) {
   .sc-bname, .sc-title { display: block; }
   .sc .sc-foot { display: flex; }

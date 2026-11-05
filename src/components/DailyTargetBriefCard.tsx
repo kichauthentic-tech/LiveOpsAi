@@ -49,9 +49,9 @@ export const DailyTargetBriefCard: React.FC<{ sessions: LiveSession[]; date: str
                 <div key={c.key} className="rounded-xl border border-[var(--border)] p-3 space-y-2 min-w-0">
                   <div className="flex items-center justify-between gap-2">
                     <span className="flex items-center gap-1.5 min-w-0 text-sm font-bold text-[var(--text)]"><span className="truncate">{c.brandName}</span><PlatformChip platform={c.platform} /></span>
-                    <span className="text-xs text-[var(--text-muted)] shrink-0">target ngày <b className="text-[var(--text)] tabular-nums">{fmtVndShort(c.dayTarget)}</b></span>
+                    <span className="sc-brief-day shrink-0"><span>target ngày</span><b>{fmtVndShort(c.dayTarget)}</b></span>
                   </div>
-                  <div className="grid gap-1.5 grid-cols-[repeat(auto-fill,minmax(210px,1fr))]">
+                  <div className="sc-brief grid gap-1.5 grid-cols-[repeat(auto-fill,minmax(210px,1fr))]">
                     {c.sessions.map((s) => (
                       <SessionEventCard
                         key={s.id}
