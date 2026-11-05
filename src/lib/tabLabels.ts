@@ -14,6 +14,7 @@ export const AGENCY_TAB_LABELS: Record<string, string> = {
   roster: "Điều Phối Lịch Live",
   ops_support: "Hỗ Trợ Vận Hành", // gộp vào Dashboard brand 28/09, tab agency 07/10, gộp vào Bảng Vận Hành 08/10 — giữ tên để "Lượt Mở Tab" đọc được lượt cũ
   host_performance: "Hiệu Suất Host",
+  leaderboard: "Leader Board",
   brands_overview: "Toàn Cảnh Brand",
   talents: "Talent Pool",
   studios: "Studios & Gear",

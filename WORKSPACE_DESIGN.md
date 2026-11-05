@@ -13,6 +13,24 @@
 
 ## 1. Giai đoạn hiện tại (cập nhật 2026-10-31; mục KH Tháng bản gọn 27/10)
 
+- **06/11: LEADER BOARD — 3 GIẢI HOST/TRỢ LIVE (đã commit, chưa push, KHÔNG migration)** — công ty có thưởng nóng ngày Campaign + giải tháng
+  theo account. User chốt 3 giải: **Ca đạt target**, **Host hiệu suất**, **Trợ live xuất sắc**; bố cục ghép 2 phương án Google Stitch
+  (project 14383689191872090120, design system "LiveOps · YFB"): tab **Campaign** = thẻ ca + vòng % target (C), tab **Giải tháng** = bục
+  top 3 (A). Menu "Phân tích" → Leader Board (`leaderboard`, route `leader-board`, quyền `manage_sessions`). **Logic thuần**
+  `lib/leaderboard/awards.ts` (test `tests/leaderboardAwards.test.ts` 14): MỌI giải xét riêng từng account (brand × sàn). (1)
+  `campaignTargetBoard` — ca ngày Campaign theo khung camp hiệu lực của Kế Hoạch Tháng (`effectiveCamp` → `resolveCampBucketType`), target
+  = `planTargetOf` (ca tăng cường không xét); ≥ 100% Mức 1, ≥ 120% Mức 2; suất = mức × phần phút người có mặt (`effectiveSegments`); ca đang
+  live chỉ báo, ca sắp live hiện để biết ai đứng; (2) `hostPerformanceBoard` — GMV/giờ ca Campaign chia hệ số Campaign ÷ Daily của account-tháng
+  (đo ~1,55 lần; user chốt "công bằng nhất"), rồi ÷ trung vị cùng account × khung giờ (4 khung như bộ xếp lịch) TRONG tháng, chia host theo phút, co về 1,00 (K = 6), cần ≥ 8 ca, "vượt rõ" = cận dưới 80% > 1; (3) `assistantBoard` — tỷ
+  lệ ca có mặt đạt target ca (mọi ngày), co về tỷ lệ chung account, ≥ 8 ca có target. **Số đo làm căn cứ (06/11, T6–T10):** Top GMV thô
+  trùng người nhiều giờ nhất 18/23 account-tháng ⇒ không có giải GMV tổng; chỉ số host theo khung giờ tháng → tháng sau r = 0,35–0,62 tuỳ thang đo (40 cặp); so 4 cách: GMV/h thô dính khung giờ r = 0,66, chia trung vị khung 0,32, + Campaign 0,29 và dính tỷ lệ ca Campaign về −0,07 (hạng 1 đổi 4/15 account-tháng, điểm lệch tới 0,35) ⇒ dùng 2 yếu tố; hồi quy thêm cuối tuần không bớt thêm mà kém ổn định ⇒ bỏ;
+  cùng cách đo cho trợ r = 0,08 ⇒ trợ không xếp theo GMV; dữ liệu chuyên cần gần như trống (472 biên bản giao ca, 0 lần ghi đi trễ). Target
+  ca chỉ có từ T10 ⇒ giải trợ live chỉ có hạng từ T10. **User chốt:** app chỉ hiện SUẤT, tiền công ty tự tính (không bảng mức thưởng);
+  không bao giờ % GMV. Hiệu ứng (`index.css` `.lb-*`, tắt khi giảm chuyển động): vệt sáng bục hạng 1, quầng vàng thẻ Mức 2, pháo giấy
+  một lần khi xem tháng đã qua, số chạy lên. **Verify:** dev server + phiên admin thật: T10 Campaign 28/63 · 11/55 · 15/59 ca đạt; T10
+  CROCS host hạng 1 Huỳnh Thái Toàn 1,16; trợ hạng 1 Lê Đức Duy 10/15 ca (account 47%); T11 hiện 72 ca D-Day đã xếp; 375px 0 tràn. **Chưa
+  làm:** role trainer/talent chưa thấy màn (chỉ ai có `manage_sessions`); chưa có nút xuất danh sách nhận thưởng; chưa thử theme sáng bằng mắt.
+
 - **06/11: 3 THEME MỚI + BỐ CỤC CHUNG (đã commit + push 06/11, KHÔNG migration)** — từ đề xuất "10 theme + tối ưu layout" (05/11, Google Stitch,
   artifact BaurhxvVcwg1x36Gon2WwN; Stitch MCP gọi thẳng `stitch.googleapis.com/mcp` bằng key của project PickdiOperator). User chốt theme
   **Paper / Sage / Daylight** + 4 điểm bố cục. **Code:** `index.css` thêm `.theme-paper/-sage/-daylight` (15 màu + `--radius-lg/xl/2xl`

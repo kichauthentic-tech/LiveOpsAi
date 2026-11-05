@@ -245,6 +245,36 @@ html.density-comfy main { --spacing: 0.3rem; }
   font-weight: 700;
 }
 
+/*
+  Leader Board (06/11, phương án Stitch A + C): vệt sáng chạy qua bục hạng 1, quầng vàng cho ca Mức 2, pháo giấy một lần khi xem tháng
+  đã qua. Màu lấy từ --accent nên đi theo theme; tắt hết khi người dùng chọn giảm chuyển động.
+*/
+.lb-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 35%, color-mix(in srgb, var(--accent) 22%, transparent) 50%, transparent 65%);
+  transform: translateX(-100%);
+  animation: lb-sweep 3.2s ease-in-out 0.4s infinite;
+  pointer-events: none;
+}
+@keyframes lb-sweep { 0% { transform: translateX(-100%); } 45%, 100% { transform: translateX(100%); } }
+.lb-tier { box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent), 0 8px 24px -12px color-mix(in srgb, var(--accent) 45%, transparent); }
+.lb-glow { filter: drop-shadow(0 0 10px color-mix(in srgb, var(--accent) 55%, transparent)); animation: lb-pulse 2.4s ease-in-out infinite; }
+@keyframes lb-pulse { 50% { filter: drop-shadow(0 0 4px color-mix(in srgb, var(--accent) 30%, transparent)); } }
+.lb-confetti { position: absolute; inset: 0; pointer-events: none; }
+.lb-confetti i {
+  position: absolute; top: -8px; width: 5px; height: 9px; border-radius: 1px; opacity: 0;
+  background: var(--accent); animation: lb-fall 1.6s ease-in forwards;
+}
+.lb-confetti i:nth-child(3n) { background: var(--success); }
+.lb-confetti i:nth-child(4n) { background: var(--text); }
+@keyframes lb-fall { 0% { opacity: 1; transform: translateY(0) rotate(0); } 100% { opacity: 0; transform: translateY(150px) rotate(320deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .lb-shimmer::after, .lb-confetti { display: none; }
+  .lb-glow { animation: none; }
+}
+
 /* Khối có trên mục lục dính (SectionNav): nhảy tới thì chừa chỗ cho thanh, không bị thanh che tiêu đề. */
 [data-section] { scroll-margin-top: 3.5rem; }
 
