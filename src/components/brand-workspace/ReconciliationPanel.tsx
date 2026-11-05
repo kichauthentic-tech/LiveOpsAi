@@ -211,7 +211,7 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
                 <span className="text-sky-300 font-bold">{sessionLabel(id)}</span>
                 <GmvEditor initial={sh?.gmv} busy={busy} onSave={(v) => void saveOverride(r.id, id, v)} onCancel={() => setEditing(null)} />
                 {typed && (
-                  <button onClick={() => void saveOverride(r.id, id, null)} disabled={busy} className="text-[11px] text-[var(--text-faint)] hover:text-[var(--text)] underline disabled:opacity-40">
+                  <button onClick={() => void saveOverride(r.id, id, null)} disabled={busy} className="text-2xs text-[var(--text-faint)] hover:text-[var(--text)] underline disabled:opacity-40">
                     Bỏ số gõ
                   </button>
                 )}
@@ -242,7 +242,7 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
 
   const roomTable = (items: ReconciliationRow[], selectable: boolean) => (
     <div className="overflow-x-auto">
-      <table className="w-full text-[11px] min-w-[520px]">
+      <table className="w-full text-2xs min-w-[520px]">
         <thead>
           <tr className="text-[var(--text-faint)] text-left">
             {selectable && <th className="font-bold pb-1.5 pr-2 w-6" aria-label="Đối soát phiên này" />}
@@ -284,7 +284,7 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
     <div className="space-y-3">
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">
         <h4 className="font-bold text-[var(--text)] text-xs">Đối soát số liệu — {brandName}</h4>
-        <p className="text-[11px] text-[var(--text-muted)] mt-1 max-w-3xl">
+        <p className="text-2xs text-[var(--text-muted)] mt-1 max-w-3xl">
           Mỗi file tải lên tạo một lần đối soát: số của từng ca phải khớp file {platform}. Phiên chạy qua nhiều ca chia theo snapshot, chưa có thì chia theo giờ (≈) — tổng luôn bằng file.
         </p>
 
@@ -299,7 +299,7 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
                 }`}
               >
                 <span className="font-bold text-[var(--text)] block truncate max-w-[220px]">{b.periodLabel ? fmtPeriodLabel(b.periodLabel) : b.fileName ?? "Không rõ kỳ"}</span>
-                <span className="text-[11px] text-[var(--text-faint)]">
+                <span className="text-2xs text-[var(--text-faint)]">
                   {b.rowCount} phiên · {b.appliedAt ? `đã áp dụng ${fmtTime(b.appliedAt)}` : "chưa áp dụng"}
                 </span>
               </button>
@@ -378,14 +378,14 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
             </div>
           </div>
           {!active.brandId && (
-            <p className="text-[11px] text-amber-300">
+            <p className="text-2xs text-amber-300">
               Lô này nạp khi đối soát còn khớp ca theo giờ với MỌI brand — không áp dụng được nữa. Xoá lô rồi tạo lại từ lần tải ở Lịch Sử Import.
             </p>
           )}
 
           {view === "ketqua" && (
             <div className="space-y-3">
-              <div className="flex flex-wrap gap-2 text-[11px]">
+              <div className="flex flex-wrap gap-2 text-2xs">
                 <span className="px-2 py-1 rounded-lg border border-emerald-800 text-emerald-300">Chuẩn · {check.counts.chuan} nhóm · {fmtVndShort(check.gmv.chuan)}</span>
                 <span className="px-2 py-1 rounded-lg border border-dashed border-amber-600 text-amber-300" title="Phiên chạy qua nhiều ca, chưa có snapshot lúc hết ca nên chia theo giờ. Tổng vẫn đúng file.">Ước tính theo giờ · {check.counts.uocTinh} nhóm · {fmtVndShort(check.gmv.uocTinh)}</span>
                 <button onClick={() => setView("cancheck")} className={`px-2 py-1 rounded-lg border ${attention > 0 ? "border-rose-500 text-rose-300" : "border-[var(--border)] text-[var(--text-faint)]"}`}>Cần check · {attention}</button>
@@ -397,7 +397,7 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
                     Phiên khớp ca · đối soát {listedPicked.length}/{listed.length} · {fmtVndFull(listedGmv)}
                     {listedPicked.length < listed.length && <span className="text-amber-300 font-normal"> · phiên bỏ chọn giữ nguyên số hiện có</span>}
                   </p>
-                  <div className="flex items-center gap-3 text-[11px]">
+                  <div className="flex items-center gap-3 text-2xs">
                     <button onClick={() => void setExcluded(listed.filter((r) => r.excluded).map((r) => r.id), false)} disabled={busy || listedPicked.length === listed.length} className="font-bold text-emerald-300 hover:text-emerald-200 underline disabled:opacity-40 disabled:no-underline">
                       Chọn tất cả
                     </button>
@@ -406,8 +406,8 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
                     </button>
                   </div>
                 </div>
-                {listed.length > 0 ? roomTable(listed, true) : <p className="text-[11px] text-[var(--text-faint)]">Không phiên nào khớp ca.</p>}
-                <p className="text-[11px] text-[var(--text-faint)] mt-2">Biết số đúng của một ca trong phiên nhiều ca? Bấm vào ô ca để gõ (✎): phần còn lại tự chia cho các ca kia.</p>
+                {listed.length > 0 ? roomTable(listed, true) : <p className="text-2xs text-[var(--text-faint)]">Không phiên nào khớp ca.</p>}
+                <p className="text-2xs text-[var(--text-faint)] mt-2">Biết số đúng của một ca trong phiên nhiều ca? Bấm vào ô ca để gõ (✎): phần còn lại tự chia cho các ca kia.</p>
               </div>
 
               {(unassignedRows.length > 0 || inhouseRows.length > 0) && (
@@ -415,11 +415,11 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
                   <summary className="text-xs font-black text-[var(--text)] cursor-pointer">
                     Phiên ngoài lịch ca · {unassignedRows.length + inhouseRows.length} phiên · {fmtVndFull(otherRows.reduce((s, r) => s + r.gmv, 0))}
                   </summary>
-                  <p className="text-[11px] text-[var(--text-muted)] mt-1">Không nằm trong khung giờ ca nào của agency — không ảnh hưởng số ca. Gán inhouse nếu là brand tự live.</p>
+                  <p className="text-2xs text-[var(--text-muted)] mt-1">Không nằm trong khung giờ ca nào của agency — không ảnh hưởng số ca. Gán inhouse nếu là brand tự live.</p>
                   {unassignedRows.length > 0 && (
                     <div className="mt-3">
                       <div className="flex items-center justify-between gap-2 mb-1">
-                        <p className="text-[11px] font-bold text-[var(--text)]">Chưa gán nhãn · {unassignedRows.length}</p>
+                        <p className="text-2xs font-bold text-[var(--text)]">Chưa gán nhãn · {unassignedRows.length}</p>
                         <button
                           onClick={() => void run(async () => {
                             const n = await setReconciliationBucket(active.id, "unassigned", "inhouse");
@@ -427,26 +427,26 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
                             setNote(`Đã gán ${n} phiên thành ca inhouse.`);
                           })}
                           disabled={busy}
-                          className="text-[11px] font-bold px-3 py-1.5 rounded-lg bg-sky-900 hover:bg-sky-800 text-sky-200 disabled:opacity-40 transition-colors"
+                          className="text-2xs font-bold px-3 py-1.5 rounded-lg bg-sky-900 hover:bg-sky-800 text-sky-200 disabled:opacity-40 transition-colors"
                         >
                           Toàn bộ rổ này là ca inhouse
                         </button>
                       </div>
                       {roomTable(unassignedRows.slice(0, 20), false)}
-                      {unassignedRows.length > 20 && <p className="text-[11px] text-[var(--text-faint)] mt-2">… và {unassignedRows.length - 20} phiên nữa</p>}
+                      {unassignedRows.length > 20 && <p className="text-2xs text-[var(--text-faint)] mt-2">… và {unassignedRows.length - 20} phiên nữa</p>}
                     </div>
                   )}
                   {inhouseRows.length > 0 && (
                     <div className="mt-3">
                       <div className="flex items-center justify-between gap-2 mb-1">
-                        <p className="text-[11px] font-bold text-[var(--text)]">Ca inhouse của brand · {inhouseRows.length}</p>
+                        <p className="text-2xs font-bold text-[var(--text)]">Ca inhouse của brand · {inhouseRows.length}</p>
                         <button
                           onClick={() => void run(async () => {
                             await setReconciliationBucket(active.id, "inhouse", "unassigned");
                             setRows(await fetchReconciliationRows(active.id));
                           })}
                           disabled={busy}
-                          className="text-[11px] text-[var(--text-muted)] hover:text-[var(--text)] underline disabled:opacity-40"
+                          className="text-2xs text-[var(--text-muted)] hover:text-[var(--text)] underline disabled:opacity-40"
                         >
                           Bỏ gán nhãn
                         </button>
@@ -463,14 +463,14 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
             <div className="space-y-3">
               <div className={`border rounded-2xl p-4 ${check.counts.canCheck > 0 ? "border-rose-800 bg-rose-950/20" : "border-emerald-800 bg-emerald-950/20"}`}>
                 <p className="text-xs font-black text-[var(--text)]">Kiểm tra theo nhóm ca–phiên · {check.groups.length} nhóm</p>
-                <p className="text-[11px] text-[var(--text-muted)] mt-0.5 max-w-2xl">Ca nối, restart, ngắt giữa chừng dùng chung một phép kiểm: tổng các ca của nhóm phải bằng tổng phiên trong file.</p>
+                <p className="text-2xs text-[var(--text-muted)] mt-0.5 max-w-2xl">Ca nối, restart, ngắt giữa chừng dùng chung một phép kiểm: tổng các ca của nhóm phải bằng tổng phiên trong file.</p>
                 {check.issues.length === 0 ? (
-                  <p className="text-[11px] text-emerald-300 mt-2 flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5" /> Tổng các ca khớp file ở mọi nhóm, không ca nào lệch hay thiếu phiên.</p>
+                  <p className="text-2xs text-emerald-300 mt-2 flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5" /> Tổng các ca khớp file ở mọi nhóm, không ca nào lệch hay thiếu phiên.</p>
                 ) : (
                   <>
                     <ul className="mt-2 space-y-1">
                       {(showAllIssues ? check.issues : check.issues.slice(0, ISSUES_SHOWN)).map((i, idx) => (
-                        <li key={`${i.kind}-${i.sessionId ?? ""}-${i.rowId ?? ""}-${idx}`} className="text-[11px] text-[var(--text-muted)] flex items-start gap-2">
+                        <li key={`${i.kind}-${i.sessionId ?? ""}-${i.rowId ?? ""}-${idx}`} className="text-2xs text-[var(--text-muted)] flex items-start gap-2">
                           <span className="shrink-0 font-bold text-rose-300 w-28">{ISSUE_TITLE[i.kind]}</span>
                           {i.sessionId && <span className="shrink-0 text-[var(--text)] font-bold whitespace-nowrap">{sessionLabel(i.sessionId)}</span>}
                           <span>{i.text}</span>
@@ -478,7 +478,7 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
                       ))}
                     </ul>
                     {check.issues.length > ISSUES_SHOWN && (
-                      <button onClick={() => setShowAllIssues((v) => !v)} className="text-[11px] text-[var(--text-muted)] underline mt-2">
+                      <button onClick={() => setShowAllIssues((v) => !v)} className="text-2xs text-[var(--text-muted)] underline mt-2">
                         {showAllIssues ? "Thu gọn" : `Xem thêm ${check.issues.length - ISSUES_SHOWN} mục`}
                       </button>
                     )}
@@ -489,7 +489,7 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
               {mergeGroups.length > 0 && (
                 <div className="border border-violet-800 bg-violet-950/30 rounded-2xl p-4">
                   <p className="text-xs font-black text-[var(--text)]">Ca bị restart / ngắt giữa chừng · {mergeGroups.length} nhóm</p>
-                  <p className="text-[11px] text-[var(--text-muted)] mt-0.5 max-w-2xl">
+                  <p className="text-2xs text-[var(--text-muted)] mt-0.5 max-w-2xl">
                     Mỗi lần tắt bật stream sàn sinh thêm một phiên (có khi chỉ 1–2 phút, {platformText("GMV", platform)} 0). Gộp lại thành một phiên: giờ từ đầu tới cuối, {platformText("GMV", platform)}/đơn/lượt xem cộng lại (tổng không đổi). Chưa ghi gì vào ca cho tới khi bạn bấm Áp dụng.
                   </p>
                   <ul className="mt-2 space-y-1">
@@ -497,7 +497,7 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
                       const key = g.ids[0];
                       return (
                         <li key={key}>
-                          <label className="flex items-center gap-2 text-[11px] text-[var(--text-muted)] cursor-pointer">
+                          <label className="flex items-center gap-2 text-2xs text-[var(--text-muted)] cursor-pointer">
                             <input
                               type="checkbox"
                               checked={!mergeOff.has(key)}

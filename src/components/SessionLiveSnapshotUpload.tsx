@@ -145,7 +145,7 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
   }
 
   if (loading) {
-    return <p className="text-[11px] text-[var(--text-faint)]">Đang tải số liệu ca...</p>;
+    return <p className="text-2xs text-[var(--text-faint)]">Đang tải số liệu ca...</p>;
   }
 
   if (pending) {
@@ -164,7 +164,7 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
           onCancel={() => { setPending(null); setError(null); }}
         />
         {error && (
-          <p className="text-[11px] text-rose-400 flex items-start gap-1.5">
+          <p className="text-2xs text-rose-400 flex items-start gap-1.5">
             <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
             {error}
           </p>
@@ -182,7 +182,7 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
               <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
               <div className="min-w-0">
                 <p className="text-xs font-bold text-emerald-300 truncate">{snapshot.fileName ?? "Đã nạp số liệu"}</p>
-                <p className="text-[11px] text-[var(--text-faint)]">
+                <p className="text-2xs text-[var(--text-faint)]">
                   Up lúc {fmtTime(snapshot.capturedAt)} · {snapshot.rowCount} {prof.liveFileRowNoun} trong file
                 </p>
               </div>
@@ -199,31 +199,31 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
 
           <div className="grid grid-cols-3 gap-2 text-center">
             <div className="bg-[var(--surface-base)] rounded-lg py-1.5">
-              <p className="text-[11px] text-[var(--text-faint)]">{platformText("GMV", prof.id)} ca này</p>
+              <p className="text-2xs text-[var(--text-faint)]">{platformText("GMV", prof.id)} ca này</p>
               <p className="text-xs font-bold text-emerald-300">{fmtVndFull(session.actualGmv ?? 0)}</p>
             </div>
             <div className="bg-[var(--surface-base)] rounded-lg py-1.5">
-              <p className="text-[11px] text-[var(--text-faint)]">Orders</p>
+              <p className="text-2xs text-[var(--text-faint)]">Orders</p>
               <p className="text-xs font-bold text-[var(--text)]">{(session.totalOrders ?? 0).toLocaleString("vi-VN")}</p>
             </div>
             <div className="bg-[var(--surface-base)] rounded-lg py-1.5">
-              <p className="text-[11px] text-[var(--text-faint)]">{prof.viewsLabel}</p>
+              <p className="text-2xs text-[var(--text-faint)]">{prof.viewsLabel}</p>
               <p className="text-xs font-bold text-[var(--text)]">{(session.totalViews ?? 0).toLocaleString("vi-VN")}</p>
             </div>
           </div>
 
           {editingGmv ? (
             <div className="space-y-1">
-              <p className="text-[11px] text-[var(--text-muted)]">
+              <p className="text-2xs text-[var(--text-muted)]">
                 {runsPastBoundary(snapshot)
                   ? `Room vẫn live sau giờ hết ca ${fmtClock(snapshot.boundaryAt)} khi tải file — số trên có thể lẫn phần của ca sau. Gõ ${platformText("GMV", prof.id)} đúng của ca (số trên dashboard lúc giao ca):`
                   : `Gõ ${platformText("GMV", prof.id)} đúng của ca:`}
               </p>
               <GmvEditor initial={snapshot.typedGmv ?? session.actualGmv} busy={busy} onSave={(v) => void saveGmv(v)} onCancel={() => setEditingGmv(false)} />
-              <p className="text-[11px] text-[var(--text-faint)]">Đơn, lượt xem… tự chia theo % {platformText("GMV", prof.id)}; phần dư tự sang ca sau.</p>
+              <p className="text-2xs text-[var(--text-faint)]">Đơn, lượt xem… tự chia theo % {platformText("GMV", prof.id)}; phần dư tự sang ca sau.</p>
             </div>
           ) : snapshot.typedGmv != null ? (
-            <p className="text-[11px] text-violet-300 flex items-center gap-1.5 flex-wrap">
+            <p className="text-2xs text-violet-300 flex items-center gap-1.5 flex-wrap">
               <Pencil className="w-3.5 h-3.5 shrink-0" />
               {platformText("GMV", prof.id)} gõ tay {fmtVndFull(snapshot.typedGmv)} — đơn, lượt xem theo % {platformText("GMV", prof.id)}, phần dư đã sang ca sau.
               <button onClick={() => setEditingGmv(true)} disabled={busy} className="underline hover:text-violet-200 disabled:opacity-40">Sửa</button>
@@ -232,7 +232,7 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
           ) : (
             <div className="flex items-start gap-2 flex-wrap">
               {runsPastBoundary(snapshot) && (
-                <p className="text-[11px] text-amber-300 flex items-start gap-1.5">
+                <p className="text-2xs text-amber-300 flex items-start gap-1.5">
                   <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
                   Room vẫn live sau giờ hết ca {fmtClock(snapshot.boundaryAt)} khi tải file — {platformText("GMV", prof.id)} trên có thể lẫn phần của ca sau.
                 </p>
@@ -240,7 +240,7 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
               <button
                 onClick={() => setEditingGmv(true)}
                 disabled={busy}
-                className="inline-flex items-center gap-1 text-[11px] font-bold text-violet-300 hover:text-violet-200 disabled:opacity-40"
+                className="inline-flex items-center gap-1 text-2xs font-bold text-violet-300 hover:text-violet-200 disabled:opacity-40"
               >
                 <Pencil className="w-3 h-3" /> Sửa {platformText("GMV", prof.id)} đúng của ca
               </button>
@@ -248,14 +248,14 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
           )}
 
           {(session.liveRoomIds?.length ?? 0) > 0 && (
-            <p className="text-[11px] text-[var(--text-faint)]">
+            <p className="text-2xs text-[var(--text-faint)]">
               Tính từ {session.liveRoomIds!.length} {prof.liveFileRowNoun} live thuộc ca này
               {session.actualStartAt ? ` · live thật ${fmtTime(session.actualStartAt)} → ${fmtTime(session.actualEndAt)}` : ""}
             </p>
           )}
 
           {(session.liveRoomIds?.length ?? 0) === 0 && (
-            <p className="text-[11px] text-amber-400 flex items-start gap-1.5">
+            <p className="text-2xs text-amber-400 flex items-start gap-1.5">
               <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
               File không có {prof.liveFileRowNoun} nào thuộc ca này. Có thể tải nhầm ca, hoặc chưa phát sinh số liệu.
             </p>
@@ -277,7 +277,7 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
           <FileSpreadsheet className="w-5 h-5 text-[var(--text-faint)] shrink-0" />
           <p className="flex-1 min-w-[12rem] text-xs text-[var(--text-muted)]">
             Tải <span className="font-bold text-[var(--text)]">{prof.reconciliationFile}</span> từ {prof.liveFileWhere} ngay khi hết ca.
-            <span className="hidden sm:block text-[11px] text-[var(--text-faint)]">Kéo thả file .xlsx vào đây hoặc bấm chọn.</span>
+            <span className="hidden sm:block text-2xs text-[var(--text-faint)]">Kéo thả file .xlsx vào đây hoặc bấm chọn.</span>
           </p>
           <button
             onClick={() => fileRef.current?.click()}
@@ -291,14 +291,14 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
       )}
 
       {dataSourceTier(session) === "reconciled" && (
-        <p className="text-[11px] text-sky-300 flex items-start gap-1.5">
+        <p className="text-2xs text-sky-300 flex items-start gap-1.5">
           <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-px" />
           Ca đã đối soát bằng file sàn: tải lên hay xoá file ở đây không đổi số của ca, chỉ dùng làm mốc khi bấm Áp dụng lại ở Đối soát.
         </p>
       )}
 
       {links.prev && !links.prev.hasSnapshot && (
-        <p className="text-[11px] text-amber-300 flex items-start gap-1.5">
+        <p className="text-2xs text-amber-300 flex items-start gap-1.5">
           <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
           Ca này nối từ ca {links.prev.startTime}–{links.prev.endTime} nhưng ca đó chưa tải lên file lúc giao ca — số của ca này sẽ chưa hiện cho tới khi ca đó tải lên.
         </p>
@@ -311,14 +311,14 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
             fileRef.current?.click();
           }}
           disabled={busy}
-          className="text-[11px] text-[var(--text-muted)] hover:text-[var(--text)] underline disabled:opacity-40"
+          className="text-2xs text-[var(--text-muted)] hover:text-[var(--text)] underline disabled:opacity-40"
         >
           {busy ? "Đang xử lý..." : "Tải lại file khác cho ca này"}
         </button>
       )}
 
       {error && (
-        <p className="text-[11px] text-rose-400 flex items-start gap-1.5">
+        <p className="text-2xs text-rose-400 flex items-start gap-1.5">
           <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
           {error}
         </p>

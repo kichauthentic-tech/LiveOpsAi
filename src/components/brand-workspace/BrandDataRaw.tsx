@@ -416,7 +416,7 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ platform, brandId, b
             )}
 
             <div className="max-h-52 overflow-auto border border-[var(--border)] rounded-xl">
-              <table className="text-[11px] whitespace-nowrap">
+              <table className="text-2xs whitespace-nowrap">
                 <thead className="bg-[var(--surface-elevated)] sticky top-0">
                   <tr className="text-left text-[var(--text-muted)]">
                     {parsedPreview.columns.map((c) => <th key={c.key} className="p-2">{c.label}</th>)}
@@ -430,7 +430,7 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ platform, brandId, b
                   ))}
                 </tbody>
               </table>
-              {parsedPreview.rows.length > 20 && <p className="text-[11px] text-[var(--text-faint)] p-2">...và {parsedPreview.rows.length - 20} dòng khác</p>}
+              {parsedPreview.rows.length > 20 && <p className="text-2xs text-[var(--text-faint)] p-2">...và {parsedPreview.rows.length - 20} dòng khác</p>}
             </div>
             <div className="flex gap-2">
               <button onClick={handleConfirmImport} disabled={loading} className="bg-[var(--accent)] text-[var(--accent-text)] font-bold px-4 py-2 rounded-xl text-xs disabled:opacity-50">
@@ -459,7 +459,7 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ platform, brandId, b
                 >
                   {expandedGroups.has(monthKey) ? <ChevronDown className="w-3.5 h-3.5 shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 shrink-0" />}
                   <span className="text-xs font-bold text-[var(--text)]">{formatMonthLabel(monthKey)}</span>
-                  <span className="text-[11px] text-[var(--text-faint)]">· {groupImports.length} lần tải</span>
+                  <span className="text-2xs text-[var(--text-faint)]">· {groupImports.length} lần tải</span>
                 </button>
 
                 {expandedGroups.has(monthKey) && (
@@ -480,7 +480,7 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ platform, brandId, b
                               onClick={() => void handleReconcileImport(imp)}
                               disabled={reconBusyId !== null}
                               title="Tạo lần đối soát từ lần tải này (không cần tải lại file)"
-                              className="shrink-0 text-[11px] font-bold px-2 py-1 rounded-lg bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-[var(--text)] disabled:opacity-40"
+                              className="shrink-0 text-2xs font-bold px-2 py-1 rounded-lg bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-[var(--text)] disabled:opacity-40"
                             >
                               {reconBusyId === imp.id ? "Đang tạo..." : "Đối soát"}
                             </button>
@@ -499,9 +499,9 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ platform, brandId, b
                               const totals = summary.totals || {};
                               const changePct = summary.changePct || {};
                               return (
-                              <div className="bg-[var(--surface-elevated)]/60 rounded-xl p-3 text-[11px] overflow-x-auto">
+                              <div className="bg-[var(--surface-elevated)]/60 rounded-xl p-3 text-2xs overflow-x-auto">
                                 <p className="font-bold text-[var(--text)] mb-1">Tổng Quan Dữ Liệu</p>
-                                <table className="text-[11px] whitespace-nowrap">
+                                <table className="text-2xs whitespace-nowrap">
                                   <tbody>
                                     {Object.keys(totals).map((k) => (
                                       <tr key={k} className="border-t border-[var(--border-muted)]">
@@ -522,7 +522,7 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ platform, brandId, b
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                                 placeholder="Tìm trong dữ liệu (tên sản phẩm, host...)..."
-                                className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-lg pl-8 pr-3 py-1.5 text-[11px] text-[var(--text)]"
+                                className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-lg pl-8 pr-3 py-1.5 text-2xs text-[var(--text)]"
                               />
                             </div>
 
@@ -530,7 +530,7 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ platform, brandId, b
                               {loading ? (
                                 <p className="text-xs text-[var(--text-faint)] p-3">Đang tải...</p>
                               ) : (
-                                <table className="text-[11px] whitespace-nowrap">
+                                <table className="text-2xs whitespace-nowrap">
                                   <thead className="bg-[var(--surface-elevated)] sticky top-0">
                                     <tr className="text-left text-[var(--text-muted)]">
                                       {imp.columns.map((c) => <th key={c.key} className="p-2">{c.label}</th>)}

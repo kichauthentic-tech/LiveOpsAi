@@ -5,7 +5,7 @@ import { fmtFixed, fmtMonth, fmtVndFull, fmtVndShort } from "../lib/format";
 import { PlatformChip } from "./common/PlatformChip";
 import { StatTile } from "./common/StatTile";
 
-const TH = "py-2 pr-3 text-[11px] font-semibold text-[var(--text-muted)] whitespace-nowrap";
+const TH = "py-2 pr-3 text-2xs font-semibold text-[var(--text-muted)] whitespace-nowrap";
 const TD = "py-2 pr-3 whitespace-nowrap";
 const NUM = `${TD} text-right tabular-nums`;
 
@@ -36,7 +36,7 @@ const AXIS = { fontSize: 11, fill: "var(--text-muted)" };
 const TIP = { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 };
 
 const Legend2: React.FC<{ items: [string, string][] }> = ({ items }) => (
-  <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-[var(--text-muted)]">
+  <div className="flex flex-wrap gap-x-4 gap-y-1 text-2xs text-[var(--text-muted)]">
     {items.map(([c, l]) => (
       <span key={l}>
         <i className="inline-block w-2.5 h-2.5 rounded-sm mr-1 align-middle" style={{ background: c }} />
@@ -50,7 +50,7 @@ const Card: React.FC<{ title: string; hint?: string; className?: string; childre
   <section className={`bg-[var(--surface)] p-5 rounded-2xl border border-[var(--border)] space-y-3 min-w-0 ${className}`}>
     <div>
       <h3 className="font-bold text-[var(--text)] text-base">{title}</h3>
-      {hint && <p className="text-[11px] text-[var(--text-faint)] mt-0.5">{hint}</p>}
+      {hint && <p className="text-2xs text-[var(--text-faint)] mt-0.5">{hint}</p>}
     </div>
     {children}
   </section>
@@ -213,12 +213,12 @@ const RowCells: React.FC<{ r: PnlRow }> = ({ r }) => {
   const none = r.coverage === "none";
   return (
     <>
-      <td className={NUM}>{none ? "—" : <>{fmtVndFull(r.revenue)}{r.estimated && <span className="ml-1 text-[11px] text-amber-300" title="NMV còn theo % hoàn ước tính">ước tính</span>}</>}</td>
+      <td className={NUM}>{none ? "—" : <>{fmtVndFull(r.revenue)}{r.estimated && <span className="ml-1 text-2xs text-amber-300" title="NMV còn theo % hoàn ước tính">ước tính</span>}</>}</td>
       <td className={NUM}>{none ? "—" : fmtVndFull(r.talentPay)}</td>
       <td className={NUM}>{none ? "—" : fmtVndFull(r.sessionCosts)}</td>
       <td className={`${NUM} font-bold ${none ? "text-[var(--text-faint)]" : r.grossProfit < 0 ? "text-red-400" : "text-emerald-400"}`}>{none ? "—" : fmtVndFull(r.grossProfit)}</td>
       <td className={NUM}>{none || r.margin == null ? "—" : `${fmtFixed(r.margin, 1)}%`}</td>
-      <td className={`${NUM} text-[11px]`}>{r.prev ? <Delta cur={r.grossProfit} prev={r.prev.grossProfit} /> : <span className="text-[var(--text-faint)]">—</span>}</td>
+      <td className={`${NUM} text-2xs`}>{r.prev ? <Delta cur={r.grossProfit} prev={r.prev.grossProfit} /> : <span className="text-[var(--text-faint)]">—</span>}</td>
       <td className={NUM}>
         <CoverageChip row={r} />
       </td>
@@ -331,7 +331,7 @@ export const PnlStatementView: React.FC<{ statement: PnlStatement; trend: PnlTre
                   <td className={NUM}>{fmtVndFull(t.sessionCosts)}</td>
                   <td className={NUM}>{fmtVndFull(t.grossProfit)}</td>
                   <td className={NUM}>{t.margin == null ? "—" : `${fmtFixed(t.margin, 1)}%`}</td>
-                  <td className={`${NUM} text-[11px]`}>{p ? <Delta cur={t.grossProfit} prev={p.grossProfit} /> : "—"}</td>
+                  <td className={`${NUM} text-2xs`}>{p ? <Delta cur={t.grossProfit} prev={p.grossProfit} /> : "—"}</td>
                   <td className={NUM}>
                     <CoverageChip row={t} />
                   </td>

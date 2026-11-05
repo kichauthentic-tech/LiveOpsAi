@@ -13,6 +13,39 @@
 
 ## 1. Giai đoạn hiện tại (cập nhật 2026-10-31; mục KH Tháng bản gọn 27/10)
 
+- **06/11: 3 THEME MỚI + BỐ CỤC CHUNG (đã commit + push 06/11, KHÔNG migration)** — từ đề xuất "10 theme + tối ưu layout" (05/11, Google Stitch,
+  artifact BaurhxvVcwg1x36Gon2WwN; Stitch MCP gọi thẳng `stitch.googleapis.com/mcp` bằng key của project PickdiOperator). User chốt theme
+  **Paper / Sage / Daylight** + 4 điểm bố cục. **Code:** `index.css` thêm `.theme-paper/-sage/-daylight` (15 màu + `--radius-lg/xl/2xl`
+  + `--font-sans`; Daylight `--text-2xs:13px`, `--text-xs:13px`), `@theme { --text-2xs: 11px }`, `html.density-compact|comfy main
+  {--spacing}`, `.sticky-col`, `[data-section]{scroll-margin-top}`; codemod 856 `text-[11px]` → `text-2xs` (cùng 11px); `useTheme.tsx`
+  6 theme + `THEME_FONTS` (Be Vietnam Pro / Nunito Sans / Lexend tải khi chọn theme) + `density` (lưu `liveops-density`); `Header`
+  ô Giao diện: nhóm Tối/Sáng + Mật độ Gọn/Vừa/Thoáng; `PageHeader` MỘT hàng: tiêu đề + `PageInfo` ⓘ (mô tả, thay dòng PageIntro) +
+  prop `tabs` + `actions` dồn phải (Dashboard đã chuyển tab vào `tabs`); `common/SectionNav.tsx` mục lục dính tự quét `[data-section]`,
+  chỉ hiện khi trang > 3 màn và ≥ 2 phần (Dashboard brand 8 phần qua prop `nav` của `BlockHead`/`Sect`; AI Training 5 phần);
+  cột đầu dính `.sticky-col` ở Sổ Ca (Giờ + nhãn ngày + dòng "ca sắp tới") và bảng Chốt tháng (`MonthClosePanel`). **KHÔNG làm sidebar tự
+  thu theo màn** — đã bỏ 29/09 (nội dung nhảy 1.184 ↔ 1.376px), user giữ quy tắc theo bề ngang. **Đo trên app thật 1440×900 (dev):**
+  số đầu tiên Sổ Ca y 273 → 201, Dashboard 261 → 221; Gọn ngắn trang 4–12% (chỉ `main`, khung app giữ nguyên); 375px Daylight+Gọn
+  0 tràn ở 5 màn; Paper/Sage/Daylight xem bằng mắt. **Test:** `uiReadability` (6 theme 4.5:1, khớp THEME_OPTIONS, cấm `text-[11px]`,
+  `--text-2xs` ≥ 11) + `layoutCalm` (một hàng, SectionNav, sticky-col); tsc/build xanh. Lịch & Studio (sau khi phiên 0199 commit f056263): chế độ xem vào `tabs`, chọn ngày +
+  "Mở ca" vào `actions` — ở 1440 hàng chọn ngày vẫn xuống dòng 2 nên chiều cao đầu trang gần như không đổi (225 → 223px), 375px 0 tràn.
+  **Còn lại:** Hiệu Suất Host bảng rộng 376px (đã có cột dính sẵn); Finance / Talent Pool /
+  Lịch brand dài là một danh sách liền — không có phần cho mục lục; 7 theme đề xuất
+  còn lại (Onyx, Graphite, Studio Night, Neon, Control Room, Indigo, Brand Portal) chưa làm; gỡ hộp lồng (Lịch brand 229, KH Tháng 54,
+  Finance 53) chưa làm.
+
+- **06/11 (sau): ĐỒNG BỘ THEME TOÀN APP + REPORT THÁNG (đã commit + push 06/11, KHÔNG migration)** — user (theme sáng): "sao còn report chưa,
+  đồng bộ toàn bộ". Quét thật 28 màn + 2 report (TikTok 9 trang, Shopee 10 trang) ở Paper/Daylight/Sage/Sand/Midnight bằng script tìm
+  nền tối trên theme sáng + chữ < 3:1 (cả chữ SVG). **Report Tháng** (skin đen-vàng cố định từ 01/10): `PAL` (report/theme.ts) thành
+  biến `--rt-*` (index.css: `:root` = mã YFB cũ, `html[class*="theme-"]:not(.theme-yfb)` lấy token theme), `demo.css` `.rt` đọc
+  `--rt-*`, nối hex alpha → `alpha()` (color-mix), recharts dùng `usePal()` (thuộc tính SVG không đọc var()). **File HTML/PDF gửi brand
+  vẫn đen-vàng**: khung xuất `.rt-skin-yfb` + `RtSkinContext "yfb"`; `exportStandaloneHtml` dùng `PAL_HEX`. **Lỗi có sẵn:** khối
+  `.theme-midnight` đứng TRƯỚC `:root, .theme-yfb` ⇒ chọn Midnight vẫn ra màu YFB — đã dời xuống sau. Nhãn cuối biểu đồ luỹ kế
+  (`runrate/parts.tsx`) pha màu brand với `--text` (CROCS #80C141 chỉ 2,2:1 trên nền trắng). Sau sửa: 0 nền tối / 0 chữ < 3:1 ở mọi
+  màn đã quét (trừ vạch 2px biểu đồ hộp — đúng ý); YFB giữ đúng mã cũ; khung xuất dưới Paper vẫn #f2c94c/#0b0b0d. Test
+  `uiReadability` canh thứ tự khối theme + PAL không nối hex/không vào thuộc tính SVG. **Chưa kiểm bằng mắt:** biểu đồ recharts của report
+  (không report nào hiện đang vẽ), tải thật file HTML/PDF. **Không phải lỗi theme, chưa sửa:** chữ trắng trên nền `orange-500`/`emerald-600`
+  (2,8–3,8:1) ở Lịch brand + Affiliate — mọi theme đều vậy.
+
 - **05/11: REPORT THÁNG SONG NGỮ VI/EN (chưa commit, KHÔNG migration)** — user: "Report Tháng cần có tiếng Anh". Nút **Tiếng Việt / English**
   ở đầu Report Tháng (mọi role, brand cũng bấm; nhớ theo trình duyệt `localStorage.monthly_report_lang`); file HTML/PDF gửi brand xuất theo
   ngôn ngữ đang chọn; Report Tuần (ops) luôn tiếng Việt. **Lõi:** `src/lib/displayLang.ts` — một biến module (`setDisplayLang`, `t(vi, en)`,
@@ -413,6 +446,10 @@ Chữ brand thấy trong Report Tháng (component `report/*`, `*MonthlyReportTab
   giải thích phương pháp dài gập vào `Explain` / `MethodNote` (Report) — số, kết luận, chú thích màu vẫn hiện; một mốc ("Số đủ tới") nói MỘT chỗ.
   Đợt 3 (19/10): ô ngày lịch (`PosterDayCell`) không viền, chỉ nền; cửa sổ/ngăn kéo gom chỉ số vào MỘT khung (`KV_GRID` SessionWindow); khối con nằm
   trong form đã có khung + tiêu đề bước thì `embedded` (vd `SessionRoomCase`); tiêu đề cửa sổ = thông tin chính (ngày · giờ), không tiêu đề chung.
+  06/11: chữ nhỏ nhất viết `text-2xs` (KHÔNG `text-[11px]` — test cấm); bo góc dùng `rounded-lg/xl/2xl` (theme đổi được), không
+  `rounded-[Npx]`; tab/chọn kỳ của trang vào prop `tabs` của `PageHeader`, mô tả vào `description` (thành ⓘ); khối cấp trang của màn dài
+  gắn `data-section="tên ngắn"` (hoặc prop `nav` của `BlockHead`/`Sect`) và đặt `<SectionNav />` dưới PageHeader; bảng rộng cuộn ngang
+  thì cột đầu `sticky-col` (hàng chọn = `data-open`); theme mới = khối `.theme-x` + 1 dòng `THEME_OPTIONS` (+ `THEME_FONTS` nếu có font).
 - **Màu brand** qua `getBrandTheme(brandName)`; **logo** qua `<BrandLogo>`; **ca trên lịch** qua `<SessionEventCard>`
   (`buildSessionMeta`/`buildSlotMeta`). Theme sáng là lớp chuyển màu CSS cuối `index.css` — component cứ viết dark-first.
 - **Tiền:** `fmtVndShort` (chỗ chật: "50M", "1,23B") / `fmtVndFull` (con số chính xác) trong `lib/format.ts`; không "đ",

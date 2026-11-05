@@ -180,7 +180,7 @@ export const MonthPicker: React.FC<MonthPickerProps> = ({
             <button
               type="button"
               onClick={() => pick("")}
-              className="w-full py-1.5 rounded-lg text-[11px] font-bold text-[var(--text-faint)] hover:text-[var(--text)] hover:bg-[var(--surface-hover)]"
+              className="w-full py-1.5 rounded-lg text-2xs font-bold text-[var(--text-faint)] hover:text-[var(--text)] hover:bg-[var(--surface-hover)]"
             >
               Bỏ chọn ({emptyLabel.toLowerCase()})
             </button>

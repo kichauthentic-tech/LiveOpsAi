@@ -144,7 +144,7 @@ export const BrandNextMonthPlan: React.FC<BrandNextMonthPlanProps> = ({ brandId,
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <span
-                className={`text-[11px] font-bold px-2.5 py-1 rounded-full border ${
+                className={`text-2xs font-bold px-2.5 py-1 rounded-full border ${
                   plan.status === "locked"
                     ? "bg-emerald-950 text-emerald-300 border-emerald-800"
                     : "bg-[var(--surface-elevated)] text-[var(--text-faint)] border-[var(--border)]"
@@ -164,7 +164,7 @@ export const BrandNextMonthPlan: React.FC<BrandNextMonthPlanProps> = ({ brandId,
             </div>
 
             {plan.brandConfirmedAt ? (
-              <span className="text-[11px] font-bold px-3 py-1.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800 flex items-center gap-1.5">
+              <span className="text-2xs font-bold px-3 py-1.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800 flex items-center gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5" /> Đã xác nhận lúc {fmtDateTime(plan.brandConfirmedAt)}
               </span>
             ) : currentRole === "brand" ? (
@@ -177,7 +177,7 @@ export const BrandNextMonthPlan: React.FC<BrandNextMonthPlanProps> = ({ brandId,
                 Xác nhận đã xem lịch
               </button>
             ) : (
-              <span className="text-[11px] font-bold px-3 py-1.5 rounded-full bg-[var(--surface-elevated)] text-[var(--text-faint)] border border-[var(--border)]">
+              <span className="text-2xs font-bold px-3 py-1.5 rounded-full bg-[var(--surface-elevated)] text-[var(--text-faint)] border border-[var(--border)]">
                 Chờ brand xác nhận
               </span>
             )}
@@ -189,7 +189,7 @@ export const BrandNextMonthPlan: React.FC<BrandNextMonthPlanProps> = ({ brandId,
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)] text-[11px] font-semibold">
+                  <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)] text-2xs font-semibold">
                     <th className="py-2.5 px-3">Ngày</th>
                     <th className="py-2.5 px-2">Giờ live</th>
                     <th className="py-2.5 px-2 text-right">{platformText("Target GMV", platform)}</th>

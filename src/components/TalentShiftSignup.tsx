@@ -177,7 +177,7 @@ export default function TalentShiftSignup({ mode, onOpenTab, brands, shiftSlots,
               <Check className="w-3.5 h-3.5" strokeWidth={3} />
             </span>
             Bạn đã đăng ký
-            <span className="ml-auto text-[11px] font-medium text-[var(--text-faint)] group-hover:text-rose-300">Chạm để huỷ</span>
+            <span className="ml-auto text-2xs font-medium text-[var(--text-faint)] group-hover:text-rose-300">Chạm để huỷ</span>
           </p>
         ) : (
           <p className="mt-3 flex items-center gap-1.5 text-sm font-bold text-[var(--accent-text)]">

@@ -19,6 +19,7 @@ import { todayVn } from "../lib/performance/brandCommitment";
 import type { TabPrefetchCtx } from "../lib/db/prefetch";
 import { useToast } from "../hooks/useToast";
 import { PageHeader } from "./common/PageHeader";
+import { SectionNav } from "./common/SectionNav";
 import { channelRefs, useChannelCards } from "./dashboard/useChannelCards";
 import { ddmm, useTooltip } from "./dashboard/shared";
 import { PlatformTab } from "./dashboard/period/PlatformTab";
@@ -189,8 +190,7 @@ export const AgencyDashboard: React.FC<AgencyDashboardProps> = (props) => {
 
   return (
     <div className="space-y-5" onMouseMove={tooltip.onMove} onMouseLeave={tooltip.onLeave}>
-      <PageHeader icon={LayoutDashboard} title={lockBrandId && pickedBrand ? `Dashboard · ${pickedBrand.name}` : "Dashboard"}>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+      <PageHeader icon={LayoutDashboard} title={lockBrandId && pickedBrand ? `Dashboard · ${pickedBrand.name}` : "Dashboard"} tabs={<>
           {!lockBrandId && <div className="flex gap-1 rounded-xl border border-[var(--border)] p-1" role="tablist" aria-label="Phần của Dashboard">
             {([["overview", "Tổng quan account"], ["platform", "Toàn sàn"], ["brand", "Brand"]] as const).map(([v, l]) => (
               <button key={v} type="button" role="tab" aria-selected={view === v} onClick={() => setView(v)} className={`${seg(view === v)} !text-sm px-3.5 min-h-[32px]`}>{l}</button>
@@ -217,15 +217,15 @@ export const AgencyDashboard: React.FC<AgencyDashboardProps> = (props) => {
           {view !== "overview" && <button type="button" onClick={exportXlsx} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] hover:border-[var(--accent)] min-h-[32px]">
             <Download className="w-3.5 h-3.5" />Tải Excel
           </button>}
-        </div>
+        </>}>
         {view === "overview" ? (
-          <p role="status" className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[var(--text-faint)] mt-2">
+          <p role="status" className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[var(--text-faint)]">
             <span>Tháng <b className="text-[var(--text-muted)]">{Number(month.slice(5))}/{month.slice(0, 4)}</b> · mọi sàn, mỗi sàn tính riêng (không cộng chéo)</span>
             <span>· Dữ liệu đầy đủ đến {allPlatforms.map((p) => `${p} ${coverageOf.get(p) ? ddmm(coverageOf.get(p)!) : "—"}`).join(" · ")}</span>
             {summaries.some((x) => x.waiting > 0) && <button type="button" onClick={() => onNavigate("sessions")} className="min-h-[24px] font-bold text-amber-300 hover:underline">· ca chưa có số liệu: {summaries.map((x) => `${x.platform} ${x.waiting}`).join(" · ")} →</button>}
           </p>
         ) : (
-        <p role="status" className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[var(--text-faint)] mt-2">
+        <p role="status" className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[var(--text-faint)]">
           <span>Đang xem <b className="text-[var(--text-muted)]">{label}</b> · {spanDays(period.start, period.end)} ngày · so với <b className="text-[var(--text-muted)]">{prevLabel}</b>{period.mode === "mom" ? " cùng ngày tháng trước" : " ngay trước, cùng độ dài"}</span>
           <span>· Dữ liệu đầy đủ đến {coverage.completeThrough ? ddmm(coverage.completeThrough) : "—"}{period.cut ? " (kỳ cắt ở đây)" : ""}</span>
           {waiting > 0 && <button type="button" onClick={() => onNavigate("sessions")} className="min-h-[24px] font-bold text-amber-300 hover:underline">· {waiting} ca chưa có số liệu →</button>}
@@ -233,6 +233,7 @@ export const AgencyDashboard: React.FC<AgencyDashboardProps> = (props) => {
         </p>
         )}
       </PageHeader>
+      <SectionNav />
 
       {view === "overview" ? (
         <OverviewTab rows={overviewRows} summaries={summaries} brands={allBrands} loading={loading} today={today} onOpenBrand={openAccount} onOpenMonthPlan={onOpenMonthPlan} />

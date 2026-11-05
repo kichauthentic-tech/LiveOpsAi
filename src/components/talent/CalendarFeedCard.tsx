@@ -74,7 +74,7 @@ export const CalendarFeedCard: React.FC<{ compact?: boolean }> = ({ compact = fa
               <Copy className="w-4 h-4" /> {copied ? "Đã chép" : "Chép link"}
             </button>
           </div>
-          {showLink && <p className="text-[11px] font-mono break-all select-all rounded-lg bg-[var(--surface-base)] border border-[var(--border)] p-2 text-[var(--text-muted)]">{state.links.https}</p>}
+          {showLink && <p className="text-2xs font-mono break-all select-all rounded-lg bg-[var(--surface-base)] border border-[var(--border)] p-2 text-[var(--text-muted)]">{state.links.https}</p>}
           {!compact && (
             <details className="text-xs text-[var(--text-muted)]">
               <summary className="cursor-pointer font-bold min-h-6 flex items-center">Cách thêm thủ công / đổi link</summary>

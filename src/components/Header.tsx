@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Brand, AppNotification } from "../types";
 import { NotificationBell } from "./NotificationBell";
 import { LogOut, Building2, ChevronDown, Check, Palette, HelpCircle } from "lucide-react";
-import { useTheme, THEME_OPTIONS } from "../hooks/useTheme";
+import { useTheme, THEME_OPTIONS, DENSITY_OPTIONS } from "../hooks/useTheme";
 import { BrandLogo } from "./ui/BrandLogo";
 import { profileOf } from "../lib/platforms/profiles";
 import { type ReportPlatform } from "../lib/reportPlatform";
@@ -71,13 +71,13 @@ const WorkspaceSwitcher: React.FC<{
               <Building2 className="w-4 h-4 text-blue-400 shrink-0" />
               <span className="flex-1 text-left">
                 Agency
-                <span className="block text-[11px] font-normal text-[var(--text-faint)]">Mọi brand, mọi kênh</span>
+                <span className="block text-2xs font-normal text-[var(--text-faint)]">Mọi brand, mọi kênh</span>
               </span>
               {workspace.type === "agency" && <Check className="w-3.5 h-3.5 text-blue-400" />}
             </button>
             <div className="border-t border-[var(--border)] my-1.5" />
-            <p className="px-3 pb-1 text-[11px] font-semibold text-[var(--text-faint)]">Brand</p>
-            {brands.length === 0 && <p className="px-3 py-2 text-[11px] text-[var(--text-faint)]">Chưa có Brand nào.</p>}
+            <p className="px-3 pb-1 text-2xs font-semibold text-[var(--text-faint)]">Brand</p>
+            {brands.length === 0 && <p className="px-3 py-2 text-2xs text-[var(--text-faint)]">Chưa có Brand nào.</p>}
             {brands.map((b) => {
               const plats = brandPlatforms?.[b.id] ?? [];
               const active = workspace.type === "brand" && workspace.brandId === b.id;
@@ -96,7 +96,7 @@ const WorkspaceSwitcher: React.FC<{
                     {plats.length > 0 && (
                       <span className="ml-1.5 font-normal">
                         {plats.map((p) => (
-                          <span key={p} className={`ml-1 text-[11px] font-bold ${profileOf(p).textClass}`}>{p}</span>
+                          <span key={p} className={`ml-1 text-2xs font-bold ${profileOf(p).textClass}`}>{p}</span>
                         ))}
                       </span>
                     )}
@@ -112,10 +112,30 @@ const WorkspaceSwitcher: React.FC<{
   );
 };
 
+// Giao diện = theme (màu, hình khối, font) + mật độ (khoảng cách). Hai lựa chọn độc lập, cùng lưu trong trình duyệt.
 const ThemeSwitcher: React.FC = () => {
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, density, setDensity } = useTheme();
   const [open, setOpen] = useState(false);
   const current = THEME_OPTIONS.find((t) => t.id === theme);
+
+  const group = (dark: boolean) => (
+    <div className="py-1">
+      <p className="px-3 pb-1 text-2xs font-semibold text-[var(--text-faint)]">{dark ? "Tối" : "Sáng"}</p>
+      {THEME_OPTIONS.filter((t) => t.dark === dark).map((opt) => (
+        <button
+          key={opt.id}
+          onClick={() => setTheme(opt.id)}
+          className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-[var(--text)] hover:bg-[var(--surface-elevated)]/80 transition-colors"
+        >
+          <span className="flex-1 min-w-0">
+            <span className="block text-xs font-semibold">{opt.label}</span>
+            <span className="block text-2xs text-[var(--text-faint)] truncate">{opt.hint}</span>
+          </span>
+          {theme === opt.id && <Check className="w-3.5 h-3.5 text-[var(--accent-text)]" />}
+        </button>
+      ))}
+    </div>
+  );
 
   return (
     <div className="relative">
@@ -123,6 +143,8 @@ const ThemeSwitcher: React.FC = () => {
         onClick={() => setOpen((v) => !v)}
         className="p-2 rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)]/80 hover:bg-[var(--surface-hover)] text-[var(--text-muted)] hover:text-[var(--text)] transition-all"
         title={`Giao diện: ${current?.label ?? theme}`}
+        aria-label="Giao diện"
+        aria-expanded={open}
       >
         <Palette className="w-4 h-4" />
       </button>
@@ -130,20 +152,28 @@ const ThemeSwitcher: React.FC = () => {
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full mt-2 w-44 bg-[var(--surface)] border border-[var(--border)] rounded-xl shadow-2xl z-50 py-1.5">
-            {THEME_OPTIONS.map((opt) => (
-              <button
-                key={opt.id}
-                onClick={() => {
-                  setTheme(opt.id);
-                  setOpen(false);
-                }}
-                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-[var(--text)] hover:bg-[var(--surface-elevated)]/80 transition-colors"
-              >
-                <span className="flex-1 text-left">{opt.label}</span>
-                {theme === opt.id && <Check className="w-3.5 h-3.5 text-blue-400" />}
-              </button>
-            ))}
+          <div className="absolute right-0 top-full mt-2 w-60 bg-[var(--surface)] border border-[var(--border)] rounded-xl shadow-2xl z-50 py-1.5">
+            {group(true)}
+            <div className="mx-3 border-t border-[var(--border)]" />
+            {group(false)}
+            <div className="mx-3 border-t border-[var(--border)]" />
+            <div className="px-3 pt-2 pb-1.5">
+              <p className="pb-1.5 text-2xs font-semibold text-[var(--text-faint)]">Mật độ</p>
+              <div className="flex rounded-lg border border-[var(--border)] p-0.5 gap-0.5" role="group" aria-label="Mật độ">
+                {DENSITY_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.id}
+                    onClick={() => setDensity(opt.id)}
+                    aria-pressed={density === opt.id}
+                    className={`flex-1 rounded-md border px-2 py-1 text-xs ${
+                      density === opt.id ? "seg-on" : "border-transparent text-[var(--text-muted)] hover:text-[var(--text)]"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </>
       )}

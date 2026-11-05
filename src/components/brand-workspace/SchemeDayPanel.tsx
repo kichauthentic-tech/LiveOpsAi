@@ -115,7 +115,7 @@ export const SchemeDayPanel: React.FC<SchemeDayPanelProps> = ({ brandId, date, s
                     onChange={(e) => setDraft((d) => ({ ...d, category: e.target.value }))}
                     list="scheme-categories-day"
                     placeholder="Hạng mục"
-                    className={`w-full bg-[var(--surface-elevated)] rounded px-1.5 py-1 text-[11px] font-bold ${color.text} focus:outline-none focus:ring-1 focus:ring-amber-500`}
+                    className={`w-full bg-[var(--surface-elevated)] rounded px-1.5 py-1 text-2xs font-bold ${color.text} focus:outline-none focus:ring-1 focus:ring-amber-500`}
                   />
                   <textarea
                     autoFocus
@@ -129,19 +129,19 @@ export const SchemeDayPanel: React.FC<SchemeDayPanelProps> = ({ brandId, date, s
                       type="date"
                       value={draft.startDate}
                       onChange={(e) => setDraft((d) => ({ ...d, startDate: e.target.value }))}
-                      className="bg-[var(--surface-elevated)] rounded px-1 py-0.5 text-[11px]"
+                      className="bg-[var(--surface-elevated)] rounded px-1 py-0.5 text-2xs"
                     />
                     <span className="text-[var(--text-faint)]">→</span>
                     <input
                       type="date"
                       value={draft.endDate}
                       onChange={(e) => setDraft((d) => ({ ...d, endDate: e.target.value }))}
-                      className="bg-[var(--surface-elevated)] rounded px-1 py-0.5 text-[11px]"
+                      className="bg-[var(--surface-elevated)] rounded px-1 py-0.5 text-2xs"
                     />
                     <button
                       disabled={busy}
                       onClick={saveEdit}
-                      className="ml-auto px-2 py-0.5 rounded bg-amber-600 text-white text-[11px] font-bold disabled:opacity-50"
+                      className="ml-auto px-2 py-0.5 rounded bg-amber-600 text-white text-2xs font-bold disabled:opacity-50"
                     >
                       Lưu
                     </button>
@@ -156,7 +156,7 @@ export const SchemeDayPanel: React.FC<SchemeDayPanelProps> = ({ brandId, date, s
                 </div>
               ) : (
                 <>
-                  <p className={`flex items-center gap-1.5 text-[11px] font-bold ${color.text} opacity-80`}>
+                  <p className={`flex items-center gap-1.5 text-2xs font-bold ${color.text} opacity-80`}>
                     <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${color.dot}`} />
                     {scheme.category}
                   </p>
@@ -176,7 +176,7 @@ export const SchemeDayPanel: React.FC<SchemeDayPanelProps> = ({ brandId, date, s
                 setNewRow({ ...EMPTY_DRAFT, startDate: date, endDate: date });
                 setAdding(true);
               }}
-              className="flex items-center gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-400 hover:text-amber-700"
+              className="flex items-center gap-1 text-2xs font-bold text-amber-600 dark:text-amber-400 hover:text-amber-700"
             >
               <Plus className="w-3.5 h-3.5" /> Thêm khuyến mãi
             </button>
@@ -188,36 +188,36 @@ export const SchemeDayPanel: React.FC<SchemeDayPanelProps> = ({ brandId, date, s
                 value={newRow.category}
                 onChange={(e) => setNewRow((d) => ({ ...d, category: e.target.value }))}
                 list="scheme-categories-day"
-                className="min-w-[130px] bg-[var(--surface-elevated)] rounded px-1.5 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-amber-500"
+                className="min-w-[130px] bg-[var(--surface-elevated)] rounded px-1.5 py-1 text-2xs focus:outline-none focus:ring-1 focus:ring-amber-500"
               />
               <input
                 type="text"
                 placeholder="Nội dung"
                 value={newRow.content}
                 onChange={(e) => setNewRow((d) => ({ ...d, content: e.target.value }))}
-                className="flex-1 min-w-[160px] bg-[var(--surface-elevated)] rounded px-1.5 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-amber-500"
+                className="flex-1 min-w-[160px] bg-[var(--surface-elevated)] rounded px-1.5 py-1 text-2xs focus:outline-none focus:ring-1 focus:ring-amber-500"
               />
               <input
                 type="date"
                 value={newRow.startDate}
                 onChange={(e) => setNewRow((d) => ({ ...d, startDate: e.target.value }))}
-                className="bg-[var(--surface-elevated)] rounded px-1.5 py-1 text-[11px]"
+                className="bg-[var(--surface-elevated)] rounded px-1.5 py-1 text-2xs"
               />
               <span className="text-[var(--text-faint)]">→</span>
               <input
                 type="date"
                 value={newRow.endDate}
                 onChange={(e) => setNewRow((d) => ({ ...d, endDate: e.target.value }))}
-                className="bg-[var(--surface-elevated)] rounded px-1.5 py-1 text-[11px]"
+                className="bg-[var(--surface-elevated)] rounded px-1.5 py-1 text-2xs"
               />
               <button
                 disabled={busy || !newRow.category.trim() || !newRow.content.trim()}
                 onClick={submitNewRow}
-                className="px-2 py-1 rounded bg-amber-600 text-white text-[11px] font-bold disabled:opacity-50"
+                className="px-2 py-1 rounded bg-amber-600 text-white text-2xs font-bold disabled:opacity-50"
               >
                 Thêm
               </button>
-              <button onClick={() => setAdding(false)} className="px-2 py-1 rounded text-[var(--text-faint)] text-[11px]">
+              <button onClick={() => setAdding(false)} className="px-2 py-1 rounded text-[var(--text-faint)] text-2xs">
                 Huỷ
               </button>
             </div>

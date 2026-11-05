@@ -220,7 +220,7 @@ export function HostPerformance({ platform, sessions, brands }: HostPerformanceP
             Chưa có ca nào có số liệu trong khoảng này. Số liệu có khi trợ live cập nhật file vào ca (mở ca ở Bảng Vận Hành).
           </p>
         ) : (
-          <p className="text-[11px] text-[var(--text-muted)] flex items-start gap-1.5">
+          <p className="text-2xs text-[var(--text-muted)] flex items-start gap-1.5">
             {quality.manual > 0 && <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px text-amber-400" />}
             <span>
               {/* Ghi kỳ ngay cạnh con số (audit người mới 2026-10-04): Talent Pool cộng MỌI tháng nên cùng một host
@@ -248,11 +248,11 @@ export function HostPerformance({ platform, sessions, brands }: HostPerformanceP
             <h3 className="text-xs font-black text-[var(--text)] flex items-center gap-1.5">
               <Trophy className="w-3.5 h-3.5" /> Xếp hạng host theo {platformText("GMV/giờ", platform)}
             </h3>
-            <p className="text-[11px] text-[var(--text-faint)] mt-0.5">
+            <p className="text-2xs text-[var(--text-faint)] mt-0.5">
               {platformText("GMV/giờ", platform)} là thước đo dùng để phân bổ ca — đo hiệu quả trên mỗi giờ nhân lực bỏ ra, không thiên vị host được xếp nhiều ca dài.
             </p>
             {unassignedHost && (
-              <div className="mt-2 flex items-start gap-2 text-[11px] rounded-xl p-2.5 bg-amber-500/10 border border-amber-500/30 text-amber-300">
+              <div className="mt-2 flex items-start gap-2 text-2xs rounded-xl p-2.5 bg-amber-500/10 border border-amber-500/30 text-amber-300">
                 <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                 <span>
                   {unassignedHost.sessionCount} ca chưa gán host ({fmtVndShort(unassignedHost.gmv)} {platformText("GMV", platform)} · {fmtFixed(unassignedHost.hours, 1)}h) không được tính
@@ -265,7 +265,7 @@ export function HostPerformance({ platform, sessions, brands }: HostPerformanceP
                   17 chỉ số còn lại theo đúng thứ tự chung. */}
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="text-[var(--text-faint)] text-left text-[11px]">
+                  <tr className="text-[var(--text-faint)] text-left text-2xs">
                     <th className="font-bold pb-2 pr-3 sticky left-0 bg-[var(--surface)]">Host</th>
                     <th className="font-bold pb-2 pr-3 text-right whitespace-nowrap" title={metricHint(METRIC.gmvPerHour)}>{METRIC.gmvPerHour}</th>
                     {rankCols.map((d) => (
@@ -292,14 +292,14 @@ export function HostPerformance({ platform, sessions, brands }: HostPerformanceP
 
           <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-5">
             <h3 className="text-xs font-black text-[var(--text)]">Host hiệu quả nhất theo thứ trong tuần</h3>
-            <p className="text-[11px] text-[var(--text-faint)] mt-0.5">
+            <p className="text-2xs text-[var(--text-faint)] mt-0.5">
               Đậm hơn = {platformText("GMV/giờ", platform)} cao hơn. Ô trống nghĩa là host chưa từng live thứ đó trong khoảng đã chọn, không phải hiệu suất bằng 0.
               Hàng cuối "Mọi host" = hiệu suất chung của thứ đó — dùng để quyết định nên mở nhiều ca vào thứ nào, tách khỏi chuyện host nào trực.
             </p>
             <div className="mt-3 overflow-x-auto">
               <table className="w-full text-xs min-w-[560px]">
                 <thead>
-                  <tr className="text-[var(--text-faint)] text-[11px]">
+                  <tr className="text-[var(--text-faint)] text-2xs">
                     <th className="font-bold pb-2 pr-3 text-left">Host</th>
                     {WEEKDAY_ORDER.map((wd) => (
                       <th key={wd} className="font-bold pb-2 px-1 text-center">{WEEKDAY_LABELS[wd].replace("Thứ ", "T")}</th>
@@ -317,7 +317,7 @@ export function HostPerformance({ platform, sessions, brands }: HostPerformanceP
                           <td key={wd} className="py-1 px-1 text-center">
                             {c ? (
                               <div
-                                className="rounded-md py-1.5 text-[11px] font-bold text-[var(--text)]"
+                                className="rounded-md py-1.5 text-2xs font-bold text-[var(--text)]"
                                 style={{ backgroundColor: `rgba(16, 185, 129, ${0.12 + ratio * 0.6})` }}
                                 title={`${c.sessionCount} ca`}
                               >
@@ -342,8 +342,8 @@ export function HostPerformance({ platform, sessions, brands }: HostPerformanceP
                         <td key={wd} className="pt-2 px-1 text-center">
                           {w ? (
                             <>
-                              <p className="text-[11px] font-black text-emerald-400">{fmtVndShort(w.gmvPerHour)}</p>
-                              <p className="text-[11px] text-[var(--text-faint)]">{w.sessionCount} ca</p>
+                              <p className="text-2xs font-black text-emerald-400">{fmtVndShort(w.gmvPerHour)}</p>
+                              <p className="text-2xs text-[var(--text-faint)]">{w.sessionCount} ca</p>
                             </>
                           ) : (
                             <span className="text-[var(--text-faint)]">—</span>

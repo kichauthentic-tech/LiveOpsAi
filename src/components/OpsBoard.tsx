@@ -125,7 +125,7 @@ const onKeyOpen = (fn: () => void) => (e: React.KeyboardEvent) => {
 const Expect: React.FC<{ value: number | null | undefined }> = ({ value }) => (
   <span className="order-5 md:order-none text-right text-xs font-bold tabular-nums text-[var(--text)] leading-tight" title={`${platformText("GMV", "all")} kỳ vọng ở mức hiện tại của kênh — cùng số với sa bàn Cả tháng`}>
     {value === null ? "…" : value === undefined ? "—" : fmtVndShort(value)}
-    <span className="block text-[11px] font-medium text-[var(--text-faint)]">kỳ vọng</span>
+    <span className="block text-2xs font-medium text-[var(--text-faint)]">kỳ vọng</span>
   </span>
 );
 const ExpandBtn: React.FC<{ open: boolean; onToggle: () => void }> = ({ open, onToggle }) => (
@@ -171,7 +171,7 @@ const SessionRow: React.FC<{
         {s.coHostName ? <span className="text-[var(--text-faint)]"> · Trợ {s.coHostName}</span> : ""}
         {s.studioName ? <span className="text-[var(--text-faint)]"> · {s.studioName}</span> : ""}
       </span>
-      <span className="order-5 md:order-none ml-auto md:ml-0 flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-[11px] font-bold">
+      <span className="order-5 md:order-none ml-auto md:ml-0 flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-2xs font-bold">
         {clashWith && <span className="px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-300" title="Người này có ca khác cùng giờ">trùng người: {clashWith.join(", ")}</span>}
         {noNumbers && <span className="px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-300">chưa có số liệu</span>}
         {noRoom && <span className="text-amber-300">chưa có phòng</span>}
@@ -186,7 +186,7 @@ const SessionRow: React.FC<{
         </span>
       )}
       {/* Điện thoại: trạng thái lên cùng hàng giờ + brand (order), người + nhãn xuống hàng dưới. */}
-      <span className={`order-3 md:order-none ml-auto md:ml-0 shrink-0 min-w-[68px] text-center text-[11px] font-bold px-2 py-0.5 rounded-full border ${STATUS_CLS[s.status]}`}>{STATUS_LABEL[s.status]}</span>
+      <span className={`order-3 md:order-none ml-auto md:ml-0 shrink-0 min-w-[68px] text-center text-2xs font-bold px-2 py-0.5 rounded-full border ${STATUS_CLS[s.status]}`}>{STATUS_LABEL[s.status]}</span>
       {upcoming && onToggle ? <ExpandBtn open={open} onToggle={onToggle} /> : <span className="hidden md:block" />}
     </div>
   );
@@ -203,7 +203,7 @@ const SlotRow: React.FC<{ r: Extract<Row, { kind: "slot" }>; brand: Brand | unde
     <span className="order-4 md:order-none flex-1 basis-40 min-w-0 md:basis-auto text-xs text-rose-300 font-bold flex items-center gap-1"><UserX className="w-3.5 h-3.5" /> chưa có người · {r.registered} đăng ký</span>
     <span className="hidden md:block" />
     {showExpected ? <Expect value={expected} /> : <span className="hidden md:block" />}
-    <span className="order-3 md:order-none ml-auto md:ml-0 text-[11px] font-bold text-[var(--accent-text)] flex items-center justify-center gap-1"><CalendarClock className="w-3.5 h-3.5" /> Chốt người</span>
+    <span className="order-3 md:order-none ml-auto md:ml-0 text-2xs font-bold text-[var(--accent-text)] flex items-center justify-center gap-1"><CalendarClock className="w-3.5 h-3.5" /> Chốt người</span>
     {onToggle ? <ExpandBtn open={open} onToggle={onToggle} /> : <span className="hidden md:block" />}
   </div>
 );
@@ -221,9 +221,9 @@ const DraftRow: React.FC<{ d: SessionDraft; brand: Brand | undefined; hostName: 
       {d.hostId ? <span className="text-[var(--text)]">{hostName}</span> : <span className="text-rose-300 font-bold">chưa chọn host</span>}
       {d.coHostId ? <span className="text-[var(--text-faint)]"> · Trợ {coHostName}</span> : ""}
     </span>
-    <span className="order-5 md:order-none ml-auto md:ml-0 text-[11px] font-bold text-amber-300 truncate">{d.reason}</span>
+    <span className="order-5 md:order-none ml-auto md:ml-0 text-2xs font-bold text-amber-300 truncate">{d.reason}</span>
     <Expect value={d.expectedGmv} />
-    <span className="order-3 md:order-none ml-auto md:ml-0 text-[11px] font-bold text-amber-300 flex items-center justify-center gap-1"><FileClock className="w-3.5 h-3.5" /> Nháp</span>
+    <span className="order-3 md:order-none ml-auto md:ml-0 text-2xs font-bold text-amber-300 flex items-center justify-center gap-1"><FileClock className="w-3.5 h-3.5" /> Nháp</span>
     <span className="hidden md:block" />
   </div>
 );

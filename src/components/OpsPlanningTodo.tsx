@@ -134,9 +134,9 @@ export default function OpsPlanningTodo({ brands, channels, sessions, talents, s
         <Layers className="w-4 h-4 text-[var(--accent-text)]" />
         <h3 className="text-sm font-black text-[var(--text)]">Việc lập kế hoạch ca</h3>
         {workCount > 0 ? (
-          <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-800">{workCount} việc</span>
+          <span className="text-2xs font-bold px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-800">{workCount} việc</span>
         ) : (
-          <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" /> không còn việc tồn đọng</span>
+          <span className="text-2xs font-bold text-emerald-400 flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" /> không còn việc tồn đọng</span>
         )}
         <div className="ml-auto">
           <MonthPicker value={month} onChange={(m) => { setMonth(m); setBulkOpen(false); }} />
@@ -184,12 +184,12 @@ export default function OpsPlanningTodo({ brands, channels, sessions, talents, s
                 <div key={brandPlatformKey(g.brandId, g.platform)} className={`rounded-xl p-3 border ${done ? "bg-emerald-950/30 border-emerald-900" : "bg-rose-950/25 border-rose-900"}`}>
                   <div className="flex items-baseline justify-between gap-2">
                     <span className="text-xs font-bold text-[var(--text)] truncate">{channelTitle(g.brandName, g.platform, false)}</span>
-                    <span className="text-[11px] text-[var(--text-faint)] shrink-0">cam kết {num(g.committedHours)}h</span>
+                    <span className="text-2xs text-[var(--text-faint)] shrink-0">cam kết {num(g.committedHours)}h</span>
                   </div>
                   <p className={`text-lg font-black mt-0.5 ${done ? "text-emerald-400" : "text-rose-400"}`}>
                     {g.monthClosed ? `Tháng đã đóng · hụt ${num(Math.max(g.gapHours, 0))}h` : done ? "Đã mở đủ" : `Cần mở thêm ${num(g.hoursStillToOpen)}h`}
                   </p>
-                  <p className="text-[11px] text-[var(--text-muted)] mt-1 leading-relaxed">
+                  <p className="text-2xs text-[var(--text-muted)] mt-1 leading-relaxed">
                     Đã live {num(g.deliveredHours)}h · đã chốt chưa live {num(g.scheduledHours)}h · đang mở chờ chốt {num(g.openSlotHours)}h ({g.openSlotCount} ca)
                     {g.unconfirmedSessions > 0 && (
                       <span className="text-amber-300"> · {num(g.unconfirmedHours)}h ({g.unconfirmedSessions} ca) đã qua giờ chưa có số liệu — xác nhận hoặc huỷ trước khi mở bù</span>
@@ -199,7 +199,7 @@ export default function OpsPlanningTodo({ brands, channels, sessions, talents, s
               );
             })}
           </div>
-          <p className="text-[11px] text-[var(--text-faint)]">Giờ ca theo lịch, cùng loại giờ dùng để tính tiền brand. Mở thêm ca ở Lịch & Studio; đặt cam kết ở CRM hoặc Kế Hoạch Tháng.</p>
+          <p className="text-2xs text-[var(--text-faint)]">Giờ ca theo lịch, cùng loại giờ dùng để tính tiền brand. Mở thêm ca ở Lịch & Studio; đặt cam kết ở CRM hoặc Kế Hoạch Tháng.</p>
         </div>
       )}
 

@@ -316,7 +316,7 @@ test("Phát hành report (Toàn Cảnh Brand, gộp 23/10): không mời phát h
 
 test("PageIntro: nút Chi tiết đạt sàn 24px (dùng chung 11 màn)", () => {
   const src = readFileSync(join(SRC, "components/common/PageIntro.tsx"), "utf8");
-  expect(src).toMatch(/shrink-0 -m-1\.5 p-1\.5 text-\[11px\]/);
+  expect(src).toMatch(/shrink-0 -m-1\.5 p-1\.5 text-2xs/);
 });
 
 test("Vùng bấm ≥ 24px ở nhóm màn M7", () => {
@@ -330,11 +330,11 @@ test("Vùng bấm ≥ 24px ở nhóm màn M7", () => {
   expect(engine).toMatch(/type="checkbox"[\s\S]{0,160}className="w-6 h-6 accent-/);
 
   const aiCenter = readFileSync(join(SRC, "components/AiTrainingCenter.tsx"), "utf8");
-  expect(aiCenter).toMatch(/className="min-h-6 -mx-1\.5 px-1\.5 rounded text-\[11px\] font-bold text-\[var\(--text-muted\)\]/);
+  expect(aiCenter).toMatch(/className="min-h-6 -mx-1\.5 px-1\.5 rounded text-2xs font-bold text-\[var\(--text-muted\)\]/);
 
   const tiktok = readFileSync(join(SRC, "components/TikTokApiAutomation.tsx"), "utf8");
-  expect(tiktok).not.toMatch(/className="text-\[11px\] font-bold text-red-600 hover:text-red-700 flex/);
-  expect(tiktok).not.toMatch(/className="text-\[11px\] font-bold text-\[var\(--accent-text\)\] hover:opacity-80 flex/);
+  expect(tiktok).not.toMatch(/className="text-2xs font-bold text-red-600 hover:text-red-700 flex/);
+  expect(tiktok).not.toMatch(/className="text-2xs font-bold text-\[var\(--accent-text\)\] hover:opacity-80 flex/);
 });
 
 test("Nút icon: padding phải đủ để vùng bấm đạt 24px", () => {
@@ -388,8 +388,8 @@ test("Report Tháng: cột tên chỉ số dính trái khi bảng cuộn ngang",
   const src = readFileSync(join(SRC, "components/brand-workspace/report/ui.tsx"), "utf8");
   expect(src).toMatch(/\[&_td:first-child\]:sticky/);
   expect(src).toMatch(/\[&_th:first-child\]:sticky/);
-  // Nền phải đặc, nếu không chữ cột sau lộ qua khi cuộn.
-  expect(src).toMatch(/\[&_td:first-child\]:bg-\[#17171b\]/);
+  // Nền phải đặc, nếu không chữ cột sau lộ qua khi cuộn. Từ 06/11 report theo theme ⇒ nền panel của report qua biến --rt-panel.
+  expect(src).toMatch(/\[&_td:first-child\]:bg-\[var\(--rt-panel\)\]/);
 });
 
 // ── Audit UX lần 2 — màn talent (2026-09-30) ────────────────────────────────────────────────────

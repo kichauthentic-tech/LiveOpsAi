@@ -85,7 +85,7 @@ export const TodoPanel: React.FC<Props> = ({ brands, channels, sessions, shiftSl
   const actionBtn = (t: Todo) => (
     <button
       onClick={() => onOpen(t)}
-      className="shrink-0 -my-0.5 min-h-6 px-2.5 py-1 rounded-lg border border-[var(--border)] text-[11px] font-bold text-[var(--accent-text)] hover:border-[var(--accent)] whitespace-nowrap"
+      className="shrink-0 -my-0.5 min-h-6 px-2.5 py-1 rounded-lg border border-[var(--border)] text-2xs font-bold text-[var(--accent-text)] hover:border-[var(--accent)] whitespace-nowrap"
     >
       {t.action} →
     </button>
@@ -105,7 +105,7 @@ export const TodoPanel: React.FC<Props> = ({ brands, channels, sessions, shiftSl
             onClick={() => setOpenDetail((id) => (id === t.id ? null : t.id))}
             aria-expanded={openDetail === t.id}
             title={openDetail === t.id ? undefined : t.detail}
-            className={`w-full text-left text-[11px] text-[var(--text-muted)] mt-0.5 hover:text-[var(--text)] ${openDetail === t.id ? "" : "line-clamp-1"}`}
+            className={`w-full text-left text-2xs text-[var(--text-muted)] mt-0.5 hover:text-[var(--text)] ${openDetail === t.id ? "" : "line-clamp-1"}`}
           >
             {t.detail}
           </button>
@@ -113,7 +113,7 @@ export const TodoPanel: React.FC<Props> = ({ brands, channels, sessions, shiftSl
         {t.children && openDetail === t.id && (
           <ul className="mt-1.5 space-y-1">
             {t.children.map((c) => (
-              <li key={c.id} className="flex items-start justify-between gap-2 text-[11px] text-[var(--text-muted)]">
+              <li key={c.id} className="flex items-start justify-between gap-2 text-2xs text-[var(--text-muted)]">
                 <span className="min-w-0">{c.title}</span>
                 {actionBtn(c)}
               </li>
@@ -129,9 +129,9 @@ export const TodoPanel: React.FC<Props> = ({ brands, channels, sessions, shiftSl
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="font-bold text-[var(--text)] text-sm flex items-center gap-2">
           <ListChecks className="w-4 h-4 text-[var(--accent-text)]" /> Hôm nay phải xong
-          <span className="text-[11px] font-normal text-[var(--text-faint)]">hạn trong 48 giờ</span>
+          <span className="text-2xs font-normal text-[var(--text-faint)]">hạn trong 48 giờ</span>
         </h3>
-        {dayRows.length > 0 && <span className="text-[11px] text-[var(--text-muted)]">{dayRows.length} việc</span>}
+        {dayRows.length > 0 && <span className="text-2xs text-[var(--text-muted)]">{dayRows.length} việc</span>}
       </div>
       {dayRows.length === 0 ? (
         <p className="text-xs text-emerald-300">Không có việc gấp: ca đã qua đều có số liệu, 48 giờ tới đủ người và phòng.</p>
@@ -154,13 +154,13 @@ export const TodoPanel: React.FC<Props> = ({ brands, channels, sessions, shiftSl
                     <button type="button" onClick={() => setOpenGroup((k) => (k === g.key ? null : g.key))} aria-expanded={openGroup === g.key} className="w-full flex items-start gap-x-2.5 text-left">
                       <span className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${LEVEL_DOT[g.level]}`} aria-hidden />
                       <span className="flex-1 min-w-0 text-xs font-bold text-[var(--text)]">{g.label}</span>
-                      <span className="text-[11px] font-bold text-[var(--text-muted)] tabular-nums">{g.items.length}</span>
+                      <span className="text-2xs font-bold text-[var(--text-muted)] tabular-nums">{g.items.length}</span>
                       <ChevronDown className={`w-3.5 h-3.5 mt-0.5 text-[var(--text-muted)] transition-transform ${openGroup === g.key ? "rotate-180" : ""}`} />
                     </button>
                     {openGroup === g.key && (
                       <ul className="mt-1.5 ml-4.5 space-y-1.5">
                         {g.items.map((t) => (
-                          <li key={t.id} className="flex items-start justify-between gap-2 text-[11px] text-[var(--text-muted)]">
+                          <li key={t.id} className="flex items-start justify-between gap-2 text-2xs text-[var(--text-muted)]">
                             <span className="min-w-0">{t.title}</span>
                             {actionBtn(t)}
                           </li>

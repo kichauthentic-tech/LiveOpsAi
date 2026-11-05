@@ -30,7 +30,7 @@ import { fmtKeyMetric, KEY_METRICS, keyMetricSheetColumns, keyMetricSheetLabel, 
 import { byHost, byHostDayType, dayTypeTeamTotals, dayTypeMetrics, HOST_DAY_TYPE_ORDER, dataQuality, filterSessions, hostKey, splitUnassignedHost, DataQuality } from "../../lib/performance/hostPerformance";
 
 import { fmtDateVn, fmtFixed, fmtVndFull, fmtVndShort } from "../../lib/format";
-import { CHANNELS, DAY_TYPE_SHORT, PAL, SECTIONS, chartTooltipStyle, type ReportSectionId } from "./report/theme";
+import { CHANNELS, DAY_TYPE_SHORT, PAL, alpha, SECTIONS, chartTooltipStyle, usePal, type ReportSectionId } from "./report/theme";
 import { chartNum, fmtHours, fmtInt, fmtPct, fmtSessionStart, monthRangeLocal, nextMonthStrLocal, prevMonthStrLocal, promoStatusLabel } from "./report/format";
 import { ChartLegend, PageInsight, KpiTile, Panel, ReportTable, toWaterfall, PageHead, PagePager, PageRail, type PageMetric } from "./report/ui";
 import { dropHeadline, keyMetricsHeadline, observeHeadline, summaryHeadline } from "../../lib/report/pageHeadlines";
@@ -87,6 +87,7 @@ interface MonthlyReportTabsProps {
 }
 
 export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, brandName, month, snapshot, liveSessions, shiftSlots = [], canManage, forBrand = false, showAll = false, scope = DEFAULT_REPORT_SCOPE }) => {
+  const P = usePal();
 
   // Brand KHÔNG được thấy số của tháng chưa phát hành (quyết định 2026-09-22, 0107) — kể cả qua cột
   // "tháng trước"/biểu đồ xu hướng của report tháng này. Bản chụp do ops dựng nên có đủ số 4 tháng;
@@ -1355,9 +1356,9 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   };
 
   // Dấu trừ chuẩn "−" và làm tròn nghìn đồng cho số tiền nhỏ trong câu (fmtVndShort in "-").
-  const rowStyle = (idx: number) => ({ borderBottom: `1px solid ${PAL.line}`, background: idx % 2 ? `${PAL.panel2}55` : "transparent" });
+  const rowStyle = (idx: number) => ({ borderBottom: `1px solid ${PAL.line}`, background: idx % 2 ? `${alpha(PAL.panel2, 33)}` : "transparent" });
   const warnBox = (children: React.ReactNode) => (
-    <div className="flex items-start gap-2 text-[11px] rounded-xl p-2.5" style={{ background: "#2a2410", border: `1px solid ${PAL.gold}55`, color: PAL.gold }}>
+    <div className="flex items-start gap-2 text-2xs rounded-xl p-2.5" style={{ background: `color-mix(in srgb, ${PAL.gold} 10%, ${PAL.panel})`, border: `1px solid ${alpha(PAL.gold, 33)}`, color: PAL.gold }}>
       <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
       <span>{children}</span>
     </div>
@@ -1376,7 +1377,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
       <div className="p-5 flex flex-col gap-8">
         {shopPiecesMissing && canManage && warnBox(<>Số liệu này chốt trước khi report có phần Shop Analytics — bấm "Cập nhật số liệu" ở trên để có đủ 7 phần.</>)}
         {canManage && outOfScopeLabel(scope) && (
-          <p data-export-hide className="text-[11px]" style={{ color: PAL.muted }}>
+          <p data-export-hide className="text-2xs" style={{ color: PAL.muted }}>
             Phạm vi dịch vụ (CRM → Hợp đồng & giá): {outOfScopeLabel(scope)}.
           </p>
         )}
@@ -1542,22 +1543,22 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                   <div style={{ height: 220 }} className="mt-4">
                     <ResponsiveContainer width="100%" height="100%">
                       <ComposedChart data={chartData} margin={{ left: 4, right: 4 }}>
-                        <CartesianGrid stroke={PAL.line} vertical={false} />
-                        <XAxis dataKey="day" stroke={PAL.muted} fontSize={11} />
-                        <YAxis yAxisId="cost" stroke={PAL.muted} fontSize={11} tickFormatter={(v) => fmtVndShort(v)} width={52} />
-                        <YAxis yAxisId="roi" orientation="right" stroke={PAL.muted} fontSize={11} tickFormatter={(v) => `${v}x`} width={40} />
+                        <CartesianGrid stroke={P.line} vertical={false} />
+                        <XAxis dataKey="day" stroke={P.muted} fontSize={11} />
+                        <YAxis yAxisId="cost" stroke={P.muted} fontSize={11} tickFormatter={(v) => fmtVndShort(v)} width={52} />
+                        <YAxis yAxisId="roi" orientation="right" stroke={P.muted} fontSize={11} tickFormatter={(v) => `${v}x`} width={40} />
                         <Tooltip
                           contentStyle={chartTooltipStyle}
                           labelFormatter={(d) => `${t("Ngày", "Day")} ${d}/${month.slice(5)}`}
                           formatter={(v, name) => (name === "ROI" ? `${fmtFixed(chartNum(v), 1)}x` : fmtVndFull(chartNum(v)))}
                         />
-                        <Bar yAxisId="cost" dataKey="cost" name={t("Chi phí", "Cost")} fill={PAL.blue} radius={[3, 3, 0, 0]} />
-                        <Line yAxisId="roi" dataKey="roi" name="ROI" stroke={PAL.gold} dot={false} strokeWidth={2} connectNulls={false} />
+                        <Bar yAxisId="cost" dataKey="cost" name={t("Chi phí", "Cost")} fill={P.blue} radius={[3, 3, 0, 0]} />
+                        <Line yAxisId="roi" dataKey="roi" name="ROI" stroke={P.gold} dot={false} strokeWidth={2} connectNulls={false} />
                       </ComposedChart>
                     </ResponsiveContainer>
                   </div>
                   <ChartLegend items={[[t("Chi phí Ads theo ngày", "Daily Ads cost"), PAL.blue], [t("ROI theo ngày (trục phải)", "Daily ROI (right axis)"), PAL.gold]]} />
-                  <ul className="mt-3 space-y-1 text-[11px] list-disc pl-4" style={{ color: PAL.muted }}>
+                  <ul className="mt-3 space-y-1 text-2xs list-disc pl-4" style={{ color: PAL.muted }}>
                     {notes.map((t) => <li key={t}>{t}</li>)}
                   </ul>
                 </Panel>
@@ -1695,7 +1696,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
 
         {/* Chỉ là chỉ đường cho ops — report gửi brand là 7 phần ở trên (Phân tích sâu đã gộp vào, 2026-09-27). */}
         {canManage && (
-          <p className="text-[11px] pt-3" style={{ color: PAL.muted, borderTop: `1px solid ${PAL.line}`, order: 100 }}>
+          <p className="text-2xs pt-3" style={{ color: PAL.muted, borderTop: `1px solid ${PAL.line}`, order: 100 }}>
             Chỉ ops thấy: target, khung campaign và lịch tháng nhập ở <b>Kế Hoạch Tháng</b>; bảng creator affiliate theo tháng ở trang <b>Affiliate</b>.
           </p>
         )}

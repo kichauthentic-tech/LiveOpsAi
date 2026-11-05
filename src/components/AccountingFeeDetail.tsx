@@ -52,14 +52,14 @@ export const AccountingFeeDetail: React.FC<Props> = ({ brandId, platform, period
             <tr key={l.key}>
               <td className="py-1.5 pr-3 align-top">
                 <span className="font-semibold text-[var(--text)]">{l.label}</span>
-                <span className="block text-[11px] text-[var(--text-faint)]">{l.detail}</span>
+                <span className="block text-2xs text-[var(--text-faint)]">{l.detail}</span>
               </td>
               <td className={`py-1.5 text-right tabular-nums align-top ${l.amount < 0 ? "text-rose-300" : "text-[var(--text)]"}`}>{fmtVndFull(l.amount)}</td>
             </tr>
           ))}
         </tbody>
       </table>
-      {settlement.owedHours > 0 && <p className="text-[11px] text-amber-300">Còn nợ {fmtNum(settlement.owedHours, 1)} giờ cam kết cần bù.</p>}
+      {settlement.owedHours > 0 && <p className="text-2xs text-amber-300">Còn nợ {fmtNum(settlement.owedHours, 1)} giờ cam kết cần bù.</p>}
       {needs.length > 0 && (
         <div className="flex flex-wrap items-end gap-3">
           {needs.includes("ads") && <Field label="Chi tiêu Ads trong tháng" className="w-48"><NumInput label="Chi tiêu Ads trong tháng" value={form.ads} step={1000000} disabled={!canEdit} onChange={(v) => setForm({ ...form, ads: v })} /></Field>}
@@ -68,7 +68,7 @@ export const AccountingFeeDetail: React.FC<Props> = ({ brandId, platform, period
           {canEdit && <button type="button" onClick={save} disabled={busy} className={`${btnCls} mb-0.5`}>{busy ? "…" : "Lưu số tháng"}</button>}
         </div>
       )}
-      {error && <p className="text-[11px] text-rose-300">{error}</p>}
+      {error && <p className="text-2xs text-rose-300">{error}</p>}
     </div>
   );
 };

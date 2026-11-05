@@ -4,6 +4,7 @@ import { AiAgentPrompt } from "../types";
 import { errorMessage } from "../lib/errorMessage";
 import { useToast } from "../hooks/useToast";
 import { PageHeader } from "./common/PageHeader";
+import { SectionNav } from "./common/SectionNav";
 
 interface AiTrainingCenterProps {
   prompts: AiAgentPrompt[];
@@ -70,10 +71,11 @@ export const AiTrainingCenter: React.FC<AiTrainingCenterProps> = ({ prompts, loa
               <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
               <span>{prompts.length} Agent</span>
             </div>
-            <p className="text-[11px] text-[var(--text-faint)]">Thay đổi có hiệu lực ngay ở lần gọi AI tiếp theo</p>
+            <p className="text-2xs text-[var(--text-faint)]">Thay đổi có hiệu lực ngay ở lần gọi AI tiếp theo</p>
           </div>
         }
       />
+      <SectionNav />
 
       {loading && (
         <div className="bg-[var(--surface)] p-8 rounded-2xl border border-[var(--border)] text-center text-[var(--text-muted)] text-sm flex items-center justify-center gap-2">
@@ -104,7 +106,7 @@ export const AiTrainingCenter: React.FC<AiTrainingCenterProps> = ({ prompts, loa
         !error &&
         Object.entries(groupedByCategory).map(([category, agents]: [string, AiAgentPrompt[]]) => (
           <div key={category} className="space-y-3">
-            <h3 className="font-bold text-[var(--text)] text-sm border-b border-[var(--border)] pb-2">
+            <h3 data-section={category} className="font-bold text-[var(--text)] text-sm border-b border-[var(--border)] pb-2">
               {category}
             </h3>
             <div className="grid lg:grid-cols-2 gap-4">
@@ -116,7 +118,7 @@ export const AiTrainingCenter: React.FC<AiTrainingCenterProps> = ({ prompts, loa
                   <div key={p.agentKey} className="bg-[var(--surface)] p-5 rounded-2xl border border-[var(--border)] shadow-sm space-y-3">
                     <div>
                       <h4 className="font-black text-[var(--text)] text-sm">{p.name}</h4>
-                      <p className="text-[11px] text-[var(--text-muted)] mt-0.5">{p.description}</p>
+                      <p className="text-2xs text-[var(--text-muted)] mt-0.5">{p.description}</p>
                     </div>
                     <textarea
                       value={draft}
@@ -128,14 +130,14 @@ export const AiTrainingCenter: React.FC<AiTrainingCenterProps> = ({ prompts, loa
                       <button
                         onClick={() => handleResetDraft(p)}
                         disabled={isDefault}
-                        className="min-h-6 -mx-1.5 px-1.5 rounded text-[11px] font-bold text-[var(--text-muted)] hover:text-[var(--text)] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
+                        className="min-h-6 -mx-1.5 px-1.5 rounded text-2xs font-bold text-[var(--text-muted)] hover:text-[var(--text)] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
                       >
                         <RotateCcw className="w-3.5 h-3.5" /> Khôi Phục Mặc Định
                       </button>
                       <button
                         onClick={() => handleSave(p.agentKey)}
                         disabled={!isDirty || savingKey === p.agentKey}
-                        className="bg-rose-600 hover:bg-rose-500 disabled:bg-[var(--text-muted)] disabled:cursor-not-allowed text-white font-bold px-3.5 py-1.5 rounded-xl text-[11px] flex items-center gap-1.5 transition-all"
+                        className="bg-rose-600 hover:bg-rose-500 disabled:bg-[var(--text-muted)] disabled:cursor-not-allowed text-white font-bold px-3.5 py-1.5 rounded-xl text-2xs flex items-center gap-1.5 transition-all"
                       >
                         {savingKey === p.agentKey ? (
                           <>
@@ -153,7 +155,7 @@ export const AiTrainingCenter: React.FC<AiTrainingCenterProps> = ({ prompts, loa
                       </button>
                     </div>
                     {p.updatedAt && (
-                      <p className="text-[11px] text-[var(--text-muted)]">Sửa lần cuối: {new Date(p.updatedAt).toLocaleString("vi-VN")}</p>
+                      <p className="text-2xs text-[var(--text-muted)]">Sửa lần cuối: {new Date(p.updatedAt).toLocaleString("vi-VN")}</p>
                     )}
                   </div>
                 );

@@ -40,7 +40,7 @@ export const BrandRateCard: React.FC<Props> = ({ brand, platform, rates, rateHis
         {cell("Tỷ lệ hoàn huỷ", rate && rate.returnRate > 0 ? `${rate.returnRate}%` : null, "Dùng để ước NMV từ GMV.")}
       </div>
       {history.length > 0 && (
-        <details className="text-[11px]">
+        <details className="text-2xs">
           <summary className="cursor-pointer font-bold text-[var(--text-muted)] inline-flex items-center gap-1">
             <History className="w-3 h-3" /> Lịch sử giá ({history.length})
           </summary>

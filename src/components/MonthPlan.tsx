@@ -1096,7 +1096,7 @@ export default function MonthPlan({
       <ol className="grid grid-cols-2 lg:grid-cols-4 gap-2" aria-label="Các bước kế hoạch tháng">
         {steps.map((x, i) => (
           <li key={x.label} className={`rounded-xl border px-3 py-2 min-w-0 ${i === stepNow ? "border-[var(--accent)]/60 bg-[var(--accent)]/10" : x.done ? "border-emerald-900 bg-[var(--surface)]" : "border-[var(--border)] bg-[var(--surface)]"}`}>
-            <div className="text-[11px] font-medium text-[var(--text-faint)] flex items-center gap-1">{i + 1} · {x.label}{x.done && <span className="text-emerald-400 font-bold">✓</span>}</div>
+            <div className="text-2xs font-medium text-[var(--text-faint)] flex items-center gap-1">{i + 1} · {x.label}{x.done && <span className="text-emerald-400 font-bold">✓</span>}</div>
             <div className={`text-sm font-bold truncate ${i === stepNow ? "text-[var(--text)]" : "text-[var(--text-muted)]"}`} title={x.value}>{x.value}</div>
           </li>
         ))}
@@ -1111,7 +1111,7 @@ export default function MonthPlan({
           ) : (
             <input type="number" min="0" step="1000000" aria-label={`${platformText("Target GMV", platform)} tháng`} disabled={!editable || allGroupsSet} title={allGroupsSet ? "Đã nhập đủ 4 nhóm ngày: target tháng = tổng 4 nhóm" : undefined} value={settings.targetGmv || ""} placeholder="0 = chưa đặt" onChange={(e) => { const t = Number(e.target.value) || 0; setSettings((s) => ({ ...s, targetGmv: t })); if (t > 0) setDrafts((prev) => withForecast(prev, t)); setDirty(true); }} className={NUM_INPUT} />
           )}
-          <span className="text-[11px] text-[var(--text-faint)] tabular-nums">
+          <span className="text-2xs text-[var(--text-faint)] tabular-nums">
             {locked ? `Σ target ${totals.slots} ca` : targetTotal > 0 ? `= ${fmtVndShort(targetTotal)}` : "chưa đặt"}
             {!locked && targetDelta !== null && Math.abs(targetDelta) >= 1 && <span className="text-amber-400"> · lưới {targetDelta < 0 ? "thiếu" : "vượt"} {fmtVndShort(Math.abs(targetDelta))}</span>}
           </span>
@@ -1123,7 +1123,7 @@ export default function MonthPlan({
             <Info text={monthCommit.source === "month" ? `Cam kết đã sửa riêng tháng này${monthCommit.contract ? ` (hợp đồng: ${fmtH(monthCommit.contract.monthlyHours)}h/tháng)` : ""}.` : monthCommit.source === "contract" ? `Theo hợp đồng${monthCommit.contract?.contractCode ? ` ${monthCommit.contract.contractCode}` : ""} ở CRM. Sửa ô này nếu tháng này brand mua thêm/bớt giờ.` : `Chưa có hợp đồng ${platform} phủ tháng này — nhập ở CRM, hoặc gõ thẳng số của tháng này.`} />
           </span>
           <input id="mp-commit-hours" type="number" min="0" step="1" aria-label="Giờ cam kết" value={commitHoursText} placeholder="chưa có" onChange={(e) => setCommitHoursDraft(e.target.value)} className={NUM_INPUT} />
-          <span className="text-[11px] text-[var(--text-faint)] tabular-nums">
+          <span className="text-2xs text-[var(--text-faint)] tabular-nums">
             lưới <b className={hoursDelta === null ? "text-[var(--text-muted)]" : Math.abs(hoursDelta) < 0.01 ? "text-emerald-400" : hoursDelta < 0 ? "text-rose-400" : "text-amber-400"}>{fmtH(totals.hours)}h{hoursDelta !== null && Math.abs(hoursDelta) >= 0.01 ? ` (${hoursDelta < 0 ? "thiếu" : "vượt"} ${fmtH(Math.abs(hoursDelta))}h)` : ""}</b>
             {commitProgress && month <= curMonth && (
               <>
@@ -1134,7 +1134,7 @@ export default function MonthPlan({
             )}
           </span>
           {commitDirty && (
-            <button onClick={() => void saveCommitment()} disabled={commitSaving} className="text-[11px] font-bold px-2 py-1 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white disabled:opacity-50">
+            <button onClick={() => void saveCommitment()} disabled={commitSaving} className="text-2xs font-bold px-2 py-1 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white disabled:opacity-50">
               {commitSaving ? "Đang lưu…" : "Lưu cam kết tháng này"}
             </button>
           )}
@@ -1144,13 +1144,13 @@ export default function MonthPlan({
           <div className={TILE}>
             <span className={TILE_LABEL}>Thực đạt tới nay <Info text={`Cùng phép tính run-rate của Dashboard: Σ ${platformText("GMV", platform)} ca kế hoạch đã có số liệu ÷ Σ target ca đã tới hạn (ca huỷ / qua giờ chưa có số liệu vẫn giữ target). Ca ngoài kế hoạch không có trong số này.`} /></span>
             <b className="text-xl font-black tabular-nums text-[var(--text)]">{fmtVndShort(rrTotal.actual)}</b>
-            <span className="text-[11px] text-[var(--text-faint)] tabular-nums"><b className={rrPct! >= 1 ? "text-emerald-400" : rrPct! >= 0.85 ? "text-amber-400" : "text-rose-400"}>{Math.round(rrPct! * 100)}%</b> của {fmtVndShort(rrTotal.targetToDate)} tới nay</span>
+            <span className="text-2xs text-[var(--text-faint)] tabular-nums"><b className={rrPct! >= 1 ? "text-emerald-400" : rrPct! >= 0.85 ? "text-amber-400" : "text-rose-400"}>{Math.round(rrPct! * 100)}%</b> của {fmtVndShort(rrTotal.targetToDate)} tới nay</span>
           </div>
         ) : (
           <div className={TILE} data-testid="grid-forecast">
             <span className={TILE_LABEL}>Dự báo lưới <Info text={`Engine target v3: giờ × loại ngày × khung giờ × vị trí ngày, mức = trung bình nhân 28 ngày gần nhất và 3 tháng gần nhất. Backtest lúc lập: sai ~13% với kênh lớn.${pastErrorsText}${calibration ? ` Đã hiệu chỉnh từ ${calibration.observations} ca kế hoạch có thực tế ở các tháng khác.` : ""}`} /></span>
             <b className="text-xl font-black tabular-nums text-[var(--text)]">{gridOutlook ? fmtVndShort(gridOutlook.p50) : "—"}</b>
-            <span className="text-[11px] text-[var(--text-faint)] tabular-nums">
+            <span className="text-2xs text-[var(--text-faint)] tabular-nums">
               {gridOutlook ? <>dải {fmtVndShort(gridOutlook.lo)} – {fmtVndShort(gridOutlook.hi)}</> : forecaster ? "lưới trống" : "kênh chưa đủ lịch sử"}
               {gridOutlook?.pHit != null && <> · đạt target <b className={gridOutlook.pHit >= 0.8 ? "text-emerald-400" : gridOutlook.pHit >= 0.5 ? "text-sky-400" : gridOutlook.pHit >= 0.2 ? "text-amber-400" : "text-rose-400"}>{Math.round(gridOutlook.pHit * 100)}%</b></>}
             </span>
@@ -1162,7 +1162,7 @@ export default function MonthPlan({
             <>
               <span className={TILE_LABEL}>Ngoài kế hoạch <Info text={`Ca đã live nhưng không thuộc kế hoạch (target 0) — ${platformText("GMV", platform)} vẫn cộng vào thực đạt nên run-rate cao hơn thực. Ca tăng cường: OP mở thêm sau chốt, target đề xuất riêng, không cộng vào target tháng. Cả hai hiện viền đứt trong lưới.`} /></span>
               <b className={`text-xl font-black tabular-nums ${offPlan ? "text-sky-300" : "text-[var(--text)]"}`}>{offPlan ? `${offPlan.count} ca` : "0 ca"}</b>
-              <span className="text-[11px] text-[var(--text-faint)] tabular-nums">
+              <span className="text-2xs text-[var(--text-faint)] tabular-nums">
                 {offPlan ? `${platformText("GMV", platform)} ${fmtVndShort(offPlan.gmv)}` : "không có"}
                 {boostInfo ? ` · ${boostInfo.count} ca tăng cường${boostInfo.targetSum > 0 ? ` (đề xuất ${fmtVndShort(boostInfo.targetSum)})` : ""}` : ""}
               </span>
@@ -1171,21 +1171,21 @@ export default function MonthPlan({
             <>
               <span className={TILE_LABEL}>Ca / ngày có ca</span>
               <b className="text-xl font-black tabular-nums text-[var(--text)]">{totals.slots} / {totals.days}</b>
-              <span className={`text-[11px] ${errors.length > 0 ? "text-rose-300" : "text-[var(--text-faint)]"}`}>{errors.length > 0 ? `${errors[0]}${errors.length > 1 ? ` · +${errors.length - 1} lỗi` : ""}` : dirty ? "có sửa chưa lưu" : "lưới hợp lệ"}</span>
+              <span className={`text-2xs ${errors.length > 0 ? "text-rose-300" : "text-[var(--text-faint)]"}`}>{errors.length > 0 ? `${errors[0]}${errors.length > 1 ? ` · +${errors.length - 1} lỗi` : ""}` : dirty ? "có sửa chưa lưu" : "lưới hợp lệ"}</span>
             </>
           )}
-          {locked && errors.length > 0 && <span className="text-[11px] text-rose-300">{errors[0]}{errors.length > 1 ? ` · +${errors.length - 1} lỗi` : ""}</span>}
+          {locked && errors.length > 0 && <span className="text-2xs text-rose-300">{errors[0]}{errors.length > 1 ? ` · +${errors.length - 1} lỗi` : ""}</span>}
         </div>
 
         <div className={TILE}>
           <span className={TILE_LABEL}>{platformText("KPI Total GMV", platform)} <Info text={`Mục tiêu brand giao cho ${platformText("Total GMV", platform)} (mọi kênh, gồm phần agency không live); Report Tháng đem so với ${platformText("Total GMV", platform)} của tháng. Không đổi target ca.`} /></span>
           <input type="number" min="0" step="1000000" aria-label={`${platformText("KPI Total GMV", platform)}`} disabled={!editable} value={settings.shopTargetGmv || ""} placeholder="brand chưa giao" onChange={(e) => { setSettings((s) => ({ ...s, shopTargetGmv: Number(e.target.value) || 0 })); setDirty(true); }} className={NUM_INPUT} />
-          <span className="text-[11px] text-[var(--text-faint)] tabular-nums">{settings.shopTargetGmv > 0 ? `= ${fmtVndShort(settings.shopTargetGmv)}${monthTarget > 0 ? ` · target live ${Math.round((monthTarget / settings.shopTargetGmv) * 100)}%` : ""}` : "không bắt buộc"}</span>
+          <span className="text-2xs text-[var(--text-faint)] tabular-nums">{settings.shopTargetGmv > 0 ? `= ${fmtVndShort(settings.shopTargetGmv)}${monthTarget > 0 ? ` · target live ${Math.round((monthTarget / settings.shopTargetGmv) * 100)}%` : ""}` : "không bắt buộc"}</span>
         </div>
       </div>
 
       {(committedGmv > 0 && monthTarget > 0 && monthTarget < committedGmv) || (!locked && committedGmv > 0 && targetTotal <= 0) || (gridOutlook && gridOutlook.excessHours > 0.05) || forecaster?.mostlyManual ? (
-        <div className="space-y-1 text-[11px] px-1">
+        <div className="space-y-1 text-2xs px-1">
           {committedGmv > 0 && monthTarget > 0 && monthTarget < committedGmv && <p className="text-amber-300">Target thấp hơn {platformText("GMV", platform)} hợp đồng {fmtVndShort(committedGmv - monthTarget)} — run-rate đạt 100% vẫn hụt cam kết với brand.</p>}
           {!locked && committedGmv > 0 && targetTotal <= 0 && (
             <button onClick={() => { setSettings((st) => ({ ...st, targetGmv: committedGmv })); setDrafts((prev) => withForecast(prev, committedGmv)); setDirty(true); }} className="font-bold px-2 py-1 rounded-lg border border-[var(--accent)]/50 text-[var(--accent-text)]">
@@ -1250,9 +1250,9 @@ export default function MonthPlan({
                   // Điện thoại: nhãn lên dòng riêng + ô ngày được co (min-w-0) — 2 ô date giữ bề rộng tự nhiên làm trang tràn ngang ở 375px (audit UX 2026-09-29).
                   <div key={k} className="flex flex-wrap sm:flex-nowrap items-center gap-1.5">
                     <span className="w-full sm:w-20 text-[var(--text)]">{CAMP_RANGE_LABEL[k]}</span>
-                    <input type="date" aria-label={`${CAMP_RANGE_LABEL[k]} từ`} disabled={!editable} value={r?.start ?? ""} onChange={(e) => setRange(e.target.value, r?.end ?? e.target.value)} className="flex-1 min-w-0 bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-1.5 py-1 text-[11px] text-[var(--text)] font-mono disabled:opacity-60" />
+                    <input type="date" aria-label={`${CAMP_RANGE_LABEL[k]} từ`} disabled={!editable} value={r?.start ?? ""} onChange={(e) => setRange(e.target.value, r?.end ?? e.target.value)} className="flex-1 min-w-0 bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-1.5 py-1 text-2xs text-[var(--text)] font-mono disabled:opacity-60" />
                     <span className="text-[var(--text-faint)]">→</span>
-                    <input type="date" aria-label={`${CAMP_RANGE_LABEL[k]} đến`} disabled={!editable} value={r?.end ?? ""} onChange={(e) => setRange(r?.start ?? e.target.value, e.target.value)} className="flex-1 min-w-0 bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-1.5 py-1 text-[11px] text-[var(--text)] font-mono disabled:opacity-60" />
+                    <input type="date" aria-label={`${CAMP_RANGE_LABEL[k]} đến`} disabled={!editable} value={r?.end ?? ""} onChange={(e) => setRange(r?.start ?? e.target.value, e.target.value)} className="flex-1 min-w-0 bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-1.5 py-1 text-2xs text-[var(--text)] font-mono disabled:opacity-60" />
                     {r && editable && <button onClick={() => setRange("", "")} className="-m-1.5 p-1.5 text-[var(--text-faint)] hover:text-rose-400" title="Bỏ, dùng lịch cố định"><X className="w-3 h-3" /></button>}
                   </div>
                 );
@@ -1336,7 +1336,7 @@ export default function MonthPlan({
           </div>
         </div>
         {(loading || msg) && (
-          <p className="text-[11px] text-[var(--text-muted)] border-t border-[var(--border)]/60 pt-2">{loading ? "Đang tải…" : msg}</p>
+          <p className="text-2xs text-[var(--text-muted)] border-t border-[var(--border)]/60 pt-2">{loading ? "Đang tải…" : msg}</p>
         )}
       </div>
 
@@ -1346,7 +1346,7 @@ export default function MonthPlan({
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
               <h3 className="text-sm font-bold text-[var(--text)]">{totals.target <= 0 ? `Đặt target tháng ${fmtMonth(month)} — chia xuống mọi ca trên lịch` : "Chia lại target theo lịch hiện có — gồm ca OP thêm và ca đã qua"}</h3>
-              <p className="text-[11px] text-[var(--text-muted)] leading-relaxed max-w-3xl">
+              <p className="text-2xs text-[var(--text-muted)] leading-relaxed max-w-3xl">
                 Lấy MỌI ca đang có trên lịch của kênh trong tháng (ca đã trong kế hoạch + ca OP thêm ngoài kế hoạch, kể cả ngày đã qua), bỏ ca đã huỷ, rồi chia target mới xuống các ca còn chạy theo bộ chia engine (v2 nếu brand đủ lịch sử, không thì dự báo engine). Ca OP thêm được đưa vào kế hoạch ngay (tính vào giờ + tổng target); ca huỷ về target 0. Giờ ca không đổi. Ghi xong thì % Target ca đã xong, run-rate và Dashboard của tháng này đổi theo; mỗi lần có nhật ký target cũ → mới. Chỉ ceo/admin ghi được.
               </p>
             </div>
@@ -1357,7 +1357,7 @@ export default function MonthPlan({
               <label className="block">
                 <span className="font-bold text-[var(--text-muted)] block mb-1">{platformText("Target GMV", platform)} tháng mới</span>
                 <input type="number" min="0" step="1000000" value={retargetTotal} onChange={(e) => { setRetargetTotal(e.target.value); setRetargetPreview(null); }} className={FIELD} />
-                <span className="text-[11px] text-[var(--text-faint)] block mt-0.5">Hiện tại {fmtVndShort(totals.target)}{Number(retargetTotal) > 0 ? ` → ${fmtVndShort(Number(retargetTotal))}` : ""}.</span>
+                <span className="text-2xs text-[var(--text-faint)] block mt-0.5">Hiện tại {fmtVndShort(totals.target)}{Number(retargetTotal) > 0 ? ` → ${fmtVndShort(Number(retargetTotal))}` : ""}.</span>
               </label>
               <label className="block">
                 <span className="font-bold text-[var(--text-muted)] block mb-1">Ghi chú vòng thử <span className="font-normal text-[var(--text-faint)]">(tuỳ chọn — tham số engine tự được ghi kèm)</span></span>
@@ -1369,7 +1369,7 @@ export default function MonthPlan({
           <div className="flex flex-wrap items-center gap-2">
             <button onClick={previewRetarget} disabled={retargetBusy} className="px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] border border-[var(--accent)]/60 font-bold text-[var(--accent-text)] disabled:opacity-40">Xem trước</button>
             <button onClick={() => void applyRetarget()} disabled={!retargetPreview || retargetBusy || loading || saving} className="px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold disabled:opacity-40">{retargetBusy ? "Đang ghi…" : "Áp dụng & ghi nhật ký"}</button>
-            {dirty && <span className="text-[11px] text-amber-300">Lưới có sửa chưa lưu — chỉ ca đã lưu của kế hoạch được tính; sửa chưa lưu sẽ bị bỏ sau khi áp dụng.</span>}
+            {dirty && <span className="text-2xs text-amber-300">Lưới có sửa chưa lưu — chỉ ca đã lưu của kế hoạch được tính; sửa chưa lưu sẽ bị bỏ sau khi áp dụng.</span>}
           </div>
           {retargetPreview && (() => {
             const pv = retargetPreview.plan;
@@ -1384,14 +1384,14 @@ export default function MonthPlan({
                 <p className="text-[var(--text)]">
                   <b>{pv.activeSlots}</b> ca còn chạy chia target · tổng <b>{fmtVndShort(pv.oldTotal)}</b> → <b>{fmtVndShort(pv.newTotal)}</b> · chia theo <b>{retargetPreview.basis === "v2" ? "mô hình v2 (trộn với cách cũ)" : "dự báo engine"}</b>
                 </p>
-                <ul className="text-[11px] text-[var(--text-muted)] space-y-0.5 list-disc pl-4">
+                <ul className="text-2xs text-[var(--text-muted)] space-y-0.5 list-disc pl-4">
                   <li><b className="text-[var(--text)]">{pv.changed}</b> ca trong kế hoạch đổi target (<b className={pv.pastChanged > 0 ? "text-amber-300" : "text-[var(--text)]"}>{pv.pastChanged} ca đã qua</b>)</li>
                   <li><b className="text-[var(--text)]">{pv.added}</b> ca trên lịch CHƯA có trong kế hoạch sẽ được thêm vào ({pv.addedPast} ca đã qua)</li>
                   <li><b className="text-[var(--text)]">{dropped.length}</b> ca huỷ / không có ca thật bị bỏ khỏi phần chia (target về 0)</li>
                   {retargetPreview.set.skippedSameTime > 0 && <li className="text-amber-300">{retargetPreview.set.skippedSameTime} ca trên lịch trùng đúng giờ với ca khác của kênh — không thêm được vào kế hoạch</li>}
                   {retargetPreview.set.futureNoCalendar > 0 && <li>{retargetPreview.set.futureNoCalendar} ca kế hoạch sắp tới chưa có ca trên lịch (chưa mở ca) — vẫn tính vào phần chia</li>}
                 </ul>
-                <table className="w-full text-[11px]">
+                <table className="w-full text-2xs">
                   <thead><tr className="text-[var(--text-faint)] text-left"><th className="py-1">Nhóm ngày</th><th>Ca</th><th className="text-right">Target cũ</th><th className="text-right">Target mới</th><th className="text-right">Đổi</th></tr></thead>
                   <tbody>
                     {rowsBefore.map((r, i) => {
@@ -1408,7 +1408,7 @@ export default function MonthPlan({
                   </tbody>
                 </table>
                 {(added.length > 0 || dropped.length > 0) && (
-                  <details className="text-[11px] text-[var(--text-muted)]">
+                  <details className="text-2xs text-[var(--text-muted)]">
                     <summary className="cursor-pointer font-bold">Chi tiết ca thêm vào ({added.length}) và ca bị bỏ ({dropped.length})</summary>
                     <ul className="mt-1 space-y-0.5 max-h-48 overflow-auto">
                       {added.map((r) => <li key={r.key} className="font-mono">+ {dm(r.draft.date)} {r.draft.startTime}–{r.draft.endTime} · {r.reason}</li>)}
@@ -1422,7 +1422,7 @@ export default function MonthPlan({
           {retargetHistory.length > 0 && (
             <div className="space-y-1">
               <div className="font-bold text-[var(--text-muted)]">Nhật ký đổi target sau chốt ({retargetHistory.length} lượt — chia lại, sửa tay, thêm/bỏ ca)</div>
-              <ul className="space-y-0.5 text-[11px] text-[var(--text-muted)]">
+              <ul className="space-y-0.5 text-2xs text-[var(--text-muted)]">
                 {retargetHistory.slice(0, 6).map((b) => (
                   <li key={b.batchId} className="flex flex-wrap gap-x-3">
                     <span className="font-mono">{new Date(b.changedAt).toLocaleString("vi-VN")}</span>
@@ -1467,13 +1467,13 @@ export default function MonthPlan({
           <p className="text-xs text-sky-200 font-bold flex items-center gap-1.5">
             <Sparkles className="w-3.5 h-3.5" /> {brand?.name ?? "Brand"} chưa có ca đối soát nào — engine không có lịch sử riêng để học
           </p>
-          <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">
+          <p className="text-2xs text-[var(--text-muted)] leading-relaxed">
             Có thể mượn <b>hình dạng</b> lịch sử toàn agency: khung giờ/thứ nào hiệu quả hơn, hệ số D-Day · lễ · khuyến mãi,
             lợi suất giảm dần khi live nhiều ca trong ngày. Đó là hành vi xem của người dùng TikTok, dùng chung giữa brand được.
             Riêng <b>mức {platformText("GMV/giờ", platform)}</b> thì không mượn được — brand khác ngành hàng, giá khác, tệp khác — nên phải là con số của bạn.
           </p>
           <div className="flex flex-wrap items-center gap-2">
-            <label className="text-[11px] font-bold text-[var(--text-muted)]">{platformText("GMV/giờ", platform)} kỳ vọng</label>
+            <label className="text-2xs font-bold text-[var(--text-muted)]">{platformText("GMV/giờ", platform)} kỳ vọng</label>
             <input
               type="number" min="0" step="1000000"
               value={levelOverride || ""}
@@ -1481,20 +1481,20 @@ export default function MonthPlan({
               onChange={(e) => setLevelOverride(Number(e.target.value) || 0)}
               className="w-44 bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-xs font-mono text-[var(--text)]"
             />
-            <span className="text-[11px] text-[var(--text-faint)]">
+            <span className="text-2xs text-[var(--text-faint)]">
               {borrowLevel > 0
                 ? <>đang dùng <b className="text-sky-300">{fmtVndFull(borrowLevel)}/giờ</b> {borrowLevelSource}</>
                 : <span className="text-amber-300">Chưa có mức — nhập {platformText("Target GMV", platform)} tháng + giờ cần xếp ở Tham số, hoặc gõ thẳng vào đây.</span>}
             </span>
             {levelOverride > 0 && (
-              <button onClick={() => setLevelOverride(0)} className="text-[11px] font-bold text-[var(--text-muted)] underline">về mức tự suy</button>
+              <button onClick={() => setLevelOverride(0)} className="text-2xs font-bold text-[var(--text-muted)] underline">về mức tự suy</button>
             )}
           </div>
           {borrowLevel > 0 && !borrowedHistory && (
-            <p className="text-[11px] text-rose-300">Cả agency cũng chưa có ca đối soát nào — chưa mượn được của ai. Dùng quy tắc lặp hoặc vẽ tay.</p>
+            <p className="text-2xs text-rose-300">Cả agency cũng chưa có ca đối soát nào — chưa mượn được của ai. Dùng quy tắc lặp hoặc vẽ tay.</p>
           )}
           {borrowedHistory && (
-            <p className="text-[11px] text-[var(--text-faint)]">
+            <p className="text-2xs text-[var(--text-faint)]">
               Mượn của {borrowedHistory.borrowedFrom!.brands} brand · {borrowedHistory.borrowedFrom!.sessions} ca · {borrowedHistory.borrowedFrom!.months} tháng.
               Bấm "Gợi ý phân bổ" như bình thường. Mọi con số {platformText("GMV", platform)} sẽ tỷ lệ thuận với mức trên, và độ tin cậy luôn hiện là <b>thấp</b>.
             </p>
@@ -1524,14 +1524,14 @@ export default function MonthPlan({
         </div>
       )}
       {targetGap && targetGap.pct < -engineParams.targetGapWarnPct && (
-        <p className="text-[11px] text-emerald-400 px-1">Lưới này dự báo {fmtVndShort(targetGap.forecast)} — vượt target {Math.round(-targetGap.pct * 100)}%; target/ca đang thấp hơn dự báo.</p>
+        <p className="text-2xs text-emerald-400 px-1">Lưới này dự báo {fmtVndShort(targetGap.forecast)} — vượt target {Math.round(-targetGap.pct * 100)}%; target/ca đang thấp hơn dự báo.</p>
       )}
 
       {suggestion && (
         <SuggestionPanel platform={platform} history={suggestion.history} result={suggestion.result} committedHours={planHours} targetTotal={targetTotal} compare={compare} current={strategy} onPick={(k) => { setStrategy(k); if (compare) { setSuggestion({ history: suggestion.history, result: compare[k] }); applySuggestion(drafts.filter((d) => d.id || d.slotId), compare[k]); } }} />
       )}
 
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-[11px] text-[var(--text-faint)]">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-2xs text-[var(--text-faint)]">
         {locked ? (
           <>
             <span><span className="text-emerald-400">■</span> đạt target ca</span>
@@ -1574,7 +1574,7 @@ export default function MonthPlan({
       />
 
       {locked && (unsynced > 0 || dirty) && (
-        <p className="text-[11px] text-amber-300 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Kế hoạch đã chốt nhưng lưới có thay đổi chưa đồng bộ ra ca ({unsynced} ca chưa mở{dirty ? ", có sửa chưa lưu" : ""}) — bấm "Chốt lại (đồng bộ ca)".</p>
+        <p className="text-2xs text-amber-300 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Kế hoạch đã chốt nhưng lưới có thay đổi chưa đồng bộ ra ca ({unsynced} ca chưa mở{dirty ? ", có sửa chưa lưu" : ""}) — bấm "Chốt lại (đồng bộ ca)".</p>
       )}
     </div>
   );
@@ -1608,11 +1608,11 @@ function SuggestionPanel({ platform, history: h, result: r, committedHours, targ
           <span className="text-[var(--text-muted)]">Độ tin cậy: <b className="text-[var(--text)]">{CONF_LABEL[r.confidence]}</b> · {h.sessions} ca đối soát / {h.months} tháng{h.firstDate ? ` (${h.firstDate} → ${h.lastDate})` : ""} · {platformText("GMV/giờ", platform)} TB {fmtVndShort(h.brandGmvPerHour)}</span>
         )}
       </div>
-      {r.notes.map((n, i) => <p key={i} className="text-[11px] text-amber-300">{n}</p>)}
+      {r.notes.map((n, i) => <p key={i} className="text-2xs text-amber-300">{n}</p>)}
       {compare && (
         <div className="overflow-x-auto">
-          <table className="w-full text-[11px]">
-            <thead><tr className="text-[11px] font-semibold text-[var(--text-faint)]"><th className="text-left py-1 pr-3">Phương án</th><th className="text-right py-1 pr-3">Ca</th><th className="text-right py-1 pr-3">Ngày</th><th className="text-right py-1 pr-3">Giờ</th><th className="text-right py-1 pr-3">Dự báo</th><th className="py-1"></th></tr></thead>
+          <table className="w-full text-2xs">
+            <thead><tr className="text-2xs font-semibold text-[var(--text-faint)]"><th className="text-left py-1 pr-3">Phương án</th><th className="text-right py-1 pr-3">Ca</th><th className="text-right py-1 pr-3">Ngày</th><th className="text-right py-1 pr-3">Giờ</th><th className="text-right py-1 pr-3">Dự báo</th><th className="py-1"></th></tr></thead>
             <tbody>
               {(Object.keys(STRATEGY_LABEL) as SuggestStrategy[]).map((k) => {
                 const x = compare[k];
@@ -1624,7 +1624,7 @@ function SuggestionPanel({ platform, history: h, result: r, committedHours, targ
                     <td className="py-1 pr-3 text-right text-[var(--text)]">{days}</td>
                     <td className="py-1 pr-3 text-right text-[var(--text)]">{fmtH(x.totalHours)}h</td>
                     <td className="py-1 pr-3 text-right font-bold text-[var(--text)]">{fmtVndShort(x.forecastGmv)}</td>
-                    <td className="py-1 text-right">{k === current ? <span className="text-[11px] text-emerald-400 font-bold">đang dùng</span> : <button onClick={() => onPick(k)} className="text-[11px] font-bold text-[var(--accent-text)]">Dùng</button>}</td>
+                    <td className="py-1 text-right">{k === current ? <span className="text-2xs text-emerald-400 font-bold">đang dùng</span> : <button onClick={() => onPick(k)} className="text-2xs font-bold text-[var(--accent-text)]">Dùng</button>}</td>
                   </tr>
                 );
               })}
@@ -1633,7 +1633,7 @@ function SuggestionPanel({ platform, history: h, result: r, committedHours, targ
         </div>
       )}
       {(h.eventLearned.holiday || h.eventLearned.event || h.eventLearned.mega_sale || h.schemeLearned) && (
-        <p className="text-[11px] text-[var(--text-faint)]">
+        <p className="text-2xs text-[var(--text-faint)]">
           Học được từ lịch sử: {h.eventLearned.holiday ? `ngày lễ ×${fmtFixed(h.eventMultipliers.holiday, 2)} · ` : ""}{h.eventLearned.mega_sale ? `mega sale ×${fmtFixed(h.eventMultipliers.mega_sale, 2)} · ` : ""}{h.eventLearned.event ? `sự kiện ×${fmtFixed(h.eventMultipliers.event, 2)} · ` : ""}{h.schemeLearned ? `ngày có khuyến mãi ×${fmtFixed(h.schemeMultiplier, 2)}` : ""}
         </p>
       )}
@@ -1643,12 +1643,12 @@ function SuggestionPanel({ platform, history: h, result: r, committedHours, targ
           {top.map((c) => (
             <div key={`${c.weekday}-${c.block}`} className="flex justify-between gap-2"><span className="text-[var(--text)]">{WD[c.weekday]} {c.block * 2}–{c.block * 2 + 2}h <span className="text-[var(--text-faint)]">({c.n} ca)</span></span><b className={c.tag === "strong" ? "text-emerald-400" : "text-[var(--text)]"}>{fmtVndShort(c.gmvPerHour)}/h</b></div>
           ))}
-          {weak.length > 0 && <p className="mt-1 text-[11px] text-[var(--text-faint)]">Yếu: {weak.map((c) => `${WD[c.weekday]} ${c.block * 2}h`).join(", ")}</p>}
+          {weak.length > 0 && <p className="mt-1 text-2xs text-[var(--text-faint)]">Yếu: {weak.map((c) => `${WD[c.weekday]} ${c.block * 2}h`).join(", ")}</p>}
         </div>
         <div>
           <p className="font-bold text-[var(--text-muted)] mb-1">Hệ số học từ lịch sử</p>
           {(["dday", "midmonth", "payday"] as const).map((b) => (
-            <div key={b} className="flex justify-between gap-2"><span className="text-[var(--text)]">{BUCKET_LABEL[b]}</span><b className="text-[var(--text)]">×{fmtFixed(h.campMultipliers[b], 2)} <span className="text-[11px] font-normal text-[var(--text-faint)]">{h.campLearned[b] ? "học được" : "mặc định"}</span></b></div>
+            <div key={b} className="flex justify-between gap-2"><span className="text-[var(--text)]">{BUCKET_LABEL[b]}</span><b className="text-[var(--text)]">×{fmtFixed(h.campMultipliers[b], 2)} <span className="text-2xs font-normal text-[var(--text-faint)]">{h.campLearned[b] ? "học được" : "mặc định"}</span></b></div>
           ))}
           <div className="flex justify-between gap-2 mt-1"><span className="text-[var(--text)]">Giờ/ngày lịch sử</span><b className="text-[var(--text)]">{(["daily", "dday", "midmonth", "payday"] as const).map((b) => h.campHoursLearned[b] ? `${b === "daily" ? "thường" : BUCKET_LABEL[b]} ${fmtFixed(h.campHoursPerDay[b], 1)}h` : "").filter(Boolean).join(" · ") || "chưa học được"}</b></div>
           <div className="flex justify-between gap-2 mt-1"><span className="text-[var(--text)]">Ca thứ 2/3 trong ngày</span><b className="text-[var(--text)]">×{fmtFixed(h.diminishing[1], 2)} / ×{fmtFixed(h.diminishing[2], 2)}</b></div>
@@ -1658,7 +1658,7 @@ function SuggestionPanel({ platform, history: h, result: r, committedHours, targ
           {curve.map((p) => (
             <div key={p.hours} className="flex justify-between gap-2"><span className="text-[var(--text)]">{fmtH(p.hours)}h</span><b className="text-[var(--text)]">{fmtVndShort(p.gmv)}</b></div>
           ))}
-          <p className="mt-1 text-[11px] text-[var(--text-faint)]">
+          <p className="mt-1 text-2xs text-[var(--text-faint)]">
             {committedHours > 0 ? `Cam kết ${fmtH(committedHours)}h → dự báo ${fmtVndShort(r.forecastGmv)}` : ""}
             {targetTotal > 0 ? ` · target ${fmtVndShort(targetTotal)}${r.hoursToHitTarget !== null ? ` cần ~${Math.ceil(r.hoursToHitTarget)}h` : " (không đạt được trong khung giờ hiện có)"}` : ""}
           </p>

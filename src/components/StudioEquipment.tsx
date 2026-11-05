@@ -254,7 +254,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
             <span className="text-[var(--text-muted)] truncate" title={`${b.brandName}${b.hostName ? ` · Host ${b.hostName}` : ""} · ${SESSION_STATUS_LABEL_VI[b.status] ?? b.status}`}>
               {b.brandName}{b.hostName ? ` · ${b.hostName}` : ""}
             </span>
-            {b.status === "Live Now" && <span className="ml-auto shrink-0 text-[11px] font-bold text-red-300">{SESSION_STATUS_LABEL_VI[b.status]}</span>}
+            {b.status === "Live Now" && <span className="ml-auto shrink-0 text-2xs font-bold text-red-300">{SESSION_STATUS_LABEL_VI[b.status]}</span>}
           </li>
         );
         return (
@@ -263,7 +263,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
             <div>
               <h3 className="font-bold text-[var(--text)] text-base flex flex-wrap items-center gap-2">
                 Phòng live
-                <span className="text-[11px] font-semibold text-emerald-400 bg-emerald-950/80 px-2.5 py-0.5 rounded-full border border-emerald-800/50">
+                <span className="text-2xs font-semibold text-emerald-400 bg-emerald-950/80 px-2.5 py-0.5 rounded-full border border-emerald-800/50">
                   {todaysBookings.length} ca hôm nay
                 </span>
               </h3>
@@ -286,11 +286,11 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
                     <div className="min-w-0">
                       <span className="text-xs text-[var(--accent-text)] font-bold bg-[var(--accent)]/30 px-2 py-0.5 rounded">{s.roomNumber}</span>
                       <h3 className="font-bold text-[var(--text)] text-base mt-1 truncate">{s.name}</h3>
-                      {s.theme && <p className="text-[11px] text-[var(--text-muted)] truncate" title={s.theme}>Ghi chú: {s.theme}</p>}
+                      {s.theme && <p className="text-2xs text-[var(--text-muted)] truncate" title={s.theme}>Ghi chú: {s.theme}</p>}
                     </div>
 
                     <div className="flex items-center gap-1 shrink-0">
-                      <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${
+                      <span className={`px-2.5 py-1 rounded-full text-2xs font-bold ${
                         shownStatus(s) === "Live Now" ? "bg-red-500/20 text-red-300 animate-pulse" :
                         shownStatus(s) === "Maintenance" ? "bg-[var(--surface-hover)] text-[var(--text-muted)]" : "bg-emerald-500/20 text-emerald-300"
                       }`}>
@@ -315,7 +315,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
                   </div>
 
                   <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] p-3 flex-1">
-                    <p className="text-[11px] font-semibold text-[var(--text-faint)] mb-1.5">Ca hôm nay · {today.length}</p>
+                    <p className="text-2xs font-semibold text-[var(--text-faint)] mb-1.5">Ca hôm nay · {today.length}</p>
                     {today.length === 0 ? (
                       <p className="text-xs text-[var(--text-faint)] italic">Trống cả ngày.</p>
                     ) : (
@@ -334,7 +334,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
 
           {noRoomToday.length > 0 && (
             <div className="rounded-xl border border-amber-800 bg-amber-950/30 p-3">
-              <p className="text-[11px] font-bold text-amber-300 mb-1.5">{noRoomToday.length} ca hôm nay chưa có phòng — mở ca ở Bảng Vận Hành → Sửa để gán phòng</p>
+              <p className="text-2xs font-bold text-amber-300 mb-1.5">{noRoomToday.length} ca hôm nay chưa có phòng — mở ca ở Bảng Vận Hành → Sửa để gán phòng</p>
               <ul className="grid sm:grid-cols-2 xl:grid-cols-3 gap-x-4 gap-y-1">{noRoomToday.map((b) => <BookingLine key={b.id} b={b} />)}</ul>
             </div>
           )}
@@ -394,11 +394,11 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
               {filteredEquipments.map((eq) => (
                 <div key={eq.id} className="p-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-elevated)]/40 space-y-3 hover:border-[var(--accent)] transition-all relative group">
                   <div className="flex justify-between items-start">
-                    <span className="bg-[var(--accent)]/30 text-[var(--accent-text)] font-mono text-[11px] font-bold px-2 py-0.5 rounded">
+                    <span className="bg-[var(--accent)]/30 text-[var(--accent-text)] font-mono text-2xs font-bold px-2 py-0.5 rounded">
                       {eq.qrCode}
                     </span>
                     <div className="flex items-center gap-1">
-                      <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
+                      <span className={`px-2 py-0.5 rounded text-2xs font-bold ${
                         eq.status === "In Use" ? "bg-[var(--accent)]/20 text-[var(--accent-text)]" :
                         eq.status === "Maintenance" ? "bg-amber-500/20 text-amber-300" :
                         eq.status === "Damaged" ? "bg-red-500/20 text-red-300" : "bg-emerald-500/20 text-emerald-300"
@@ -423,12 +423,12 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
                   </div>
                   <div>
                     <h4 className="font-bold text-[var(--text)] text-xs">{eq.name}</h4>
-                    <p className="text-[11px] text-[var(--text-muted)] mt-0.5">{eq.model}</p>
-                    <span className="text-[11px] text-[var(--accent-text)] font-semibold bg-[var(--accent)]/30 px-1.5 py-0.5 rounded mt-1 inline-block">
+                    <p className="text-2xs text-[var(--text-muted)] mt-0.5">{eq.model}</p>
+                    <span className="text-2xs text-[var(--accent-text)] font-semibold bg-[var(--accent)]/30 px-1.5 py-0.5 rounded mt-1 inline-block">
                       {eq.category}
                     </span>
                   </div>
-                  <div className="text-[11px] text-[var(--text-muted)] border-t border-[var(--border)] pt-2">
+                  <div className="text-2xs text-[var(--text-muted)] border-t border-[var(--border)] pt-2">
                     Kiểm tra: {eq.lastCheckDate}
                   </div>
                 </div>

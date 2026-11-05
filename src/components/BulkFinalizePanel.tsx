@@ -134,10 +134,10 @@ export function BulkFinalizePanel({
             <p className="text-xs text-rose-400 font-bold">{state.failed.length} ca KHÔNG chốt được:</p>
             <ul className="mt-1 space-y-0.5">
               {state.failed.map((f) => (
-                <li key={f} className="text-[11px] text-rose-300">· {f}</li>
+                <li key={f} className="text-2xs text-rose-300">· {f}</li>
               ))}
             </ul>
-            <p className="text-[11px] text-[var(--text-faint)] mt-1">
+            <p className="text-2xs text-[var(--text-faint)] mt-1">
               Các ca này vẫn đang mở, chốt lại từng ca ở danh sách bên dưới để xem lỗi cụ thể.
             </p>
           </div>
@@ -155,7 +155,7 @@ export function BulkFinalizePanel({
           <h3 className="text-sm font-bold text-[var(--text)] flex items-center gap-2">
             <Layers className="w-4 h-4 text-blue-400" /> Chốt Lịch Hàng Loạt — tháng {fmtMonth(month)}
           </h3>
-          <p className="text-[11px] text-[var(--text-muted)] mt-1 max-w-3xl">
+          <p className="text-2xs text-[var(--text-muted)] mt-1 max-w-3xl">
             Mỗi ca được gợi ý Host xếp hạng cao nhất mà <strong>đang rảnh khung giờ đó</strong> — xét cả ca đã có trong hệ thống
             lẫn các ca khác trong chính mẻ này, nên không ai bị xếp 2 ca trùng giờ. Đây chỉ là đề xuất: sửa hoặc bỏ chọn dòng nào
             cũng được trước khi chốt.
@@ -179,10 +179,10 @@ export function BulkFinalizePanel({
               {noCandidate.length > 0 && <> · <strong className="text-amber-400">{noCandidate.length}</strong> không còn ai rảnh</>}
             </span>
             <div className="flex items-center gap-1.5 ml-auto">
-              <button onClick={() => setAllIncluded(true)} disabled={running} className="px-2.5 py-1 rounded-lg bg-[var(--surface-base)] border border-[var(--border)] text-[11px] font-bold text-[var(--text-muted)] hover:text-[var(--text)] disabled:opacity-40">
+              <button onClick={() => setAllIncluded(true)} disabled={running} className="px-2.5 py-1 rounded-lg bg-[var(--surface-base)] border border-[var(--border)] text-2xs font-bold text-[var(--text-muted)] hover:text-[var(--text)] disabled:opacity-40">
                 Tick tất cả
               </button>
-              <button onClick={() => setAllIncluded(false)} disabled={running} className="px-2.5 py-1 rounded-lg bg-[var(--surface-base)] border border-[var(--border)] text-[11px] font-bold text-[var(--text-muted)] hover:text-[var(--text)] disabled:opacity-40">
+              <button onClick={() => setAllIncluded(false)} disabled={running} className="px-2.5 py-1 rounded-lg bg-[var(--surface-base)] border border-[var(--border)] text-2xs font-bold text-[var(--text-muted)] hover:text-[var(--text)] disabled:opacity-40">
                 Bỏ chọn tất cả
               </button>
             </div>
@@ -191,7 +191,7 @@ export function BulkFinalizePanel({
           <div className="mt-3 overflow-x-auto">
             <table className="w-full text-xs min-w-[720px]">
               <thead>
-                <tr className="text-[var(--text-faint)] text-left text-[11px]">
+                <tr className="text-[var(--text-faint)] text-left text-2xs">
                   <th className="font-bold pb-2 pr-2 w-8"></th>
                   <th className="font-bold pb-2 pr-3">Ca</th>
                   <th className="font-bold pb-2 pr-3">Brand</th>
@@ -220,7 +220,7 @@ export function BulkFinalizePanel({
                       </td>
                       <td className="py-2 pr-3 align-top whitespace-nowrap text-[var(--text)]">
                         {r.date}
-                        <div className="text-[11px] text-[var(--text-faint)]">
+                        <div className="text-2xs text-[var(--text-faint)]">
                           {r.startTime}–{r.endTime}
                           {r.studioName && ` · ${r.studioName}`}
                         </div>
@@ -239,18 +239,18 @@ export function BulkFinalizePanel({
                           ))}
                         </select>
                         {h && h.scope !== "none" && (
-                          <div className="text-[11px] text-emerald-400 mt-0.5">
+                          <div className="text-2xs text-emerald-400 mt-0.5">
                             {fmtPerHour(h.value)} ({h.scope === "brand" ? "brand này" : "chung"} {headline!.platform}, {h.sessions} ca)
                           </div>
                         )}
                         {r.noFreeCandidate && (
-                          <div className="text-[11px] text-amber-400 mt-0.5 flex items-start gap-1">
+                          <div className="text-2xs text-amber-400 mt-0.5 flex items-start gap-1">
                             <AlertTriangle className="w-3 h-3 shrink-0 mt-px" />
                             Cả {r.candidates.length} người đăng ký đều đã bận khung này
                           </div>
                         )}
                         {conflict && (
-                          <div className="text-[11px] text-rose-400 mt-0.5 flex items-start gap-1">
+                          <div className="text-2xs text-rose-400 mt-0.5 flex items-start gap-1">
                             <AlertTriangle className="w-3 h-3 shrink-0 mt-px" />
                             {conflict}
                           </div>
@@ -288,7 +288,7 @@ export function BulkFinalizePanel({
                 : `Chốt ${ready.length} ca`}
             </button>
             {blocked.length > 0 && (
-              <span className="text-[11px] text-rose-400">
+              <span className="text-2xs text-rose-400">
                 {blocked.length} dòng đang chọn nhưng vướng trùng lịch — sẽ bị bỏ qua, sửa Host hoặc bỏ chọn để hết cảnh báo.
               </span>
             )}

@@ -224,7 +224,7 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
             <div className="rounded-xl bg-[var(--surface-base)]/40 border border-[var(--border)] p-3">
               <div className="text-[var(--text-muted)]">Ca đã live</div>
               <div className="font-bold text-[var(--text)] text-base">{month.done.count > 0 ? `${month.done.count} ca` : <Empty>chưa có</Empty>}</div>
-              {month.done.count > 0 && <div className="text-[11px] text-[var(--text-faint)]">{h1(month.done.hostHours)} host · {h1(month.done.coHours)} trợ</div>}
+              {month.done.count > 0 && <div className="text-2xs text-[var(--text-faint)]">{h1(month.done.hostHours)} host · {h1(month.done.coHours)} trợ</div>}
             </div>
             {/* Thu nhập tháng — đúng công thức hostPayout/coHostPayout của Finance & P&L (computeTalentMonthlyIncome) */}
             <div className="rounded-xl bg-amber-950/30 border border-amber-500/30 p-3">
@@ -241,13 +241,13 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
             </div>
           </div>
           {myTalent.rateHidden ? (
-            <p className="text-[11px] text-[var(--text-faint)]">Tài khoản của bạn chưa được liên kết đúng hồ sơ Talent nên chưa xem được Rate Card — báo Admin gán lại giúp.</p>
+            <p className="text-2xs text-[var(--text-faint)]">Tài khoản của bạn chưa được liên kết đúng hồ sơ Talent nên chưa xem được Rate Card — báo Admin gán lại giúp.</p>
           ) : noRate ? (
-            <p className="text-[11px] text-[var(--text-faint)]">Rate của bạn ops chưa nhập nên chưa tính được lương — nhờ ops nhập ở Talent Pool.</p>
+            <p className="text-2xs text-[var(--text-faint)]">Rate của bạn ops chưa nhập nên chưa tính được lương — nhờ ops nhập ở Talent Pool.</p>
           ) : income.missingRate ? (
-            <p className="text-[11px] text-rose-300">Có ca trong tháng chưa được đặt rate, nên số trên đang thiếu phần của những ca đó.</p>
+            <p className="text-2xs text-rose-300">Có ca trong tháng chưa được đặt rate, nên số trên đang thiếu phần của những ca đó.</p>
           ) : income.rows.length === 0 && monthDone.length > 0 ? (
-            <p className="text-[11px] text-[var(--text-faint)]">Ca nạp bù từ file của tháng cũ không vào bảng lương ở đây — lương những tháng đó đã chốt ngoài app.</p>
+            <p className="text-2xs text-[var(--text-faint)]">Ca nạp bù từ file của tháng cũ không vào bảng lương ở đây — lương những tháng đó đã chốt ngoài app.</p>
           ) : null}
         </section>
       )}
@@ -260,7 +260,7 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
         <section className={CARD} aria-label="Bảng công tháng">
           <div className="flex items-baseline justify-between gap-2">
             <h3 className={SECTION_TITLE}>Bảng công · {monthDone.length} ca</h3>
-            <span className="text-[11px] text-[var(--text-faint)]">thấy sai giờ thì báo OP</span>
+            <span className="text-2xs text-[var(--text-faint)]">thấy sai giờ thì báo OP</span>
           </div>
           <div className="max-h-96 lg:max-h-[70vh] overflow-y-auto -mx-1">
             {monthDone.map((s) => {
@@ -272,7 +272,7 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
                     <p className="font-bold text-[var(--text)] flex flex-wrap items-center gap-1.5">
                       {s.brandName} <PlatformChip platform={s.platform} />
                     </p>
-                    <p className="text-[11px] text-[var(--text-faint)]">
+                    <p className="text-2xs text-[var(--text-faint)]">
                       {dayLabel(s.date)} · {s.startTime}–{s.endTime} · {asHost ? "Host" : "Trợ live"}
                       {/* GMV chỉ ở ca mình làm HOST — GMV của ca tính cho host (cùng luật assistSessionCount ở Talent Pool). */}
                       {asHost && s.actualGmv > 0 ? ` · ${platformText("GMV", "all")} ${fmtVndShort(s.actualGmv)}` : ""}
@@ -280,13 +280,13 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
                   </div>
                   <div className="text-right shrink-0">
                     <p className="font-mono font-bold text-[var(--text)]">{h1(pay?.hours ?? sessionMinutes(s) / 60)}</p>
-                    {pay && pay.payout > 0 && <p className="text-[11px] text-[var(--text-muted)]">{money(pay.payout)}</p>}
+                    {pay && pay.payout > 0 && <p className="text-2xs text-[var(--text-muted)]">{money(pay.payout)}</p>}
                   </div>
                 </div>
               );
             })}
           </div>
-          <p className="text-[11px] text-[var(--text-faint)]">Số tạm tính theo rate hiện tại — có thể đổi khi ca chưa đối soát xong hoặc rate vừa được cập nhật.</p>
+          <p className="text-2xs text-[var(--text-faint)]">Số tạm tính theo rate hiện tại — có thể đổi khi ca chưa đối soát xong hoặc rate vừa được cập nhật.</p>
         </section>
       )}
 
@@ -297,7 +297,7 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
       <section className={CARD} aria-label="Hiệu suất so trung bình nhóm">
         <div className="flex items-baseline justify-between gap-2">
           <h3 className={SECTION_TITLE}>Bạn so với trung bình nhóm</h3>
-          <span className="text-[11px] text-[var(--text-faint)]">{STANDING_DAYS} ngày gần nhất</span>
+          <span className="text-2xs text-[var(--text-faint)]">{STANDING_DAYS} ngày gần nhất</span>
         </div>
         {standing.clear.length + standing.unclear.length === 0 ? (
           <p className="text-xs text-[var(--text-faint)]">Chưa có ca nào có số liệu trong {STANDING_DAYS} ngày gần nhất.</p>
@@ -314,7 +314,7 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
                 {standing.clear.length > 0 ? `${standing.unclear.length} kênh khác` : `Cả ${standing.unclear.length} kênh bạn đã live`} chưa đủ số để nói bạn cao hay thấp hơn trung bình nhóm.
               </p>
             )}
-            <details className="text-[11px] text-[var(--text-faint)]">
+            <details className="text-2xs text-[var(--text-faint)]">
               <summary className="cursor-pointer font-bold min-h-6 flex items-center">Cách tính · xem từng kênh</summary>
               <p className="mt-1">
                 {platformText("GMV", "all")} thực của ca bạn ÷ {platformText("GMV", "all")} nếu đạt bằng trung bình cả nhóm cùng kênh, cùng tháng, cùng loại ngày (lịch Campaign cố định) và buổi.
@@ -359,7 +359,7 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
                   .filter((p) => myReal.perf[p].gmv > 0)
                   .map((p) => (
                     <span key={p} className="block">
-                      {fmtVndShort(myReal.perf[p].gmv)} <span className="text-[11px] font-normal text-[var(--text-faint)]">{p}</span>
+                      {fmtVndShort(myReal.perf[p].gmv)} <span className="text-2xs font-normal text-[var(--text-faint)]">{p}</span>
                     </span>
                   ))
               ) : (

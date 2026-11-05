@@ -202,7 +202,7 @@ export const CumChart: React.FC<{ sessions: LiveSession[]; P: ResolvedPeriod; ca
           </>
         )}
       </svg>
-      <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-[11px] text-[var(--text-faint)]">
+      <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-2xs text-[var(--text-faint)]">
         <span className="inline-flex items-center gap-1.5"><i className="w-4 border-t-2 border-[var(--accent)]" />{rangeLabel(P.start, P.end)}</span>
         {!P.noBase && <span className="inline-flex items-center gap-1.5"><i className="w-4 border-t-2 border-dashed border-[var(--text-faint)]" />{P.isCurrentMonth ? fmtMonth(P.prevStart.slice(0, 7)) : rangeLabel(P.prevStart, P.prevEnd)}</span>}
         {showTgt && <span className="inline-flex items-center gap-1.5"><i className="w-4 border-t-2 border-dashed border-[var(--warning)]" />Target luỹ kế</span>}

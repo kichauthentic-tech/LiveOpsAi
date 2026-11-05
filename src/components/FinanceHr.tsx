@@ -266,7 +266,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
             10/10: 3 dải cảnh báo (thiếu rate / ca chưa xác nhận / nguồn {platformText("GMV", "all")}) gộp thành MỘT khối,
             mỗi lý do một dòng có chấm màu — trước đó 3 hộp màu chồng nhau đẩy bảng xuống ~230px. */}
         {(missingSummary.rowsAffected > 0 || unconfirmed.length > 0 || (rows.length > 0 && quality.reconciled < quality.total)) && (
-          <div className="text-[11px] rounded-xl border border-[var(--border)] bg-[var(--surface-base)] divide-y divide-[var(--border-muted)]">
+          <div className="text-2xs rounded-xl border border-[var(--border)] bg-[var(--surface-base)] divide-y divide-[var(--border-muted)]">
             <p className="px-3 py-1.5 font-semibold text-[var(--text-muted)]">Số liệu trên trang này chưa chốt vì</p>
             {missingSummary.rowsAffected > 0 && (
               <div className="px-3 py-2 flex gap-2">
@@ -321,7 +321,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="text-left text-[11px] font-semibold text-[var(--text-faint)] border-b border-[var(--border)]">
+                <tr className="text-left text-2xs font-semibold text-[var(--text-faint)] border-b border-[var(--border)]">
                   <th className="py-2 pr-3">Kênh</th>
                   <th className="py-2 pr-3 text-right">Ca</th>
                   <th className="py-2 pr-3 text-right">Doanh thu agency</th>
@@ -383,12 +383,12 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                       <div className="font-bold text-[var(--text)] flex items-center gap-1.5 flex-wrap">
                         {s.title}
                         {excluded && (
-                          <span className="text-[11px] font-bold bg-[var(--surface-elevated)] text-[var(--text-muted)] border border-[var(--border)] px-1.5 py-0.5 rounded-full" title={s.excludedReason ? `Lý do loại: ${s.excludedReason}` : undefined}>
+                          <span className="text-2xs font-bold bg-[var(--surface-elevated)] text-[var(--text-muted)] border border-[var(--border)] px-1.5 py-0.5 rounded-full" title={s.excludedReason ? `Lý do loại: ${s.excludedReason}` : undefined}>
                             Đã loại khỏi báo cáo — chỉ tính công, không tính {platformText("GMV", "all")}/doanh thu
                           </span>
                         )}
                         {missingInputs.length > 0 && !uniformMissing && (
-                          <span className="text-[11px] font-semibold text-amber-300" title={missingInputs.map((m) => PNL_MISSING_LABEL[m]).join("\n")}>
+                          <span className="text-2xs font-semibold text-amber-300" title={missingInputs.map((m) => PNL_MISSING_LABEL[m]).join("\n")}>
                             Thiếu {missingInputs.map((m) => MISSING_SHORT[m]).join(" · ")}
                           </span>
                         )}
@@ -402,7 +402,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                     <td className="py-2 pr-3">
                       {isHourly ? (
                         <div>
-                          <span className="text-[11px] font-bold bg-blue-950 text-blue-300 border border-blue-800 px-1.5 py-0.5 rounded-full">
+                          <span className="text-2xs font-bold bg-blue-950 text-blue-300 border border-blue-800 px-1.5 py-0.5 rounded-full">
                             Theo giờ live
                           </span>
                           <div className="font-bold text-[var(--text)] mt-0.5">{money(grossAgencyRev)}</div>
@@ -410,7 +410,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                       ) : (
                         // % hoa hồng theo brand × sàn ở CRM (gộp cấu hình 06/10) — không sửa từng ca ở đây.
                         <div>
-                          <span className="text-[11px] font-bold text-[var(--text-muted)]">{agencyCommissionRate}% NMV</span>
+                          <span className="text-2xs font-bold text-[var(--text-muted)]">{agencyCommissionRate}% NMV</span>
                           <div className="font-bold text-[var(--text)] mt-0.5">{money(grossAgencyRev)}</div>
                         </div>
                       )}
@@ -434,7 +434,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                       <div className="text-amber-400 font-bold">{money(hostPayout)}</div>
                       {/* Đổi người giữa ca (0138): mỗi người một dòng — công theo giờ của chính họ. */}
                       {segmented && (
-                        <div className="text-[11px] text-[var(--text-muted)] mt-0.5 space-y-0.5">
+                        <div className="text-2xs text-[var(--text-muted)] mt-0.5 space-y-0.5">
                           {payouts.map((p) => (
                             <div key={`${p.role}-${p.talentId}`}>
                               {p.role === "host" ? "Host" : "Trợ"} {p.name}: {fmtFixed(p.hours, 2)}h · <b>{p.missingRate ? "chưa có rate" : money(p.payout)}</b>
@@ -443,7 +443,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                         </div>
                       )}
                       {!segmented && hostPaidHourly && (
-                        <div className="text-[11px] text-[var(--text-muted)] mt-0.5">
+                        <div className="text-2xs text-[var(--text-muted)] mt-0.5">
                           {fmtFixed(billableHours, 2)}h × rate/giờ
                           {otMinutes > 0 && <span className="text-emerald-400 font-bold"> · OT +{otMinutes}p</span>}
                           {earlyLeaveMinutes > 0 && <span className="text-amber-400 font-bold"> · kết thúc sớm −{earlyLeaveMinutes} phút</span>}
@@ -453,12 +453,12 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                           Profit trừ những ai. Ca có co_host_id nhưng talent đã bị xoá thì không
                           tính được, phải nói ra chứ không im lặng ra 0. */}
                       {segmented ? null : coHost ? (
-                        <div className="text-[11px] text-amber-300/80 mt-1">
+                        <div className="text-2xs text-amber-300/80 mt-1">
                           Trợ live {coHost.name}: <b>{money(coHostPayout)}</b>
                           {coHostPaidHourly && <span className="text-[var(--text-muted)]"> ({fmtFixed(billableHours, 2)}h × {coHostUsesAssistantRate ? "rate trợ/giờ" : "rate host/giờ — chưa đặt rate trợ"})</span>}
                         </div>
                       ) : s.coHostId ? (
-                        <div className="text-[11px] text-red-300 mt-1">Trợ live {s.coHostName || "—"} không còn hồ sơ talent — chưa tính công</div>
+                        <div className="text-2xs text-red-300 mt-1">Trợ live {s.coHostName || "—"} không còn hồ sơ talent — chưa tính công</div>
                       ) : null}
                     </td>
                     <td className={`py-2 pr-3 font-black ${netProfit >= 0 ? "text-emerald-400" : "text-red-400"}`}>

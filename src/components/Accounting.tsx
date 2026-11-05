@@ -46,7 +46,7 @@ interface AccountingProps {
   canEditFees?: boolean;
 }
 
-const TH = "py-2 pr-3 text-[11px] font-semibold text-[var(--text-muted)] whitespace-nowrap";
+const TH = "py-2 pr-3 text-2xs font-semibold text-[var(--text-muted)] whitespace-nowrap";
 const TD = "py-2 pr-3 whitespace-nowrap";
 const NUM = `${TD} text-right tabular-nums`;
 
@@ -407,7 +407,7 @@ export const Accounting: React.FC<AccountingProps> = ({
           </div>
 
           {notices.length > 0 && (
-            <div className="text-[11px] rounded-xl border border-[var(--border)] bg-[var(--surface-base)] divide-y divide-[var(--border-muted)]">
+            <div className="text-2xs rounded-xl border border-[var(--border)] bg-[var(--surface-base)] divide-y divide-[var(--border-muted)]">
               <p className="px-3 py-1.5 font-semibold text-[var(--text-muted)]">Cần biết trước khi đối chiếu</p>
               {notices.map((n, i) => (
                 <div key={i} className="px-3 py-2 flex gap-2">
@@ -453,7 +453,7 @@ export const Accounting: React.FC<AccountingProps> = ({
                         <td className={NUM}>
                           {fmtVndFull(c.revenue)}
                           {(c.basis.kind === "nmv_final" || (c.basis.kind === "terms" && c.basis.state === "final")) && c.revenue !== c.revenueEstimate && (
-                            <div className="text-[11px] text-[var(--text-faint)]" title="so với số ước tính trước đó">
+                            <div className="text-2xs text-[var(--text-faint)]" title="so với số ước tính trước đó">
                               ước tính {fmtVndFull(c.revenueEstimate)}
                             </div>
                           )}

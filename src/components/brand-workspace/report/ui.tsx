@@ -8,7 +8,7 @@ import { errorMessage } from "../../../lib/errorMessage";
 
 import { fmtFixed, fmtVndShort } from "../../../lib/format";
 import type { ReportSectionId } from "./theme";
-import { LINK_BTN, PAL, DRIVER_SHORT, chartTooltipStyle } from "./theme";
+import { LINK_BTN, PAL, alpha, DRIVER_SHORT, chartTooltipStyle, usePal } from "./theme";
 import { chartNum } from "./format";
 import { STAT_LABEL_SHAPE } from "../../common/StatTile";
 import { t, monthLong } from "../../../lib/displayLang";
@@ -21,9 +21,9 @@ export const Panel: React.FC<{ title: string; icon: React.ReactNode; sub?: strin
   <div className="rounded-2xl overflow-hidden" style={{ background: PAL.panel, border: `1px solid ${PAL.line}` }}>
     <div
       className="px-5 py-3.5 flex items-center gap-2.5"
-      style={{ borderBottom: `1px solid ${PAL.line}`, background: `linear-gradient(90deg, ${PAL.gold}22, transparent)` }}
+      style={{ borderBottom: `1px solid ${PAL.line}`, background: `linear-gradient(90deg, ${alpha(PAL.gold, 13)}, transparent)` }}
     >
-      <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg" style={{ background: PAL.gold, color: "#1a1500" }}>
+      <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg" style={{ background: PAL.gold, color: PAL.onGold }}>
         {icon}
       </span>
       <div>
@@ -31,7 +31,7 @@ export const Panel: React.FC<{ title: string; icon: React.ReactNode; sub?: strin
           {title}
         </h3>
         {sub && (
-          <p className="text-[11px]" style={{ color: PAL.muted }}>
+          <p className="text-2xs" style={{ color: PAL.muted }}>
             {sub}
           </p>
         )}
@@ -48,13 +48,13 @@ export const Panel: React.FC<{ title: string; icon: React.ReactNode; sub?: strin
 /** `leftCols`: chỉ số các cột chữ (canh trái) — mặc định chỉ cột đầu, các cột sau là số (canh phải). */
 export const ReportTable: React.FC<{ head: string[]; children: React.ReactNode; leftCols?: number[] }> = ({ head, children, leftCols }) => (
   <div className="overflow-x-auto -mx-1">
-    <table className="w-full text-xs min-w-[520px] [&_th:first-child]:sticky [&_th:first-child]:left-0 [&_th:first-child]:z-10 [&_td:first-child]:sticky [&_td:first-child]:left-0 [&_td:first-child]:z-10 [&_th:first-child]:bg-[#17171b] [&_td:first-child]:bg-[#17171b]">
+    <table className="w-full text-xs min-w-[520px] [&_th:first-child]:sticky [&_th:first-child]:left-0 [&_th:first-child]:z-10 [&_td:first-child]:sticky [&_td:first-child]:left-0 [&_td:first-child]:z-10 [&_th:first-child]:bg-[var(--rt-panel)] [&_td:first-child]:bg-[var(--rt-panel)]">
       <thead>
         <tr style={{ borderBottom: `1px solid ${PAL.line}` }}>
           {head.map((h, i) => (
             <th
               key={i}
-              className={`py-2 px-3 text-left text-[11px] font-semibold ${i > 0 && !leftCols?.includes(i) ? "text-right" : ""}`}
+              className={`py-2 px-3 text-left text-2xs font-semibold ${i > 0 && !leftCols?.includes(i) ? "text-right" : ""}`}
               style={{ color: PAL.muted }}
               title={metricHint(h)}
             >
@@ -90,19 +90,21 @@ export function toWaterfall(b: DriverBreakdown | null, cmp: { partial: boolean; 
   return out;
 }
 
-export const WaterfallPanel: React.FC<{ title: string; sub: string; data: WaterfallPoint[]; breakdown: DriverBreakdown; note?: string }> = ({ title, sub, data, breakdown, note }) => (
+export const WaterfallPanel: React.FC<{ title: string; sub: string; data: WaterfallPoint[]; breakdown: DriverBreakdown; note?: string }> = ({ title, sub, data, breakdown, note }) => {
+  const P = usePal();
+  return (
   <Panel title={title} icon={<BarChart3 className="w-4 h-4" />} sub={sub}>
     <div style={{ height: 240 }}>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} margin={{ top: 18, right: 8 }}>
-          <CartesianGrid stroke={PAL.line} vertical={false} />
-          <XAxis dataKey="label" stroke={PAL.muted} fontSize={11} interval={0} />
-          <YAxis stroke={PAL.muted} fontSize={11} tickFormatter={(v) => fmtVndShort(v)} width={70} />
+          <CartesianGrid stroke={P.line} vertical={false} />
+          <XAxis dataKey="label" stroke={P.muted} fontSize={11} interval={0} />
+          <YAxis stroke={P.muted} fontSize={11} tickFormatter={(v) => fmtVndShort(v)} width={70} />
           <Tooltip contentStyle={chartTooltipStyle} formatter={(_v, _n, item) => fmtVndShort(chartNum((item as { payload?: { display?: number } }).payload?.display))} />
           <Bar dataKey="base" stackId="w" fill="transparent" isAnimationActive={false} legendType="none" tooltipType="none" />
           <Bar dataKey="value" stackId="w" radius={[4, 4, 0, 0]} name="GMV">
             {data.map((d, i) => (
-              <Cell key={i} fill={d.kind === "total" ? PAL.gold : d.kind === "up" ? PAL.green : PAL.red} />
+              <Cell key={i} fill={d.kind === "total" ? P.gold : d.kind === "up" ? P.green : P.red} />
             ))}
           </Bar>
         </BarChart>
@@ -110,21 +112,22 @@ export const WaterfallPanel: React.FC<{ title: string; sub: string; data: Waterf
     </div>
     <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 mt-2">
       {breakdown.parts.map((p) => (
-        <div key={p.key} className="text-xs rounded-lg px-3 py-2" style={{ background: PAL.panel2, color: PAL.muted }}>
-          <span style={{ color: PAL.cream }}>{DRIVER_LABEL[p.key]}</span> {p.change >= 0 ? "+" : "−"}{fmtFixed(Math.abs(p.change), 1)}% ⇒{" "}
-          <span className="font-mono" style={{ color: p.value >= 0 ? PAL.green : PAL.red }}>
+        <div key={p.key} className="text-xs rounded-lg px-3 py-2" style={{ background: P.panel2, color: P.muted }}>
+          <span style={{ color: P.cream }}>{DRIVER_LABEL[p.key]}</span> {p.change >= 0 ? "+" : "−"}{fmtFixed(Math.abs(p.change), 1)}% ⇒{" "}
+          <span className="font-mono" style={{ color: p.value >= 0 ? P.green : P.red }}>
             {p.value >= 0 ? "+" : "−"}{fmtVndShort(Math.abs(p.value))}
           </span>
         </div>
       ))}
     </div>
     {note && (
-      <p className="text-[11px] mt-2" style={{ color: PAL.muted }}>
+      <p className="text-2xs mt-2" style={{ color: P.muted }}>
         {note}
       </p>
     )}
   </Panel>
-);
+  );
+};
 
 // Phần chi tiết của một mục Report Tháng — trên điện thoại gập lại sau Insight (xem isNarrow trong MonthlyReportTabs).
 export const SectionDetail: React.FC<{ open: boolean; onOpen: () => void; children: React.ReactNode }> = ({ open, onOpen, children }) =>
@@ -150,7 +153,7 @@ export const SectionHead: React.FC<{ no: string; title: string; sub?: string }> 
       {title}
     </h2>
     {sub && (
-      <span className="text-[11px]" style={{ color: PAL.muted }}>
+      <span className="text-2xs" style={{ color: PAL.muted }}>
         {sub}
       </span>
     )}
@@ -176,7 +179,7 @@ export const badgeTone = (p: number) => (p >= 100 ? PAL.green : p >= 90 ? PAL.go
 
 export const PageMetricCard: React.FC<PageMetric> = ({ label, value, badge, badgeLabel, change, note }) => (
   <div className="min-w-0 rounded-xl p-4" style={{ background: PAL.panel2, border: `1px solid ${PAL.line}` }}>
-    <div className="text-[11px] font-bold leading-snug line-clamp-2 min-h-[2.75em]" style={{ color: PAL.muted }} title={metricHint(label)}>
+    <div className="text-2xs font-bold leading-snug line-clamp-2 min-h-[2.75em]" style={{ color: PAL.muted }} title={metricHint(label)}>
       {label}
     </div>
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
@@ -184,18 +187,18 @@ export const PageMetricCard: React.FC<PageMetric> = ({ label, value, badge, badg
         {value}
       </span>
       {badge != null && (
-        <span className="rounded-md px-1.5 py-0.5 text-[11px] font-bold whitespace-nowrap" style={{ color: badgeTone(badge), border: `1px solid ${badgeTone(badge)}`, background: `${badgeTone(badge)}1f` }}>
+        <span className="rounded-md px-1.5 py-0.5 text-2xs font-bold whitespace-nowrap" style={{ color: badgeTone(badge), border: `1px solid ${badgeTone(badge)}`, background: `${badgeTone(badge)}1f` }}>
           {badgeLabel ?? `${fmtFixed(badge, 0)}% Target`}
         </span>
       )}
     </div>
     {change != null && (
-      <div className="text-[11px] mt-1 font-bold" style={{ color: change >= 0 ? PAL.green : PAL.red }}>
+      <div className="text-2xs mt-1 font-bold" style={{ color: change >= 0 ? PAL.green : PAL.red }}>
         {change >= 0 ? "▲" : "▼"} {fmtFixed(Math.abs(change), 1)}% {t("cùng kỳ", "vs same period")}
       </div>
     )}
     {note && (
-      <div className="text-[11px] mt-1" style={{ color: PAL.muted }}>
+      <div className="text-2xs mt-1" style={{ color: PAL.muted }}>
         {note}
       </div>
     )}
@@ -257,7 +260,7 @@ export const PageRail = React.forwardRef<HTMLElement, { items: RailItem[]; curre
       onClick={onExcel}
       data-export-hide
       title={t("Xuất toàn bộ Report Tháng ra 1 file Excel nhiều sheet", "Export the whole report to one multi-sheet Excel file")}
-      className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap shrink-0"
+      className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-2xs font-bold whitespace-nowrap shrink-0"
       style={{ background: PAL.panel2, border: `1px solid ${PAL.line}`, color: PAL.gold }}
     >
       <Download className="w-3.5 h-3.5" /> {t("Xuất Excel", "Export Excel")}
@@ -314,7 +317,7 @@ export const InsightBox: React.FC<{
     }
   };
   return (
-    <div className="rounded-xl p-4 space-y-2" style={{ background: "#1f1b10", border: `1px solid ${PAL.gold}44` }}>
+    <div className="rounded-xl p-4 space-y-2" style={{ background: `color-mix(in srgb, ${PAL.gold} 8%, ${PAL.panel})`, border: `1px solid ${alpha(PAL.gold, 27)}` }}>
       <div className="flex items-center gap-2 text-xs font-bold" style={{ color: PAL.gold }}>
         <Lightbulb className="w-3.5 h-3.5" /> Insight
       </div>
@@ -327,11 +330,11 @@ export const InsightBox: React.FC<{
             className="w-full rounded-lg p-2.5 text-[13px] leading-relaxed font-sans"
             style={{ background: PAL.panel, border: `1px solid ${PAL.line}`, color: PAL.cream }}
           />
-          <p className="text-[11px]" style={{ color: PAL.muted }}>
+          <p className="text-2xs" style={{ color: PAL.muted }}>
             Dòng đầu = kết luận · mỗi dòng sau = 1 gạch đầu dòng · dòng bắt đầu bằng "→" = việc cần làm.
           </p>
-          {error && <p className="text-[11px]" style={{ color: PAL.red }}>{error}</p>}
-          <div className="flex gap-3 text-[11px] font-bold">
+          {error && <p className="text-2xs" style={{ color: PAL.red }}>{error}</p>}
+          <div className="flex gap-3 text-2xs font-bold">
             <button onClick={() => save(draft.trim() || null)} disabled={saving} className={LINK_BTN} style={{ color: PAL.gold }}>
               {saving ? "Đang lưu…" : "Lưu"}
             </button>
@@ -364,7 +367,7 @@ export const InsightBox: React.FC<{
             <p className="text-[12px]" style={{ color: PAL.muted }}>{t("Chưa đủ số để tự sinh Insight cho phần này.", "Not enough data to generate insights for this section.")}</p>
           )}
           {canManage && (
-            <div className="flex flex-wrap items-center gap-3 pt-2 text-[11px]" style={{ borderTop: `1px solid ${PAL.line}`, color: PAL.muted }}>
+            <div className="flex flex-wrap items-center gap-3 pt-2 text-2xs" style={{ borderTop: `1px solid ${PAL.line}`, color: PAL.muted }}>
               <span>{note ? "Ops đã sửa." : "Bản tự sinh từ số liệu."}</span>
               {note && note.savedAt < computedAt && <span style={{ color: PAL.gold }}>Số liệu đã cập nhật sau lần sửa — đọc lại cho khớp.</span>}
               <button
@@ -403,12 +406,12 @@ export const KpiTile: React.FC<{ label: string; value: string; change?: number |
       {value}
     </div>
     {change != null && (
-      <div className="text-[11px] mt-1 font-bold" style={{ color: change >= 0 ? PAL.green : PAL.red }}>
+      <div className="text-2xs mt-1 font-bold" style={{ color: change >= 0 ? PAL.green : PAL.red }}>
         {change >= 0 ? "▲" : "▼"} {fmtFixed(Math.abs(change), 1)}% {t("cùng kỳ", "vs same period")}
       </div>
     )}
     {note && (
-      <div className="text-[11px] mt-1" style={{ color: PAL.muted }}>
+      <div className="text-2xs mt-1" style={{ color: PAL.muted }}>
         {note}
       </div>
     )}
@@ -418,7 +421,7 @@ export const KpiTile: React.FC<{ label: string; value: string; change?: number |
 // Giải thích cách tính dài của một khối — gập sau dòng "Cách tính" (bố cục 18/10 đợt 2). Số, kết luận và chú thích màu
 // vẫn hiện; chỉ phần nói phương pháp mới gập.
 export const MethodNote: React.FC<{ children: React.ReactNode; label?: string; className?: string }> = ({ children, label = t("Cách tính", "Methodology"), className = "mt-2" }) => (
-  <details className={`text-[11px] ${className}`} style={{ color: PAL.muted }}>
+  <details className={`text-2xs ${className}`} style={{ color: PAL.muted }}>
     <summary className="cursor-pointer min-h-6 py-1 font-bold w-fit">{label}</summary>
     <div className="leading-relaxed">{children}</div>
   </details>
@@ -427,7 +430,7 @@ export const MethodNote: React.FC<{ children: React.ReactNode; label?: string; c
 export const ChartLegend: React.FC<{ items: [string, string][] }> = ({ items }) => (
   <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-2">
     {items.map(([label, color]) => (
-      <span key={label} className="flex items-center gap-1.5 text-[11px]" style={{ color: PAL.muted }}>
+      <span key={label} className="flex items-center gap-1.5 text-2xs" style={{ color: PAL.muted }}>
         <span className="w-2.5 h-2.5 rounded-sm" style={{ background: color }} />
         {label}
       </span>
@@ -463,7 +466,7 @@ export const NarrativeEditor: React.FC<{
       </p>
     )}
     <div className="flex gap-2">
-      <button onClick={onSave} disabled={saving} className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold disabled:opacity-60" style={{ background: PAL.gold, color: "#1a1500" }}>
+      <button onClick={onSave} disabled={saving} className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold disabled:opacity-60" style={{ background: PAL.gold, color: PAL.onGold }}>
         {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} Lưu
       </button>
       <button onClick={onCancel} disabled={saving} className="px-4 py-2 rounded-lg text-xs font-bold" style={{ background: PAL.panel2, border: `1px solid ${PAL.line}`, color: PAL.muted }}>

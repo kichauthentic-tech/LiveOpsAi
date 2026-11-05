@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { BrandMonthlyReport, BrandMonthPlan, BrandMonthPlanSlot, LiveSession } from "../../types";
 import { fmtFixed, fmtVndFull, fmtVndShort } from "../../lib/format";
 import { METRIC } from "../../lib/metricGlossary";
-import { PAL, SECTIONS, type ReportSectionId } from "./report/theme";
+import { PAL, alpha, SECTIONS, type ReportSectionId } from "./report/theme";
 import { fmtInt } from "./report/format";
 import { PageHead, PagePager, PageRail, type PageMetric } from "./report/ui";
 import { DemoHead as WhyHead, DemoInsight, type DemoKpi as WhyKpi } from "./report/DemoShopWhy";
@@ -442,7 +442,7 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
   const rail = visible.map((p) => ({ id: p.id as ReportSectionId, label: p.label }));
   const fileHint = (what: string) => (canManage ? `Chưa có file ${what} của tháng này — tải lên ở Dữ Liệu Gốc.` : tr("Chưa có số liệu cho phần này trong tháng.", "No data for this section this month yet."));
   const warnBox = (children: React.ReactNode) => (
-    <div className="rounded-xl px-3 py-2 text-[12px]" style={{ background: `${PAL.gold}14`, color: PAL.gold, border: `1px solid ${PAL.gold}44` }} data-export-hide>
+    <div className="rounded-xl px-3 py-2 text-[12px]" style={{ background: `${alpha(PAL.gold, 8)}`, color: PAL.gold, border: `1px solid ${alpha(PAL.gold, 27)}` }} data-export-hide>
       {children}
     </div>
   );
@@ -650,7 +650,7 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
       <div className="p-5 flex flex-col gap-8">
         {canManage && s.version < 6 && warnBox(<>Số liệu này chốt trước khi report Shopee dùng chung trang với TikTok (hạng sản phẩm so tháng trước) — bấm &quot;Cập nhật số liệu&quot; ở trên để có đủ các trang.</>)}
         {canManage && (scopeLine || outsideLine) && (
-          <p data-export-hide className="text-[11px]" style={{ color: outsideBig && !scope.inhouseLive ? PAL.gold : PAL.muted }}>
+          <p data-export-hide className="text-2xs" style={{ color: outsideBig && !scope.inhouseLive ? PAL.gold : PAL.muted }}>
             {scopeLine && <>Phạm vi dịch vụ (CRM → Hợp đồng & giá): {scopeLine}.</>}
             {scopeLine && outsideLine && " "}
             {outsideLine && <>Chỉ ops thấy · {outsideLine}</>}

@@ -154,7 +154,7 @@ export function ShopeeAdsPanel({ brandId, brandName, month, canManage, isPublish
         <h3 className="font-bold text-[var(--text)] text-sm flex items-center gap-2">
           <Target className="w-4 h-4 text-[var(--accent-text)]" /> Ads Shopee · tháng {fmtMonth(month)}
         </h3>
-        <p className="text-[11px] text-[var(--text-faint)] mt-1">
+        <p className="text-2xs text-[var(--text-faint)] mt-1">
           Tới 3 file, mỗi loại Ads một file (Seller Centre → Quảng cáo Shopee → xuất dữ liệu, chọn đúng một tháng): <b>Livestream Ads</b>, <b>Shop+ Ads</b> (tìm kiếm từ khoá / ngành hàng), <b>Product Ads</b> (CPC / Sales Max).
           Thả cả 3 file vào một ô, app tự nhận loại. File là tổng cả tháng theo chiến dịch hoặc sản phẩm, không có số theo ngày.
         </p>
@@ -195,15 +195,15 @@ export function ShopeeAdsPanel({ brandId, brandName, month, canManage, isPublish
                     <b className="text-[var(--text)]">{fmtVndFull(sm.gmv)}</b> · {METRIC.roas} {sm.expense > 0 ? `${fmtFixed(sm.gmv / sm.expense, 2)}x` : "—"}
                   </p>
                 )}
-                {p.replace && <p className="text-[11px] text-amber-300">Đã có file {SHOPEE_ADS_KIND_LABEL[p.kind]} tháng này (tải {new Date(p.replace.importedAt).toLocaleString("vi-VN")}) — lưu sẽ THAY file cũ, không cộng dồn.</p>}
+                {p.replace && <p className="text-2xs text-amber-300">Đã có file {SHOPEE_ADS_KIND_LABEL[p.kind]} tháng này (tải {new Date(p.replace.importedAt).toLocaleString("vi-VN")}) — lưu sẽ THAY file cũ, không cộng dồn.</p>}
               </div>
             );
           })}
-          <p className="text-[11px] text-amber-300">
+          <p className="text-2xs text-amber-300">
             File ghi shop <b>{shopNames.join("; ")}</b> — kiểm lại đây đúng là shop Shopee của <b>{brandName}</b> trước khi lưu.
           </p>
           {isPublished && pending[0].parsed.periodStart?.startsWith(month) && (
-            <p className="text-[11px] text-[var(--text-muted)]">Report Shopee tháng {fmtMonth(month)} đã phát hành: brand vẫn thấy số cũ tới khi thu hồi report và bấm Cập nhật số liệu.</p>
+            <p className="text-2xs text-[var(--text-muted)]">Report Shopee tháng {fmtMonth(month)} đã phát hành: brand vẫn thấy số cũ tới khi thu hồi report và bấm Cập nhật số liệu.</p>
           )}
           <div className="flex gap-2">
             <button onClick={onSave} disabled={saving} className="bg-[var(--accent)] text-white font-bold px-4 py-2 rounded-xl text-xs disabled:opacity-50">
@@ -246,7 +246,7 @@ export function ShopeeAdsPanel({ brandId, brandName, month, canManage, isPublish
                     <span className="text-[var(--text-faint)] flex-1">Chưa có file tháng {fmtMonth(month)}. Brand không chạy loại Ads này thì bỏ qua.</span>
                   )}
                   {imp && canManage && (
-                    <button onClick={() => void onDelete(k)} className="text-[11px] font-bold text-red-400 hover:text-red-300 flex items-center gap-1 px-2 py-1 rounded-lg">
+                    <button onClick={() => void onDelete(k)} className="text-2xs font-bold text-red-400 hover:text-red-300 flex items-center gap-1 px-2 py-1 rounded-lg">
                       <Trash2 className="w-3.5 h-3.5" /> Xoá
                     </button>
                   )}
@@ -254,7 +254,7 @@ export function ShopeeAdsPanel({ brandId, brandName, month, canManage, isPublish
               );
             })}
           </div>
-          <p className="text-[11px] text-[var(--text-faint)]">
+          <p className="text-2xs text-[var(--text-faint)]">
             Doanh số trong file Ads là số Shopee quy cho quảng cáo, một phần của Sales shop — không cộng thêm vào Sales live. Shop+ Ads và Product Ads có thể cùng nhận công một đơn nên tổng doanh số có thể cao hơn thực tế; report luôn kèm ROAS đơn trực tiếp.
           </p>
         </>

@@ -254,7 +254,7 @@ export const BrandCommitmentView: React.FC<BrandCommitmentViewProps> = ({
             <h3 className="font-black text-[var(--text)] flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-[var(--accent-text)]" /> {fmtMonth(current.periodMonth)} — đang chạy
             </h3>
-            <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full border ${STATUS_CLS[current.status]}`}>
+            <span className={`text-2xs font-bold px-2.5 py-1 rounded-full border ${STATUS_CLS[current.status]}`}>
               {STATUS_LABEL[current.status]}
             </span>
           </div>
@@ -275,7 +275,7 @@ export const BrandCommitmentView: React.FC<BrandCommitmentViewProps> = ({
           </div>
 
           <Bar done={current.deliveredHours} scheduled={current.scheduledHours} committed={current.committedHours} />
-          <p className="text-[11px] text-[var(--text-faint)]">
+          <p className="text-2xs text-[var(--text-faint)]">
             Đậm = đã lên sóng · nhạt = ca đã xếp lịch chưa tới ngày. Tổng đã chắc chắn có:{" "}
             <b className="text-[var(--text-muted)]">{fmtHours(current.plannedTotalHours)}</b>/{fmtHours(current.committedHours)}.
           </p>
@@ -292,7 +292,7 @@ export const BrandCommitmentView: React.FC<BrandCommitmentViewProps> = ({
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)] text-[11px] font-semibold">
+                <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)] text-2xs font-semibold">
                   <th className="py-2.5 px-4">Tháng</th>
                   <th className="py-2.5 px-2 text-right">Cam kết</th>
                   <th className="py-2.5 px-2 text-right">Đã live</th>
@@ -324,7 +324,7 @@ export const BrandCommitmentView: React.FC<BrandCommitmentViewProps> = ({
                         {/* Tháng chưa phát hành Report Tháng thì cột tiền chưa được mở (Đợt B).
                             Nói rõ lý do, đừng hiện 0 — "0 đ" đọc thành "không bán được gì". */}
                         {gmvHidden ? (
-                          <span className="text-[11px] italic text-[var(--text-faint)]">chưa phát hành</span>
+                          <span className="text-2xs italic text-[var(--text-faint)]">chưa phát hành</span>
                         ) : p.deliveredGmv > 0 ? (
                           fmtVndShort(p.deliveredGmv)
                         ) : (
@@ -332,7 +332,7 @@ export const BrandCommitmentView: React.FC<BrandCommitmentViewProps> = ({
                         )}
                       </td>
                       <td className="py-2.5 px-2">
-                        <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${STATUS_CLS[p.status]}`}>
+                        <span className={`text-2xs font-bold px-2 py-0.5 rounded-full border ${STATUS_CLS[p.status]}`}>
                           {STATUS_LABEL[p.status]}
                         </span>
                       </td>

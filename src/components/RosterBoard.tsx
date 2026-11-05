@@ -349,11 +349,11 @@ export const RosterBoard: React.FC<Props> = (p) => {
             <i className="block bg-[var(--success)]" style={{ width: w(h.delivered) }} />
             <i className="block bg-[var(--success)] opacity-40" style={{ width: w(h.scheduled + h.open) }} />
           </span>
-          <span className="block text-[11px] tabular-nums text-[var(--text-muted)]">
+          <span className="block text-2xs tabular-nums text-[var(--text-muted)]">
             {Math.round(h.delivered)} + {Math.round(h.scheduled + h.open)}
             {r.committed > 0 ? ` / ${Math.round(r.committed)} giờ` : " giờ"}
           </span>
-          {r.verdict && <span className={`block text-[11px] font-bold ${r.verdict.tone === "bad" ? "text-rose-400" : r.verdict.tone === "good" ? "text-emerald-400" : "text-[var(--text-faint)]"}`}>{r.verdict.text}</span>}
+          {r.verdict && <span className={`block text-2xs font-bold ${r.verdict.tone === "bad" ? "text-rose-400" : r.verdict.tone === "good" ? "text-emerald-400" : "text-[var(--text-faint)]"}`}>{r.verdict.text}</span>}
         </span>
       );
     }
@@ -368,11 +368,11 @@ export const RosterBoard: React.FC<Props> = (p) => {
               <i className="block bg-[var(--success)] opacity-60" style={{ width: `${Math.min(100, (r.r.opened / need) * 100)}%` }} />
             </span>
           ) : null}
-          <span className="block text-[11px] tabular-nums text-[var(--text-muted)]">
+          <span className="block text-2xs tabular-nums text-[var(--text-muted)]">
             {Math.round(r.r.opened)}
             {need ? ` / ${Math.ceil(need)} giờ cần mở` : " giờ đã mở"}
           </span>
-          <span className={`block text-[11px] font-bold ${r.r.step === "done" ? "text-emerald-400" : r.r.step === "commit" || r.r.step === "plan" ? "text-rose-400" : "text-amber-300"}`}>{r.r.next}</span>
+          <span className={`block text-2xs font-bold ${r.r.step === "done" ? "text-emerald-400" : r.r.step === "commit" || r.r.step === "plan" ? "text-rose-400" : "text-amber-300"}`}>{r.r.next}</span>
         </span>
       );
     }
@@ -801,7 +801,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
                 {MORE.map((m) => (
                   <button key={m.id} type="button" onClick={() => openSection(m.id)} className={`block w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-[var(--surface-hover)] ${section === m.id ? "font-bold text-[var(--text)]" : "text-[var(--text-muted)]"}`}>
                     {m.label}
-                    {m.id === "checks" && blocks.length + warns.length > 0 && <span className="ml-1.5 text-[11px] tabular-nums text-[var(--text-faint)]">{blocks.length} lỗi · {warns.length} cảnh báo</span>}
+                    {m.id === "checks" && blocks.length + warns.length > 0 && <span className="ml-1.5 text-2xs tabular-nums text-[var(--text-faint)]">{blocks.length} lỗi · {warns.length} cảnh báo</span>}
                   </button>
                 ))}
               </div>
@@ -859,18 +859,18 @@ export const RosterBoard: React.FC<Props> = (p) => {
                 So sánh 3 mục tiêu
               </button>
             </div>
-            <p className="text-[11px] text-[var(--text-muted)]">{planNote ?? "Chỉ lấy người đã đăng ký đúng ca, giữ giờ tối thiểu/tối đa và luật lịch. Bấm là ghi NHÁP ngay, talent chưa thấy; ô bạn tự xếp không bị ghi đè."}</p>
+            <p className="text-2xs text-[var(--text-muted)]">{planNote ?? "Chỉ lấy người đã đăng ký đúng ca, giữ giờ tối thiểu/tối đa và luật lịch. Bấm là ghi NHÁP ngay, talent chưa thấy; ô bạn tự xếp không bị ghi đè."}</p>
           </div>
           <WeekGrid weekStart={weekStart} channels={channels} shifts={wk} analysis={analysis} nameOf={nameOf} selectedKey={selectedKey} canAdd={!readOnly} onSelect={setSelectedKey} onAdd={addShift} channelMeta={channelMeta} />
         </div>
         <section className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 space-y-2" aria-label="Khối lượng nhân sự">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h2 className="text-sm font-black text-[var(--text)]">Khối lượng nhân sự · {planScopeLabel}</h2>
-            <span className="text-[11px] text-[var(--text-muted)]">
+            <span className="text-2xs text-[var(--text-muted)]">
               {workload.totals.below} dưới tối thiểu · {workload.totals.over} vượt tối đa · tính theo ca đã lên lịch + nháp hiện có
             </span>
           </div>
-          <p className="text-[11px] text-[var(--text-muted)]">Thanh: đậm = ca đã lên lịch, nhạt = nháp chưa công bố; vạch đứng = giờ tối thiểu (đảm bảo thu nhập), cuối thanh = giờ tối đa.</p>
+          <p className="text-2xs text-[var(--text-muted)]">Thanh: đậm = ca đã lên lịch, nhạt = nháp chưa công bố; vạch đứng = giờ tối thiểu (đảm bảo thu nhập), cuối thanh = giờ tối đa.</p>
           <div className="grid gap-3 xl:grid-cols-2">
             {(["host", "assistant"] as const).map((role) => {
               const rows = workload.load.filter((l) => (role === "host" ? l.role === "host" : l.role !== "host"));
@@ -888,14 +888,14 @@ export const RosterBoard: React.FC<Props> = (p) => {
         <aside className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 space-y-2" aria-label="Việc cần làm">
           <h2 className="flex items-baseline justify-between gap-2 text-sm font-black text-[var(--text)]">
             Việc cần làm
-            <span className="text-[11px] font-medium text-[var(--text-muted)]">{desk.loading ? "đang tính…" : todos.length ? `${todos.length} việc` : "không còn việc"}</span>
+            <span className="text-2xs font-medium text-[var(--text-muted)]">{desk.loading ? "đang tính…" : todos.length ? `${todos.length} việc` : "không còn việc"}</span>
           </h2>
           {todos.length === 0 && !desk.loading && <p className="text-xs text-[var(--text-muted)]">Tuần đang xem và tháng sau không còn việc gì cần làm.</p>}
           <div className="grid gap-2 sm:grid-cols-2 max-h-[232px] overflow-y-auto pr-1">
           {todos.map((t) => (
             <div key={t.key} className={`rounded-xl border border-[var(--border)] border-l-[3px] ${t.tone === "bad" ? "border-l-rose-500" : "border-l-amber-400"} bg-[var(--surface-base)] px-3 py-2 space-y-1.5`}>
               <p className="text-xs text-[var(--text)]">{t.text}</p>
-              {t.sub && <p className="text-[11px] text-[var(--text-muted)]">{t.sub}</p>}
+              {t.sub && <p className="text-2xs text-[var(--text-muted)]">{t.sub}</p>}
               {t.action && (
                 <button type="button" disabled={busy} onClick={t.action.run} className="text-xs font-bold px-2.5 py-1 rounded-lg border border-[var(--accent)]/60 bg-[var(--accent)]/10 text-[var(--text)] hover:bg-[var(--accent)]/20 disabled:opacity-40">
                   {t.action.label}

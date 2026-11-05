@@ -45,7 +45,7 @@ export const SwingList: React.FC<{ channel: RoomChannel }> = ({ channel }) => {
           <span className={`text-right tabular-nums font-bold ${v >= 0 ? "text-emerald-400" : "text-rose-400"}`}>{byPoints ? `${v >= 0 ? "+" : "−"}${Math.abs(v * 100).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} điểm` : `${v >= 0 ? "+" : "−"}${money(Math.abs(v))}`}</span>
         </div>
       ))}
-      {byPoints && <p className="text-[11px] text-[var(--text-faint)]">Điểm = điểm % của xác suất đạt target.</p>}
+      {byPoints && <p className="text-2xs text-[var(--text-faint)]">Điểm = điểm % của xác suất đạt target.</p>}
     </div>
   );
 };
@@ -58,7 +58,7 @@ export const PeopleLoadTable: React.FC<{ people: PersonLoad[]; weekLimit: number
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
-        <thead><tr className="text-[11px] text-[var(--text-faint)] text-left"><th className="py-1.5 pr-2">Người</th><th className="py-1.5 pr-2" style={{ minWidth: 140 }}>Giờ tháng này (host · trợ)</th><th className="py-1.5 pr-2 text-right">Tuần nặng nhất</th><th className="py-1.5 text-right">Kênh</th></tr></thead>
+        <thead><tr className="text-2xs text-[var(--text-faint)] text-left"><th className="py-1.5 pr-2">Người</th><th className="py-1.5 pr-2" style={{ minWidth: 140 }}>Giờ tháng này (host · trợ)</th><th className="py-1.5 pr-2 text-right">Tuần nặng nhất</th><th className="py-1.5 text-right">Kênh</th></tr></thead>
         <tbody>
           {top.map((p) => {
             const tot = p.hostHours + p.assistantHours;
@@ -82,7 +82,7 @@ export const PeopleLoadTable: React.FC<{ people: PersonLoad[]; weekLimit: number
           })}
         </tbody>
       </table>
-      <p className="text-[11px] text-[var(--text-faint)] mt-1.5">Gồm cả ca sắp tới. Đã kiểm trên 942 ca: giờ 7 ngày trước, ca thứ hai trong ngày, số ngày liền chưa làm GMV giảm đo được ở mức tải hiện tại — tô vàng (tuần trên {weekLimit} giờ) là cảnh báo sức khoẻ và rủi ro nghỉ đột xuất.</p>
+      <p className="text-2xs text-[var(--text-faint)] mt-1.5">Gồm cả ca sắp tới. Đã kiểm trên 942 ca: giờ 7 ngày trước, ca thứ hai trong ngày, số ngày liền chưa làm GMV giảm đo được ở mức tải hiện tại — tô vàng (tuần trên {weekLimit} giờ) là cảnh báo sức khoẻ và rủi ro nghỉ đột xuất.</p>
     </div>
   );
 };

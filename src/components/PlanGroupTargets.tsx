@@ -37,7 +37,7 @@ export const PlanGroupTargetsBlock: React.FC<Props> = ({ rows, targets, targetTo
         Target theo nhóm ngày <span className="font-normal text-[var(--text-faint)]">(tuỳ chọn{given.length > 0 ? ` — đã nhập ${given.length}/4 nhóm` : ""})</span>
       </summary>
       <div className="mt-2 space-y-2">
-        <p className="text-[11px] text-[var(--text-faint)] leading-snug">
+        <p className="text-2xs text-[var(--text-faint)] leading-snug">
           Nhập target từng nhóm thì ca của nhóm đó chia đúng số này; nhóm bỏ trống chia chung phần còn lại của Target tháng{all ? ". Đã nhập đủ 4 nhóm: Target tháng = tổng 4 nhóm." : "."}
         </p>
         {rows.map((r) => {
@@ -55,27 +55,27 @@ export const PlanGroupTargetsBlock: React.FC<Props> = ({ rows, targets, targetTo
                   className="w-36 bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-1.5 text-right text-[var(--text)] font-mono disabled:opacity-60"
                 />
               </div>
-              <div className="text-[11px] text-[var(--text-faint)] text-right">
+              <div className="text-2xs text-[var(--text-faint)] text-right">
                 {r.slots === 0 ? "chưa có ca" : <>Σ ca <b className="text-[var(--text-muted)]">{fmtVndShort(r.slotTarget)}</b> · {fmtVndShort(perHour)}/giờ{rate > 0 && perHour > 0 ? <> · <b className="text-[var(--text-muted)]">×{fmtFixed(perHour / rate, 2)}</b> lịch sử</> : null}</>}
               </div>
-              {r.orphaned && <p className="text-[11px] text-amber-300 text-right">Đã nhập target nhưng lưới chưa có ca {GROUP_LABEL[r.bucket]} — phần này chưa chia đi đâu.</p>}
+              {r.orphaned && <p className="text-2xs text-amber-300 text-right">Đã nhập target nhưng lưới chưa có ca {GROUP_LABEL[r.bucket]} — phần này chưa chia đi đâu.</p>}
             </div>
           );
         })}
         {!all && given.length > 0 && restWithSlots.length > 0 && (
           remain > 0
-            ? <p className="text-[11px] text-[var(--text-faint)]">Phần còn lại {fmtVndShort(remain)} chia cho {restWithSlots.map((r) => GROUP_LABEL[r.bucket]).join(", ")}.</p>
-            : <p className="text-[11px] text-amber-300">Các nhóm đã nhập đã dùng hết Target tháng — {restWithSlots.map((r) => GROUP_LABEL[r.bucket]).join(", ")} không còn phần nào (target ca = 0). Nhập thêm target nhóm đó hoặc tăng Target tháng.</p>
+            ? <p className="text-2xs text-[var(--text-faint)]">Phần còn lại {fmtVndShort(remain)} chia cho {restWithSlots.map((r) => GROUP_LABEL[r.bucket]).join(", ")}.</p>
+            : <p className="text-2xs text-amber-300">Các nhóm đã nhập đã dùng hết Target tháng — {restWithSlots.map((r) => GROUP_LABEL[r.bucket]).join(", ")} không còn phần nào (target ca = 0). Nhập thêm target nhóm đó hoặc tăng Target tháng.</p>
         )}
         {/* Audit 27/10: tháng 1 tỷ, nhập D-Day 300tr + Ngày thường 400tr, lưới không có ca Mid-Month/Pay Day ⇒ 300tr không về ca nào
             mà trước đây không một dòng báo — chỉ lộ ở hộp xác nhận lúc Chốt, và chốt xong target tháng thành 700tr. */}
         {!all && given.length > 0 && restWithSlots.length === 0 && remain > 0 && (
-          <p className="text-[11px] text-amber-300">
+          <p className="text-2xs text-amber-300">
             Phần còn lại {fmtVndShort(remain)} của Target tháng KHÔNG có ca nào để chia (lưới chưa có ca của nhóm bỏ trống) — tổng target các ca sẽ thiếu {fmtVndShort(remain)}, chốt xong Target tháng = tổng ca. Thêm ca cho nhóm bỏ trống, hoặc cộng phần này vào một nhóm đã nhập.
           </p>
         )}
         {given.length > 0 && editable && !locked && (
-          <button onClick={() => onChange({})} className="min-h-6 px-1 text-[11px] text-[var(--text-faint)] hover:text-rose-400 underline">Bỏ target nhóm, chia theo Target tháng</button>
+          <button onClick={() => onChange({})} className="min-h-6 px-1 text-2xs text-[var(--text-faint)] hover:text-rose-400 underline">Bỏ target nhóm, chia theo Target tháng</button>
         )}
       </div>
     </details>

@@ -137,7 +137,7 @@ export const TalentToday: React.FC<Props> = ({
     <div id={`my-shift-${s.id}`} className="space-y-1 scroll-mt-24">
       <AckLabel p={pendingById.get(s.id)} />
       <TalentSessionCard session={s} brand={brandById.get(s.brandId)} talents={talents} meId={myTalentId} clash={clashIds.has(s.id)} onOpen={setOpenId} />
-      {clashIds.has(s.id) && <p className="text-[11px] font-bold text-rose-300 px-1">Trùng giờ với một ca khác của bạn</p>}
+      {clashIds.has(s.id) && <p className="text-2xs font-bold text-rose-300 px-1">Trùng giờ với một ca khác của bạn</p>}
     </div>
   );
   const dayTitle = (date: string) => (date === today ? "Hôm nay" : date === addDays(today, 1) ? "Ngày mai" : dayLabel(date));
@@ -227,12 +227,12 @@ export const TalentToday: React.FC<Props> = ({
                 const items = dayTimeline(mine, date);
                 return (
                   <section key={date} aria-label={dayLabel(date)} className={`min-w-0 rounded-2xl border p-2 space-y-1.5 ${date === today ? "border-[var(--accent)]/70 bg-[var(--accent)]/5" : "border-[var(--border)] bg-[var(--surface)]"} ${date < today ? "opacity-60" : ""}`}>
-                    <h3 className={`text-[11px] font-black px-1 ${date === today ? "text-[var(--accent-text)]" : "text-[var(--text-muted)]"}`}>
+                    <h3 className={`text-2xs font-black px-1 ${date === today ? "text-[var(--accent-text)]" : "text-[var(--text-muted)]"}`}>
                       {date === today ? "Hôm nay" : dayLabel(date)}
                       {items.length > 0 && <span className="font-normal text-[var(--text-faint)]"> · {items.length} ca</span>}
                     </h3>
                     {items.length === 0 ? (
-                      <p className="text-[11px] text-[var(--text-faint)] px-1">Nghỉ</p>
+                      <p className="text-2xs text-[var(--text-faint)] px-1">Nghỉ</p>
                     ) : (
                       items.map(({ session: s, gapMin }) => (
                         <React.Fragment key={s.id}>
@@ -256,7 +256,7 @@ export const TalentToday: React.FC<Props> = ({
                       {dayTitle(d.date)}
                       {d.date === today || d.date === addDays(today, 1) ? <span className="font-normal text-[var(--text-faint)]"> · {dayLabel(d.date)}</span> : null}
                     </h3>
-                    <span className="text-[11px] text-[var(--text-faint)]">{d.items.length} ca · {hrs(d.hours)}</span>
+                    <span className="text-2xs text-[var(--text-faint)]">{d.items.length} ca · {hrs(d.hours)}</span>
                   </div>
                   {d.items.map(({ session: s, gapMin }) => (
                     <React.Fragment key={s.id}>
@@ -292,7 +292,7 @@ const AckLabel: React.FC<{ p?: PendingAck }> = ({ p }) => {
   if (!p) return null;
   const st = p.state;
   return (
-    <p className="text-[11px] font-bold text-[var(--accent-text)] px-1 flex items-center gap-1.5">
+    <p className="text-2xs font-bold text-[var(--accent-text)] px-1 flex items-center gap-1.5">
       <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] shrink-0" />
       {st.kind === "changed" ? `Đổi giờ · trước: ${st.before.date === p.session.date ? "" : `${dayLabel(st.before.date)} `}${st.before.startTime}–${st.before.endTime}` : "Ca mới"}
     </p>
@@ -300,9 +300,9 @@ const AckLabel: React.FC<{ p?: PendingAck }> = ({ p }) => {
 };
 
 const GapLine: React.FC<{ gapMin: number }> = ({ gapMin }) => {
-  if (gapMin < 0) return <p className="text-[11px] font-bold text-rose-300 pl-3 border-l-2 border-rose-700 ml-3">Chồng {duration(-gapMin)} với ca trước — báo OP</p>;
-  if (gapMin <= BACK_TO_BACK_MIN) return <p className="text-[11px] font-bold text-amber-300 pl-3 border-l-2 border-amber-700 ml-3">Nối ca · nghỉ {gapMin} phút</p>;
-  return <p className="text-[11px] text-[var(--text-faint)] pl-3 border-l-2 border-dotted border-[var(--border)] ml-3">Nghỉ {duration(gapMin)}</p>;
+  if (gapMin < 0) return <p className="text-2xs font-bold text-rose-300 pl-3 border-l-2 border-rose-700 ml-3">Chồng {duration(-gapMin)} với ca trước — báo OP</p>;
+  if (gapMin <= BACK_TO_BACK_MIN) return <p className="text-2xs font-bold text-amber-300 pl-3 border-l-2 border-amber-700 ml-3">Nối ca · nghỉ {gapMin} phút</p>;
+  return <p className="text-2xs text-[var(--text-faint)] pl-3 border-l-2 border-dotted border-[var(--border)] ml-3">Nghỉ {duration(gapMin)}</p>;
 };
 
 const HeroCard: React.FC<{
@@ -367,7 +367,7 @@ const HeroCard: React.FC<{
         <button type="button" onClick={() => onOpen(s.id)} className="px-3 py-2 min-h-8 rounded-lg bg-[var(--surface)] border border-[var(--border)] text-xs font-bold text-[var(--text)] hover:border-[var(--accent)]">
           Chi tiết ca
         </button>
-        {after && <span className="text-[11px] text-[var(--text-muted)]">Sau đó: {after.startTime} {after.brandName}</span>}
+        {after && <span className="text-2xs text-[var(--text-muted)]">Sau đó: {after.startTime} {after.brandName}</span>}
       </div>
     </section>
   );

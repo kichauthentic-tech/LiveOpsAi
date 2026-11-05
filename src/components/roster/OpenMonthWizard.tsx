@@ -277,7 +277,7 @@ export const OpenMonthWizard: React.FC<{
                             <span className="flex items-center gap-2 font-bold text-[var(--text)]">
                               {r.brandName} <PlatformChip platform={r.platform} />
                             </span>
-                            {locked && <span className="text-[11px] text-emerald-400">đã chốt kế hoạch — sửa ở Kế Hoạch Tháng</span>}
+                            {locked && <span className="text-2xs text-emerald-400">đã chốt kế hoạch — sửa ở Kế Hoạch Tháng</span>}
                           </td>
                           <td className="px-3 py-2 text-right tabular-nums text-[var(--text-muted)]">{r.contract ? `${vn(r.contract.monthlyHours)} giờ` : "—"}</td>
                           <td className="px-3 py-2 text-right tabular-nums text-[var(--text-muted)]">{r.prevHours > 0 ? `${vn(r.prevHours)} giờ` : "—"}</td>
@@ -288,7 +288,7 @@ export const OpenMonthWizard: React.FC<{
                           <td className="px-3 py-2 text-right tabular-nums">
                             {need > 0 ? (
                               <>
-                                <b className="text-[var(--text)]">{vn(Math.ceil(need))}</b> <span className="text-[11px] text-[var(--text-faint)]">(+{vn(Math.ceil(need - (hoursOf(r) ?? 0)))} phòng hờ)</span>
+                                <b className="text-[var(--text)]">{vn(Math.ceil(need))}</b> <span className="text-2xs text-[var(--text-faint)]">(+{vn(Math.ceil(need - (hoursOf(r) ?? 0)))} phòng hờ)</span>
                               </>
                             ) : (
                               <span className="text-[var(--text-faint)]">—</span>

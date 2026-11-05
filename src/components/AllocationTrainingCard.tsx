@@ -42,7 +42,7 @@ export const AllocationTrainingCard: React.FC<Props> = ({ brandId, sessions, par
   return (
     <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 space-y-3">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-bold text-[var(--text)] flex items-center gap-1.5"><Target className="w-4 h-4 text-[var(--accent-text)]" /> Chia target ca — engine v2</h3>
+        <h3 data-section="Chia target" className="text-sm font-bold text-[var(--text)] flex items-center gap-1.5"><Target className="w-4 h-4 text-[var(--accent-text)]" /> Chia target ca — engine v2</h3>
         {platforms.length > 1 && (
           <div className="flex gap-1">
             {platforms.map((p) => (
@@ -78,7 +78,7 @@ export const AllocationTrainingCard: React.FC<Props> = ({ brandId, sessions, par
                     <p className="text-[var(--text-muted)] mb-0.5">Khung giờ bắt đầu (trung bình = ×1,00)</p>
                     {ALLOC_BAND_LABEL.map((label, k) => (
                       <div key={label} className="flex justify-between gap-2">
-                        <span className="text-[var(--text)]">{label} <span className="text-[11px] text-[var(--text-faint)]">({model.bandSessions[k]} ca)</span></span>
+                        <span className="text-[var(--text)]">{label} <span className="text-2xs text-[var(--text-faint)]">({model.bandSessions[k]} ca)</span></span>
                         <b className={model.band[k] >= 1.03 ? "text-emerald-400" : model.band[k] <= 0.9 ? "text-amber-400" : "text-[var(--text)]"}>{mult(model.band[k])}</b>
                       </div>
                     ))}
@@ -101,7 +101,7 @@ export const AllocationTrainingCard: React.FC<Props> = ({ brandId, sessions, par
             ) : (
               <>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-[11px]">
+                  <table className="w-full text-2xs">
                     <thead>
                       <tr className="text-[var(--text-faint)] text-right">
                         <th className="text-left font-normal py-1">Sai số theo ca</th>

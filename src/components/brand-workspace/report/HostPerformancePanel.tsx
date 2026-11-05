@@ -7,7 +7,7 @@ import { dayTypeMetrics, dayTypeDriverLines, sumDayTypeParts, vsTeam, HOST_DAY_T
 import { CampDayBucket } from "../../../lib/campaignDays";
 
 import { fmtFixed } from "../../../lib/format";
-import { DAY_TYPE_SHORT, PAL } from "./theme";
+import { DAY_TYPE_SHORT, PAL, alpha } from "./theme";
 import { fmtHours } from "./format";
 import { MethodNote, Panel, ReportTable } from "./ui";
 
@@ -120,7 +120,7 @@ export const HostPerformancePanel: React.FC<{
               aria-selected={on}
               disabled={empty}
               onClick={() => setTab(t.key)}
-              className="text-[11px] font-bold px-3 py-1 rounded-full disabled:opacity-40 disabled:cursor-not-allowed"
+              className="text-2xs font-bold px-3 py-1 rounded-full disabled:opacity-40 disabled:cursor-not-allowed"
               style={{ background: on ? PAL.gold : PAL.panel2, color: on ? PAL.bg : PAL.cream, border: `1px solid ${on ? PAL.gold : PAL.line}` }}
             >
               {t.label}
@@ -133,7 +133,7 @@ export const HostPerformancePanel: React.FC<{
           nghĩa của màu hiện luôn, cách tính "trung bình nhóm" dài 3 dòng gập vào "Cách tính" (bố cục 18/10 đợt 2). */}
       {isAll ? (
         <div className="mb-2">
-          <p className="text-[11px]" style={{ color: PAL.muted }}>
+          <p className="text-2xs" style={{ color: PAL.muted }}>
             <span style={{ color: PAL.green }}>Xanh</span> / <span style={{ color: PAL.red }}>đỏ</span> = cao hơn / thấp hơn trung bình có ý nghĩa (gộp {relMonths} tháng, khoảng tin cậy 95%; rê chuột để xem khoảng).
           </p>
           <MethodNote className="mt-0.5">
@@ -144,7 +144,7 @@ export const HostPerformancePanel: React.FC<{
           </MethodNote>
         </div>
       ) : (
-        <p className="text-[11px] mb-2" style={{ color: PAL.muted }}>
+        <p className="text-2xs mb-2" style={{ color: PAL.muted }}>
           <span style={{ color: PAL.green }}>▲ xanh</span> / <span style={{ color: PAL.red }}>▼ đỏ</span> = cao / thấp hơn cột Cả team từ {DAY_TYPE_DIFF_THRESHOLD}% trở lên (cùng loại ngày). Host
           chỉ có 1 phiên không so. Dùng để hiểu yếu tố nào tác động tới GMV/giờ, không dùng để xếp hạng host (xếp hạng xem tab Cả tháng).
         </p>
@@ -159,7 +159,7 @@ export const HostPerformancePanel: React.FC<{
         ]}
       >
         {shownRows.map((r, idx) => (
-          <tr key={r.label} style={{ borderBottom: `1px solid ${PAL.line}`, background: idx % 2 ? `${PAL.panel2}55` : "transparent" }}>
+          <tr key={r.label} style={{ borderBottom: `1px solid ${PAL.line}`, background: idx % 2 ? `${alpha(PAL.panel2, 33)}` : "transparent" }}>
             <td className={`py-2 px-3 whitespace-nowrap ${r.bold ? "font-black" : "font-semibold"}`} style={{ color: r.indent ? PAL.muted : PAL.cream, paddingLeft: r.indent ? 24 : undefined }} title={metricHint(r.label)}>
               {r.label}
             </td>
@@ -193,7 +193,7 @@ export const HostPerformancePanel: React.FC<{
         )}
       </ReportTable>
       {assistOnly.length > 0 && (
-        <p className="mt-2 text-[11px]" style={{ color: PAL.muted }}>
+        <p className="mt-2 text-2xs" style={{ color: PAL.muted }}>
           Chỉ làm trợ live: {assistOnly.map((r) => `${r.name} ${fmtHours(r.assist.hours)} · ${r.assist.sessions} phiên`).join(" · ")}
         </p>
       )}

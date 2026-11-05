@@ -41,7 +41,7 @@ export function NumberField({
   return (
     <div className="space-y-1">
       <div className="flex items-baseline justify-between gap-2">
-        <span className="text-[11px] font-bold text-[var(--text-muted)]">{label}</span>
+        <span className="text-2xs font-bold text-[var(--text-muted)]">{label}</span>
         <span className="text-xs font-black text-[var(--text)]">{current}</span>
       </div>
       {canEdit && (
@@ -50,7 +50,7 @@ export function NumberField({
           <button onClick={save} disabled={busy || draft.trim() === ""} className={btnCls}>{busy ? "…" : "Lưu"}</button>
         </div>
       )}
-      {hint && <p className="text-[11px] text-[var(--text-faint)] leading-snug">{hint}</p>}
+      {hint && <p className="text-2xs text-[var(--text-faint)] leading-snug">{hint}</p>}
     </div>
   );
 }
@@ -101,7 +101,7 @@ export function NumInput({
         onBlur={() => setTyping(null)}
         className={inputCls}
       />
-      {suffix && <span className="text-[11px] text-[var(--text-faint)] whitespace-nowrap">{suffix}</span>}
+      {suffix && <span className="text-2xs text-[var(--text-faint)] whitespace-nowrap">{suffix}</span>}
     </div>
   );
 }
@@ -109,9 +109,9 @@ export function NumInput({
 export function Field({ label, hint, children, className = "" }: { label: string; hint?: string; children: React.ReactNode; className?: string }) {
   return (
     <label className={`flex flex-col gap-1 ${className}`}>
-      <span className="text-[11px] font-bold text-[var(--text-muted)]">{label}</span>
+      <span className="text-2xs font-bold text-[var(--text-muted)]">{label}</span>
       {children}
-      {hint && <span className="text-[11px] text-[var(--text-faint)] leading-snug">{hint}</span>}
+      {hint && <span className="text-2xs text-[var(--text-faint)] leading-snug">{hint}</span>}
     </label>
   );
 }

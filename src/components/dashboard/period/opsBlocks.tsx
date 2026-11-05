@@ -36,7 +36,7 @@ export interface Scope {
 
 const hrs = (h: number, d = 0) => `${h.toLocaleString("vi-VN", { maximumFractionDigits: d })}`;
 const brandTag = (ids: string[], brands: Brand[], show: boolean) =>
-  show && ids.length ? <span className="ml-1.5 text-[11px] font-normal text-[var(--text-faint)]">{ids.map((id) => brands.find((b) => b.id === id)?.name ?? "").filter(Boolean).join(" · ")}</span> : null;
+  show && ids.length ? <span className="ml-1.5 text-2xs font-normal text-[var(--text-faint)]">{ids.map((id) => brands.find((b) => b.id === id)?.name ?? "").filter(Boolean).join(" · ")}</span> : null;
 
 // ---------------------------------------------------------------------------
 // Lên sóng trễ
@@ -147,10 +147,10 @@ export const HeatCard: React.FC<{ s: Scope }> = ({ s }) => {
       <div className="overflow-x-auto">
         <div className="grid gap-1 min-w-[420px]" style={{ gridTemplateColumns: `28px repeat(${HEAT_BLOCKS.length}, minmax(0,1fr))` }}>
           <span />
-          {HEAT_BLOCKS.map((x) => <span key={x} className="text-[11px] text-center text-[var(--text-faint)]">{String(x * 2).padStart(2, "0")}h</span>)}
+          {HEAT_BLOCKS.map((x) => <span key={x} className="text-2xs text-center text-[var(--text-faint)]">{String(x * 2).padStart(2, "0")}h</span>)}
           {WD.map((w, wi) => (
             <React.Fragment key={w}>
-              <span className="text-[11px] text-[var(--text-faint)] self-center">{w}</span>
+              <span className="text-2xs text-[var(--text-faint)] self-center">{w}</span>
               {HEAT_BLOCKS.map((x) => {
                 const v = mc.get(`${wi}|${x}`), q = mb.get(`${wi}|${x}`);
                 if (!v || v.hours < 3) return <span key={x} className="h-7 rounded text-center text-[var(--text-faint)] text-xs leading-7" title={`${w} ${x * 2}h: ${v ? hrs(v.hours, 1) : 0} giờ live`}>·</span>;
@@ -259,7 +259,7 @@ export const SlotTable: React.FC<{ s: Scope; within?: string }> = ({ s, within =
   const best = [...ok].sort((p, q) => q.x!.index - p.x!.index)[0], worst = [...ok].sort((p, q) => p.x!.index - q.x!.index)[0];
   return (
     <Card>
-      <BlockHead title="Khung giờ của kênh" sub={`${s.label} so với ${s.prevLabel} · theo giờ bắt đầu ca · chỉ số 100 = GMV/giờ trung bình của kênh trong ${within} · dưới 5 ca hiển thị mờ`} />
+      <BlockHead nav="Khung giờ" title="Khung giờ của kênh" sub={`${s.label} so với ${s.prevLabel} · theo giờ bắt đầu ca · chỉ số 100 = GMV/giờ trung bình của kênh trong ${within} · dưới 5 ca hiển thị mờ`} />
       <Table head={["Khung giờ", "Sessions", "Giờ live", "GMV/giờ", "Chỉ số", "vs kỳ trước"]} empty={rows.length ? undefined : `Không có ca có số liệu trong ${s.label}.`}>
         {rows.map((r) => {
           const weak = r.x!.n < WEAK_SESSIONS || !r.y || r.y.n < WEAK_SESSIONS;
@@ -313,7 +313,7 @@ export const ProfitCard: React.FC<{ s: Scope; pnl: PnlFn }> = ({ s, pnl }) => {
           <div key={l} className="min-w-0">
             <p className="text-xs text-[var(--text-muted)] truncate">{l}</p>
             <p className="text-lg font-black tabular-nums text-[var(--text)]">{money(v)}</p>
-            <p className="text-[11px]"><Chg cur={v} prev={p} inv={inv} weak={!b || b.priced < WEAK_SESSIONS || c.priced < WEAK_SESSIONS} /></p>
+            <p className="text-2xs"><Chg cur={v} prev={p} inv={inv} weak={!b || b.priced < WEAK_SESSIONS || c.priced < WEAK_SESSIONS} /></p>
           </div>
         ))}
       </div>

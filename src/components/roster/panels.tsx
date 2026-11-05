@@ -74,20 +74,20 @@ export const WeekGrid: React.FC<{
                           onClick={() => onSelect(s.key)}
                           // Bố cục 19/10: thẻ ca chỉ còn vạch màu bên trái (đỏ/vàng/xanh) + nền nhạt — trước mỗi thẻ thêm viền đủ 4 cạnh
                           // trong ô lưới cũng có viền (~90 hộp lồng một tuần). Ca mở vẫn viền đứt để khác ca đã có người.
-                          className={`block w-full text-left rounded-md border-l-[3px] px-1.5 py-1 text-[11px] leading-snug hover:bg-[var(--surface-hover)] ${sev === "ok" ? "bg-[var(--surface-elevated)]/50" : ""} ${CARD_BORDER[sev]} ${selectedKey === s.key ? "ring-2 ring-[var(--accent)]" : ""} ${s.kind === "open" ? "border border-dashed border-[var(--border)]" : ""}`}
+                          className={`block w-full text-left rounded-md border-l-[3px] px-1.5 py-1 text-2xs leading-snug hover:bg-[var(--surface-hover)] ${sev === "ok" ? "bg-[var(--surface-elevated)]/50" : ""} ${CARD_BORDER[sev]} ${selectedKey === s.key ? "ring-2 ring-[var(--accent)]" : ""} ${s.kind === "open" ? "border border-dashed border-[var(--border)]" : ""}`}
                         >
                           <span className="font-mono font-bold text-[var(--text)]">
                             {s.startTime}–{s.endTime}
                           </span>
-                          {s.kind === "open" && <span className="ml-1 text-[11px] font-bold text-sky-300">{s.drafted ? "nháp" : "mở"}</span>}
+                          {s.kind === "open" && <span className="ml-1 text-2xs font-bold text-sky-300">{s.drafted ? "nháp" : "mở"}</span>}
                           <span className="block truncate text-[var(--text)]">{s.hostId ? nameOf(s.hostId) : <span className="text-red-300 font-bold">thiếu host</span>}</span>
                           <span className="block truncate text-[var(--text-muted)]">{s.coHostId ? nameOf(s.coHostId) : <span className="text-amber-300">thiếu trợ</span>}</span>
-                          {s.kind === "open" && s.registrants.length > 0 && <span className="block text-[11px] text-emerald-300">{s.registrants.length} báo rảnh</span>}
+                          {s.kind === "open" && s.registrants.length > 0 && <span className="block text-2xs text-emerald-300">{s.registrants.length} báo rảnh</span>}
                         </button>
                       );
                     })}
                     {canAdd && (
-                      <button type="button" onClick={() => onAdd(ch, d)} className="w-full min-h-6 flex items-center justify-center gap-1 rounded-md py-1 text-[11px] text-[var(--text-faint)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]/60" aria-label={`Thêm ca ${ch.brandName} ${dayLabel(d)}`}>
+                      <button type="button" onClick={() => onAdd(ch, d)} className="w-full min-h-6 flex items-center justify-center gap-1 rounded-md py-1 text-2xs text-[var(--text-faint)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]/60" aria-label={`Thêm ca ${ch.brandName} ${dayLabel(d)}`}>
                         <Plus className="w-3 h-3" /> ca
                       </button>
                     )}
@@ -98,7 +98,7 @@ export const WeekGrid: React.FC<{
           ))}
         </div>
       </div>
-      <p className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-[var(--text-muted)]">
+      <p className="flex flex-wrap gap-x-4 gap-y-1 text-2xs text-[var(--text-muted)]">
         <span>Viền đỏ = lỗi chặn công bố hoặc ca thiếu host</span>
         <span>Viền vàng = cảnh báo</span>
         <span>Viền đứt = ca mở (nháp / chưa xếp), talent chưa thấy người</span>
@@ -325,7 +325,7 @@ export const MatrixPanel: React.FC<{ channels: ChannelRow[]; fam: FamiliarityMap
               </li>
             ))}
           </ul>
-          <p className="text-[11px] text-[var(--text-muted)]">Ưu tiên người đã quen cùng brand ở sàn còn lại (cùng sản phẩm, khác sàn) — mỗi người một kênh chính + một kênh phụ là đủ để kênh nào cũng có người thay.</p>
+          <p className="text-2xs text-[var(--text-muted)]">Ưu tiên người đã quen cùng brand ở sàn còn lại (cùng sản phẩm, khác sàn) — mỗi người một kênh chính + một kênh phụ là đủ để kênh nào cũng có người thay.</p>
         </div>
       )}
     </div>
@@ -463,7 +463,7 @@ export const HoursCostPanel: React.FC<{
             </tbody>
           </table>
         </div>
-        {showCost && rows.some((r) => r.missing) && <p className="text-[11px] text-[var(--text-muted)]">* có ca chưa tính được vì người đó chưa có rate — nhập ở Talent Pool.</p>}
+        {showCost && rows.some((r) => r.missing) && <p className="text-2xs text-[var(--text-muted)]">* có ca chưa tính được vì người đó chưa có rate — nhập ở Talent Pool.</p>}
       </section>
       {showCost && (
         <section className="space-y-2">
@@ -514,7 +514,7 @@ export const RulesPanel: React.FC<{ rules: RosterRules; readOnly: boolean; busy:
     <label className="flex flex-col gap-1 text-xs">
       <span className="font-bold text-[var(--text)]">{label}</span>
       <input type="number" step={step} min={0} value={draft[k] as number} disabled={readOnly} onChange={(e) => setDraft({ ...draft, [k]: Number(e.target.value) })} className="px-2 py-1.5 rounded-lg bg-[var(--surface-base)] border border-[var(--border)] text-[var(--text)] w-32" />
-      <span className="text-[11px] text-[var(--text-muted)]">{hint}</span>
+      <span className="text-2xs text-[var(--text-muted)]">{hint}</span>
     </label>
   );
   return (
@@ -527,7 +527,7 @@ export const RulesPanel: React.FC<{ rules: RosterRules; readOnly: boolean; busy:
         <label className="flex flex-col gap-1 text-xs">
           <span className="font-bold text-[var(--text)]">Ca khuya = kết thúc từ</span>
           <input type="time" value={draft.lateEndTime} disabled={readOnly} onChange={(e) => setDraft({ ...draft, lateEndTime: e.target.value })} className="px-2 py-1.5 rounded-lg bg-[var(--surface-base)] border border-[var(--border)] text-[var(--text)] w-32" />
-          <span className="text-[11px] text-[var(--text-muted)]">Ca qua nửa đêm luôn là ca khuya.</span>
+          <span className="text-2xs text-[var(--text-muted)]">Ca qua nửa đêm luôn là ca khuya.</span>
         </label>
         {num("maxDayHours", "Giờ tối đa / ngày", "Vượt thì cảnh báo.", 0.5)}
         {num("maxStreakDays", "Số ngày làm liền tối đa", "Ngày thứ (ngưỡng + 1) liền thì cảnh báo.")}

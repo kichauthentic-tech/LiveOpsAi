@@ -1,4 +1,5 @@
 import { createPortal } from "react-dom";
+import { RtSkinContext } from "./report/theme";
 import React, { Suspense, useEffect, useMemo, useState } from "react";
 import { defaultReportMonth } from "../../lib/defaultMonth";
 import { LiveSession, ShiftSlot, UserRole, BrandMonthlyReport as BrandMonthlyReportType, BrandPlatformRate } from "../../types";
@@ -370,6 +371,8 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
     const host = document.createElement("div");
     host.setAttribute("aria-hidden", "true");
     host.style.cssText = "position:fixed;left:-10000px;top:0;width:1180px;pointer-events:none";
+    // File gửi brand giữ skin đen-vàng YFB dù người xuất đang dùng theme nào (06/11: report trong app đã theo theme).
+    host.className = "rt-skin-yfb";
     document.body.appendChild(host);
     setExportKind(kind);
     setExportHost(host);
@@ -488,7 +491,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
             <MonthPicker value={month} onChange={setMonth} />
             {report && (
               <span
-                className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full border ${
+                className={`inline-flex items-center gap-1 text-2xs font-bold px-2.5 py-1 rounded-full border ${
                   isPublished
                     ? "bg-emerald-950 text-emerald-300 border-emerald-800"
                     : "bg-[var(--surface-elevated)] text-[var(--text-muted)] border-[var(--border)]"
@@ -593,19 +596,19 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
             <AlertTriangle className="w-4 h-4 text-amber-400" />
             {unreconciledSessions.length} Phiên Live Completed Trong Tháng Chưa Đối Soát Với {platform}
           </div>
-          <p className="text-[11px] text-amber-300">
+          <p className="text-2xs text-amber-300">
             {manualOnly.length > 0 && `${manualOnly.length} phiên là số talent tự khai, chưa được xác thực. `}
             {snapshotOnly > 0 && `${snapshotOnly} phiên đã có số liệu lúc giao ca nhưng ${platform} còn cập nhật đơn/hoàn/huỷ sau đó. `}
             Đối soát trước khi phát hành report cho khách — vào Dữ Liệu Gốc → file {profileOf(platform).reconciliationFile}, tải lên file rồi bấm Áp dụng ở mục Đối soát số liệu.
           </p>
           <div className="flex flex-wrap gap-1.5">
             {unreconciledSessions.slice(0, 12).map((s) => (
-              <span key={s.id} className="text-[11px] font-mono bg-amber-900/60 text-amber-200 px-2 py-0.5 rounded border border-amber-800/50">
+              <span key={s.id} className="text-2xs font-mono bg-amber-900/60 text-amber-200 px-2 py-0.5 rounded border border-amber-800/50">
                 {fmtDateVn(s.date)} {s.startTime.slice(0, 5)} · {s.hostName || "chưa gán host"}
               </span>
             ))}
             {unreconciledSessions.length > 12 && (
-              <span className="text-[11px] text-amber-300">+{unreconciledSessions.length - 12} khác</span>
+              <span className="text-2xs text-amber-300">+{unreconciledSessions.length - 12} khác</span>
             )}
           </div>
         </div>
@@ -683,9 +686,11 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
       )}
       {exportHost && stored &&
         createPortal(
+          <RtSkinContext.Provider value="yfb">
           <Suspense fallback={null}>
             <View.Render key={shownLang} brandId={brandId} brandName={brandName} month={month} snapshot={stored.snapshot as AnySnapshot} report={report} canManage={false} forBrand onReportChange={setReport} liveSessions={sessions} shiftSlots={shiftSlots} scope={reportScope} />
-          </Suspense>,
+          </Suspense>
+          </RtSkinContext.Provider>,
           exportHost
         )}
     </div>

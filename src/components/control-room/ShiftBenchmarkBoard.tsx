@@ -68,8 +68,8 @@ const Step: React.FC<{ item: BenchItem; hours: number; live?: LiveCell }> = ({ i
       ) : (
         <p className="text-xl font-black tabular-nums text-[var(--text)] my-0.5">{avg}</p>
       )}
-      {live && live.adj !== undefined && <p className="text-[11px] text-[var(--text)] tabular-nums">{live.adj == null ? "ca này: chưa trừ được" : `ca này ${nf(live.adj)}`}</p>}
-      {live && <p className="text-[11px] text-[var(--text-muted)] tabular-nums">trung bình {avg}</p>}
+      {live && live.adj !== undefined && <p className="text-2xs text-[var(--text)] tabular-nums">{live.adj == null ? "ca này: chưa trừ được" : `ca này ${nf(live.adj)}`}</p>}
+      {live && <p className="text-2xs text-[var(--text-muted)] tabular-nums">trung bình {avg}</p>}
     </div>
   );
 };
@@ -78,7 +78,7 @@ const Step: React.FC<{ item: BenchItem; hours: number; live?: LiveCell }> = ({ i
 const Arrow: React.FC<{ item: BenchItem; row?: CheckRow; live: boolean }> = ({ item, row, live }) => {
   const tone = row ? TONE[row.zone] : null;
   return (
-    <div className="md:flex-[0_0_118px] flex md:flex-col items-center justify-center text-center gap-x-2 gap-y-0.5 py-1 md:py-0 px-1 text-[11px] text-[var(--text-muted)]">
+    <div className="md:flex-[0_0_118px] flex md:flex-col items-center justify-center text-center gap-x-2 gap-y-0.5 py-1 md:py-0 px-1 text-2xs text-[var(--text-muted)]">
       <b className="text-[var(--text)]">{item.label}</b>
       <span className={`text-sm font-black tabular-nums ${tone ? tone.text : "text-[var(--text)]"}`}>{live ? (row ? pct(row.value) : "—") : pct(item.p50)}</span>
       <span className={`text-lg leading-none rotate-90 md:rotate-0 ${tone ? tone.text : "text-[var(--accent-text)]"}`}>→</span>
@@ -91,11 +91,11 @@ const PlainStep: React.FC<{ label: string; value: number | null; hint: string }>
   <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-base)] px-3 py-3 min-w-0 text-center">
     <p className="text-xs font-semibold text-[var(--text-muted)] leading-snug">{label}</p>
     <p className="text-xl font-black tabular-nums text-[var(--text)] my-0.5">{value == null ? "—" : nf(value)}</p>
-    <p className="text-[11px] text-[var(--text-muted)]">{hint}</p>
+    <p className="text-2xs text-[var(--text-muted)]">{hint}</p>
   </div>
 );
 const PlainArrow: React.FC<{ label: string; value: string }> = ({ label, value }) => (
-  <div className="md:flex-[0_0_118px] flex md:flex-col items-center justify-center text-center gap-x-2 gap-y-0.5 py-1 md:py-0 px-1 text-[11px] text-[var(--text-muted)]">
+  <div className="md:flex-[0_0_118px] flex md:flex-col items-center justify-center text-center gap-x-2 gap-y-0.5 py-1 md:py-0 px-1 text-2xs text-[var(--text-muted)]">
     <b className="text-[var(--text)]">{label}</b>
     <span className="text-sm font-black tabular-nums text-[var(--text)]">{value === "" ? "—" : `${value}%`}</span>
     <span className="text-lg leading-none rotate-90 md:rotate-0 text-[var(--accent-text)]">→</span>
@@ -112,7 +112,7 @@ const ExtraLine: React.FC<{
   const gph = res?.outcomes.find((o) => o.key === "gmvPerHour");
   const gmvN = digits(gmv), adsN = digits(ads);
   const field = (k: string, label: string, value: string, set: (v: string) => void, fmt?: string) => (
-    <label key={k} className="inline-flex items-center gap-1.5 text-[11px] text-[var(--text-muted)]">{label}
+    <label key={k} className="inline-flex items-center gap-1.5 text-2xs text-[var(--text-muted)]">{label}
       <input className={`w-28 min-w-0 bg-[var(--surface-base)] border rounded-lg px-2 py-1 text-sm tabular-nums text-[var(--text)] ${guessed.has(k) ? "border-amber-400 bg-amber-500/10" : "border-[var(--border)]"}`} inputMode="numeric"
         value={value === "" ? "" : nf(Number(value.replace(/\D/g, "")) || 0)} placeholder="—" onChange={(e) => set(e.target.value)} aria-label={label} />
       {fmt && <b className="text-[var(--text)] tabular-nums">{fmt}</b>}
@@ -122,16 +122,16 @@ const ExtraLine: React.FC<{
     <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-[var(--border)] bg-[var(--surface-base)] px-3 py-2">
       {field("minutes", "Đã live (phút)", minutes, onMinutes)}
       {field("gmv", "GMV", gmv, onGmv, gmvN != null ? fmtVndShort(gmvN) : undefined)}
-      {gph && <span className="text-[11px] text-[var(--text-muted)]">GMV/giờ{joint ? " ca này" : ""} <b className={`tabular-nums ${TONE[gph.zone].text}`}>{fmtVndShort(gph.value)}</b> <span className={`font-bold ${TONE[gph.zone].text}`}>{ZONE_WORD[gph.zone]}</span> <span className="tabular-nums">(trung bình {fmtVndShort(gph.item.p50)})</span></span>}
+      {gph && <span className="text-2xs text-[var(--text-muted)]">GMV/giờ{joint ? " ca này" : ""} <b className={`tabular-nums ${TONE[gph.zone].text}`}>{fmtVndShort(gph.value)}</b> <span className={`font-bold ${TONE[gph.zone].text}`}>{ZONE_WORD[gph.zone]}</span> <span className="tabular-nums">(trung bình {fmtVndShort(gph.item.p50)})</span></span>}
       {field("ads", "Ads đã chi", ads, onAds, adsN != null ? fmtVndShort(adsN) : undefined)}
-      {gmvN != null && adsN != null && adsN > 0 && <span className="text-[11px] text-[var(--text-muted)]">ROAS <b className="text-[var(--text)] tabular-nums">{(gmvN / adsN).toLocaleString("vi-VN", { maximumFractionDigits: 1 })}x</b></span>}
-      {chips.map((c) => <span key={c.label} className="text-[11px] text-[var(--text-muted)]">{c.label} <b className={`tabular-nums ${TONE[c.zone].text}`}>{c.text}</b> <span className={`font-bold ${TONE[c.zone].text}`}>{ZONE_WORD[c.zone]}</span> <span className="tabular-nums">(trung bình {c.avg})</span></span>)}
+      {gmvN != null && adsN != null && adsN > 0 && <span className="text-2xs text-[var(--text-muted)]">ROAS <b className="text-[var(--text)] tabular-nums">{(gmvN / adsN).toLocaleString("vi-VN", { maximumFractionDigits: 1 })}x</b></span>}
+      {chips.map((c) => <span key={c.label} className="text-2xs text-[var(--text-muted)]">{c.label} <b className={`tabular-nums ${TONE[c.zone].text}`}>{c.text}</b> <span className={`font-bold ${TONE[c.zone].text}`}>{ZONE_WORD[c.zone]}</span> <span className="tabular-nums">(trung bình {c.avg})</span></span>)}
       {optional.map((o) => o.decimal ? (
-        <label key={o.key} className="inline-flex items-center gap-1.5 text-[11px] text-[var(--text-muted)]">{o.label}
+        <label key={o.key} className="inline-flex items-center gap-1.5 text-2xs text-[var(--text-muted)]">{o.label}
           <input className={`w-20 min-w-0 bg-[var(--surface-base)] border rounded-lg px-2 py-1 text-sm tabular-nums text-[var(--text)] ${guessed.has(o.key) ? "border-amber-400 bg-amber-500/10" : "border-[var(--border)]"}`} inputMode="decimal" value={o.value} placeholder="—" onChange={(e) => onOptional(o.key, e.target.value)} aria-label={o.label} />
         </label>
       ) : field(o.key, o.label, o.value, (v) => onOptional(o.key, v)))}
-      {info && <span className="text-[11px] text-[var(--text-muted)]">{info}</span>}
+      {info && <span className="text-2xs text-[var(--text-muted)]">{info}</span>}
     </div>
   );
 };
@@ -143,7 +143,7 @@ const HandoverPanel: React.FC<{
   onMinutes: (v: string) => void; onGmv: (v: string) => void; onAds: (v: string) => void; onCount: (k: string, v: string) => void;
 }> = ({ on, onToggle, note, minutes, gmv, ads, counts, keys, onMinutes, onGmv, onAds, onCount }) => {
   const f = (label: string, value: string, set: (v: string) => void) => (
-    <label key={label} className="space-y-1 min-w-0"><span className="text-[11px] text-[var(--text-muted)]">{label}</span>
+    <label key={label} className="space-y-1 min-w-0"><span className="text-2xs text-[var(--text-muted)]">{label}</span>
       <input className="w-full min-w-0 bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1 text-sm tabular-nums text-[var(--text)]" inputMode="numeric" placeholder="—"
         value={value === "" ? "" : nf(Number(value.replace(/\D/g, "")) || 0)} onChange={(e) => set(e.target.value)} aria-label={`Lúc giao ca: ${label}`} /></label>
   );
@@ -151,11 +151,11 @@ const HandoverPanel: React.FC<{
     <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-base)] px-3 py-2 space-y-2">
       <label className="inline-flex items-center gap-2 text-xs font-bold text-[var(--text)] cursor-pointer">
         <input type="checkbox" checked={on} onChange={(e) => onToggle(e.target.checked)} className="accent-[var(--accent)]" />Ca nối: trừ số lúc giao ca
-        <span className="font-normal text-[11px] text-[var(--text-muted)]">Dashboard cộng dồn từ lúc mở phòng, bật mục này để chấm riêng ca hiện tại.</span>
+        <span className="font-normal text-2xs text-[var(--text-muted)]">Dashboard cộng dồn từ lúc mở phòng, bật mục này để chấm riêng ca hiện tại.</span>
       </label>
       {on && (
         <>
-          <p className="text-[11px] text-[var(--text-muted)] leading-snug">{note}</p>
+          <p className="text-2xs text-[var(--text-muted)] leading-snug">{note}</p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {f("Đã live lúc giao (phút)", minutes, onMinutes)}
             {f("GMV", gmv, onGmv)}
@@ -377,17 +377,17 @@ const Body: React.FC<{ groups: Group[]; g: Group; sessions: LiveSession[]; today
               <ImageUp className="w-5 h-5 text-[var(--accent-text)] shrink-0" aria-hidden />
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-bold text-[var(--text)]">Dán ảnh Dashboard {g.platform} vào đây (Cmd+V hoặc Ctrl+V)</p>
-                <p className="text-[11px] text-[var(--text-muted)]">Ảnh được đọc ngay trên máy này, không gửi đi, không lưu. Tắt trang hoặc bấm Xoá ảnh là mất.{SHOT_NOTE[g.platform]}</p>
+                <p className="text-2xs text-[var(--text-muted)]">Ảnh được đọc ngay trên máy này, không gửi đi, không lưu. Tắt trang hoặc bấm Xoá ảnh là mất.{SHOT_NOTE[g.platform]}</p>
               </div>
               <label className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-xs font-bold text-[var(--text)] hover:bg-[var(--surface-hover)] cursor-pointer min-h-[32px] inline-flex items-center">
                 Chọn ảnh<input type="file" accept="image/*" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; if (f) void load(f); e.target.value = ""; }} /></label>
               {!showFields && <button type="button" className={pill(false)} onClick={() => setManual(true)}>Gõ số tay</button>}
-              {(shot || manual || res) && <button type="button" className="text-[11px] underline text-[var(--text-muted)] hover:text-[var(--text)]" onClick={clearAll}>Xoá hết</button>}
+              {(shot || manual || res) && <button type="button" className="text-2xs underline text-[var(--text-muted)] hover:text-[var(--text)]" onClick={clearAll}>Xoá hết</button>}
             </div>
             {shot && (
               <div className="flex gap-3 items-start">
                 <img src={shot.url} alt="Ảnh Dashboard vừa dán" className="w-40 max-h-28 object-cover object-top rounded-lg border border-[var(--border)]" />
-                <div className="text-[11px] text-[var(--text-muted)] space-y-1 min-w-0">
+                <div className="text-2xs text-[var(--text-muted)] space-y-1 min-w-0">
                   {shot.busy ? <p>Đang đọc ảnh… {Math.round(shot.progress * 100)}%</p> : shot.error ? <p className="text-rose-300">{shot.error}</p> : <p>Đọc được {shot.read}/{SHOT_FIELDS[g.platform]} số. Số có viền vàng là số đoán, đối chiếu lại với màn hình rồi sửa ngay trên phễu.</p>}
                   <button type="button" className="underline hover:text-[var(--text)]" onClick={clearShot}>Xoá ảnh</button>
                 </div>
@@ -422,7 +422,7 @@ const Body: React.FC<{ groups: Group[]; g: Group; sessions: LiveSession[]; today
                 onMinutes={(v) => { setMinutes(v); unguess("minutes"); }} onGmv={setGmv} onAds={(v) => { setAds(v); unguess("ads"); }} onOptional={(k, v) => { unguess(k); if (k === "ctr") setCtr(v); else if (k === "co") setCo(v); else if (k === "watch") setWatch(v); else setCounts((c) => ({ ...c, [k]: v })); }} />
               <HandoverPanel on={joint} onToggle={toggleJoint} note={hNote} minutes={hMinutes} gmv={hGmv} ads={hAds} counts={hCounts} keys={bench.funnel.map((f) => ({ key: f.key, label: f.label.replace("/giờ", "") }))}
                 onMinutes={setHMinutes} onGmv={setHGmv} onAds={setHAds} onCount={(k, v) => setHCounts((c) => ({ ...c, [k]: v }))} />
-              {joint && !input && <p className="text-[11px] text-amber-300">Chưa trừ được: nhập số phút đã live lúc giao ca (nhỏ hơn số phút hiện tại).</p>}
+              {joint && !input && <p className="text-2xs text-amber-300">Chưa trừ được: nhập số phút đã live lúc giao ca (nhỏ hơn số phút hiện tại).</p>}
           {res && res.verdict && (
             <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-base)] p-3 space-y-2.5">
               <p className="flex items-center gap-2 flex-wrap"><span className={`px-2.5 py-1 rounded-full text-xs font-black ${ZONE[res.verdict].chip}`}>{ZONE[res.verdict].label}</span><span className="text-xs text-[var(--text)]">{res.headline}</span></p>
@@ -443,17 +443,17 @@ const Body: React.FC<{ groups: Group[]; g: Group; sessions: LiveSession[]; today
               {res.adsLine && <p className="text-xs text-[var(--text-muted)] leading-snug"><b className="text-[var(--text)]">Ads: </b>{res.adsLine}</p>}
             </div>
           )}
-          {res && !res.verdict && <p className="text-[11px] text-[var(--text-muted)]">Nhập thêm số (ít nhất GMV hoặc Orders) để có kết luận.</p>}
+          {res && !res.verdict && <p className="text-2xs text-[var(--text-muted)]">Nhập thêm số (ít nhất GMV hoặc Orders) để có kết luận.</p>}
             </div>
           )}
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
               <p className="text-xs font-black text-[var(--text)]">Phễu trung bình, ưu tiên ca gần đây</p>
-              <span className="text-[11px] text-[var(--text-muted)]">
+              <span className="text-2xs text-[var(--text-muted)]">
                 {bench.n} ca · ca gần nhất {bench.latest.slice(8)}/{bench.latest.slice(5, 7)}
                 {bench.weak && <b className="text-amber-300"> · ít ca, mốc chưa vững</b>}
               </span>
-              <span className="md:ml-auto inline-flex items-center gap-1.5 text-[11px] text-[var(--text-muted)]">
+              <span className="md:ml-auto inline-flex items-center gap-1.5 text-2xs text-[var(--text-muted)]">
                 {res ? <>Sau {Math.floor(res.hours)} giờ {Math.round((res.hours % 1) * 60)} phút live</> : (
                   <>Sau {HOURS.map((h) => <button key={h} type="button" aria-pressed={h === hoursPick} className={pill(h === hoursPick)} onClick={() => setHoursPick(h)}>{h} giờ live</button>)}</>
                 )}

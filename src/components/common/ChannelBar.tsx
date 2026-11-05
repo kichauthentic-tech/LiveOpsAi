@@ -37,7 +37,7 @@ export function ChannelBar({
           );
         })}
       </div>
-      {note && <span className="text-[11px] text-[var(--text-faint)]">{note}</span>}
+      {note && <span className="text-2xs text-[var(--text-faint)]">{note}</span>}
     </div>
   );
 }

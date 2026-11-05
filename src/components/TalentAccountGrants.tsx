@@ -140,7 +140,7 @@ export function TalentAccountGrants({ talents, users, sessions, onGrant }: Props
           <li key={t.id} className="py-2.5 flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2">
             <div className="sm:w-56 shrink-0">
               <p className="text-sm font-bold text-[var(--text)]">{t.name}</p>
-              <p className="text-[11px] text-[var(--text-muted)]">
+              <p className="text-2xs text-[var(--text-muted)]">
                 {talentRoleLabel(t.role)} ·{" "}
                 {upcoming > 0 ? (
                   <span className="font-bold text-amber-600">
@@ -175,7 +175,7 @@ export function TalentAccountGrants({ talents, users, sessions, onGrant }: Props
               </button>
             </div>
             {!errors[t.id] && !(emails[t.id] ?? "").trim() && (
-              <p className="text-[11px] text-[var(--text-faint)] sm:basis-full sm:pl-[14.5rem]">
+              <p className="text-2xs text-[var(--text-faint)] sm:basis-full sm:pl-[14.5rem]">
                 Để trống ⇒ đăng nhập bằng tên <span className="font-mono font-bold text-[var(--text-muted)]">{suggested[t.id]}</span>
               </p>
             )}

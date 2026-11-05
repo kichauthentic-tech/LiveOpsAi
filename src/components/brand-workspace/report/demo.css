@@ -1,7 +1,7 @@
-.rt{--bg: #0b0b0d; --panel: #17171b; --panel2: #1d1d22; --line: #2a2a30;
-  --gold: #f2c94c; --gold-dim: #a9873a; --cream: #f4f1e8; --muted: #93939c;
-  --green: #6fcf97; --red: #eb6b6b; --blue: #7fb0e0;
-  color-scheme: dark;}
+.rt{--bg: var(--rt-bg); --panel: var(--rt-panel); --panel2: var(--rt-panel2); --line: var(--rt-line);
+  --gold: var(--rt-gold); --gold-dim: var(--rt-gold-dim); --cream: var(--rt-cream); --muted: var(--rt-muted);
+  --green: var(--rt-green); --red: var(--rt-red); --blue: var(--rt-blue);
+  color-scheme: var(--rt-scheme);}
 .rt, .rt *{box-sizing: border-box;}
 .rt{background: var(--bg); color: var(--cream); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; line-height: 1.5; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));}
 .rt .wrap{max-width: 1180px; margin: 0 auto; padding-block: 20px 56px;}
@@ -81,10 +81,10 @@
 .rt .rr:focus-visible{outline: 2px solid var(--gold); outline-offset: 1px;}
 .rt #dayAbs.vt th, .rt #dayAbs.vt td{text-align: center;}
 .rt #dayAbs.vt th:first-child, .rt #dayAbs.vt td:first-child{text-align: left;}
-.rt #dayAbs.vt .g-daily{--gc: #9a9aa5;}
-.rt #dayAbs.vt .g-dday{--gc: #f2c94c;}
-.rt #dayAbs.vt .g-mm{--gc: #7fb0e0;}
-.rt #dayAbs.vt .g-pd{--gc: #e08a4b;}
+.rt #dayAbs.vt .g-daily{--gc: var(--rt-gc-daily);}
+.rt #dayAbs.vt .g-dday{--gc: var(--rt-gold);}
+.rt #dayAbs.vt .g-mm{--gc: var(--rt-blue);}
+.rt #dayAbs.vt .g-pd{--gc: var(--rt-gc-pd);}
 .rt #dayAbs.vt th.grpH{color: var(--gc); border-bottom: 0; border-top: 3px solid var(--gc); background: color-mix(in srgb, var(--gc) 10%, transparent);}
 .rt #dayAbs.vt th.sub{color: var(--gc); font-weight: 700; background: color-mix(in srgb, var(--gc) 6%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--gc) 50%, var(--line));}
 .rt #dayAbs.vt .gs{border-left: 2px solid color-mix(in srgb, var(--gc) 60%, var(--line));}
@@ -163,7 +163,7 @@
 .rt .nm small{display: block; color: var(--muted); font-size: 11px;}
 .rt .hb .trk{position: relative; height: 18px; background: color-mix(in srgb, var(--line) 55%, transparent); border-radius: 5px;}
 .rt .hb .fill{position: absolute; left: 0; top: 4px; bottom: 4px; border-radius: 3px; background: var(--gold);}
-.rt .hb .fill.dim{background: #55555d;}
+.rt .hb .fill.dim{background: color-mix(in srgb, var(--rt-muted) 60%, var(--rt-panel));}
 .rt .hb .fill.blue{background: var(--blue);}
 .rt .hb .fill.red{background: var(--red);}
 .rt .hb .fill.stk{top: 2px; bottom: 2px; border-radius: 0;}

@@ -26,12 +26,12 @@ export const TalentTabBar: React.FC<{ items: NavItem[]; activeTab: string; onSel
           type="button"
           onClick={() => onSelect(it.id)}
           aria-current={on ? "page" : undefined}
-          className={`relative flex flex-col items-center justify-center gap-0.5 py-2 min-h-14 text-[11px] font-bold ${on ? "text-[var(--accent-text)]" : "text-[var(--text-faint)]"}`}
+          className={`relative flex flex-col items-center justify-center gap-0.5 py-2 min-h-14 text-2xs font-bold ${on ? "text-[var(--accent-text)]" : "text-[var(--text-faint)]"}`}
         >
           <Icon className="w-5 h-5" />
           {SHORT[it.id] ?? it.label}
           {n > 0 && (
-            <span className="absolute top-1 left-1/2 ml-2 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-600 text-white text-[11px] leading-[18px] text-center">{n}</span>
+            <span className="absolute top-1 left-1/2 ml-2 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-600 text-white text-2xs leading-[18px] text-center">{n}</span>
           )}
         </button>
       );

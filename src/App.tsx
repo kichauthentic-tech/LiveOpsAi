@@ -1805,7 +1805,7 @@ export default function App() {
             </div>
             <button
               onClick={() => setDismissedDataErrorSignature(dataLoadErrorSignature)}
-              className="px-3 py-1 bg-red-900/80 hover:bg-red-800 text-red-200 border border-red-500/40 font-bold rounded-lg text-[11px] transition-all shrink-0"
+              className="px-3 py-1 bg-red-900/80 hover:bg-red-800 text-red-200 border border-red-500/40 font-bold rounded-lg text-2xs transition-all shrink-0"
             >
               Đóng
             </button>
@@ -1882,7 +1882,7 @@ export default function App() {
                 </div>
 
                 <div className="p-4 bg-[var(--surface-base)] border border-[var(--border)] rounded-xl text-left text-xs font-mono space-y-1 text-[var(--text-muted)]">
-                  <div className="text-[var(--text-faint)] font-sans text-[11px] font-bold">Chi tiết yêu cầu an ninh:</div>
+                  <div className="text-[var(--text-faint)] font-sans text-2xs font-bold">Chi tiết yêu cầu an ninh:</div>
                   {/* Tab không có nav item cho role này thì không có perm key nào để in — nói thẳng là do role,
                       thay vì in "undefined". */}
                   <div>• Permission Required: <span className="text-blue-400">{currentTabNavItem?.perm ?? "không khả dụng cho role này"}</span></div>
@@ -1909,7 +1909,7 @@ export default function App() {
                       <span>Quản Lý Phân Quyền Hợp Lệ (Role Settings)</span>
                     </button>
                   ) : (
-                    <div className="px-4 py-2 bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-xl text-[11px] font-semibold flex items-center gap-2">
+                    <div className="px-4 py-2 bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-xl text-2xs font-semibold flex items-center gap-2">
                       <Lock className="w-3.5 h-3.5" />
                       <span>Tài khoản hiện tại không thể tự cấp quyền. Vui lòng liên hệ Ban Giám Đốc (CEO).</span>
                     </div>

@@ -159,7 +159,7 @@ export const OpenSlotModal: React.FC<OpenSlotModalProps> = ({
           </div>
           <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text)] p-1 rounded-lg"><X className="w-5 h-5" /></button>
         </div>
-        <p className="text-[11px] text-[var(--text-muted)] bg-[var(--surface-base)]/60 border border-[var(--border)] rounded-xl p-2.5">
+        <p className="text-2xs text-[var(--text-muted)] bg-[var(--surface-base)]/60 border border-[var(--border)] rounded-xl p-2.5">
           Ca hiện ở <b>Bảng Vận Hành</b> (talent thấy ở Đăng Ký Ca) để talent đăng ký rảnh, ops chốt Host/Trợ sau. Ca đều đặn hằng tháng nên lập ở Kế Hoạch Tháng — chỗ này cho ca phát sinh. <b>Ca mở ở đây nằm ngoài kế hoạch nên không có target</b> (không cộng vào target tháng); muốn ca có target thì thêm vào lưới Kế Hoạch Tháng.
         </p>
 
@@ -223,7 +223,7 @@ export const OpenSlotModal: React.FC<OpenSlotModalProps> = ({
                   const on = p.start === start && p.end === end;
                   return (
                     <button key={`${p.start}${p.end}`} type="button" onClick={() => { setStart(p.start); setEnd(p.end); }}
-                      className={`px-2.5 py-1.5 rounded-lg border font-mono font-bold text-[11px] ${on ? "seg-on" : "bg-[var(--surface-base)] text-[var(--text-muted)] border-[var(--border)] hover:border-[var(--accent)]/60"}`}>
+                      className={`px-2.5 py-1.5 rounded-lg border font-mono font-bold text-2xs ${on ? "seg-on" : "bg-[var(--surface-base)] text-[var(--text-muted)] border-[var(--border)] hover:border-[var(--accent)]/60"}`}>
                       {p.start}–{p.end}
                     </button>
                   );
@@ -253,7 +253,7 @@ export const OpenSlotModal: React.FC<OpenSlotModalProps> = ({
           </label>
 
           {pastDays > 0 && (
-            <p className="text-[11px] text-amber-300 flex items-start gap-1.5 bg-amber-950/40 border border-amber-900 rounded-xl p-2.5">
+            <p className="text-2xs text-amber-300 flex items-start gap-1.5 bg-amber-950/40 border border-amber-900 rounded-xl p-2.5">
               <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
               <span>
                 <b>Ngày đã qua {pastDays} ngày.</b> Talent không đăng ký được ca ở quá khứ — chỉ mở nếu bạn đang <b>nạp bù ca đã live</b>, rồi tự chốt Host ở Bảng Vận Hành.
@@ -262,7 +262,7 @@ export const OpenSlotModal: React.FC<OpenSlotModalProps> = ({
           )}
 
           {studioClash && (
-            <p className="text-[11px] text-rose-300 flex items-center gap-1.5 bg-rose-950/50 border border-rose-900 rounded-xl p-2.5">
+            <p className="text-2xs text-rose-300 flex items-center gap-1.5 bg-rose-950/50 border border-rose-900 rounded-xl p-2.5">
               <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> Phòng trùng với {studioClash}.
             </p>
           )}

@@ -364,7 +364,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
               </span>
             )}
           </span>
-          <span className="flex items-center gap-1.5 text-[11px] text-[var(--text-faint)] min-w-0">
+          <span className="flex items-center gap-1.5 text-2xs text-[var(--text-faint)] min-w-0">
             <span className="bg-[var(--accent)]/50 text-[var(--accent-text)] font-bold px-1.5 py-0.5 rounded shrink-0">{talentRoleLabel(t.role)}</span>
             <span className="truncate">{parts.length ? parts.join(" · ") : "Chưa gắn với ca nào"}</span>
           </span>
@@ -408,7 +408,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
           { label: "Chưa gắn ca", value: String(overview.all - overview.active) }
         ].map((k) => (
           <div key={k.label} className="bg-[var(--surface)] border border-[var(--border)] rounded-xl px-4 py-3">
-            <p className="text-[11px] text-[var(--text-faint)] font-semibold">{k.label}</p>
+            <p className="text-2xs text-[var(--text-faint)] font-semibold">{k.label}</p>
             <p className="text-xl font-bold text-[var(--text)] font-mono">{k.value}</p>
           </div>
         ))}
@@ -462,7 +462,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                 </button>
               ))}
             </div>
-            <p className="text-[11px] text-[var(--text-faint)]">
+            <p className="text-2xs text-[var(--text-faint)]">
               Số ca và giờ cộng <b>mọi tháng</b> đã chạy (Hiệu Suất Host mặc định chỉ xem 90 ngày gần nhất). Xếp theo tổng ca.
             </p>
           </div>
@@ -473,7 +473,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
             <>
               {/* Dòng ngăn để mắt dừng lại thay vì lướt qua một dải "—" dài không biết bắt đầu từ đâu. */}
               {activeRows.length > 0 && (
-                <div className="px-3 py-1.5 text-[11px] font-bold text-[var(--text-muted)] bg-[var(--surface-elevated)]/50 border-b border-[var(--border-muted)]">
+                <div className="px-3 py-1.5 text-2xs font-bold text-[var(--text-muted)] bg-[var(--surface-elevated)]/50 border-b border-[var(--border-muted)]">
                   {idleRows.length} hồ sơ chưa gắn với ca nào
                   <span className="text-[var(--text-faint)] font-normal"> — tài khoản mới hoặc chưa được xếp ca</span>
                 </div>
@@ -500,10 +500,10 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                   <h4 className="font-bold text-[var(--text)] text-base leading-tight">{selected.t.name}</h4>
                   <p className="text-[var(--text-muted)] mt-0.5 flex flex-wrap items-center gap-x-1.5">
                     {selected.t.nickname && <span>{selected.t.nickname} ·</span>}
-                    <span className="bg-[var(--accent)]/50 text-[var(--accent-text)] text-[11px] font-bold px-1.5 py-0.5 rounded">{talentRoleLabel(selected.t.role)}</span>
+                    <span className="bg-[var(--accent)]/50 text-[var(--accent-text)] text-2xs font-bold px-1.5 py-0.5 rounded">{talentRoleLabel(selected.t.role)}</span>
                     {selected.t.availabilityStatus && selected.t.availabilityStatus !== "Available" && (
                       <span
-                        className={`text-[11px] font-bold px-1.5 py-0.5 rounded ${
+                        className={`text-2xs font-bold px-1.5 py-0.5 rounded ${
                           selected.t.availabilityStatus === "On Live" ? "bg-red-900/80 text-red-300" : "bg-amber-900/80 text-amber-300"
                         }`}
                       >
@@ -546,7 +546,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
               </div>
 
               {roleMismatch(selected.t.role, selected.real) && (
-                <p className="flex items-start gap-1.5 text-[11px] text-amber-300 bg-amber-950/40 border border-amber-500/30 rounded-lg px-2.5 py-1.5">
+                <p className="flex items-start gap-1.5 text-2xs text-amber-300 bg-amber-950/40 border border-amber-500/30 rounded-lg px-2.5 py-1.5">
                   <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                   Hồ sơ ghi {talentRoleLabel(selected.t.role)} nhưng người này chỉ chạy {selected.t.role === "Assistant" ? "host" : "trợ live"} trong ca — bấm ✏️ để sửa vai trò.
                 </p>
@@ -560,13 +560,13 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                   { label: "Giờ trợ", value: selected.real.assistHours > 0 ? `${fmtFixed(selected.real.assistHours, 1)}h` : null }
                 ].map((k) => (
                   <div key={k.label} className="bg-[var(--surface-base)]/40 border border-[var(--border)] rounded-xl px-3 py-2">
-                    <p className="text-[11px] text-[var(--text-faint)]">{k.label}</p>
+                    <p className="text-2xs text-[var(--text-faint)]">{k.label}</p>
                     <p className="text-base font-bold text-[var(--text)] font-mono">{k.value ?? <Dash />}</p>
                   </div>
                 ))}
               </div>
               {selected.real.sessionCount === 0 && selected.real.assistSessionCount > 0 && (
-                <p className="text-[11px] text-[var(--text-faint)]">
+                <p className="text-2xs text-[var(--text-faint)]">
                   {platformText("GMV", "all")} của ca tính cho host, nên người chỉ chạy vai trợ không có {platformText("GMV", "all")} lũy kế — không phải chưa làm ca nào.
                 </p>
               )}
@@ -588,7 +588,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                     );
                   })
                 ) : (
-                  <p className="text-[11px] text-[var(--text-faint)]">Chưa có {platformText("GMV", "all")} ở sàn nào.</p>
+                  <p className="text-2xs text-[var(--text-faint)]">Chưa có {platformText("GMV", "all")} ở sàn nào.</p>
                 )}
               </div>
 
@@ -600,7 +600,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                   {METRIC.gmvPerHour} theo kênh (brand × sàn)
                 </p>
                 {selectedBrandPerf.every((b) => b.sessions === 0) ? (
-                  <p className="text-[11px] text-[var(--text-faint)]">Chưa live ca nào có số liệu ở kênh nào.</p>
+                  <p className="text-2xs text-[var(--text-faint)]">Chưa live ca nào có số liệu ở kênh nào.</p>
                 ) : (
                   <ul className="space-y-1">
                     {selectedBrandPerf.filter((b) => b.sessions > 0).map((b) => {
@@ -619,7 +619,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                     })}
                   </ul>
                 )}
-                <p className="text-[11px] text-[var(--text-faint)] leading-relaxed">
+                <p className="text-2xs text-[var(--text-faint)] leading-relaxed">
                   Không có số liệu {platformText("GMV/giờ", "all")} gộp mọi brand hay gộp hai sàn: chỉ số này phụ thuộc ngành hàng, giá bán và sàn hơn là người chạy.
                   Muốn xếp hạng host trong một brand thì mở Hiệu Suất Host (có lọc brand, thứ và khung giờ).
                 </p>
@@ -693,7 +693,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
           </div>
 
           {matchingError && (
-            <div className="flex items-start gap-2 text-[11px] text-amber-400 bg-amber-950/40 border border-amber-500/40 rounded-xl px-3 py-2">
+            <div className="flex items-start gap-2 text-2xs text-amber-400 bg-amber-950/40 border border-amber-500/40 rounded-xl px-3 py-2">
               <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
               <span>
                 {matchingError}
@@ -716,8 +716,8 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                         Match Score: {r.matchScore}%
                       </span>
                     </div>
-                    <p className="text-[var(--text-muted)] text-[11px] leading-relaxed">{r.reasoning}</p>
-                    <div className="text-right text-[11px] text-emerald-400 font-mono font-bold">Dự đoán {platformText("GMV", "all")}: {r.predictedGmv}</div>
+                    <p className="text-[var(--text-muted)] text-2xs leading-relaxed">{r.reasoning}</p>
+                    <div className="text-right text-2xs text-emerald-400 font-mono font-bold">Dự đoán {platformText("GMV", "all")}: {r.predictedGmv}</div>
                   </div>
                 ))}
               </div>
@@ -789,7 +789,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                     placeholder="host@liveops.ai"
                     className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)] focus:ring-2 focus:ring-[var(--accent)]"
                   />
-                  <p className="text-[11px] text-[var(--text-faint)] mt-1">
+                  <p className="text-2xs text-[var(--text-faint)] mt-1">
                     Hệ thống tự sinh mật khẩu ngẫu nhiên, hiện 1 lần ngay sau khi tạo xong — talent BẮT BUỘC phải đổi mật khẩu khi đăng nhập lần đầu.
                   </p>
                 </div>
@@ -849,7 +849,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                         onChange={(e) => setFormRateHour(Number(e.target.value))}
                         className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)]"
                       />
-                      <p className="text-[11px] text-[var(--text-faint)] mt-1">
+                      <p className="text-2xs text-[var(--text-faint)] mt-1">
                         {Number(formRateHour) > 0 ? "Đang tính lương theo giờ — bỏ qua rate/live." : "Để 0 = tính theo rate/live."}
                       </p>
                     </div>
@@ -863,7 +863,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                         onChange={(e) => setFormAssistantRateHour(Number(e.target.value))}
                         className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)]"
                       />
-                      <p className="text-[11px] text-[var(--text-faint)] mt-1">
+                      <p className="text-2xs text-[var(--text-faint)] mt-1">
                         {Number(formAssistantRateHour) > 0 ? "Ca làm trợ live tính theo rate này × giờ." : "Để 0 = ca làm trợ tính theo rate host ở trên."}
                       </p>
                     </div>

@@ -52,7 +52,7 @@ export const Sandbox: React.FC<{
       </div>
 
       <div className="overflow-x-auto -mx-1 px-1">
-        <div className="grid gap-[3px] text-[11px]" style={{ gridTemplateColumns: `140px repeat(${days.length}, minmax(26px, 1fr))`, minWidth: 140 + days.length * 29 }}>
+        <div className="grid gap-[3px] text-2xs" style={{ gridTemplateColumns: `140px repeat(${days.length}, minmax(26px, 1fr))`, minWidth: 140 + days.length * 29 }}>
           <div />
           {days.map((d) => (
             <div key={d} className={`text-center ${channels[0]?.bucketOf(d) !== "daily" ? "text-amber-400 font-bold" : "text-[var(--text-faint)]"}`}>{Number(d.slice(8))}</div>
@@ -84,12 +84,12 @@ export const Sandbox: React.FC<{
           ))}
         </div>
       </div>
-      <p className="text-[11px] text-[var(--text-faint)]">Mỗi ngày 3 ô: 10h · 14h · 20h (ca 3 giờ). Ô trống: phòng đã có ca, hoặc không còn host/trợ quen kênh rảnh. Ca thêm tính 0,8 lần kỳ vọng vì giờ thêm thường có hiệu suất thấp hơn giờ sẵn có; khung 14h ít lịch sử nên cân nhắc trước khi tin.</p>
+      <p className="text-2xs text-[var(--text-faint)]">Mỗi ngày 3 ô: 10h · 14h · 20h (ca 3 giờ). Ô trống: phòng đã có ca, hoặc không còn host/trợ quen kênh rảnh. Ca thêm tính 0,8 lần kỳ vọng vì giờ thêm thường có hiệu suất thấp hơn giờ sẵn có; khung 14h ít lịch sử nên cân nhắc trước khi tin.</p>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead><tr className="text-[11px] text-[var(--text-faint)] text-left"><th className="py-1.5 pr-2">Kênh</th><th className="py-1.5 pr-2 text-right">Ca thêm</th><th className="py-1.5 pr-2 text-right">GMV thêm</th><th className="py-1.5 text-right">Xác suất đạt target</th></tr></thead>
+            <thead><tr className="text-2xs text-[var(--text-faint)] text-left"><th className="py-1.5 pr-2">Kênh</th><th className="py-1.5 pr-2 text-right">Ca thêm</th><th className="py-1.5 pr-2 text-right">GMV thêm</th><th className="py-1.5 text-right">Xác suất đạt target</th></tr></thead>
             <tbody>
               {channels.map((c) => {
                 const mine = plan.filter((p) => p.candidate.channelKey === c.key).map((p) => p.candidate);
@@ -130,7 +130,7 @@ export const Sandbox: React.FC<{
               ))
             )}
           </div>
-          <p className="text-[11px] text-[var(--text-faint)]">Ca thêm là giờ brand mua thêm (hoặc agency tặng) — bàn với brand trước. Ca nháp chưa giữ phòng, chưa báo ai; OP xác nhận ở khối "Ca nháp chờ xác nhận" mới thành ca thật và tự thành ca tăng cường (không cộng vào target tháng).</p>
+          <p className="text-2xs text-[var(--text-faint)]">Ca thêm là giờ brand mua thêm (hoặc agency tặng) — bàn với brand trước. Ca nháp chưa giữ phòng, chưa báo ai; OP xác nhận ở khối "Ca nháp chờ xác nhận" mới thành ca thật và tự thành ca tăng cường (không cộng vào target tháng).</p>
         </div>
       </div>
     </div>

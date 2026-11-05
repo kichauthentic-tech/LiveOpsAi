@@ -65,7 +65,7 @@ interface BrandsOverviewProps {
 // "Chưa lập / Chưa có cam kết / Chưa tạo / Chưa set" mà không nói đi đâu để làm).
 const GoLink: React.FC<{ label: string; onClick?: () => void }> = ({ label, onClick }) =>
   onClick ? (
-    <button onClick={onClick} className="block mt-1 text-[11px] font-bold text-[var(--accent-text)] hover:underline min-h-6">
+    <button onClick={onClick} className="block mt-1 text-2xs font-bold text-[var(--accent-text)] hover:underline min-h-6">
       {label} →
     </button>
   ) : null;
@@ -278,7 +278,7 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ platform, brands
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)] text-[11px] font-semibold">
+              <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)] text-2xs font-semibold">
                 <th className="py-2.5 px-4">Brand</th>
                 <th className="py-2.5 px-2">Kế hoạch tháng</th>
                 <th className="py-2.5 px-2">Cam kết</th>
@@ -298,7 +298,7 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ platform, brands
                       </span>
                     </td>
                     <td className="py-2.5 px-2">
-                      <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${PLAN_STATUS_CLS[planStatus]}`}>
+                      <span className={`text-2xs font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${PLAN_STATUS_CLS[planStatus]}`}>
                         {PLAN_STATUS_LABEL[planStatus]}
                       </span>
                       {/* Tháng đã hết không lập kế hoạch / đặt cam kết được nữa — không mời bấm (23/10). */}
@@ -306,23 +306,23 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ platform, brands
                         <GoLink label={planStatus === "none" ? "Lập kế hoạch" : "Chốt kế hoạch"} onClick={onNavigate && (() => { rememberBrandId(b.id); onNavigate("month_plan", undefined, platform); })} />
                       )}
                       {plan?.brandConfirmedAt && (
-                        <span className="block text-[11px] text-emerald-400 mt-1">✓ brand đã xác nhận</span>
+                        <span className="block text-2xs text-emerald-400 mt-1">✓ brand đã xác nhận</span>
                       )}
                       {plan && plan.targetGmv > 0 && (
-                        <span className="block text-[11px] text-[var(--text-faint)] mt-0.5">
+                        <span className="block text-2xs text-[var(--text-faint)] mt-0.5">
                           Target {fmtVndShort(plan.targetGmv)}
                         </span>
                       )}
                     </td>
                     <td className="py-2.5 px-2">
-                      <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${COMMIT_STATUS_CLS[commitStatus]}`}>
+                      <span className={`text-2xs font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${COMMIT_STATUS_CLS[commitStatus]}`}>
                         {COMMIT_STATUS_LABEL[commitStatus]}
                       </span>
                       {commitStatus === "no_commitment" && month >= today.slice(0, 7) && (
                         <GoLink label="Đặt cam kết tháng" onClick={onNavigate && (() => { rememberBrandId(b.id); onNavigate("month_plan", undefined, platform); })} />
                       )}
                       {progress && (
-                        <span className="block text-[11px] text-[var(--text-faint)] mt-1">
+                        <span className="block text-2xs text-[var(--text-faint)] mt-1">
                           {progress.committedHours > 0 ? `${fmtHours(progress.plannedTotalHours)}/${fmtHours(progress.committedHours)}` : `${fmtHours(progress.plannedTotalHours)} trong lịch`}
                           {progress.gapHours > 0 && <span className="text-amber-300"> · thiếu {fmtHours(progress.gapHours)}</span>}
                         </span>
@@ -332,9 +332,9 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ platform, brands
                       {s.countable > 0 ? fmtHours(s.hours) : <span className="text-[var(--text-faint)] font-normal">—</span>}
                       {/* Đ11: `happened` chứ không phải `total` — bảng này tự nhận chỉ hiện số đã xảy ra,
                           nên ca sắp tới tách ra thành dòng riêng thay vì cộng chung vào "N ca". */}
-                      <span className="block text-[11px] text-[var(--text-faint)] font-normal">{s.happened} ca</span>
+                      <span className="block text-2xs text-[var(--text-faint)] font-normal">{s.happened} ca</span>
                       {s.upcoming > 0 && (
-                        <span className="block text-[11px] text-[var(--text-muted)] font-normal">+{s.upcoming} ca sắp tới</span>
+                        <span className="block text-2xs text-[var(--text-muted)] font-normal">+{s.upcoming} ca sắp tới</span>
                       )}
                     </td>
                     <td className="py-2.5 px-2 text-right font-bold text-[var(--success)] whitespace-nowrap">
@@ -357,10 +357,10 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ platform, brands
                     </td>
                     <td className="py-2.5 px-2">
                       {price ? (
-                        <span className="text-[11px] text-[var(--text-muted)]">{price}</span>
+                        <span className="text-2xs text-[var(--text-muted)]">{price}</span>
                       ) : (
                         <>
-                          <span className="text-[11px] text-rose-300 font-bold">Chưa nhập</span>
+                          <span className="text-2xs text-rose-300 font-bold">Chưa nhập</span>
                           <GoLink label="Nhập ở CRM" onClick={onNavigate && (() => { requestCrmFocus(b.id, platform); onNavigate("crm"); })} />
                         </>
                       )}
@@ -381,7 +381,7 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ platform, brands
       </div>
 
       {loading && (
-        <p className="text-[11px] text-[var(--text-faint)] flex items-center gap-1">
+        <p className="text-2xs text-[var(--text-faint)] flex items-center gap-1">
           <Loader2 className="w-3 h-3 animate-spin" /> Đang tải…
         </p>
       )}
@@ -406,26 +406,26 @@ const ReportCell: React.FC<{
 }> = ({ status, report, month, currentMonth, sessionCount, unreconciled, busy, error, onPublish, onUnpublish, onOpen }) => {
   const isPublished = status === "published" && !!report;
   const nothingToPublish = sessionCount === 0 && !report;
-  const btn = "inline-flex items-center gap-1.5 mt-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold min-h-6 disabled:opacity-60";
+  const btn = "inline-flex items-center gap-1.5 mt-1.5 px-2.5 py-1 rounded-lg text-2xs font-bold min-h-6 disabled:opacity-60";
   return (
     <div>
-      <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${REPORT_STATUS_CLS[status]}`}>
+      <span className={`text-2xs font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${REPORT_STATUS_CLS[status]}`}>
         {REPORT_STATUS_LABEL[status]}
       </span>
       {isPublished && report?.publishedAt && (
-        <span className="block text-[11px] text-[var(--text-faint)] mt-1">{new Date(report.publishedAt).toLocaleDateString("vi-VN")}</span>
+        <span className="block text-2xs text-[var(--text-faint)] mt-1">{new Date(report.publishedAt).toLocaleDateString("vi-VN")}</span>
       )}
       {!isPublished && month < currentMonth && unreconciled > 0 && (
-        <span className="block text-[11px] text-amber-300 mt-1">{unreconciled} ca chưa đối soát</span>
+        <span className="block text-2xs text-amber-300 mt-1">{unreconciled} ca chưa đối soát</span>
       )}
       {isPublished ? (
         <button type="button" onClick={() => onUnpublish(report!.id)} disabled={busy} className={`${btn} text-[var(--text-muted)] hover:bg-[var(--surface-elevated)]`}>
           {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />} Thu hồi
         </button>
       ) : month >= currentMonth ? (
-        <span className="block text-[11px] text-[var(--text-faint)] mt-1" title="Phát hành là đóng sổ số của tháng — chỉ làm sau khi hết tháng.">Chờ hết tháng</span>
+        <span className="block text-2xs text-[var(--text-faint)] mt-1" title="Phát hành là đóng sổ số của tháng — chỉ làm sau khi hết tháng.">Chờ hết tháng</span>
       ) : nothingToPublish ? (
-        <span className="flex items-center gap-1 text-[11px] text-[var(--text-faint)] mt-1" title="Tháng này brand chưa có ca nào và cũng chưa ai tạo dòng report — không có số liệu gì để gửi.">
+        <span className="flex items-center gap-1 text-2xs text-[var(--text-faint)] mt-1" title="Tháng này brand chưa có ca nào và cũng chưa ai tạo dòng report — không có số liệu gì để gửi.">
           <Ban className="w-3 h-3 shrink-0" /> Không có gì để phát hành
         </span>
       ) : (
@@ -436,7 +436,7 @@ const ReportCell: React.FC<{
           <GoLink label="Xem report" onClick={onOpen} />
         </div>
       )}
-      {error && <div className="text-[11px] text-red-300 font-semibold mt-1 max-w-[220px] whitespace-normal">{error}</div>}
+      {error && <div className="text-2xs text-red-300 font-semibold mt-1 max-w-[220px] whitespace-normal">{error}</div>}
     </div>
   );
 };

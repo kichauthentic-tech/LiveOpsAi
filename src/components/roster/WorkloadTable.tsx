@@ -45,7 +45,7 @@ export const WorkloadTable: React.FC<{ load: readonly PersonLoad[]; nameOf: (id:
                     <i className="absolute inset-y-0 bg-[var(--success)] opacity-45" style={{ left: pct(real), width: pct(draft) }} />
                     <i className="absolute inset-y-0 w-px bg-[var(--text)]" style={{ left: pct(l.min) }} />
                   </div>
-                  <div className="mt-0.5 tabular-nums text-[11px] text-[var(--text-muted)]">
+                  <div className="mt-0.5 tabular-nums text-2xs text-[var(--text-muted)]">
                     {fmtH(l.hours)}h <span className="text-[var(--text-faint)]">· {fmtH(l.min)}–{fmtH(l.max)}h</span>
                     {draft > 0 && <span className="text-[var(--text-faint)]"> · {fmtH(draft)}h nháp</span>}
                   </div>
@@ -57,7 +57,7 @@ export const WorkloadTable: React.FC<{ load: readonly PersonLoad[]; nameOf: (id:
                   {l.role === "host" ? (l.perf ? `${fmtFixed(l.perf.index, 2)} (${l.perf.n})` : "—") : "—"}
                 </td>
                 <td className="px-3 py-1.5">
-                  <span className={`inline-block rounded-md border px-1.5 py-0.5 text-[11px] font-bold ${STATUS_CLASS[l.status]}`}>{STATUS_TEXT[l.status]}</span>
+                  <span className={`inline-block rounded-md border px-1.5 py-0.5 text-2xs font-bold ${STATUS_CLASS[l.status]}`}>{STATUS_TEXT[l.status]}</span>
                 </td>
               </tr>
             );

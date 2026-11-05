@@ -257,14 +257,14 @@ export const BackfillFromRooms: React.FC<Props> = ({ platform, brandId, brandNam
         <span className="font-bold text-[var(--text-muted)] text-xs flex items-center gap-2">
           <Layers className="w-4 h-4" /> Nạp bù ca từ file {platform} — {brandName}
         </span>
-        <button type="button" onClick={toggleHidden} className="text-[11px] font-bold text-[var(--accent-text)] flex items-center gap-1">
+        <button type="button" onClick={toggleHidden} className="text-2xs font-bold text-[var(--accent-text)] flex items-center gap-1">
           Hiện <ChevronDown className="w-3.5 h-3.5" />
         </button>
       </div>
     );
   }
 
-  const selectCls = "bg-[var(--surface)] border border-[var(--border)] rounded-lg px-1.5 py-1 text-[11px] text-[var(--text)] w-full";
+  const selectCls = "bg-[var(--surface)] border border-[var(--border)] rounded-lg px-1.5 py-1 text-2xs text-[var(--text)] w-full";
 
   return (
     <div className="bg-[var(--surface)] p-4 rounded-2xl border border-[var(--border)] shadow-sm space-y-4">
@@ -276,19 +276,19 @@ export const BackfillFromRooms: React.FC<Props> = ({ platform, brandId, brandNam
           <select value={month} onChange={(e) => setMonth(e.target.value)} className="bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1 text-xs text-[var(--text)]">
             {months.map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}
           </select>
-          <button type="button" onClick={toggleHidden} className="text-[11px] font-bold text-[var(--text-muted)] hover:text-[var(--text)] flex items-center gap-1">
+          <button type="button" onClick={toggleHidden} className="text-2xs font-bold text-[var(--text-muted)] hover:text-[var(--text)] flex items-center gap-1">
             Ẩn <ChevronUp className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
 
-      {error && <p className="text-[11px] text-rose-500">{error}</p>}
-      {message && <p className="text-[11px] text-emerald-600">{message}</p>}
+      {error && <p className="text-2xs text-rose-500">{error}</p>}
+      {message && <p className="text-2xs text-emerald-600">{message}</p>}
 
       {/* Bước 1 — phân loại + sinh ca */}
       <div className="bg-[var(--surface-base)]/60 border border-[var(--border)] rounded-xl p-3 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="text-[11px] text-[var(--text-muted)] space-y-0.5">
+          <div className="text-2xs text-[var(--text-muted)] space-y-0.5">
             <p className="font-bold text-[var(--text)]">Bước 1 · Phân loại và sinh ca từ {prof.liveUnitWord}</p>
             {loadingRows ? (
               <p>Đang đọc file...</p>
@@ -314,7 +314,7 @@ export const BackfillFromRooms: React.FC<Props> = ({ platform, brandId, brandNam
             type="button"
             onClick={handleGenerate}
             disabled={generating || loadingRows || plan.toCreate.length === 0}
-            className="px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white font-bold text-[11px] flex items-center gap-1.5"
+            className="px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white font-bold text-2xs flex items-center gap-1.5"
           >
             <Wand2 className="w-3.5 h-3.5" /> {generating ? "Đang lưu..." : agencyCount > 0 ? `Sinh ${agencyCount} ca` : draftInhouse.length > 0 ? `Ghi nhận ${draftInhouse.length} inhouse` : "Sinh 0 ca"}
           </button>
@@ -322,11 +322,11 @@ export const BackfillFromRooms: React.FC<Props> = ({ platform, brandId, brandNam
 
         {plan.toCreate.length > 0 && (
           <div className="space-y-2">
-            <p className="text-[11px] text-[var(--text-muted)]">
+            <p className="text-2xs text-[var(--text-muted)]">
               Mỗi {prof.liveUnitWord} chưa có ca có thể là <b className="text-[var(--text)]">agency live bị thiếu ca</b> hoặc <b className="text-sky-500">brand tự live (inhouse)</b>.
               Mặc định tất cả là agency — đánh dấu inhouse những {prof.liveUnitWord} không phải của agency trước khi sinh ca.
             </p>
-            <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+            <div className="flex flex-wrap items-center gap-1.5 text-2xs">
               <span className="font-bold text-[var(--text-muted)]">Theo giờ bắt đầu:</span>
               {hourGroups.map((g) => {
                 const allOn = g.roomIds.every((id) => inhouseDraft.has(id));
@@ -352,7 +352,7 @@ export const BackfillFromRooms: React.FC<Props> = ({ platform, brandId, brandNam
                 {plan.toCreate.map((p) => {
                   const on = inhouseDraft.has(p.room_id);
                   return (
-                    <div key={p.room_id} className="flex items-center gap-3 px-2.5 py-1.5 text-[11px]">
+                    <div key={p.room_id} className="flex items-center gap-3 px-2.5 py-1.5 text-2xs">
                       <span className="w-28 font-mono text-[var(--text)]">{vnParts(p.started_at).label}</span>
                       <span className="w-24 text-[var(--text-muted)]">→ {vnParts(p.ended_at).time} · {Math.round(p.duration_minutes)}p</span>
                       <span className="w-28 text-right font-bold text-[var(--text)]">{fmtMoney(p.gmv)}</span>
@@ -370,7 +370,7 @@ export const BackfillFromRooms: React.FC<Props> = ({ platform, brandId, brandNam
         )}
 
         {savedInThisMonth.length > 0 && (
-          <div className="text-[11px] text-[var(--text-muted)] flex flex-wrap items-center gap-2">
+          <div className="text-2xs text-[var(--text-muted)] flex flex-wrap items-center gap-2">
             <Home className="w-3.5 h-3.5 text-sky-500" />
             <span>Đã ghi nhận inhouse tháng này: <b className="text-sky-500">{savedInThisMonth.length}</b> {prof.liveUnitWord} · {platformText("GMV", platform)} {fmtMoney(savedInThisMonth.reduce((a, r) => a + r.gmv, 0))} — không tính vào ca agency</span>
             <button
@@ -387,7 +387,7 @@ export const BackfillFromRooms: React.FC<Props> = ({ platform, brandId, brandNam
       {/* Bước 2 — gán host */}
       <div className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-[11px] font-bold text-[var(--text)] flex items-center gap-1.5">
+          <p className="text-2xs font-bold text-[var(--text)] flex items-center gap-1.5">
             <Users className="w-3.5 h-3.5 text-[var(--accent-text)]" /> Bước 2 · Gán host / trợ live
             <span className="font-normal text-[var(--text-muted)]">— {monthSessions.length} ca trong tháng, {unassigned} chưa có host</span>
           </p>
@@ -395,18 +395,18 @@ export const BackfillFromRooms: React.FC<Props> = ({ platform, brandId, brandNam
             type="button"
             onClick={handleSave}
             disabled={saving || pending.length === 0}
-            className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-[11px] flex items-center gap-1.5"
+            className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-2xs flex items-center gap-1.5"
           >
             <Save className="w-3.5 h-3.5" /> {saving ? "Đang lưu..." : `Lưu ${pending.length} thay đổi`}
           </button>
         </div>
 
         {monthSessions.length === 0 ? (
-          <p className="text-[11px] text-[var(--text-faint)]">Tháng này chưa có ca {platform} nào — sinh ca ở bước 1 trước.</p>
+          <p className="text-2xs text-[var(--text-faint)]">Tháng này chưa có ca {platform} nào — sinh ca ở bước 1 trước.</p>
         ) : (
           <>
             {/* Công cụ điền */}
-            <div className="bg-[var(--surface-base)]/60 border border-[var(--border)] rounded-xl p-3 space-y-2 text-[11px]">
+            <div className="bg-[var(--surface-base)]/60 border border-[var(--border)] rounded-xl p-3 space-y-2 text-2xs">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-bold text-[var(--text-muted)]">Điền theo thứ:</span>
                 <div className="flex items-center gap-1">
@@ -473,7 +473,7 @@ export const BackfillFromRooms: React.FC<Props> = ({ platform, brandId, brandNam
 
             {/* Lưới */}
             <div className="overflow-x-auto border border-[var(--border)] rounded-xl">
-              <table className="w-full text-[11px]">
+              <table className="w-full text-2xs">
                 <thead className="bg-[var(--surface-elevated)]/60 text-[var(--text-muted)]">
                   <tr>
                     <th className="text-left px-2 py-1.5 font-bold whitespace-nowrap">Ngày</th>

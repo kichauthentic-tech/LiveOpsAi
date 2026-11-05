@@ -117,7 +117,7 @@ export const TabUsagePanel: React.FC = () => {
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="text-left text-[11px] font-semibold text-[var(--text-faint)] border-b border-[var(--border)]">
+                <tr className="text-left text-2xs font-semibold text-[var(--text-faint)] border-b border-[var(--border)]">
                   <th className="py-2 pr-3 font-bold">Tab</th>
                   <th className="py-2 pr-3 font-bold text-right">Lượt mở</th>
                   <th className="py-2 pr-3 font-bold text-right">Người</th>
@@ -132,7 +132,7 @@ export const TabUsagePanel: React.FC = () => {
                       <div className="font-bold text-[var(--text)] whitespace-nowrap">
                         {g.label}
                         {g.workspace === "brand" && (
-                          <span className="ml-1.5 text-[11px] font-bold text-[var(--text-faint)]">brand</span>
+                          <span className="ml-1.5 text-2xs font-bold text-[var(--text-faint)]">brand</span>
                         )}
                       </div>
                       <div className="mt-1 h-1.5 rounded-full bg-[var(--surface-elevated)] w-40 max-w-full">

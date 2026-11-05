@@ -22,7 +22,7 @@ const TONE_PILL: Record<RowTone, string> = {
   off: "bg-[var(--surface-elevated)] text-[var(--text-faint)] border-[var(--border)]"
 };
 const Pill: React.FC<{ tone: RowTone; children: React.ReactNode }> = ({ tone, children }) => (
-  <span className={`inline-flex self-start items-center text-[11px] font-bold px-2 py-0.5 rounded-full border leading-snug ${TONE_PILL[tone]}`}>{children}</span>
+  <span className={`inline-flex self-start items-center text-2xs font-bold px-2 py-0.5 rounded-full border leading-snug ${TONE_PILL[tone]}`}>{children}</span>
 );
 const num = (v: number, d = 0) => v.toLocaleString("vi-VN", { maximumFractionDigits: d });
 const signPct = (x: number) => `${x >= 0 ? "+" : "−"}${num(Math.abs(x) * 100, Math.abs(x) < 0.1 ? 1 : 0)}%`;
@@ -82,7 +82,7 @@ export const OverviewTab: React.FC<{
         <div className="rounded-2xl border border-dashed border-[var(--border)] p-8 text-center text-sm text-[var(--text-muted)]">Đang dựng số từng account…</div>
       ) : (
         <div className="space-y-2">
-          <div className="hidden xl:grid grid-cols-[150px_190px_minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,1.15fr)_150px_16px] gap-4 px-4 text-[11px] font-semibold text-[var(--text-faint)]" aria-hidden="true">
+          <div className="hidden xl:grid grid-cols-[150px_190px_minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,1.15fr)_150px_16px] gap-4 px-4 text-2xs font-semibold text-[var(--text-faint)]" aria-hidden="true">
             <span>Account</span><span>Trạng thái</span><span>Tiến độ tháng · <span className="font-normal">vạch = target luỹ kế, vòng = dự báo</span></span><span>Khả năng bù thiếu hụt</span><span>Phân rã {platformText("GMV/giờ", "all")} · Daily so tháng trước</span><span>Giờ cam kết</span><span />
           </div>
           {rows.map((r) => {
@@ -100,7 +100,7 @@ export const OverviewTab: React.FC<{
                   <div className="flex flex-col gap-1 min-w-0 col-span-2 md:col-span-1">
                     <Label>Trạng thái</Label>
                     <Pill tone={r.tone}>{r.status}</Pill>
-                    <span className="text-[11px] text-[var(--text-faint)]">{r.runRate != null ? `Run-rate ${pct(r.runRate)}${r.asOf ? ` · dữ liệu đến ${ddmm(r.asOf)}` : ""}` : r.lastLive ? `ca live cuối ${ddmm(r.lastLive)}` : "chưa có ca live trong tháng"}</span>
+                    <span className="text-2xs text-[var(--text-faint)]">{r.runRate != null ? `Run-rate ${pct(r.runRate)}${r.asOf ? ` · dữ liệu đến ${ddmm(r.asOf)}` : ""}` : r.lastLive ? `ca live cuối ${ddmm(r.lastLive)}` : "chưa có ca live trong tháng"}</span>
                   </div>
                   <ChevronRight className={`w-4 h-4 text-[var(--text-faint)] transition-transform justify-self-end self-start xl:self-center row-start-1 col-start-2 md:col-start-3 xl:col-start-7 ${isOpen ? "rotate-90" : ""}`} aria-hidden="true" />
                   <div className="flex flex-col gap-1 min-w-0 col-span-2 md:col-span-3 xl:col-span-1"><Label>Tiến độ tháng</Label><Progress r={r} /></div>
@@ -146,9 +146,9 @@ export const OverviewTab: React.FC<{
   );
 };
 
-const Label: React.FC<{ children: React.ReactNode }> = ({ children }) => <span className="xl:hidden text-[11px] font-semibold text-[var(--text-faint)]">{children}</span>;
+const Label: React.FC<{ children: React.ReactNode }> = ({ children }) => <span className="xl:hidden text-2xs font-semibold text-[var(--text-faint)]">{children}</span>;
 const Fig: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => (
-  <div className="min-w-0"><p className="text-[11px] text-[var(--text-faint)]">{label}</p><p className="font-black tabular-nums text-[var(--text)]">{value}</p></div>
+  <div className="min-w-0"><p className="text-2xs text-[var(--text-faint)]">{label}</p><p className="font-black tabular-nums text-[var(--text)]">{value}</p></div>
 );
 
 const Progress: React.FC<{ r: AccountRow }> = ({ r }) => {
@@ -163,14 +163,14 @@ const Progress: React.FC<{ r: AccountRow }> = ({ r }) => {
         {fc != null && <b className="absolute top-1/2 w-3 h-3 -mt-1.5 -ml-1.5 rounded-full border-2 border-[var(--text)] bg-[var(--surface)]" style={{ left: `${fc}%` }} />}
       </div>
       <span className="text-xs text-[var(--text-muted)] tabular-nums"><b className="text-[var(--text)]">{money(r.actual)}</b> / {money(r.target)} · {pct(r.actual / r.target)}</span>
-      <span className="text-[11px] text-[var(--text-faint)]">{r.targetToDate != null ? `target luỹ kế ${money(r.targetToDate)} · ` : ""}{r.forecast != null ? <>dự báo <b className="text-[var(--text-muted)]">~{money(r.forecast)}</b> ({pct(r.forecast / r.target)})</> : "chưa có dự báo"}</span>
+      <span className="text-2xs text-[var(--text-faint)]">{r.targetToDate != null ? `target luỹ kế ${money(r.targetToDate)} · ` : ""}{r.forecast != null ? <>dự báo <b className="text-[var(--text-muted)]">~{money(r.forecast)}</b> ({pct(r.forecast / r.target)})</> : "chưa có dự báo"}</span>
     </>
   );
 };
 
 const Rescue: React.FC<{ r: AccountRow }> = ({ r }) => {
   const x = r.rescue;
-  if (x.kind === "no_schedule" && r.hours) return <><Pill tone="bad">Rủi ro không đủ giờ cam kết</Pill><span className="text-[11px] text-[var(--text-faint)]">Cam kết {num(r.hours.committed)} giờ, chưa xếp lịch live giờ nào.</span></>;
+  if (x.kind === "no_schedule" && r.hours) return <><Pill tone="bad">Rủi ro không đủ giờ cam kết</Pill><span className="text-2xs text-[var(--text-faint)]">Cam kết {num(r.hours.committed)} giờ, chưa xếp lịch live giờ nào.</span></>;
   if (x.kind === "off" || x.kind === "no_plan") return <span className="text-xs text-[var(--text-faint)]">{x.kind === "off" ? "Không có lịch live" : "Chưa có target để tính"}</span>;
   const tone: RowTone = x.kind === "on_track" || x.kind === "save" ? "good" : x.kind === "no_forecast" ? "off" : "bad";
   const head =
@@ -184,7 +184,7 @@ const Rescue: React.FC<{ r: AccountRow }> = ({ r }) => {
     <>
       <Pill tone={tone}>{head}</Pill>
       {x.needRate != null && x.nowRate != null && max > 0 && (
-        <div className="grid grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 text-[11px]">
+        <div className="grid grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 text-2xs">
           <span className="text-[var(--text-faint)]">Cần</span>
           <span className="h-2 rounded bg-[var(--surface-base)] overflow-hidden"><i className="block h-full rounded" style={{ width: `${(x.needRate / max) * 100}%`, background: TONE_BORDER[tone === "off" ? "warn" : tone] }} /></span>
           <b className="tabular-nums text-[var(--text)]">{money(x.needRate)}/giờ</b>
@@ -193,7 +193,7 @@ const Rescue: React.FC<{ r: AccountRow }> = ({ r }) => {
           <b className="tabular-nums text-[var(--text)]">{money(x.nowRate)}/giờ</b>
         </div>
       )}
-      {x.hoursLeft != null && x.hoursLeft > 0 && <span className="text-[11px] text-[var(--text-faint)]">còn {num(x.hoursLeft)} giờ live trong lịch{x.kind === "cannot" && x.needPct != null ? ` · cần thêm +${num(x.needPct * 100)}% giờ, vượt giới hạn +30%` : ""}</span>}
+      {x.hoursLeft != null && x.hoursLeft > 0 && <span className="text-2xs text-[var(--text-faint)]">còn {num(x.hoursLeft)} giờ live trong lịch{x.kind === "cannot" && x.needPct != null ? ` · cần thêm +${num(x.needPct * 100)}% giờ, vượt giới hạn +30%` : ""}</span>}
     </>
   );
 };
@@ -205,7 +205,7 @@ const Why: React.FC<{ r: AccountRow }> = ({ r }) => {
   return (
     <>
       <span className="text-xs text-[var(--text-muted)]">{platformText("GMV/giờ", r.platform)} (Daily) {t.gmvPerHour.change != null && <b className={t.gmvPerHour.change >= 0 ? "text-emerald-400" : "text-rose-400"}>{signPct(t.gmvPerHour.change)}</b>} <span className="text-[var(--text-faint)]">vs {money(t.gmvPerHour.prev)}/giờ</span></span>
-      <div className="grid grid-cols-[80px_minmax(0,1fr)_44px] items-center gap-x-2 gap-y-1 text-[11px]">
+      <div className="grid grid-cols-[80px_minmax(0,1fr)_44px] items-center gap-x-2 gap-y-1 text-2xs">
         {t.parts.map((p) => {
           const w = (Math.min(Math.abs(p.change), 0.4) / 0.4) * 50;
           return (
@@ -226,7 +226,7 @@ const Why: React.FC<{ r: AccountRow }> = ({ r }) => {
 
 const Hours: React.FC<{ r: AccountRow }> = ({ r }) => {
   const h = r.hours;
-  if (!h) return <span className="text-[11px] text-[var(--text-faint)]">không có cam kết giờ{r.waiting ? ` · ${r.waiting} ca chưa có số liệu` : ""}</span>;
+  if (!h) return <span className="text-2xs text-[var(--text-faint)]">không có cam kết giờ{r.waiting ? ` · ${r.waiting} ca chưa có số liệu` : ""}</span>;
   const run = clamp((h.delivered / h.committed) * 100), sched = Math.min(clamp((h.scheduled / h.committed) * 100), 100 - run);
   return (
     <>
@@ -235,7 +235,7 @@ const Hours: React.FC<{ r: AccountRow }> = ({ r }) => {
         <i className="absolute inset-y-0 bg-[var(--text)] opacity-20" style={{ left: `${run}%`, width: `${sched}%` }} />
       </div>
       <span className="text-xs text-[var(--text-muted)] tabular-nums">{num(h.delivered)} đã live + {num(h.scheduled)} đã xếp / {num(h.committed)} giờ</span>
-      <span className={`text-[11px] ${h.gap > 0.5 ? "text-amber-300" : "text-[var(--text-faint)]"}`}>{h.gap > 0.5 ? `còn ${num(h.gap)} giờ chưa xếp lịch` : h.gap < -0.5 ? `vượt cam kết ${num(-h.gap)} giờ` : "đủ giờ cam kết"}{r.waiting ? ` · ${r.waiting} ca chưa có số liệu` : ""}</span>
+      <span className={`text-2xs ${h.gap > 0.5 ? "text-amber-300" : "text-[var(--text-faint)]"}`}>{h.gap > 0.5 ? `còn ${num(h.gap)} giờ chưa xếp lịch` : h.gap < -0.5 ? `vượt cam kết ${num(-h.gap)} giờ` : "đủ giờ cam kết"}{r.waiting ? ` · ${r.waiting} ca chưa có số liệu` : ""}</span>
     </>
   );
 };

@@ -571,34 +571,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
             ? "Lịch ca đã chốt của bạn và của toàn agency, theo tháng, tuần, phòng. Bấm một ca để xem chi tiết; ca của bạn có chip \"Bạn\"."
             : "Ca live theo tháng, tuần, phòng studio và host. Kéo thẻ ca sang hàng phòng khác để đổi phòng (giữ giờ), sang ngày khác để đổi ngày; đổi giờ thì mở ca → Sửa."
         }
-        actions={
-          talentView ? (
-            <div role="group" aria-label="Phạm vi lịch" className="flex items-center bg-[var(--surface-base)] p-1 rounded-xl border border-[var(--border)] text-xs font-bold">
-              {([[true, "Của tôi"], [false, "Toàn agency"]] as const).map(([v, label]) => (
-                <button
-                  key={label}
-                  type="button"
-                  aria-pressed={onlyMine === v}
-                  onClick={() => setOnlyMine(v)}
-                  className={`px-3 py-2 min-h-8 rounded-lg transition-all ${onlyMine === v ? "seg-on font-black" : "text-[var(--text-muted)] hover:text-[var(--text)]"}`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          ) : canManageSlots && onCreateSlot ? (
-          <button
-            onClick={() => setSlotModal({ date: selectedDate })}
-            className="w-full sm:w-auto bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-[var(--accent)]/20 transition-all active:scale-95"
-          >
-            <Plus className="w-4 h-4" /> Mở ca chờ đăng ký
-          </button>
-          ) : undefined
-        }
-      >
-        {/* Chế độ xem + chọn ngày + bộ lọc nằm trong thẻ đầu trang (sắp lại 10/10: trước là 3 dải riêng + 1 dải hướng dẫn kéo-thả). */}
-        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
-          {/* View Mode Switcher */}
+        tabs={
           <div className="overflow-x-auto no-scrollbar pb-1 lg:pb-0">
             <div className="flex items-center bg-[var(--surface-base)] p-1 rounded-xl border border-[var(--border)] text-xs font-bold whitespace-nowrap min-w-max">
               <button
@@ -643,8 +616,9 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
               </button>}
             </div>
           </div>
-
-          {/* Date / Month / Week Step Navigation */}
+        }
+        actions={
+          <>
           <div className="flex flex-wrap items-center justify-between lg:justify-end gap-2 text-xs">
             <div className="flex items-center gap-1 bg-[var(--surface-base)] p-1 rounded-xl border border-[var(--border)]">
               <button
@@ -657,7 +631,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
 
               <button
                 onClick={handleGoToday}
-                className="px-2.5 py-1 text-[11px] font-bold bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-[var(--accent-text)] rounded-lg transition-colors"
+                className="px-2.5 py-1 text-2xs font-bold bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-[var(--accent-text)] rounded-lg transition-colors"
               >
                 Hôm Nay
               </button>
@@ -696,8 +670,32 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
               />
             </div>
           </div>
-        </div>
-
+          {talentView ? (
+            <div role="group" aria-label="Phạm vi lịch" className="flex items-center bg-[var(--surface-base)] p-1 rounded-xl border border-[var(--border)] text-xs font-bold">
+              {([[true, "Của tôi"], [false, "Toàn agency"]] as const).map(([v, label]) => (
+                <button
+                  key={label}
+                  type="button"
+                  aria-pressed={onlyMine === v}
+                  onClick={() => setOnlyMine(v)}
+                  className={`px-3 py-2 min-h-8 rounded-lg transition-all ${onlyMine === v ? "seg-on font-black" : "text-[var(--text-muted)] hover:text-[var(--text)]"}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          ) : canManageSlots && onCreateSlot ? (
+          <button
+            onClick={() => setSlotModal({ date: selectedDate })}
+            className="w-full sm:w-auto bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-[var(--accent)]/20 transition-all active:scale-95"
+          >
+            <Plus className="w-4 h-4" /> Mở ca chờ đăng ký
+          </button>
+          ) : null}
+          </>
+        }
+      >
+        {/* Chọn ngày nằm cùng hàng tiêu đề (`actions`), chế độ xem là `tabs` (đầu trang một hàng 06/11). */}
         {/* Filter Dropdowns & Search — đặt ngay trên lịch để lọc áp dụng tức thì cho view đang xem */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 text-xs">
           <div className="flex gap-2">
@@ -809,14 +807,14 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
               </h3>
               <p className="text-xs text-[var(--text-muted)]">{canEdit ? "Kéo thả để đổi lịch · " : ""}Màu thẻ = màu nhận diện của brand</p>
             </div>
-            <div className="flex items-center gap-1.5 flex-wrap text-[11px] font-semibold">
+            <div className="flex items-center gap-1.5 flex-wrap text-2xs font-semibold">
               {monthBrandNames.map((name) => {
                 const theme = getBrandTheme(name);
                 return (
                   <span
                     key={name}
                     style={{ "--b": theme.accent } as React.CSSProperties}
-                    className="inline-flex items-center gap-1.5 pl-1 pr-2 py-0.5 rounded-full border-[1.5px] text-[var(--text)] text-[11px] font-black uppercase tracking-tight bg-[color-mix(in_srgb,var(--b)_14%,var(--surface))] border-[color-mix(in_srgb,var(--b)_60%,var(--surface))]"
+                    className="inline-flex items-center gap-1.5 pl-1 pr-2 py-0.5 rounded-full border-[1.5px] text-[var(--text)] text-2xs font-black uppercase tracking-tight bg-[color-mix(in_srgb,var(--b)_14%,var(--surface))] border-[color-mix(in_srgb,var(--b)_60%,var(--surface))]"
                   >
                     <BrandLogo brand={brandByName.get(name)} size="sm" className="rounded-md bg-white" />
                     {name}
@@ -891,7 +889,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   {isToday && (
                     // z-30 > z-20 của CampaignDayRibbon — ngày "hôm nay" rơi vào dải camp (D-Day/
                     // Mid-Month/Pay Day) vẫn phải đọc được chữ "HÔM NAY", không bị dải banner đè lên.
-                    <span className="absolute -top-2 right-1.5 shrink-0 text-[11px] sm:text-[11px] font-black px-2 py-0.5 rounded-full bg-orange-500 text-white leading-none shadow-md z-30 tracking-wide">
+                    <span className="absolute -top-2 right-1.5 shrink-0 text-2xs sm:text-2xs font-black px-2 py-0.5 rounded-full bg-orange-500 text-white leading-none shadow-md z-30 tracking-wide">
                       HÔM NAY
                     </span>
                   )}
@@ -921,13 +919,13 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                       {daySchemes.length > 0 && (
                         <span
                           title={daySchemes.map((s) => `${s.title}${s.description ? ` — ${s.description}` : ""}`).join("\n")}
-                          className="text-[11px] leading-none"
+                          className="text-2xs leading-none"
                         >
                           <Tag className="w-2.5 h-2.5" />
                         </span>
                       )}
                       {hasLiveNow && (
-                        <span className="text-[11px] sm:text-[11px] font-black px-1.5 py-0.5 rounded-full bg-rose-600 text-white animate-pulse tracking-wide">
+                        <span className="text-2xs sm:text-2xs font-black px-1.5 py-0.5 rounded-full bg-rose-600 text-white animate-pulse tracking-wide">
                           LIVE
                         </span>
                       )}
@@ -986,13 +984,13 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
 
                   {/* Day total GMV */}
                   {dayTargetPlatforms.length > 0 ? (
-                    <div className="text-[11px] font-mono font-bold text-[var(--success)] pt-1 border-t border-[var(--border-muted)]">
+                    <div className="text-2xs font-mono font-bold text-[var(--success)] pt-1 border-t border-[var(--border-muted)]">
                       {dayTargetPlatforms.map((p) => (
                         <div key={p} className="truncate flex items-center gap-1" title={`Target ${p}`}>Target <PlatformLogo platform={p} size="xs" /> {fmtVndShort(dayTarget[p])}</div>
                       ))}
                     </div>
                   ) : daySessions.length > 0 ? null : (
-                    <div className="text-[11px] text-[var(--text-faint)] italic">Trống lịch</div>
+                    <div className="text-2xs text-[var(--text-faint)] italic">Trống lịch</div>
                   )}
                 </div>
               );
@@ -1062,7 +1060,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                     className="flex justify-between items-center border-b border-[var(--border-muted)] pb-2 cursor-pointer"
                   >
                     <div>
-                      <span className="text-[11px] font-bold text-[var(--text-muted)] flex items-center gap-1">
+                      <span className="text-2xs font-bold text-[var(--text-muted)] flex items-center gap-1">
                         {wDay.dayName}
                         {daySchemes.length > 0 && (
                           <span title={daySchemes.map((s) => `${s.title}${s.description ? ` — ${s.description}` : ""}`).join("\n")}>
@@ -1075,11 +1073,11 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                       </strong>
                     </div>
                     <div className="flex items-center gap-1">
-                      <span className="text-[11px] bg-[var(--surface-elevated)] text-[var(--text-muted)] font-bold px-2 py-0.5 rounded-full">
+                      <span className="text-2xs bg-[var(--surface-elevated)] text-[var(--text-muted)] font-bold px-2 py-0.5 rounded-full">
                         {daySessions.length}
                       </span>
                       {daySlots.length > 0 && (
-                        <span className="text-[11px] bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-700/50 font-bold px-2 py-0.5 rounded-full">
+                        <span className="text-2xs bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-700/50 font-bold px-2 py-0.5 rounded-full">
                           {daySlots.length} chờ ĐK
                         </span>
                       )}
@@ -1127,7 +1125,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                     {/* Người không mở ca được (talent): một dòng chữ — ô "+ Trống" cao 96px mời một thao tác họ không có,
                         và 4–5 ngày trống liền nhau đẩy ca thật xuống dưới màn điện thoại. */}
                     {daySessions.length === 0 && daySlots.length === 0 && !canManageSlots && (
-                      <p className="text-[11px] text-[var(--text-faint)] italic">Không có ca</p>
+                      <p className="text-2xs text-[var(--text-faint)] italic">Không có ca</p>
                     )}
                     {daySessions.length === 0 && daySlots.length === 0 && canManageSlots && (
                       <div
@@ -1142,7 +1140,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                         }`}
                       >
                         <Plus className="w-4 h-4" />
-                        <span className="text-[11px] font-semibold">
+                        <span className="text-2xs font-semibold">
                           {isWeekHovered ? "Thả vào đây" : "Trống"}
                         </span>
                       </div>
@@ -1262,7 +1260,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
           <div className="overflow-x-auto rounded-xl border border-[var(--border)]/80 scrollbar-thin">
             <div style={{ minWidth: 176 + timelineMinWidth }}>
               {/* Trục giờ */}
-              <div className="flex border-b border-[var(--border)] bg-[var(--surface-base)] text-[11px] font-mono text-[var(--text-muted)]">
+              <div className="flex border-b border-[var(--border)] bg-[var(--surface-base)] text-2xs font-mono text-[var(--text-muted)]">
                 <div className="w-44 shrink-0 p-2 font-semibold border-r border-[var(--border)] sticky left-0 bg-[var(--surface-base)] z-10">Phòng</div>
                 <div className="relative flex-1 h-8" style={{ minWidth: timelineMinWidth }}>
                   {/* Nhãn đầu/cuối trục căn vào trong (trước: cùng -50% nên "08:00" bị cắt còn ":00", "23:00" còn "23:"). */}
@@ -1288,7 +1286,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                         <span className="p-1.5 rounded-lg bg-[var(--surface-elevated)] border border-[var(--border)] text-[var(--accent-text)] shrink-0"><Building2 className="w-3.5 h-3.5" /></span>
                         <div className="min-w-0">
                           <p className="text-xs sm:text-sm font-bold text-[var(--text)] truncate">{std.name}</p>
-                          <p className="text-[11px] text-[var(--text-muted)] font-mono">{std.roomNumber}</p>
+                          <p className="text-2xs text-[var(--text-muted)] font-mono">{std.roomNumber}</p>
                         </div>
                       </div>
                     </div>
@@ -1306,7 +1304,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                       ))}
                       {rowLayout.items.map(renderLaneItem)}
                       {rowSessions.length === 0 && rowSlots.length === 0 && (
-                        <span className="absolute inset-0 flex items-center justify-center text-[11px] text-[var(--text-faint)] pointer-events-none">
+                        <span className="absolute inset-0 flex items-center justify-center text-2xs text-[var(--text-faint)] pointer-events-none">
                           {hovered ? "Thả vào đây để đổi phòng" : "Trống"}
                         </span>
                       )}
@@ -1318,7 +1316,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                 <div className="flex border-t border-amber-900/60 bg-amber-950/20">
                   <div className="w-44 shrink-0 p-3 border-r border-[var(--border)] sticky left-0 bg-[var(--surface)] z-10">
                     <p className="text-xs font-bold text-amber-300">Chưa gán phòng</p>
-                    <p className="text-[11px] text-[var(--text-muted)]">mở ca → sửa phòng</p>
+                    <p className="text-2xs text-[var(--text-muted)]">mở ca → sửa phòng</p>
                   </div>
                   <div className="relative flex-1" style={{ height: noRoomLayout.height, minWidth: timelineMinWidth }}>
                     {noRoomLayout.items.map(renderLaneItem)}

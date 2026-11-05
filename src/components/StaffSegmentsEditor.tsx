@@ -118,7 +118,7 @@ export const StaffSegmentsEditor: React.FC<Props> = ({ session: s, talents, allS
         <Users className="w-4 h-4 mt-0.5 text-[var(--accent)] shrink-0" />
         <div>
           <p className="font-bold text-[var(--text)]">Đổi người giữa ca</p>
-          <p className="text-[11px] text-[var(--text-muted)]">
+          <p className="text-2xs text-[var(--text-muted)]">
             Ghi ai làm Host / Trợ live từ giờ nào đến giờ nào trong ca {s.startTime}–{s.endTime}. GMV vẫn của cả ca; lương và giờ làm tính theo
             giờ của từng người.
           </p>
@@ -150,18 +150,18 @@ export const StaffSegmentsEditor: React.FC<Props> = ({ session: s, talents, allS
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
             </div>
-            {clashes[i] && <p className="text-[11px] text-rose-300 pl-1">{nameOf(r.talentId) || "Người này"}: {clashes[i]}</p>}
+            {clashes[i] && <p className="text-2xs text-rose-300 pl-1">{nameOf(r.talentId) || "Người này"}: {clashes[i]}</p>}
           </div>
         ))}
       </div>
 
-      <button type="button" onClick={add} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[var(--surface-elevated)] text-[var(--text)] font-bold text-[11px]">
+      <button type="button" onClick={add} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[var(--surface-elevated)] text-[var(--text)] font-bold text-2xs">
         <Plus className="w-3.5 h-3.5" /> Thêm đoạn
       </button>
 
-      {totals.length > 0 && <p className="text-[11px] text-[var(--text-muted)]">Giờ làm: {totals.join(" · ")}</p>}
-      {gaps.length > 0 && <p className="text-[11px] text-amber-300">{gaps.join(" · ")} — không ai đứng ca khoảng này.</p>}
-      {error && <p className="text-[11px] text-rose-300 font-medium">{error}</p>}
+      {totals.length > 0 && <p className="text-2xs text-[var(--text-muted)]">Giờ làm: {totals.join(" · ")}</p>}
+      {gaps.length > 0 && <p className="text-2xs text-amber-300">{gaps.join(" · ")} — không ai đứng ca khoảng này.</p>}
+      {error && <p className="text-2xs text-rose-300 font-medium">{error}</p>}
 
       <label className="block">
         <span className="font-bold text-amber-300 block mb-1">
@@ -172,19 +172,19 @@ export const StaffSegmentsEditor: React.FC<Props> = ({ session: s, talents, allS
 
       <div className="flex items-center justify-between gap-2 pt-1">
         {hasStaffSegments(s) ? (
-          <button type="button" onClick={reset} disabled={saving} className="px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] text-[var(--text-muted)] font-bold text-[11px]">
+          <button type="button" onClick={reset} disabled={saving} className="px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] text-[var(--text-muted)] font-bold text-2xs">
             Bỏ chia đoạn (cả ca một người)
           </button>
         ) : (
           <span />
         )}
         <div className="flex gap-2">
-          <button type="button" onClick={onClose} className="px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] text-[var(--text-muted)] font-bold text-[11px]">Đóng</button>
+          <button type="button" onClick={onClose} className="px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] text-[var(--text-muted)] font-bold text-2xs">Đóng</button>
           <button
             type="button"
             onClick={save}
             disabled={saving || !!error}
-            className="px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-60 text-white font-bold text-[11px]"
+            className="px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-60 text-white font-bold text-2xs"
           >
             {saving ? "Đang lưu..." : "Lưu các đoạn"}
           </button>

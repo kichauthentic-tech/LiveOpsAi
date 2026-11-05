@@ -56,11 +56,11 @@ export const TalentRulesPanel: React.FC<Props> = ({ brand, talents, rules, avail
     }
   }
 
-  if (!available) return <p className="text-[11px] text-amber-300">Chưa dùng được: migration 0191 chưa chạy.</p>;
+  if (!available) return <p className="text-2xs text-amber-300">Chưa dùng được: migration 0191 chưa chạy.</p>;
   return (
     <div className="space-y-3">
       {mine.length === 0 ? (
-        <p className="text-[11px] text-[var(--text-faint)]">Chưa có host nào.</p>
+        <p className="text-2xs text-[var(--text-faint)]">Chưa có host nào.</p>
       ) : (
         <div className="space-y-1.5">
           {mine.map((r) => (
@@ -91,7 +91,7 @@ export const TalentRulesPanel: React.FC<Props> = ({ brand, talents, rules, avail
           <button type="button" onClick={add} disabled={busy || !talentId} className={btnCls}>Thêm</button>
         </div>
       )}
-      {error && <p className="text-[11px] text-rose-300">{error}</p>}
+      {error && <p className="text-2xs text-rose-300">{error}</p>}
     </div>
   );
 };

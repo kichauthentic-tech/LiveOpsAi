@@ -17,7 +17,7 @@ const TONE: Record<ToneKey, { pill: string; fill: string }> = {
 export const TONE_FILL = Object.fromEntries(Object.entries(TONE).map(([k, v]) => [k, v.fill])) as Record<ToneKey, string>;
 
 export const CardPill: React.FC<{ card: ChannelCard }> = ({ card: c }) => {
-  const base = "inline-flex items-center gap-1.5 text-[11px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap";
+  const base = "inline-flex items-center gap-1.5 text-2xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap";
   if (c.state === "off") return <span className={`${base} bg-[var(--surface-elevated)] text-[var(--text-faint)]`}>Không chạy</span>;
   if (c.state === "no_plan") return <span className={`${base} bg-[var(--surface-elevated)] text-[var(--text-faint)]`}>Chưa có target</span>;
   if (!c.landing) return <span className={`${base} bg-[var(--surface-elevated)] text-[var(--text-faint)]`}>{c.newChannel ? "Chưa có dự báo" : "Chưa có số liệu"}</span>;

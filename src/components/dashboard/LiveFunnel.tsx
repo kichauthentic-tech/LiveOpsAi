@@ -25,9 +25,9 @@ export const LiveFunnel: React.FC<{ views: FunnelView[]; showAction?: boolean }>
     <div className="space-y-3">
       <div className="flex gap-2 flex-wrap items-center">
         {views.length > 1 && views.map((v) => <button key={v.key} type="button" className={pill(v.key === view.key)} onClick={() => setPick(v.key)}>{v.tab}</button>)}
-        <span className="text-[11px] text-[var(--text-faint)]">{view.sub}{f ? ` · ${f.curSessions === f.prevSessions ? `${f.curSessions} ca` : `${f.curSessions} ca so ${f.prevSessions} ca`}` : ""}</span>
+        <span className="text-2xs text-[var(--text-faint)]">{view.sub}{f ? ` · ${f.curSessions === f.prevSessions ? `${f.curSessions} ca` : `${f.curSessions} ca so ${f.prevSessions} ca`}` : ""}</span>
       </div>
-      {view.note && <p className="text-[11px] text-amber-300 leading-snug">{view.note}</p>}
+      {view.note && <p className="text-2xs text-amber-300 leading-snug">{view.note}</p>}
       {f ? <FunnelBody funnel={f} showAction={showAction} /> : <p className="text-xs text-[var(--text-muted)]">Chưa đủ dữ liệu để kết luận: {view.empty}</p>}
     </div>
   );
@@ -46,7 +46,7 @@ const FunnelBody: React.FC<{ funnel: LiveFunnelLite; showAction: boolean }> = ({
           return (
             <React.Fragment key={s.label}>
               {r && (
-                <div title={`Ngưỡng chú ý ${band(r.watchBand)} · gãy rõ ${band(r.band)} (tính theo số ca của kỳ này và kỳ so)`} className="md:flex-[0_0_132px] flex md:flex-col items-center justify-center text-center gap-x-2 gap-y-0.5 py-2 md:py-0 px-1 text-[11px] text-[var(--text-muted)]">
+                <div title={`Ngưỡng chú ý ${band(r.watchBand)} · gãy rõ ${band(r.band)} (tính theo số ca của kỳ này và kỳ so)`} className="md:flex-[0_0_132px] flex md:flex-col items-center justify-center text-center gap-x-2 gap-y-0.5 py-2 md:py-0 px-1 text-2xs text-[var(--text-muted)]">
                   <b className="text-[var(--text)]">{r.label}</b>
                   <span className={`text-sm font-black tabular-nums ${lv?.cls ?? "text-[var(--text)]"}`}>{rt(r.cur)}</span>
                   <span className="text-lg leading-none text-[var(--accent-text)] rotate-90 md:rotate-0">→</span>

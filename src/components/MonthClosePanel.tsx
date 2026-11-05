@@ -128,12 +128,12 @@ export const MonthClosePanel: React.FC<Props> = ({ platform, month, today, brand
         </span>
         {ready && <span className="text-xs text-[var(--text-faint)]">{totalOpen ? `${totalOpen} ô còn thiếu` : "đủ đầu vào cho mọi kênh"}</span>}
       </div>
-      <p className="px-4 pb-2 text-[11px] text-[var(--text-faint)]">
+      <p className="px-4 pb-2 text-2xs text-[var(--text-faint)]">
         Report Tháng chỉ đầy đủ khi mọi ô xanh. File toàn shop phủ thiếu ngày thì không phát hành được; chưa tải file toàn shop thì report gửi brand chỉ có phần livestream. Bấm ô để mở chỗ nhập.
       </p>
       {error && <p className="px-4 pb-3 text-xs text-red-300">{error}</p>}
       {!ready && !error && (
-        <p className="px-4 pb-3 text-[11px] text-[var(--text-faint)] flex items-center gap-1">
+        <p className="px-4 pb-3 text-2xs text-[var(--text-faint)] flex items-center gap-1">
           <Loader2 className="w-3 h-3 animate-spin" /> Đang đọc file đã tải…
         </p>
       )}
@@ -141,8 +141,8 @@ export const MonthClosePanel: React.FC<Props> = ({ platform, month, today, brand
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="text-left text-[var(--text-faint)] border-y border-[var(--border)] text-[11px] font-semibold">
-                <th className="py-2 px-4">Kênh</th>
+              <tr className="text-left text-[var(--text-faint)] border-y border-[var(--border)] text-2xs font-semibold">
+                <th className="py-2 px-4 sticky-col">Kênh</th>
                 {cols.map((c) => (
                   <th key={c.key} className="py-2 px-2 whitespace-nowrap">
                     {c.label}
@@ -153,14 +153,14 @@ export const MonthClosePanel: React.FC<Props> = ({ platform, month, today, brand
             <tbody>
               {rows.map(({ brand: b, cells, multi }) => (
                 <tr key={b.id} className="border-b border-[var(--border-muted)] align-top">
-                  <td className="py-2 px-4 whitespace-nowrap">
+                  <td className="py-2 px-4 whitespace-nowrap sticky-col">
                     <span className="inline-flex items-center gap-1.5 font-bold text-[var(--text)]">
                       <BrandLogo brand={b} size="xs" /> {channelTitle(b.name, platform, multi)}
                     </span>
                   </td>
                   {cells.map((c) => {
                     const actionable = (c.state === "missing" || c.state === "partial" || c.state === "optional") && !!onNavigate;
-                    const cls = `inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full border whitespace-nowrap ${CELL_CLS[c.state]}`;
+                    const cls = `inline-block text-2xs font-semibold px-2 py-0.5 rounded-full border whitespace-nowrap ${CELL_CLS[c.state]}`;
                     return (
                       <td key={c.key} className="py-2 px-2">
                         {actionable ? (

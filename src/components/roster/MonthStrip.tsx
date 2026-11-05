@@ -72,14 +72,14 @@ export const MonthStrip: React.FC<{ cards: MonthCard[]; viewMonth: string; onAct
         <div key={c.status.month} className={`rounded-xl border bg-[var(--surface)] px-3 py-2.5 space-y-1.5 min-w-0 ${c.status.month === viewMonth ? "border-[var(--accent)]/50" : "border-[var(--border)]"}`}>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-sm font-black text-[var(--text)]">{monthName(c.status.month)}</h3>
-            <span className={`inline-flex text-[11px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${PILL[d.tone]}`}>{d.label}</span>
+            <span className={`inline-flex text-2xs font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${PILL[d.tone]}`}>{d.label}</span>
           </div>
           <div className="flex gap-1" aria-label={`Bước: ${MONTH_STEPS.filter((_, i) => c.status.steps[i] === "done").join(", ") || "chưa bước nào"}`}>
             {(c.later && c.status.phase === "none" ? c.status.steps.map(() => "todo" as const) : c.status.steps).map((st, i) => (
               <i key={i} title={MONTH_STEPS[i]} className={`block h-1.5 flex-1 rounded-full ${st === "done" ? "bg-[var(--success)]" : st === "cur" ? "bg-[var(--warning)]" : "bg-[var(--surface-elevated)]"}`} />
             ))}
           </div>
-          <p className="text-[11px] text-[var(--text-faint)]">{MONTH_STEPS.join(" · ")}</p>
+          <p className="text-2xs text-[var(--text-faint)]">{MONTH_STEPS.join(" · ")}</p>
           {d.text && <p className="text-xs text-[var(--text-muted)] tabular-nums">{d.text}</p>}
           {d.action && (
             <button type="button" onClick={() => onAction(d.action!.kind, c.status.month)} className="text-xs font-bold px-2.5 py-1 rounded-lg border border-[var(--accent)]/60 bg-[var(--accent)]/10 text-[var(--text)] hover:bg-[var(--accent)]/20">

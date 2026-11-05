@@ -42,7 +42,7 @@ export const WhySection: React.FC<{ card: ChannelCard; sessions: LiveSession[]; 
   }, [prof, shopCur, shopPrev, sessions, win, bucketOf]);
   return (
     <>
-      <Sect title="Nguyên nhân và hành động đề xuất" sub="tháng đang chạy · cùng số với thẻ kênh" />
+      <Sect nav="Nguyên nhân" title="Nguyên nhân và hành động đề xuất" sub="tháng đang chạy · cùng số với thẻ kênh" />
       <Card>
         <BlockHead title="Phân rã GMV/giờ · ngày Daily" />
         <TreeCard tree={card.tree} platform={platform} />
@@ -112,10 +112,10 @@ const Suggestions: React.FC<{ sessions: LiveSession[]; bucketOf: (d: string) => 
     return { daily: byCamp(false), camp: byCamp(true) };
   }, [sessions, through, bucketOf]);
   const lbl = (k: SlotBlock) => SLOT_BLOCK_LABEL[k].replace("Bắt đầu ", "");
-  const pill = (ok: boolean) => <span className={`px-2 py-0.5 rounded-full text-[11px] ${ok ? "bg-emerald-500/15 text-emerald-400" : "bg-[var(--surface-elevated)] text-[var(--text-faint)]"}`}>{ok ? "Đủ tin cậy" : "Chưa đủ tin cậy"}</span>;
+  const pill = (ok: boolean) => <span className={`px-2 py-0.5 rounded-full text-2xs ${ok ? "bg-emerald-500/15 text-emerald-400" : "bg-[var(--surface-elevated)] text-[var(--text-faint)]"}`}>{ok ? "Đủ tin cậy" : "Chưa đủ tin cậy"}</span>;
   return (
     <Card>
-      <BlockHead title="Đề xuất tối ưu" sub="Chỉ giữ quy tắc đã được thử lại: lấy các tháng trước để đoán tháng sau, quy tắc nào đoán đúng hơn mới được đưa ra. Mức tăng là mức tối đa — giả định giờ dời sang khung khác vẫn đạt GMV/giờ như trung bình khung đó." />
+      <BlockHead nav="Đề xuất" title="Đề xuất tối ưu" sub="Chỉ giữ quy tắc đã được thử lại: lấy các tháng trước để đoán tháng sau, quy tắc nào đoán đúng hơn mới được đưa ra. Mức tăng là mức tối đa — giả định giờ dời sang khung khác vẫn đạt GMV/giờ như trung bình khung đó." />
       <div className="space-y-4 text-xs">
         <div className={`border-l-2 pl-3 space-y-1.5 ${slotOk ? "border-emerald-500" : "border-[var(--border)] opacity-80"}`}>
           <p className="font-bold text-[var(--text)] flex items-center gap-2">{pill(slotOk)}Khung giờ ngày Daily</p>
@@ -171,7 +171,7 @@ const Suggestions: React.FC<{ sessions: LiveSession[]; bucketOf: (d: string) => 
           )}
         </div>
         <div className="border-l-2 border-[var(--border)] pl-3 space-y-1 opacity-80">
-          <p className="font-bold text-[var(--text)] flex items-center gap-2"><span className="px-2 py-0.5 rounded-full text-[11px] bg-[var(--surface-elevated)] text-[var(--text-faint)]">Đã thử, bị loại</span> Chọn thứ trong tuần để live · Xếp hạng host theo tháng</p>
+          <p className="font-bold text-[var(--text)] flex items-center gap-2"><span className="px-2 py-0.5 rounded-full text-2xs bg-[var(--surface-elevated)] text-[var(--text-faint)]">Đã thử, bị loại</span> Chọn thứ trong tuần để live · Xếp hạng host theo tháng</p>
           <p className="text-[var(--text-faint)]">
             Chỉ số thứ trong tuần của các tháng trước {wfWeekday.gain == null ? "chưa đủ tháng để thử" : wfWeekday.gain > 0 ? `giảm sai số ${pct(wfWeekday.gain)}` : `làm sai số tăng ${pct(-wfWeekday.gain)}`}; host đứng đầu tháng này gần như không đứng đầu tháng sau (đo CROCS 26/09). Màn này không đưa lời khuyên dựa trên hai thứ đó.
           </p>
@@ -203,7 +203,7 @@ export const ForecastHistory: React.FC<{ card: ChannelCard; rows: ForecastSnapsh
   const ch = last.p50 / first.p50 - 1;
   return (
     <Card>
-      <BlockHead title="Dự báo cuối tháng qua từng ngày" sub={`Dự báo ghi lại mỗi ngày · vùng tin cậy 80% · từ ${ddmm(first.asOf)} tới ${ddmm(last.asOf)} dự báo ${ch >= 0 ? "lên" : "xuống"} ${pct(Math.abs(ch), 1)} (${money(first.p50)} → ${money(last.p50)})`} />
+      <BlockHead nav="Dự báo" title="Dự báo cuối tháng qua từng ngày" sub={`Dự báo ghi lại mỗi ngày · vùng tin cậy 80% · từ ${ddmm(first.asOf)} tới ${ddmm(last.asOf)} dự báo ${ch >= 0 ? "lên" : "xuống"} ${pct(Math.abs(ch), 1)} (${money(first.p50)} → ${money(last.p50)})`} />
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label="Dự báo cuối tháng qua từng ngày">
         {[0, 1, 2, 3, 4].map((j) => { const v = ymin + step * j; return <g key={j}><line x1={L} x2={L + iw} y1={Y(v)} y2={Y(v)} stroke="var(--border)" strokeDasharray={j ? "2 4" : undefined} /><text x={L - 6} y={Y(v) + 3.5} textAnchor="end" fontSize="10" fill="var(--text-faint)">{money(v)}</text></g>; })}
         {days.map((d, i) => (i % 5 === 0 ? <text key={d} x={X(d)} y={H - 6} textAnchor="middle" fontSize="10" fill="var(--text-faint)">{ddmm(d)}</text> : null))}

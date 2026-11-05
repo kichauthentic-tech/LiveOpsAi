@@ -88,7 +88,7 @@ export const ShiftPanel: React.FC<Props> = ({ shift, analysis, ctx, talents, his
             </span>
           )}
         </div>
-        {absent === role && cur && <p className="text-[11px] text-[var(--accent-text)]">Chọn người thay {nm(cur)} bên dưới — lý do "Báo nghỉ" ghi sẵn vào nhật ký, cả hai người nhận thông báo.</p>}
+        {absent === role && cur && <p className="text-2xs text-[var(--accent-text)]">Chọn người thay {nm(cur)} bên dưới — lý do "Báo nghỉ" ghi sẵn vào nhật ký, cả hai người nhận thông báo.</p>}
         {!lockedPeople && (
           <ul className="space-y-1.5">
             {ok.map((c) => (
@@ -106,7 +106,7 @@ export const ShiftPanel: React.FC<Props> = ({ shift, analysis, ctx, talents, his
             {ok.length === 0 && <li className="text-xs text-[var(--text-muted)]">Không còn ai rảnh và đủ điều kiện.</li>}
           </ul>
         )}
-        {!lockedPeople && blocked > 0 && <p className="text-[11px] text-[var(--text-muted)]">{blocked} người khác bận ca trùng giờ hoặc sẽ quá {ctx.rules.maxWeekHours} giờ/tuần nên không hiện.</p>}
+        {!lockedPeople && blocked > 0 && <p className="text-2xs text-[var(--text-muted)]">{blocked} người khác bận ca trùng giờ hoặc sẽ quá {ctx.rules.maxWeekHours} giờ/tuần nên không hiện.</p>}
       </section>
     );
   };
@@ -115,7 +115,7 @@ export const ShiftPanel: React.FC<Props> = ({ shift, analysis, ctx, talents, his
     <aside className="fixed inset-y-0 right-0 z-40 w-full sm:w-[440px] bg-[var(--surface)] border-l border-[var(--border)] shadow-2xl flex flex-col" aria-label="Chi tiết ca">
       <div className="p-4 border-b border-[var(--border)] flex items-start justify-between gap-3">
         <div className="min-w-0 space-y-1">
-          <p className="text-[11px] font-semibold text-[var(--accent-text)]">
+          <p className="text-2xs font-semibold text-[var(--accent-text)]">
             {dayLabel(shift.date)} · {shift.kind === "open" ? (shift.drafted ? "Ca mở · đang nháp" : "Ca mở · chưa xếp") : "Đã lên lịch"}
           </p>
           <h3 className="text-lg font-black text-[var(--text)] flex flex-wrap items-center gap-2">
@@ -183,7 +183,7 @@ export const ShiftPanel: React.FC<Props> = ({ shift, analysis, ctx, talents, his
                 Dời
               </button>
             </div>
-            <p className="text-[11px] text-[var(--text-muted)]">
+            <p className="text-2xs text-[var(--text-muted)]">
               {shift.kind === "open" ? "Ca chưa có người chốt: dời thẳng, người đã báo rảnh vẫn giữ." : "Ca đã lên lịch: phải ghi lý do; host/trợ nhận thông báo đổi giờ và phải bấm Đã nhận lại."}
             </p>
           </section>
@@ -193,7 +193,7 @@ export const ShiftPanel: React.FC<Props> = ({ shift, analysis, ctx, talents, his
             <Trash2 className="w-3.5 h-3.5" /> {shift.kind === "open" ? "Bỏ ca này (ca thêm, chưa có người)" : "Huỷ ca (ghi lý do)"}
           </button>
         )}
-        <p className="text-[11px] text-[var(--text-muted)] border-t border-[var(--border)] pt-3">
+        <p className="text-2xs text-[var(--text-muted)] border-t border-[var(--border)] pt-3">
           {ctx.mode === "cost"
             ? "Đang ưu tiên chi phí thấp: trong nhóm đủ điều kiện (đã đứng kênh ≥ 3 ca, không cảnh báo, tuần ≤ 36 giờ), người đã báo rảnh lên trước rồi tới người rẻ hơn; người còn lại xếp sau."
             : "Thứ tự gợi ý: đã báo rảnh, quen kênh (số ca 90 ngày), giờ tuần còn thấp, ít cảnh báo."}{" "}
@@ -209,13 +209,13 @@ const CandidateRow: React.FC<{ c: Candidate; role: RosterRole; name: string; sho
     <div className="min-w-0 space-y-1">
       <p className="text-sm font-bold text-[var(--text)]">{name}</p>
       <div className="flex flex-wrap gap-1">
-        {c.registered && <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300">Đã báo rảnh</span>}
-        <span className={`text-[11px] px-1.5 py-0.5 rounded-full ${c.famHost + c.famCo > 0 ? "bg-[var(--surface-elevated)] text-[var(--text-muted)]" : "bg-red-500/15 text-red-300"}`}>
+        {c.registered && <span className="text-2xs px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300">Đã báo rảnh</span>}
+        <span className={`text-2xs px-1.5 py-0.5 rounded-full ${c.famHost + c.famCo > 0 ? "bg-[var(--surface-elevated)] text-[var(--text-muted)]" : "bg-red-500/15 text-red-300"}`}>
           {role === "host" ? `${c.famHost} ca host` : `${c.famCo} ca trợ`} · {role === "host" ? `${c.famCo} ca trợ` : `${c.famHost} ca host`} ở kênh (90 ngày)
         </span>
-        <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-[var(--surface-elevated)] text-[var(--text-muted)]">{fmtH(c.weekHours)}h tuần này</span>
+        <span className="text-2xs px-1.5 py-0.5 rounded-full bg-[var(--surface-elevated)] text-[var(--text-muted)]">{fmtH(c.weekHours)}h tuần này</span>
         {showCost && (
-          <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-[var(--surface-elevated)] text-[var(--text-muted)]">
+          <span className="text-2xs px-1.5 py-0.5 rounded-full bg-[var(--surface-elevated)] text-[var(--text-muted)]">
             {c.cost.missing ? "chưa có rate" : `ca ${fmtVndShort(c.cost.amount)}`}
             {!c.cost.missing && currentCost !== undefined && Math.round(currentCost) !== Math.round(c.cost.amount) && (
               <b className={c.cost.amount < currentCost ? "text-emerald-300" : "text-red-300"}>
@@ -227,7 +227,7 @@ const CandidateRow: React.FC<{ c: Candidate; role: RosterRole; name: string; sho
           </span>
         )}
         {c.issues.map((x) => (
-          <span key={x} className="text-[11px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300">
+          <span key={x} className="text-2xs px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300">
             {x}
           </span>
         ))}

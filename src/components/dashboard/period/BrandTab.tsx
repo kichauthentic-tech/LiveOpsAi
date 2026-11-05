@@ -111,7 +111,7 @@ export const BrandTab: React.FC<{
           </div>
           {lens === "month" && (
             <Card>
-              <BlockHead title="Đã đạt so với target, luỹ kế theo ngày" sub={`Nét liền dừng ở ngày có dữ liệu cuối (${ddmm(r.asOf!)})`} />
+              <BlockHead nav="Luỹ kế" title="Đã đạt so với target, luỹ kế theo ngày" sub={`Nét liền dừng ở ngày có dữ liệu cuối (${ddmm(r.asOf!)})`} />
               <CumulativeChart r={r} color={chartColor(brand.name)} showPace={false} forecastEnd={card?.forecast?.p50 ?? null} />
               <CumulativeLegend color={chartColor(brand.name)} showPace={false} forecast={card?.forecast != null} />
               <RowsTable kind="Tuần" rows={weeks.rows} total={weeks.total} selected={pick.week ?? ""} onPick={(id) => set({ week: id && id !== pick.week ? id : null })} card={card} lastHead="Target cả kỳ"
@@ -178,16 +178,16 @@ const RunRateHead: React.FC<{ vm: AccountVM; onNavigate: (tab: string) => void }
           {card && <CardPill card={card} />}
           <div className="grid grid-cols-2 gap-2 w-full mt-1">
             <div className={small}>
-              <span className="text-[11px] text-[var(--text-faint)] truncate">% Target tháng</span>
+              <span className="text-2xs text-[var(--text-faint)] truncate">% Target tháng</span>
               <b className="text-lg font-black text-[var(--text)] tabular-nums leading-tight">{pct(pM)}</b>
-              <span className="text-[11px] text-[var(--text-faint)] truncate tabular-nums">{money(t.actual)} / {money(t.target)}</span>
-              <span className="text-[11px] text-[var(--text-faint)] truncate">target luỹ kế {pct(pPlan)}</span>
+              <span className="text-2xs text-[var(--text-faint)] truncate tabular-nums">{money(t.actual)} / {money(t.target)}</span>
+              <span className="text-2xs text-[var(--text-faint)] truncate">target luỹ kế {pct(pPlan)}</span>
             </div>
             <div className={small}>
-              <span className="text-[11px] text-[var(--text-faint)] truncate">Dự báo cuối tháng</span>
+              <span className="text-2xs text-[var(--text-faint)] truncate">Dự báo cuối tháng</span>
               <b className="text-lg font-black tabular-nums leading-tight" style={{ color: fc ? fill : "var(--text-faint)" }}>{fc ? pct(pF) : "—"}</b>
-              <span className="text-[11px] text-[var(--text-faint)] truncate tabular-nums">{fc ? `~${money(fc.p50)}` : "kênh mới"}</span>
-              <span className="text-[11px] text-[var(--text-faint)] truncate">{fc && card?.landing ? `xác suất đạt ${card.landing.pHit < 0.01 ? "≈ 0%" : pct(card.landing.pHit)}` : "chưa có dự báo"}</span>
+              <span className="text-2xs text-[var(--text-faint)] truncate tabular-nums">{fc ? `~${money(fc.p50)}` : "kênh mới"}</span>
+              <span className="text-2xs text-[var(--text-faint)] truncate">{fc && card?.landing ? `xác suất đạt ${card.landing.pHit < 0.01 ? "≈ 0%" : pct(card.landing.pHit)}` : "chưa có dự báo"}</span>
             </div>
           </div>
         </div>
@@ -221,7 +221,7 @@ const RunRateHead: React.FC<{ vm: AccountVM; onNavigate: (tab: string) => void }
               <div key={i} className="rounded-xl border border-[var(--border)] bg-[var(--surface-base)] p-3 min-w-0">
                 <p className="text-xs text-[var(--text-muted)]">{l}</p>
                 <p className="text-lg font-black tabular-nums text-[var(--text)] leading-tight mt-0.5">{v}</p>
-                <p className="text-[11px] text-[var(--text-faint)] mt-0.5 truncate">{h || " "}</p>
+                <p className="text-2xs text-[var(--text-faint)] mt-0.5 truncate">{h || " "}</p>
               </div>
             ))}
           </div>
@@ -271,7 +271,7 @@ const RowsTable: React.FC<{ kind: string; rows: LensRow[]; total: LensRow; selec
           return (
             <tr key={w.id || "tot"} onClick={clickable ? () => onPick(w.id) : undefined} aria-selected={on}
               className={`${clickable ? "cursor-pointer hover:bg-[var(--surface-hover)]/40" : ""} ${on ? "bg-[var(--accent)]/10" : ""} ${isTot ? "border-t-2 border-[var(--border)] font-bold" : ""} ${fut ? "opacity-60" : ""}`}>
-              <td className={TD}><b className="text-[var(--text)]">{w.name}</b><span className="block text-[11px] font-normal text-[var(--text-faint)]">{w.when}{!isTot && w.status === "live" && kind === "Tuần" ? " · đang chạy" : !isTot && w.status === "done" && kind === "Tuần" ? " · đã xong" : ""}</span></td>
+              <td className={TD}><b className="text-[var(--text)]">{w.name}</b><span className="block text-2xs font-normal text-[var(--text-faint)]">{w.when}{!isTot && w.status === "live" && kind === "Tuần" ? " · đang chạy" : !isTot && w.status === "done" && kind === "Tuần" ? " · đã xong" : ""}</span></td>
               <td className={TD}>{fut ? "—" : money(w.actual)}</td>
               <td className={TD}>{fut ? <span className="text-[var(--text-faint)]">chưa tới</span> : money(w.targetToDate)}</td>
               <td className={TD}>
@@ -280,7 +280,7 @@ const RowsTable: React.FC<{ kind: string; rows: LensRow[]; total: LensRow; selec
                   <b className="tabular-nums" style={{ color: TONE_VAR[tone] }}>{fut ? "—" : pct(w.runRate)}</b>
                 </span>
               </td>
-              <td className={TD}>{last > 0 ? money(last) : "—"}{isTot && fcLine && <span className="block text-[11px] font-normal text-[var(--text-faint)]">{fcLine}</span>}</td>
+              <td className={TD}>{last > 0 ? money(last) : "—"}{isTot && fcLine && <span className="block text-2xs font-normal text-[var(--text-faint)]">{fcLine}</span>}</td>
             </tr>
           );
         })}
@@ -307,7 +307,7 @@ const ShiftPicker: React.FC<{ r: NonNullable<AccountVM["report"]>; day: string; 
         {days.map((x) => (
           <button key={x.date} type="button" aria-pressed={x.date === d?.date} onClick={() => onDay(x.date)}
             className={`shrink-0 min-w-[52px] rounded-xl border px-2 py-1.5 text-center min-h-[48px] ${x.date === d?.date ? "border-[var(--accent)] bg-[var(--accent)]/10" : x.withData < x.shifts && x.state !== "future" ? "border-amber-500/40" : "border-[var(--border)]"}`}>
-            <span className="block text-[11px] text-[var(--text-faint)]">{WEEKDAY[weekdayIdx(x.date)]}</span>
+            <span className="block text-2xs text-[var(--text-faint)]">{WEEKDAY[weekdayIdx(x.date)]}</span>
             <b className="block text-sm text-[var(--text)] tabular-nums">{x.date.slice(8, 10)}</b>
           </button>
         ))}
@@ -330,7 +330,7 @@ const ShiftPicker: React.FC<{ r: NonNullable<AccountVM["report"]>; day: string; 
                   className={`w-full grid grid-cols-[auto_minmax(0,1fr)_auto] sm:grid-cols-[96px_minmax(0,1fr)_110px_minmax(0,200px)_52px] gap-x-3 gap-y-0.5 items-center py-2 px-2 text-left text-sm rounded-lg ${on ? "bg-[var(--accent)]/10" : ses ? "hover:bg-[var(--surface-hover)]/40" : ""}`}>
                   <span className="tabular-nums font-bold text-[var(--text)]">{on ? "▸ " : ""}{s.startTime}–{s.endTime}</span>
                   <span className="truncate text-[var(--text-muted)]">{[s.hostName, s.assistantName].filter(Boolean).join(" + ") || "Chưa có người"}</span>
-                  <span className="text-[11px] text-[var(--text-faint)] hidden sm:block">{SHIFT_STATE_LABEL[s.state]}</span>
+                  <span className="text-2xs text-[var(--text-faint)] hidden sm:block">{SHIFT_STATE_LABEL[s.state]}</span>
                   <span className="tabular-nums text-[var(--text)] col-span-2 sm:col-span-1">{s.state === "done" ? money(s.actual) : s.state === "no_data" ? "Ca đã live, chưa có số liệu" : "Chưa tới giờ"}<span className="text-[var(--text-faint)]"> / target {money(s.target)}</span></span>
                   <b className="tabular-nums text-right" style={{ color: TONE_VAR[tone] }}>{s.pctTarget == null ? "" : pct(s.pctTarget)}</b>
                 </button>
@@ -359,7 +359,7 @@ const ScopeFunnel: React.FC<{ platform: ReportPlatform; scope: LensScope; sessio
   }, [platform, scope, sessions]);
   return (
     <Card>
-      <BlockHead title="Phễu LIVE" />
+      <BlockHead nav="Phễu" title="Phễu LIVE" />
       <LiveFunnel views={views} />
     </Card>
   );
@@ -383,13 +383,13 @@ const KeyMetrics: React.FC<{ platform: ReportPlatform; scope: LensScope }> = ({ 
       <div key={d.key} className={`min-w-0 ${big ? "h-full rounded-xl border border-[var(--border)] bg-[var(--surface-base)] p-3" : "py-1.5"}`}>
         <p className="text-xs text-[var(--text-muted)] truncate">{d.label}</p>
         <p className={`${big ? "text-lg" : "text-sm"} font-black tabular-nums text-[var(--text)] leading-tight`}>{prof.metrics.fmt(d, cv)}</p>
-        <p className="text-[11px] truncate">{ch == null ? <span className="text-[var(--text-faint)]">{baseGot.length ? "—" : "kỳ so sánh chưa có số liệu"}</span> : <><span className={`font-bold ${cls}`}>{ch >= 0 ? "+" : "−"}{(Math.abs(ch) * 100).toLocaleString("vi-VN", { maximumFractionDigits: Math.abs(ch) < 0.1 ? 1 : 0 })}%</span> <span className="text-[var(--text-faint)]">({prof.metrics.fmt(d, bn)}{vol && norm ? `/${scope.unit}` : ""})</span></>}</p>
+        <p className="text-2xs truncate">{ch == null ? <span className="text-[var(--text-faint)]">{baseGot.length ? "—" : "kỳ so sánh chưa có số liệu"}</span> : <><span className={`font-bold ${cls}`}>{ch >= 0 ? "+" : "−"}{(Math.abs(ch) * 100).toLocaleString("vi-VN", { maximumFractionDigits: Math.abs(ch) < 0.1 ? 1 : 0 })}%</span> <span className="text-[var(--text-faint)]">({prof.metrics.fmt(d, bn)}{vol && norm ? `/${scope.unit}` : ""})</span></>}</p>
       </div>
     );
   };
   return (
     <Card>
-      <BlockHead title={`Key Metrics · ${scope.label}`} sub={<><span className="inline-block px-2 py-0.5 rounded-full bg-[var(--surface-base)] text-[var(--text-muted)] mr-1.5">theo: {scope.by}</span>% thay đổi so với {scope.baseLabel}, số trong ngoặc là giá trị kỳ so sánh{norm ? ` (chỉ số tổng quy về bình quân mỗi ${scope.unit})` : ""} · {curGot.length} ca có số liệu</>} />
+      <BlockHead nav="Key Metrics" title={`Key Metrics · ${scope.label}`} sub={<><span className="inline-block px-2 py-0.5 rounded-full bg-[var(--surface-base)] text-[var(--text-muted)] mr-1.5">theo: {scope.by}</span>% thay đổi so với {scope.baseLabel}, số trong ngoặc là giá trị kỳ so sánh{norm ? ` (chỉ số tổng quy về bình quân mỗi ${scope.unit})` : ""} · {curGot.length} ca có số liệu</>} />
       {curGot.length === 0 ? (
         <p className="text-sm text-[var(--text-muted)]">Không có ca có số liệu trong {scope.label}. Chọn ngày, đợt hoặc ca khác.</p>
       ) : (

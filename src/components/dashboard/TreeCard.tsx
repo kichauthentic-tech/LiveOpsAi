@@ -34,7 +34,7 @@ export const TreeCard: React.FC<{ tree: GmvTree | null; platform: ReportPlatform
                   <div className="relative h-5">
                     <div className="absolute inset-y-0 left-1/2 w-px bg-[var(--border)]" />
                     <div className={`absolute inset-y-0.5 rounded ${p.change >= 0 ? "bg-emerald-500/70" : "bg-rose-500/70"}`} style={p.change >= 0 ? { left: "50%", width: w } : { right: "50%", width: w }} />
-                    <span className={`absolute top-0.5 font-mono text-[11px] ${p.change >= 0 ? "text-emerald-400" : "text-rose-400"}`} style={p.change >= 0 ? { left: `calc(50% + ${w} + 4px)` } : { right: `calc(50% + ${w} + 4px)` }}>{sign(p.change)}</span>
+                    <span className={`absolute top-0.5 font-mono text-2xs ${p.change >= 0 ? "text-emerald-400" : "text-rose-400"}`} style={p.change >= 0 ? { left: `calc(50% + ${w} + 4px)` } : { right: `calc(50% + ${w} + 4px)` }}>{sign(p.change)}</span>
                   </div>
                 </div>
               );

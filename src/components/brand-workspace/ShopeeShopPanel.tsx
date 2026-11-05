@@ -174,7 +174,7 @@ export function ShopeeShopPanel({ brandId, brandName, canManage }: Props) {
           <h3 className="font-bold text-[var(--text)] text-sm flex items-center gap-2">
             <ShoppingBag className="w-4 h-4 text-[var(--accent-text)]" /> Dữ liệu cả shop Shopee · tháng {fmtMonth(month)}
           </h3>
-          <p className="text-[11px] text-[var(--text-faint)] mt-1 max-w-3xl">
+          <p className="text-2xs text-[var(--text-faint)] mt-1 max-w-3xl">
             Chỉ cần với brand dùng dịch vụ <b>whole shop</b>. Mỗi tháng tải 5 file từ Seller Centre (một tháng trọn, tải sau khi hết tháng, cùng một ngày): <b>Shop Stats</b>, <b>Voucher</b>, <b>Discount</b>,{" "}
             <b>Sales Composition</b>, <b>Sản phẩm cả shop</b>. Thả cả 5 file vào một ô, app tự nhận loại. Giao diện Seller Centre phải để tiếng Việt.
           </p>
@@ -212,11 +212,11 @@ export function ShopeeShopPanel({ brandId, brandName, canManage }: Props) {
               <p>
                 Kỳ {p.parsed.periodStart} đến {p.parsed.periodEnd} · {summaryOf(p.kind, p.parsed.rows as Rows) ?? `${p.parsed.rows.length} dòng`}
               </p>
-              {p.replace && <p className="text-[11px] text-amber-300">Đã có file {SHOPEE_SHOP_KIND_LABEL[p.kind]} tháng này (tải {new Date(p.replace.importedAt).toLocaleString("vi-VN")}) — lưu sẽ THAY file cũ, không cộng dồn.</p>}
+              {p.replace && <p className="text-2xs text-amber-300">Đã có file {SHOPEE_SHOP_KIND_LABEL[p.kind]} tháng này (tải {new Date(p.replace.importedAt).toLocaleString("vi-VN")}) — lưu sẽ THAY file cũ, không cộng dồn.</p>}
             </div>
           ))}
-          {pendingWarnings.map((w) => <p key={w} className="text-[11px] text-amber-300">{w}</p>)}
-          <p className="text-[11px] text-amber-300">Kiểm lại đây đúng là shop Shopee của <b>{brandName}</b> trước khi lưu.</p>
+          {pendingWarnings.map((w) => <p key={w} className="text-2xs text-amber-300">{w}</p>)}
+          <p className="text-2xs text-amber-300">Kiểm lại đây đúng là shop Shopee của <b>{brandName}</b> trước khi lưu.</p>
           <div className="flex gap-2">
             <button onClick={onSave} disabled={saving} className="bg-[var(--accent)] text-white font-bold px-4 py-2 rounded-xl text-xs disabled:opacity-50">
               {saving ? "Đang lưu..." : `Lưu ${pending.length} file cả shop`}
@@ -257,7 +257,7 @@ export function ShopeeShopPanel({ brandId, brandName, canManage }: Props) {
                     <span className="text-[var(--text-faint)] flex-1">Chưa có file tháng {fmtMonth(month)}. {SHOPEE_SHOP_KIND_HINT[k]}</span>
                   )}
                   {imp && canManage && (
-                    <button onClick={() => void onDelete(k)} className="text-[11px] font-bold text-red-400 hover:text-red-300 flex items-center gap-1 px-2 py-1 rounded-lg">
+                    <button onClick={() => void onDelete(k)} className="text-2xs font-bold text-red-400 hover:text-red-300 flex items-center gap-1 px-2 py-1 rounded-lg">
                       <Trash2 className="w-3.5 h-3.5" /> Xoá
                     </button>
                   )}
@@ -266,9 +266,9 @@ export function ShopeeShopPanel({ brandId, brandName, canManage }: Props) {
             })}
           </div>
           {missing.length > 0 && missing.length < SHOPEE_SHOP_KINDS.length && (
-            <p className="text-[11px] text-amber-300">Còn thiếu {missing.map((k) => SHOPEE_SHOP_KIND_LABEL[k]).join(", ")}: các trang dùng file đó trong report sẽ ẩn cho tới khi tải đủ.</p>
+            <p className="text-2xs text-amber-300">Còn thiếu {missing.map((k) => SHOPEE_SHOP_KIND_LABEL[k]).join(", ")}: các trang dùng file đó trong report sẽ ẩn cho tới khi tải đủ.</p>
           )}
-          <p className="text-[11px] text-[var(--text-faint)]">
+          <p className="text-2xs text-[var(--text-faint)]">
             Bốn nguồn doanh số ({SHOPEE_SHOP.productCard}, {SHOPEE_SHOP.sellerLive}, {SHOPEE_SHOP.sellerVideo}, {SHOPEE_SHOP.affiliate}) cộng đúng tổng doanh số. Doanh số qua {SHOPEE_SHOP.shopeeAds} nằm trong tổng, không cộng thêm. {SHOPEE_SHOP.sellerLive} được đối chiếu với tổng ngày của file Daily cùng tháng.
           </p>
         </>

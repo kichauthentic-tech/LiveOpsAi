@@ -46,9 +46,9 @@ function themeTokens(): Record<string, Record<string, string>> {
   return out;
 }
 
-test("3 theme đều có token và chữ đạt 4.5:1 trên nền thẻ", () => {
+test("mọi theme đều có token và chữ đạt 4.5:1 trên nền thẻ", () => {
   const themes = themeTokens();
-  expect(Object.keys(themes).sort()).toEqual(["midnight", "sand", "yfb"]);
+  expect(Object.keys(themes).sort()).toEqual(["daylight", "midnight", "paper", "sage", "sand", "yfb"]);
   const fails: string[] = [];
   for (const [name, t] of Object.entries(themes)) {
     for (const fg of ["text", "text-muted", "text-faint", "accent-text"]) {
@@ -83,6 +83,49 @@ test("không còn cỡ chữ nhỏ hơn 11px (Material 3 / Apple HIG lấy 11 l�
     }
   }
   expect(hits).toEqual([]);
+});
+
+test("theme khai trong index.css khớp danh sách chọn ở useTheme.tsx", () => {
+  const hook = readFileSync(join(SRC, "hooks/useTheme.tsx"), "utf8");
+  const ids = [...hook.matchAll(/\{ id: "([a-z]+)", label:/g)].map((m) => m[1]).filter((id) => !["compact", "normal", "comfy"].includes(id));
+  expect(ids.sort()).toEqual(Object.keys(themeTokens()).sort());
+});
+
+test("chữ nhỏ nhất dùng text-2xs (biến --text-2xs theo theme), không viết cứng text-[11px]; theme nào cũng ≥ 11px", () => {
+  const hits: string[] = [];
+  for (const file of sourceFiles(SRC)) {
+    for (const { line, n } of codeLines(file)) if (/text-\[11px\]/.test(line)) hits.push(`${file.split("/src/")[1]}:${n}`);
+  }
+  expect(hits).toEqual([]);
+  const css = readFileSync(join(SRC, "index.css"), "utf8");
+  const sizes = [...css.matchAll(/--text-2xs:\s*(\d+(?:\.\d+)?)px/g)].map((m) => Number(m[1]));
+  expect(sizes.length).toBeGreaterThan(0);
+  for (const px of sizes) expect(px).toBeGreaterThanOrEqual(11);
+});
+
+test("khối token của theme đứng SAU `:root, .theme-yfb` (cùng độ ưu tiên thì khối sau thắng — Midnight từng ra màu YFB tới 06/11)", () => {
+  const css = readFileSync(join(SRC, "index.css"), "utf8");
+  const root = css.indexOf(":root,\n.theme-yfb {");
+  expect(root).toBeGreaterThan(-1);
+  for (const name of Object.keys(themeTokens())) {
+    if (name === "yfb") continue;
+    expect(css.indexOf(`.theme-${name} {`), name).toBeGreaterThan(root);
+  }
+});
+
+test("Report Tháng theo theme: PAL là biến CSS, không nối hex độ trong suốt, không đưa PAL vào thuộc tính SVG", () => {
+  const hits: string[] = [];
+  for (const file of sourceFiles(SRC)) {
+    for (const { line, n } of codeLines(file)) {
+      if (/\$\{PAL\.\w+\}[0-9a-fA-F]{2}(?![0-9a-fA-F])/.test(line)) hits.push(`${file.split("/src/")[1]}:${n} nối hex`);
+      if (/\b(fill|stroke|stopColor)=\{[^}]*\bPAL\./.test(line)) hits.push(`${file.split("/src/")[1]}:${n} PAL trong thuộc tính SVG (dùng usePal)`);
+    }
+  }
+  expect(hits).toEqual([]);
+  const theme = readFileSync(join(SRC, "components/brand-workspace/report/theme.ts"), "utf8");
+  expect(theme).toMatch(/gold: "var\(--rt-gold\)"/);
+  // File gửi brand vẫn đen-vàng: khung bản xuất mang .rt-skin-yfb.
+  expect(readFileSync(join(SRC, "components/brand-workspace/BrandMonthlyReport.tsx"), "utf8")).toMatch(/host\.className = "rt-skin-yfb"/);
 });
 
 test("không dùng alert/confirm/prompt gốc của trình duyệt — dùng useToast/useConfirm/usePrompt", () => {

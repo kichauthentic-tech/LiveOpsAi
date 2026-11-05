@@ -87,7 +87,7 @@ export const MonthSettlementPanel: React.FC<Props> = ({ brand, platform, canEdit
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-[11px] text-[var(--text-muted)]">
+        <p className="text-2xs text-[var(--text-muted)]">
           {period && terms ? `${period.label || "Điều khoản chính"} · ${termsLabel(terms)}` : `Chưa có điều khoản hiệu lực trong ${fmtMonth(month)}.`}
         </p>
         <MonthPicker value={month} onChange={setMonth} align="right" ariaLabel="Tháng tính phí" size="sm" />
@@ -95,7 +95,7 @@ export const MonthSettlementPanel: React.FC<Props> = ({ brand, platform, canEdit
 
       {period && terms && settlement && (
         <>
-          <p className="text-[11px] text-[var(--text-faint)]">
+          <p className="text-2xs text-[var(--text-faint)]">
             {monthSessions.length} ca · {fmtNum(settlement.hours, 1)} giờ · cam kết {commit.hours > 0 ? `${fmtNum(commit.hours, 0)} giờ` : "chưa có"}
             {commit.gmv ? ` · ${fmtVndFull(commit.gmv)} GMV` : ""}
           </p>
@@ -108,7 +108,7 @@ export const MonthSettlementPanel: React.FC<Props> = ({ brand, platform, canEdit
               {canEdit && <button type="button" onClick={saveInputs} disabled={busy} className={`${btnCls} mb-0.5`}>{busy ? "…" : "Lưu số tháng"}</button>}
             </div>
           )}
-          {error && <p className="text-[11px] text-rose-300">{error}</p>}
+          {error && <p className="text-2xs text-rose-300">{error}</p>}
 
           <table className="w-full text-xs">
             <tbody className="divide-y divide-[var(--border-muted)]">
@@ -117,7 +117,7 @@ export const MonthSettlementPanel: React.FC<Props> = ({ brand, platform, canEdit
                 <tr key={l.key}>
                   <td className="py-1.5 pr-3 align-top">
                     <span className="font-semibold text-[var(--text)]">{l.label}</span>
-                    <span className="block text-[11px] text-[var(--text-faint)]">{l.detail}</span>
+                    <span className="block text-2xs text-[var(--text-faint)]">{l.detail}</span>
                   </td>
                   <td className={`py-1.5 text-right tabular-nums align-top ${l.amount < 0 ? "text-rose-300" : "text-[var(--text)]"}`}>{fmtVndFull(l.amount)}</td>
                 </tr>
@@ -128,9 +128,9 @@ export const MonthSettlementPanel: React.FC<Props> = ({ brand, platform, canEdit
               </tr>
             </tbody>
           </table>
-          {settlement.missing.length > 0 && <p className="text-[11px] text-amber-300">Chưa tính đủ — còn thiếu: {settlement.missing.join("; ")}.</p>}
-          {settlement.owedHours > 0 && <p className="text-[11px] text-amber-300">Còn nợ {fmtNum(settlement.owedHours, 1)} giờ cam kết cần bù.</p>}
-          <p className="text-[11px] text-[var(--text-faint)]">Xem thử, hoàn huỷ dự kiến {fmtNum(returnRate, 1)}%. Số chính thức ở Kế Toán.</p>
+          {settlement.missing.length > 0 && <p className="text-2xs text-amber-300">Chưa tính đủ — còn thiếu: {settlement.missing.join("; ")}.</p>}
+          {settlement.owedHours > 0 && <p className="text-2xs text-amber-300">Còn nợ {fmtNum(settlement.owedHours, 1)} giờ cam kết cần bù.</p>}
+          <p className="text-2xs text-[var(--text-faint)]">Xem thử, hoàn huỷ dự kiến {fmtNum(returnRate, 1)}%. Số chính thức ở Kế Toán.</p>
         </>
       )}
     </div>

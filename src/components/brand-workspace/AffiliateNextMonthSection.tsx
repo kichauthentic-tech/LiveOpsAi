@@ -51,7 +51,7 @@ export function AffiliateNextMonthSection({ brandId, month, isOps, shopTarget }:
           <Users className="w-4 h-4 text-emerald-600" /> Affiliate — kế hoạch {fmtMonth(month)}
         </h3>
         {isOps && (
-          <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${meta?.publishedAt ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
+          <span className={`text-2xs font-bold px-2.5 py-1 rounded-full ${meta?.publishedAt ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
             {meta?.publishedAt ? "Đã chốt, brand đang thấy" : "Nháp, brand chưa thấy — chốt ở tab Affiliate"}
           </span>
         )}

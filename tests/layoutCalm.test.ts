@@ -19,8 +19,26 @@ function* sourceFiles(dir: string): Generator<string> {
 test("đầu trang (PageHeader) không còn là một thẻ có viền/nền/bóng như khối nội dung", () => {
   const src = read("components/common/PageHeader.tsx");
   const body = src.slice(src.indexOf("export const PageHeader"));
-  expect(body).toMatch(/<header className=\{`space-y-4/);
+  expect(body).toMatch(/<header className=\{`space-y-3/);
   expect(body).not.toMatch(/rounded-2xl|shadow-xl|bg-\[var\(--surface\)\]/);
+});
+
+test("đầu trang một hàng (05/11): mô tả vào nút ⓘ, tab cùng hàng tiêu đề, không còn dòng PageIntro dưới tiêu đề", () => {
+  const src = read("components/common/PageHeader.tsx");
+  expect(src).not.toMatch(/<PageIntro/);
+  expect(src).toMatch(/\{description && <PageInfo>\{description\}<\/PageInfo>\}/);
+  expect(src).toMatch(/\{tabsEl\}\s*\{actionsEl\}/);
+  // Dashboard đưa thanh Tổng quan account / Toàn sàn / Brand lên hàng tiêu đề qua prop `tabs`.
+  expect(read("components/AgencyDashboard.tsx")).toMatch(/<PageHeader icon=\{LayoutDashboard\}[^>]*tabs=\{<>/);
+});
+
+test("mục lục dính và cột đầu dính dùng thành phần chung", () => {
+  expect(read("components/AgencyDashboard.tsx")).toMatch(/<SectionNav \/>/);
+  expect(read("components/AiTrainingCenter.tsx")).toMatch(/<SectionNav \/>/);
+  const css = read("index.css");
+  expect(css).toMatch(/\.sticky-col \{[^}]*position: sticky/);
+  expect(read("components/SessionLedger.tsx")).toMatch(/sticky-col">Giờ<\/th>/);
+  expect(read("components/MonthClosePanel.tsx")).toMatch(/sticky-col">Kênh<\/th>/);
 });
 
 test("5 màn từng tự vẽ thẻ tiêu đề nay dùng PageHeader (để chế độ Tất cả kênh không lặp tiêu đề mỗi sàn)", () => {

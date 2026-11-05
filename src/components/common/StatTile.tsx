@@ -50,7 +50,7 @@ export const StatTile: React.FC<{
         {value}
       </p>
     )}
-    {hint != null && hint !== "" && <div className="text-[11px] text-[var(--text-faint)] mt-0.5 leading-snug">{hint}</div>}
+    {hint != null && hint !== "" && <div className="text-2xs text-[var(--text-faint)] mt-0.5 leading-snug">{hint}</div>}
     {children}
   </div>
 );

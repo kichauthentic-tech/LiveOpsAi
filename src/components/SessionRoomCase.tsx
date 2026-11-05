@@ -62,8 +62,8 @@ const vnTime = (iso?: string) => (iso ? new Date(iso).toLocaleTimeString("vi-VN"
 const linkedLabel = (x: { date: string; startTime: string; endTime: string; hostName: string }) =>
   `${fmtDay(x.date)} ${x.startTime}–${x.endTime}${x.hostName ? ` · ${x.hostName}` : ""}`;
 
-const chipBase = "text-[11px] font-bold px-2 py-0.5 rounded-full border";
-const btnGhost = "inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1.5 rounded-lg bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-[var(--text)] disabled:opacity-40 transition-colors";
+const chipBase = "text-2xs font-bold px-2 py-0.5 rounded-full border";
+const btnGhost = "inline-flex items-center gap-1.5 text-2xs font-bold px-2.5 py-1.5 rounded-lg bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-[var(--text)] disabled:opacity-40 transition-colors";
 
 export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSessionsUpdated, embedded = false, restartFlagged = false }: Props) {
   const confirm = useConfirm();
@@ -227,7 +227,7 @@ export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSes
         {body}
       </section>
     );
-  if (loading) return shell(<p className="text-[11px] text-[var(--text-faint)]">Đang tải thông tin {unit}...</p>);
+  if (loading) return shell(<p className="text-2xs text-[var(--text-faint)]">Đang tải thông tin {unit}...</p>);
 
   const rooms = snapshot?.rooms ?? [];
   const gap = roomGapMinutes(rooms);
@@ -262,7 +262,7 @@ export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSes
           onCancel={() => { setPendingFile(null); setError(null); }}
         />
         {fresh.length < pendingFile.parsed.rows.length && (
-          <p className="text-[11px] text-[var(--text-faint)]">Đã ẩn {pendingFile.parsed.rows.length - fresh.length} {prof.liveFileRowNoun} đã có ở lượt trước của ca này.</p>
+          <p className="text-2xs text-[var(--text-faint)]">Đã ẩn {pendingFile.parsed.rows.length - fresh.length} {prof.liveFileRowNoun} đã có ở lượt trước của ca này.</p>
         )}
         {error && <ErrorLine text={error} />}
       </div>
@@ -301,7 +301,7 @@ export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSes
                   Ca trước chưa tải file lên — chia ước lượng theo thời gian
                 </button>
               )}
-              {isOps && !snapshot && <p className="text-[11px] text-[var(--text-faint)]">Cần tải lên file của ca này trước thì mới chia ước lượng được.</p>}
+              {isOps && !snapshot && <p className="text-2xs text-[var(--text-faint)]">Cần tải lên file của ca này trước thì mới chia ước lượng được.</p>}
             </>
           ) : prev.isEstimated ? (
             <p className="text-amber-300 flex items-start gap-1.5">
@@ -350,7 +350,7 @@ export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSes
           <p className="text-xs font-bold text-[var(--text)]">
             {overRoom ? <>{Unit} <span className="font-mono">{shortRoomId(overRoom.roomId)}</span> đang chạy qua giờ giao ca — chạy tiếp sang ca nào?</> : <>{Unit} này chạy tiếp sang ca nào?</>}
           </p>
-          <p className="text-[11px] text-[var(--text-muted)]">Chỉ liệt kê ca {s.platform} cùng brand đã có trên lịch, bắt đầu sau ca này và trong vòng 2 giờ sau khi ca này hết.</p>
+          <p className="text-2xs text-[var(--text-muted)]">Chỉ liệt kê ca {s.platform} cùng brand đã có trên lịch, bắt đầu sau ca này và trong vòng 2 giờ sau khi ca này hết.</p>
           {chooser.length === 0 ? (
             <p className="text-xs text-amber-300">Chưa có ca nào trên lịch phù hợp. Nhờ OPS thêm ca sau vào lịch trước, rồi quay lại đây.</p>
           ) : (
@@ -361,10 +361,10 @@ export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSes
                     <input type="radio" name="next-session" className="mt-0.5 w-4 h-4 shrink-0" disabled={!!c.takenBy} checked={pickedNext === c.sessionId} onChange={() => setPickedNext(c.sessionId)} />
                     <span className="min-w-0">
                       <span className="block font-bold text-[var(--text)]">{fmtDay(c.date)} · {c.startTime}–{c.endTime}</span>
-                      <span className="block text-[11px] text-[var(--text-muted)]">
+                      <span className="block text-2xs text-[var(--text-muted)]">
                         Host {c.hostName || "chưa gán"}{c.coHostName ? ` · Trợ ${c.coHostName}` : ""}{c.studioName ? ` · ${c.studioName}` : ""}
                       </span>
-                      {c.takenBy && <span className="block text-[11px] text-[var(--text-faint)]">Đã được nối từ một ca khác.</span>}
+                      {c.takenBy && <span className="block text-2xs text-[var(--text-faint)]">Đã được nối từ một ca khác.</span>}
                     </span>
                   </label>
                 </li>
@@ -415,7 +415,7 @@ export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSes
             })}
           </ul>
           {multiRoom && (
-            <p className="text-[11px] text-[var(--text-muted)]">
+            <p className="text-2xs text-[var(--text-muted)]">
               Gián đoạn giữa các {unit}: <b>{gap} phút</b> · giờ live = cộng thời lượng từng {unit} (khoảng nghỉ không tính).
             </p>
           )}
@@ -451,7 +451,7 @@ export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSes
       {chain.length > 1 && (
         <div className="rounded-xl border border-[var(--border)] p-2.5 space-y-1.5">
           <p className="text-xs font-bold text-[var(--text-muted)]">Chuỗi ca liền kề trong ngày</p>
-          <div className="flex flex-wrap items-center gap-1 text-[11px]">
+          <div className="flex flex-wrap items-center gap-1 text-2xs">
             {chain.map((c, i) => {
               const bd = i > 0 ? boundaries[i - 1] : undefined;
               const here = c.id === s.id;
@@ -472,7 +472,7 @@ export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSes
               );
             })}
           </div>
-          <p className="text-[11px] text-[var(--text-faint)]">⛓ {unit} chạy tiếp (ca sau trừ mốc ca trước) · ○ chưa xác nhận nối ({unit} mới) · 🔒 chờ file ca trước · ✔ đã có file</p>
+          <p className="text-2xs text-[var(--text-faint)]">⛓ {unit} chạy tiếp (ca sau trừ mốc ca trước) · ○ chưa xác nhận nối ({unit} mới) · 🔒 chờ file ca trước · ✔ đã có file</p>
         </div>
       )}
 
@@ -484,7 +484,7 @@ export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSes
             {BREAK_REASONS.map((r) => (
               <label key={r.key} className={`flex items-start gap-2 rounded-lg border px-2.5 py-1.5 text-xs cursor-pointer ${partForm.reason === r.key ? "border-emerald-700 bg-emerald-950/30" : "border-[var(--border)]"}`}>
                 <input type="radio" name="break-reason" className="mt-0.5" checked={partForm.reason === r.key} onChange={() => setPartForm({ ...partForm, reason: r.key })} />
-                <span><span className="block font-bold text-[var(--text)]">{r.label}</span><span className="block text-[11px] text-[var(--text-faint)]">{r.hint}</span></span>
+                <span><span className="block font-bold text-[var(--text)]">{r.label}</span><span className="block text-2xs text-[var(--text-faint)]">{r.hint}</span></span>
               </label>
             ))}
           </div>
@@ -530,13 +530,13 @@ export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSes
         </div>
       )}
       {canEdit && embedded && restartFlagged && !chooser && !partForm && (
-        <p className="text-[11px] text-amber-300/90">
+        <p className="text-2xs text-amber-300/90">
           {snapshot
             ? `Lượt restart chưa có trong file vừa tải lên thì bấm "Thêm lượt restart" — mỗi lượt một file riêng.`
             : `Có restart: file ở bước 1 thường có đủ các lượt — chọn hết ${prof.liveFileRowNoun} của ca ở đó, app hỏi lý do từng lượt. Lượt nào không có trong file thì tải lên file riêng bằng "Thêm lượt restart" sau khi xong bước 1.`}
         </p>
       )}
-      {canEdit && !embedded && !snapshot && !chooser && !partForm && <p className="text-[11px] text-[var(--text-faint)]">Restart giữa ca: tải lên file lượt đầu trước, rồi bấm "Thêm lượt restart" — mỗi lượt có một lần tải lên file riêng.</p>}
+      {canEdit && !embedded && !snapshot && !chooser && !partForm && <p className="text-2xs text-[var(--text-faint)]">Restart giữa ca: tải lên file lượt đầu trước, rồi bấm "Thêm lượt restart" — mỗi lượt có một lần tải lên file riêng.</p>}
 
       {error && <ErrorLine text={error} />}
       <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleFile(f); }} />
@@ -546,7 +546,7 @@ export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSes
 
 function ErrorLine({ text }: { text: string }) {
   return (
-    <p className="text-[11px] text-rose-400 flex items-start gap-1.5">
+    <p className="text-2xs text-rose-400 flex items-start gap-1.5">
       <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
       {text}
     </p>

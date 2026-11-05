@@ -91,9 +91,9 @@ export function PlanMonthGrid(p: Props) {
     <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 overflow-x-auto">
       <div className="grid grid-cols-[repeat(7,minmax(0,1fr))_minmax(120px,0.8fr)] gap-1.5 min-w-[1200px]">
         {WEEKDAY_LABELS.map((w, i) => (
-          <div key={w} className={`text-center text-[11px] font-bold py-1 rounded-lg ${i >= 5 ? "text-rose-300 bg-rose-950/30" : "text-[var(--text-faint)] bg-[var(--surface-base)]"}`}>{w}</div>
+          <div key={w} className={`text-center text-2xs font-bold py-1 rounded-lg ${i >= 5 ? "text-rose-300 bg-rose-950/30" : "text-[var(--text-faint)] bg-[var(--surface-base)]"}`}>{w}</div>
         ))}
-        <div className="text-center text-[11px] font-bold py-1 rounded-lg text-[var(--text-faint)] bg-[var(--surface-base)]">Tuần</div>
+        <div className="text-center text-2xs font-bold py-1 rounded-lg text-[var(--text-faint)] bg-[var(--surface-base)]">Tuần</div>
         {rows.map((row, ri) => {
           const days = row.filter((d): d is string => !!d);
           return [
@@ -135,7 +135,7 @@ function DayCell({ day, p, onEdit, editingKey }: { day: string; p: Props; onEdit
     <div className={`min-h-[84px] rounded-xl border p-1.5 flex flex-col gap-1 ${isBlackout ? "bg-[var(--surface-base)] border-dashed border-rose-800 opacity-70" : style ? style.cell : "bg-[var(--surface-base)] border-[var(--border)]"}`}>
       <div className="flex items-center justify-between gap-1">
         <span className={`text-xs font-black ${style ? style.text : "text-[var(--text)]"}`}>{Number(day.slice(-2))}{style ? ` · ${BUCKET_LABEL[bucket]}` : ""}</span>
-        <span className="text-[11px] text-[var(--text-faint)] flex items-center gap-1 tabular-nums" title={list.length > 0 ? `${list.length} ca · ${fmtH(sum.hours)}h · target ${fmtVndShort(sum.target)}` : undefined}>
+        <span className="text-2xs text-[var(--text-faint)] flex items-center gap-1 tabular-nums" title={list.length > 0 ? `${list.length} ca · ${fmtH(sum.hours)}h · target ${fmtVndShort(sum.target)}` : undefined}>
           {p.locked && sum.pct !== null ? <b className={pctTone(sum.pct)}>{Math.round(sum.pct * 100)}%</b> : sum.target > 0 ? fmtVndShort(sum.target) : ""}
           {/* -m-1.5 p-1.5: vùng bấm 24×24 (sàn WCAG 2.5.8) mà không đẩy cao dòng ngày — M5. */}
           {!past && (
@@ -145,13 +145,13 @@ function DayCell({ day, p, onEdit, editingKey }: { day: string; p: Props; onEdit
           )}
         </span>
       </div>
-      {fc.length > 0 && <div className="text-[11px] text-sky-300 tabular-nums" title="Tổng dự báo các ca chưa chạy trong ngày">dự báo ngày {fmtVndShort(fcSum)}</div>}
-      {label && <div className="text-[11px] text-[var(--accent-text)] truncate" title={label}>{label}</div>}
-      {isBlackout && <div className="text-[11px] text-rose-400 font-bold">cấm live</div>}
+      {fc.length > 0 && <div className="text-2xs text-sky-300 tabular-nums" title="Tổng dự báo các ca chưa chạy trong ngày">dự báo ngày {fmtVndShort(fcSum)}</div>}
+      {label && <div className="text-2xs text-[var(--accent-text)] truncate" title={label}>{label}</div>}
+      {isBlackout && <div className="text-2xs text-rose-400 font-bold">cấm live</div>}
       {list.map((d) => <SlotChip key={d.key} d={d} p={p} active={d.key === editingKey} onEdit={onEdit} />)}
       {extras.map((x) => <ExtraChip key={x.key} x={x} onRemoveReserve={p.onRemoveReserve} />)}
       {!past && !isBlackout && list.length < p.maxSlotsPerDay && (
-        <button onClick={() => p.onAdd(day)} className="mt-auto min-h-6 text-[11px] font-bold text-[var(--text-faint)] hover:text-[var(--accent-text)] flex items-center justify-center gap-1 border border-dashed border-[var(--border)] rounded-lg" aria-label={`Thêm ca ngày ${Number(day.slice(-2))}`}>
+        <button onClick={() => p.onAdd(day)} className="mt-auto min-h-6 text-2xs font-bold text-[var(--text-faint)] hover:text-[var(--accent-text)] flex items-center justify-center gap-1 border border-dashed border-[var(--border)] rounded-lg" aria-label={`Thêm ca ngày ${Number(day.slice(-2))}`}>
           <Plus className="w-3 h-3" /> ca
         </button>
       )}
@@ -217,7 +217,7 @@ function SlotChip({ d, p, active, onEdit }: { d: PlanDraftSlot; p: Props; active
 function ExtraChip({ x, onRemoveReserve }: { x: GridExtra; onRemoveReserve?: (key: string) => void }) {
   if (x.kind === "reserve") {
     return (
-      <div title={`Ca dự phòng ${x.startTime}–${x.endTime}${x.target ? ` (dự báo ≈ ${fmtVndShort(x.target)})` : ""}. Chưa phải ca thật: chỉ mở khi tới mốc kiểm mà dự báo hụt target. Không cộng vào target tháng.`} className="w-full min-h-6 flex items-center justify-between gap-1 rounded-md border border-dashed border-amber-500/70 px-1.5 text-[11px] tabular-nums bg-amber-400/10">
+      <div title={`Ca dự phòng ${x.startTime}–${x.endTime}${x.target ? ` (dự báo ≈ ${fmtVndShort(x.target)})` : ""}. Chưa phải ca thật: chỉ mở khi tới mốc kiểm mà dự báo hụt target. Không cộng vào target tháng.`} className="w-full min-h-6 flex items-center justify-between gap-1 rounded-md border border-dashed border-amber-500/70 px-1.5 text-2xs tabular-nums bg-amber-400/10">
         <span className="text-amber-300">{hm(x.startTime)}–{hm(x.endTime)} dự phòng</span>
         <span className="flex items-center gap-1 text-amber-200">
           {x.target ? fmtVndShort(x.target) : ""}
@@ -232,7 +232,7 @@ function ExtraChip({ x, onRemoveReserve }: { x: GridExtra; onRemoveReserve?: (ke
       ? `Ca tăng cường ${x.startTime}–${x.endTime}: ${x.pending ? "chờ target đề xuất" : x.provisional ? `target tạm ${fmtVndShort(x.target ?? 0)} (target/giờ của kế hoạch × giờ ca, engine chưa tính)` : `đề xuất ${fmtVndShort(x.target ?? 0)}`}${x.actual !== null ? ` → thực đạt ${fmtVndShort(x.actual)}` : ""}. Không cộng vào target tháng; GMV vẫn cộng vào thực đạt.`
       : `Ca live ngoài kế hoạch ${x.startTime}–${x.endTime}: target 0, GMV ${fmtVndShort(x.actual ?? 0)} vẫn cộng vào thực đạt ⇒ run-rate cao hơn thực. Đưa vào kế hoạch: "Chia lại theo lịch hiện có…".`;
   return (
-    <div title={title} className="w-full min-h-6 flex items-center justify-between gap-1 rounded-md border border-dashed border-sky-700 px-1.5 text-[11px] tabular-nums bg-sky-950/20">
+    <div title={title} className="w-full min-h-6 flex items-center justify-between gap-1 rounded-md border border-dashed border-sky-700 px-1.5 text-2xs tabular-nums bg-sky-950/20">
       <span className="text-sky-300">{hm(x.startTime)}–{hm(x.endTime)} {x.kind === "boost" ? "+" : "ngoài kế hoạch"}</span>
       {x.actual !== null ? (
         <b className={x.target === null ? "text-sky-200" : ok ? "text-emerald-400" : "text-rose-400"}>{fmtVndShort(x.actual)}</b>
@@ -248,7 +248,7 @@ function WeekCell({ days, p }: { days: string[]; p: Props }) {
   const s = summarizePlanSpan(days, drafts, p.outcomeOf);
   const showPct = p.locked && s.pct !== null;
   return (
-    <div className="min-h-[84px] rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] p-2 flex flex-col justify-center gap-0.5 text-[11px] tabular-nums">
+    <div className="min-h-[84px] rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] p-2 flex flex-col justify-center gap-0.5 text-2xs tabular-nums">
       {showPct ? (
         <>
           <span className={`text-lg font-black leading-none ${pctTone(s.pct!)}`}>{Math.round(s.pct! * 100)}%</span>
@@ -333,17 +333,17 @@ const SlotEditor = ({ d, x, y, p, onClose, ref }: { d: PlanDraftSlot; x: number;
           className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1 font-mono text-[var(--text)] disabled:opacity-60"
         />
         {/* Số 8 chữ số gõ tay dễ thừa/thiếu một số 0 — dạng rút gọn ngay dưới để thấy sai bậc. */}
-        <span className="text-[11px] text-[var(--text-faint)] block mt-0.5">
+        <span className="text-2xs text-[var(--text-faint)] block mt-0.5">
           = {fmtVndShort(Number(targetText.replace(/[^\d]/g, "")) || 0)}
           {d.expectedGmv !== undefined ? ` · dự báo ${fmtVndShort(d.expectedGmv)}` : ""}
         </span>
       </label>
       {o?.state === "done" && <p className="text-[var(--text-muted)]">Thực đạt <b className={o.actual >= d.targetGmv ? "text-emerald-400" : "text-rose-400"}>{fmtVndShort(o.actual)}</b>{d.targetGmv > 0 ? ` · ${Math.round((o.actual / d.targetGmv) * 100)}% target` : ""}</p>}
-      {targetReason && <p className="text-[11px] text-[var(--text-faint)]">{targetReason}</p>}
-      {moveStaffed && <p className="text-[11px] text-[var(--text-faint)]">Ca đã chốt người: đổi giờ sẽ dời cả ca thật, host/trợ giữ nguyên.</p>}
-      {tLocked && <p className="text-[11px] text-[var(--text-faint)]">{p.isStaffed(d) ? "Đã chốt người: huỷ ca ở Cửa sổ Ca Live." : "Ca ngày đã qua giữ nguyên giờ như lúc chốt."}</p>}
-      {clash && <p className="text-[11px] text-rose-300 font-bold">Trùng phòng với {clash}</p>}
-      {d.reason && <p className="text-[11px] text-[var(--text-faint)] leading-snug">{d.reason}</p>}
+      {targetReason && <p className="text-2xs text-[var(--text-faint)]">{targetReason}</p>}
+      {moveStaffed && <p className="text-2xs text-[var(--text-faint)]">Ca đã chốt người: đổi giờ sẽ dời cả ca thật, host/trợ giữ nguyên.</p>}
+      {tLocked && <p className="text-2xs text-[var(--text-faint)]">{p.isStaffed(d) ? "Đã chốt người: huỷ ca ở Cửa sổ Ca Live." : "Ca ngày đã qua giữ nguyên giờ như lúc chốt."}</p>}
+      {clash && <p className="text-2xs text-rose-300 font-bold">Trùng phòng với {clash}</p>}
+      {d.reason && <p className="text-2xs text-[var(--text-faint)] leading-snug">{d.reason}</p>}
       <div className="flex items-center gap-2 pt-1">
         <button disabled={moving} onClick={() => void done()} className="px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold disabled:opacity-60">{moving ? "Đang dời…" : "Xong"}</button>
         {!tLocked && !p.isStaffed(d) && <button onClick={() => { onClose(); p.onRemove(d.key); }} className="px-3 py-1.5 rounded-lg border border-rose-900 text-rose-400 font-bold hover:bg-rose-950/40">Bỏ ca</button>}

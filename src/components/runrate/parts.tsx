@@ -149,7 +149,8 @@ export const CumulativeChart: React.FC<{ r: AccountRunRate; color: string; showP
           <circle cx={x(asOfIdx)} cy={y(pts[asOfIdx].actual!)} r={5} fill={color} style={{ stroke: "var(--surface)" }} strokeWidth={2.5} />
         </>
       )}
-      {endLabels.map((l) => <text key={l.text} x={W - R + 8} y={l.y} dominantBaseline="middle" style={{ fill: l.fill, fontSize: 11, fontWeight: 800 }}>{l.text}</text>)}
+      {/* Chữ nhãn pha màu brand về phía màu chữ của theme: CROCS #80C141 nguyên màu chỉ 2,2:1 trên nền trắng (quét 06/11). Đường vẽ giữ màu brand. */}
+      {endLabels.map((l) => <text key={l.text} x={W - R + 8} y={l.y} dominantBaseline="middle" style={{ fill: `color-mix(in srgb, ${l.fill} 60%, var(--text))`, fontSize: 11, fontWeight: 800 }}>{l.text}</text>)}
       {r.days.map((d, i) => (
         <rect key={d.date} x={x(i) - colW / 2} y={T} width={colW} height={H - T - B} fill="transparent"
           data-tip={`${dayTip(d)}\n\nTarget luỹ kế: ${money(pts[i].target)}${pts[i].actual != null ? `\nĐã đạt luỹ kế: ${money(pts[i].actual)}` : fcAt(i) != null && i > asOfI ? `\nDự báo luỹ kế: ${money(fcAt(i)!)}` : showPace && pts[i].projected != null ? `\nDự báo nếu giữ tiến độ: ${money(pts[i].projected)}` : ""}`} />

@@ -1,22 +1,21 @@
+import { createContext, useContext, useEffect, useState } from "react";
 import { CHANNEL, METRIC } from "../../../lib/metricGlossary";
 import { DriverKey } from "../../../lib/report/monthlyReportInsights";
 import { CampDayBucket } from "../../../lib/campaignDays";
 import { byLang, t } from "../../../lib/displayLang";
 
 
-// Skin đen-vàng CỐ ĐỊNH của Report Tháng + các bảng hằng số dùng chung. Tách khỏi MonthlyReportTabs.tsx
-// 2026-10-01 (file khi đó 2.337 dòng). Đây là tài liệu gửi thẳng cho brand để pitching nên nhận diện
-// phải nhất quán bất kể Ops đang chọn theme nội bộ nào — KHÔNG dùng var(--accent)/var(--surface).
-
-// Report Tháng — skin đen-vàng CỐ ĐỊNH riêng cho tab này (khác theme sáng/tối/sand nội bộ app):
-// đây là tài liệu gửi thẳng cho brand để pitching, nhận diện thương hiệu phải nhất quán bất kể Ops
-// đang chọn theme nội bộ nào. Không dùng var(--accent)/var(--surface) như phần còn lại của app.
+// Màu của Report Tháng. Trước 06/11 là skin đen-vàng CỐ ĐỊNH bất kể theme (tài liệu gửi brand). Nay (user: "đồng bộ toàn bộ")
+// xem trong app thì theo theme: PAL là biến CSS --rt-* (index.css — theme YFB giữ đúng mã cũ, theme khác lấy token của theme);
+// FILE HTML/PDF gửi brand vẫn đen-vàng: khung dựng bản xuất có class .rt-skin-yfb + RtSkinContext "yfb" (BrandMonthlyReport).
+// Thuộc tính SVG của recharts (fill/stroke) không đọc var() ⇒ biểu đồ dùng usePal() lấy mã màu thật.
 // Nút dạng chữ gạch chân trong report (Sửa Insight, Lưu, Huỷ…) — trước chỉ cao 17px (dòng chữ 11px), dưới
 // ngưỡng 24px của WCAG 2.5.8; min-h-7 = 28px, giữ dáng link (audit UX 2026-09-29, M1).
 export const LINK_BTN =
-  "inline-flex items-center min-h-7 px-2 -mx-1 rounded-lg font-bold underline underline-offset-2 hover:bg-white/5 disabled:opacity-50";
+  "inline-flex items-center min-h-7 px-2 -mx-1 rounded-lg font-bold underline underline-offset-2 hover:bg-[color-mix(in_srgb,var(--rt-cream)_6%,transparent)] disabled:opacity-50";
 
-export const PAL = {
+/** Mã màu gốc của skin đen-vàng YFB — file xuất (exportStandaloneHtml) và giá trị mặc định :root của --rt-*. */
+export const PAL_HEX = {
   bg: "#0b0b0d",
   panel: "#17171b",
   panel2: "#1d1d22",
@@ -27,8 +26,67 @@ export const PAL = {
   muted: "#93939c",
   green: "#6fcf97",
   red: "#eb6b6b",
-  blue: "#7fb0e0"
+  blue: "#7fb0e0",
+  onGold: "#1a1500"
 };
+export type Pal = typeof PAL_HEX;
+
+/** Dùng trong style (inline) — biến CSS nên đổi theo theme. KHÔNG truyền vào thuộc tính SVG (dùng usePal()). */
+export const PAL: Pal = {
+  bg: "var(--rt-bg)",
+  panel: "var(--rt-panel)",
+  panel2: "var(--rt-panel2)",
+  line: "var(--rt-line)",
+  gold: "var(--rt-gold)",
+  goldDim: "var(--rt-gold-dim)",
+  cream: "var(--rt-cream)",
+  muted: "var(--rt-muted)",
+  green: "var(--rt-green)",
+  red: "var(--rt-red)",
+  blue: "var(--rt-blue)",
+  onGold: "var(--rt-on-gold)"
+};
+
+/** Màu pha trong suốt — thay cách nối hex cũ (`${PAL.gold}55`), vì PAL giờ là var(). `pct` = độ đậm 0–100. */
+export const alpha = (color: string, pct: number) => `color-mix(in srgb, ${color} ${pct}%, transparent)`;
+
+/** "yfb" khi đang dựng bản xuất gửi brand: usePal() trả đúng mã đen-vàng dù người xuất đang dùng theme nào. */
+export const RtSkinContext = createContext<"theme" | "yfb">("theme");
+
+const resolvePal = (): Pal => {
+  if (typeof document === "undefined") return PAL_HEX;
+  // Biến có color-mix nên đọc thẳng getPropertyValue chỉ ra chuỗi chưa tính — tô vào một phần tử thử rồi chuẩn hoá qua canvas.
+  const probe = document.createElement("span");
+  probe.style.display = "none";
+  document.body.appendChild(probe);
+  const ctx = document.createElement("canvas").getContext("2d");
+  const out = {} as Pal;
+  for (const k of Object.keys(PAL) as (keyof Pal)[]) {
+    probe.style.color = PAL[k];
+    const c = getComputedStyle(probe).color;
+    if (ctx) {
+      ctx.fillStyle = PAL_HEX[k];
+      ctx.fillStyle = c;
+      out[k] = String(ctx.fillStyle);
+    } else out[k] = c || PAL_HEX[k];
+  }
+  probe.remove();
+  return out;
+};
+
+/** Mã màu thật của report theo theme đang chọn (đổi theme là vẽ lại) — cho fill/stroke của biểu đồ SVG. */
+export function usePal(): Pal {
+  const skin = useContext(RtSkinContext);
+  const [pal, setPal] = useState<Pal>(() => (skin === "yfb" ? PAL_HEX : resolvePal()));
+  useEffect(() => {
+    if (skin === "yfb") return;
+    const update = () => setPal(resolvePal());
+    const mo = new MutationObserver(update);
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => mo.disconnect();
+  }, [skin]);
+  return skin === "yfb" ? PAL_HEX : pal;
+}
 
 export const chartTooltipStyle = { background: PAL.panel2, border: `1px solid ${PAL.line}`, borderRadius: 8, fontSize: 11, color: PAL.cream };
 

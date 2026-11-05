@@ -134,7 +134,7 @@ function Step({ no, state, title, hint, last = false, children }: { no: number; 
             {title}
           </span>
           {state === "done" && <span className="text-xs font-semibold text-emerald-400">đã có</span>}
-          {hint && <span className="text-[11px] font-normal text-[var(--text-faint)]">{hint}</span>}
+          {hint && <span className="text-2xs font-normal text-[var(--text-faint)]">{hint}</span>}
         </p>
         {children}
       </div>

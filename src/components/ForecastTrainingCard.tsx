@@ -96,7 +96,7 @@ export const ForecastTrainingCard: React.FC<Props> = ({ brandId, sessions, param
   return (
     <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 space-y-3" data-testid="forecast-training-card">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-bold text-[var(--text)] flex items-center gap-1.5"><LineChart className="w-4 h-4 text-[var(--accent-text)]" /> Dự báo {platformText("GMV", platform)} tháng — engine v3</h3>
+        <h3 data-section="Dự báo GMV" className="text-sm font-bold text-[var(--text)] flex items-center gap-1.5"><LineChart className="w-4 h-4 text-[var(--accent-text)]" /> Dự báo {platformText("GMV", platform)} tháng — engine v3</h3>
         {platforms.length > 1 && (
           <div className="flex gap-1">
             {platforms.map((p) => (
@@ -125,16 +125,16 @@ export const ForecastTrainingCard: React.FC<Props> = ({ brandId, sessions, param
               <p className="text-[var(--text-muted)]">Chưa đủ lịch sử (cần ≥ 15 ca có số liệu) — Kế Hoạch Tháng dùng engine cũ, Dashboard dùng {platformText("GMV/giờ", platform)} 28 ngày.</p>
             ) : (
               <>
-                <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px]">
+                <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-2xs">
                   {fc.levelMonths.slice(-4).map((p) => <span key={p.month} className="text-[var(--text-muted)]">Mức T{Number(p.month.slice(5))}: <b className="text-[var(--text)]">{fmtVndShort(p.level)}</b> <span className="text-[var(--text-faint)]">({p.sessions} ca)</span></span>)}
                   {fc.levelRecent != null && <span className="text-[var(--text-muted)]">{params.fcRecentDays} ngày gần nhất: <b className="text-[var(--text)]">{fmtVndShort(fc.levelRecent)}</b></span>}
                   <span className="text-[var(--text-muted)]">Dùng: <b className="text-[var(--accent-text)]">{fmtVndShort(fc.level)}</b>/giờ quy chuẩn</span>
                 </div>
-                <p className="text-[11px] text-[var(--text-muted)]">Dải ~80% lúc lập: <b className="text-[var(--text)]">±{Math.round(fc.band * 100)}%</b> ({fc.big ? "kênh đủ lịch sử" : "kênh ít lịch sử"}) · giờ/ngày p90 đã thấy: {(["daily", "dday", "midmonth", "payday"] as const).map((b) => `${BUCKET_LABEL[b]} ${Number.isFinite(fc.dayHoursP90[b]) ? `${fmtFixed(fc.dayHoursP90[b], 1)}h` : "—"}`).join(" · ")}</p>
+                <p className="text-2xs text-[var(--text-muted)]">Dải ~80% lúc lập: <b className="text-[var(--text)]">±{Math.round(fc.band * 100)}%</b> ({fc.big ? "kênh đủ lịch sử" : "kênh ít lịch sử"}) · giờ/ngày p90 đã thấy: {(["daily", "dday", "midmonth", "payday"] as const).map((b) => `${BUCKET_LABEL[b]} ${Number.isFinite(fc.dayHoursP90[b]) ? `${fmtFixed(fc.dayHoursP90[b], 1)}h` : "—"}`).join(" · ")}</p>
                 {fc.pastErrors.length > 0 && (
-                  <p className="text-[11px] text-[var(--text-muted)]">Lệch lúc lập các tháng trước: {fc.pastErrors.map((e) => <b key={e.month} className={`${tone(e.error, 0.05)} mr-1.5`}>T{Number(e.month.slice(5))} {pct(e.error, true)}</b>)}{fc.biasFactor !== 1 ? `— đang tự hiệu chỉnh ×${fmtFixed(fc.biasFactor, 2)}` : params.fcBiasCorrect ? "— chưa đủ điều kiện tự hiệu chỉnh" : "— tự hiệu chỉnh đang tắt"}</p>
+                  <p className="text-2xs text-[var(--text-muted)]">Lệch lúc lập các tháng trước: {fc.pastErrors.map((e) => <b key={e.month} className={`${tone(e.error, 0.05)} mr-1.5`}>T{Number(e.month.slice(5))} {pct(e.error, true)}</b>)}{fc.biasFactor !== 1 ? `— đang tự hiệu chỉnh ×${fmtFixed(fc.biasFactor, 2)}` : params.fcBiasCorrect ? "— chưa đủ điều kiện tự hiệu chỉnh" : "— tự hiệu chỉnh đang tắt"}</p>
                 )}
-                {fc.mostlyManual && <p className="text-[11px] text-amber-300">Lịch sử chủ yếu là số nhập tay (chưa đối soát) — độ tin cậy thấp hơn.</p>}
+                {fc.mostlyManual && <p className="text-2xs text-amber-300">Lịch sử chủ yếu là số nhập tay (chưa đối soát) — độ tin cậy thấp hơn.</p>}
               </>
             )}
           </div>
@@ -145,7 +145,7 @@ export const ForecastTrainingCard: React.FC<Props> = ({ brandId, sessions, param
               <p className="text-[var(--text-muted)]">Chưa có tháng nào đã hết với ≥ 10 ca và lịch sử trước nó.</p>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-[11px]">
+                <table className="w-full text-2xs">
                   <thead>
                     <tr className="text-[var(--text-faint)] text-right">
                       <th className="text-left font-normal py-1">Tháng</th>
@@ -186,7 +186,7 @@ export const ForecastTrainingCard: React.FC<Props> = ({ brandId, sessions, param
               <p className="text-[var(--text-muted)]">Chưa có dòng nào. Sổ tự ghi khi ceo/ops/admin mở Dashboard tháng này (mỗi kênh một dòng/ngày) và khi Chốt Kế Hoạch Tháng (dự báo lúc lập).</p>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-[11px]">
+                <table className="w-full text-2xs">
                   <thead>
                     <tr className="text-[var(--text-faint)] text-right">
                       <th className="text-left font-normal py-1">Tháng</th>
@@ -206,14 +206,14 @@ export const ForecastTrainingCard: React.FC<Props> = ({ brandId, sessions, param
                     ))}
                   </tbody>
                 </table>
-                <p className="mt-1 text-[11px] text-[var(--text-faint)] leading-snug">Tháng đang chạy chỉ hiện dự báo đã ghi; hết tháng mới chấm lệch so với {platformText("GMV", platform)} cuối tháng (lấy từ ca, nên đối soát lại vẫn đúng).</p>
+                <p className="mt-1 text-2xs text-[var(--text-faint)] leading-snug">Tháng đang chạy chỉ hiện dự báo đã ghi; hết tháng mới chấm lệch so với {platformText("GMV", platform)} cuối tháng (lấy từ ca, nên đối soát lại vẫn đúng).</p>
               </div>
             )}
           </div>
 
           <Explain summary="Chỉ báo sớm (leading indicator) — có giảm sai số lúc lập không">
             {leading.map((c) => (
-              <p key={c.signal} className="text-[11px] text-[var(--text-muted)] leading-snug">
+              <p key={c.signal} className="text-2xs text-[var(--text-muted)] leading-snug">
                 <b className="text-[var(--text)]">{c.signal === "ads" ? "Ngân sách Ads (Kế Hoạch Tháng)" : "Chương trình khuyến mãi"}</b>:{" "}
                 {c.months < LEADING_MIN_MONTHS
                   ? `chưa đủ — ${c.months}/${c.needed} tháng có ${c.signal === "ads" ? "ngân sách Ads" : "chương trình khuyến mãi"} kèm dự báo lúc lập. ${c.signal === "ads" ? "Nhập ô Ngân sách Ads ở Kế Hoạch Tháng mỗi tháng." : "Nhập chương trình khuyến mãi của brand ở CRM / lịch KM."}`

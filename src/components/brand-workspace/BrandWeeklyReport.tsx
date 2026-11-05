@@ -54,11 +54,11 @@ const KPI_TONE = { good: "text-emerald-400", bad: "text-rose-400", warn: "text-a
 const Kpi: React.FC<{ label: string; value: string; delta?: number | null; hint?: string; tone?: "good" | "bad" | "warn"; vsLabel?: string }> = ({ label, value, delta, hint, tone, vsLabel = "so tuần trước" }) => (
   <StatTile frame="card" label={label} value={value} tone={tone ? KPI_TONE[tone] : undefined}>
     {delta !== undefined && (
-      <p className={`text-[11px] font-bold mt-0.5 flex items-center gap-1 ${delta === null ? "text-[var(--text-faint)]" : delta >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+      <p className={`text-2xs font-bold mt-0.5 flex items-center gap-1 ${delta === null ? "text-[var(--text-faint)]" : delta >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
         {delta === null ? "tuần trước chưa có số liệu" : <>{delta >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />} {fmtPct(Math.abs(delta))} {vsLabel}</>}
       </p>
     )}
-    {hint && <p className="text-[11px] text-[var(--text-faint)] mt-0.5">{hint}</p>}
+    {hint && <p className="text-2xs text-[var(--text-faint)] mt-0.5">{hint}</p>}
   </StatTile>
 );
 
@@ -291,7 +291,7 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
             </button>
           </div>
         </div>
-        <p className="text-[11px] text-[var(--text-muted)]">
+        <p className="text-2xs text-[var(--text-muted)]">
           {weekSessions.length} ca trong tuần — {cur.done} có số liệu ({cur.reconciled} đã đối soát{cur.snapshot > 0 ? `, ${cur.snapshot} số lúc giao ca` : ""}{cur.manual > 0 ? `, ${cur.manual} tự khai` : ""})
           {cur.noData > 0 && <> · <span className="text-amber-300">{cur.noData} đã qua chưa có số liệu</span></>}
           {cur.upcoming > 0 && <> · {cur.upcoming} sắp tới</>}
@@ -319,7 +319,7 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
         <div className="overflow-x-auto">
           <table className="w-full text-xs min-w-[640px]">
             <thead>
-              <tr className="text-[var(--text-faint)] text-left text-[11px] font-semibold">
+              <tr className="text-[var(--text-faint)] text-left text-2xs font-semibold">
                 <th className="py-1.5 pr-2">Ngày</th>
                 <th className="py-1.5 pr-2 text-right">Sessions</th>
                 <th className="py-1.5 pr-2 text-right">Giờ live</th>
@@ -364,14 +364,14 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
           </table>
         </div>
         {loading ? (
-          <p className="text-[11px] text-[var(--text-faint)] flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Đang đọc Dữ Liệu Gốc…</p>
+          <p className="text-2xs text-[var(--text-faint)] flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Đang đọc Dữ Liệu Gốc…</p>
         ) : slice?.hasAnyBatch ? (
-          <p className="text-[11px] text-[var(--text-faint)] flex items-center gap-1">
+          <p className="text-2xs text-[var(--text-faint)] flex items-center gap-1">
             <Database className="w-3 h-3" /> Cột "Total GMV (TikTok)" = GMV mọi kênh của shop theo file Dữ Liệu Gốc, để thấy live chiếm bao nhiêu
             {slice.missingDays.length > 0 && <> · thiếu file {slice.missingDays.length} ngày ({slice.missingDays.map(fmtDay).join(", ")})</>}.
           </p>
         ) : (
-          <p className="text-[11px] text-[var(--text-faint)]">Chưa có file Dữ Liệu Gốc tuần này — chỉ có số liệu từ ca.</p>
+          <p className="text-2xs text-[var(--text-faint)]">Chưa có file Dữ Liệu Gốc tuần này — chỉ có số liệu từ ca.</p>
         )}
       </div>
 
@@ -388,11 +388,11 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
                   <span className="w-5 text-center font-black text-[var(--text-faint)]">{i + 1}</span>
                   <div className="min-w-0 flex-1">
                     <p className="font-mono text-[var(--text)]">{DOW[days.indexOf(s.date)] ?? ""} {fmtDay(s.date)} · {s.startTime}–{s.endTime}</p>
-                    <p className="text-[11px] text-[var(--text-muted)] truncate">{s.hostName || "chưa gán"}{s.coHostName ? ` · trợ ${s.coHostName}` : ""} · {fmtH(sessionHours(s))} · {fmtInt(s.totalOrders ?? 0)} đơn</p>
+                    <p className="text-2xs text-[var(--text-muted)] truncate">{s.hostName || "chưa gán"}{s.coHostName ? ` · trợ ${s.coHostName}` : ""} · {fmtH(sessionHours(s))} · {fmtInt(s.totalOrders ?? 0)} đơn</p>
                   </div>
                   <div className="text-right shrink-0">
                     <p className="font-bold text-emerald-400">{fmtVndShort(s.actualGmv)}</p>
-                    <p className="text-[11px] text-[var(--text-faint)]">{fmtVndShort(s.actualGmv / Math.max(0.5, sessionHours(s)))}/h{s.targetGmv > 0 ? ` · ${fmtPct(s.actualGmv / s.targetGmv)} target` : ""}</p>
+                    <p className="text-2xs text-[var(--text-faint)]">{fmtVndShort(s.actualGmv / Math.max(0.5, sessionHours(s)))}/h{s.targetGmv > 0 ? ` · ${fmtPct(s.actualGmv / s.targetGmv)} target` : ""}</p>
                   </div>
                 </li>
               ))}
@@ -406,14 +406,14 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
       <div className="bg-[var(--surface)] rounded-2xl border border-[var(--border)] p-4 space-y-2">
         <h4 className="font-bold text-[var(--text)] text-sm flex items-center gap-2"><Users className="w-4 h-4 text-[var(--accent-text)]" /> Key Metrics · tuần & host</h4>
         {unassignedHost && (
-          <p className="text-[11px] text-amber-300">
+          <p className="text-2xs text-amber-300">
             {unassignedHost.sessionCount} ca chưa gán host ({fmtVndShort(unassignedHost.gmv)}) có trong cột Tuần này nhưng không có cột host riêng.
           </p>
         )}
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="text-[var(--text-faint)] text-left text-[11px] font-semibold">
+              <tr className="text-[var(--text-faint)] text-left text-2xs font-semibold">
                 <th className="py-1.5 pr-3">Chỉ số</th>
                 <th className="py-1.5 pr-3 text-right">Tuần này</th>
                 <th className="py-1.5 pr-3 text-right">{partialWeek ? `Tuần trước tới ${fmtDay(prevCut)}` : "Tuần trước"}</th>
@@ -439,13 +439,13 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
             </tbody>
           </table>
         </div>
-        <p className="text-[11px] text-[var(--text-faint)]">± so tuần trước: xanh = tốt lên, đỏ = xấu đi, {prof.metricsLegend}</p>
+        <p className="text-2xs text-[var(--text-faint)]">± so tuần trước: xanh = tốt lên, đỏ = xấu đi, {prof.metricsLegend}</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Việc còn thiếu */}
         <div className="bg-[var(--surface)] rounded-2xl border border-[var(--border)] p-4 space-y-2">
-          <h4 className="font-bold text-[var(--text)] text-sm flex items-center gap-2"><ClipboardList className="w-4 h-4 text-amber-400" /> Còn thiếu để chốt tuần {todo.length > 0 && <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-800">{todo.length}</span>}</h4>
+          <h4 className="font-bold text-[var(--text)] text-sm flex items-center gap-2"><ClipboardList className="w-4 h-4 text-amber-400" /> Còn thiếu để chốt tuần {todo.length > 0 && <span className="text-2xs font-bold px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-800">{todo.length}</span>}</h4>
           {todo.length === 0 ? (
             <p className="text-xs text-emerald-400">Mọi ca đã qua đều đủ file · report · đối soát.</p>
           ) : (
@@ -456,7 +456,7 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
                   <span className="text-[var(--text-muted)]">{s.hostName || "chưa gán"}</span>
                   <DataSourceBadge dataSource={s.dataSource} platform={s.platform} />
                   {missing.map((m) => (
-                    <span key={m} className={`text-[11px] font-bold px-1.5 py-0.5 rounded border ${m === "reconcile" ? "bg-sky-950 text-sky-300 border-sky-800" : "bg-amber-950 text-amber-300 border-amber-800"}`}>{MISSING_LABEL[m]}</span>
+                    <span key={m} className={`text-2xs font-bold px-1.5 py-0.5 rounded border ${m === "reconcile" ? "bg-sky-950 text-sky-300 border-sky-800" : "bg-amber-950 text-amber-300 border-amber-800"}`}>{MISSING_LABEL[m]}</span>
                   ))}
                 </li>
               ))}
@@ -467,7 +467,7 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
         {/* Tuần tới */}
         <div className="bg-[var(--surface)] rounded-2xl border border-[var(--border)] p-4 space-y-2">
           <h4 className="font-bold text-[var(--text)] text-sm">Tuần tới ({fmtDay(nextStart)} → {fmtDay(nextEnd)})</h4>
-          <p className="text-[11px] text-[var(--text-muted)]">
+          <p className="text-2xs text-[var(--text-muted)]">
             {nextSessions.length} ca đã chốt{nextTarget > 0 ? ` · target tuần ${fmtVndShort(nextTarget)}` : ""}
             {nextOpenSlots.length > 0 && <> · <span className="text-rose-300 font-bold">{nextOpenSlots.length} ca chưa có người</span></>}
           </p>

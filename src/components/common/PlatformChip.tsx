@@ -8,7 +8,7 @@ import { profileOf } from "../../lib/platforms/profiles";
 export function PlatformChip({ platform, className = "" }: { platform: LiveSession["platform"] | undefined; className?: string }) {
   const p = profileOf({ platform });
   return (
-    <span className={`inline-flex items-center text-[11px] font-bold px-1.5 py-0.5 rounded border whitespace-nowrap ${p.chipClass} ${className}`} title={`Sàn: ${p.label}`}>
+    <span className={`inline-flex items-center text-2xs font-bold px-1.5 py-0.5 rounded border whitespace-nowrap ${p.chipClass} ${className}`} title={`Sàn: ${p.label}`}>
       {p.label}
     </span>
   );

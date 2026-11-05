@@ -20,7 +20,7 @@ import {
 } from "../../../lib/report/brandReport";
 import type { CampDayBucket } from "../../../lib/campaignDays";
 import { fmtFixed, fmtVndShort } from "../../../lib/format";
-import { DAY_TYPE_SHORT, PAL } from "./theme";
+import { DAY_TYPE_SHORT, PAL, alpha } from "./theme";
 import { fmtHours, fmtPct } from "./format";
 import { KpiTile, MethodNote, Panel, ReportTable } from "./ui";
 import { numLocale } from "../../../lib/displayLang";
@@ -30,14 +30,14 @@ import { numLocale } from "../../../lib/displayLang";
 // ở đây chỉ trình bày, cùng skin đen-vàng cố định của report (theme.ts).
 
 const TONE_COLOR: Record<ChangeTone, string> = { up: PAL.green, down: PAL.red, shift: PAL.gold, noise: PAL.muted };
-const TONE_BG: Record<ChangeTone, string> = { up: `${PAL.green}22`, down: `${PAL.red}22`, shift: `${PAL.gold}18`, noise: "transparent" };
+const TONE_BG: Record<ChangeTone, string> = { up: `${alpha(PAL.green, 13)}`, down: `${alpha(PAL.red, 13)}`, shift: `${alpha(PAL.gold, 9)}`, noise: "transparent" };
 const signedPct = (v: number | null, digits = 0) => (v == null ? "—" : `${v >= 0 ? "+" : "−"}${fmtFixed(Math.abs(v), digits)}%`);
-const rowStyle = (idx: number) => ({ borderBottom: `1px solid ${PAL.line}`, background: idx % 2 ? `${PAL.panel2}55` : "transparent" });
+const rowStyle = (idx: number) => ({ borderBottom: `1px solid ${PAL.line}`, background: idx % 2 ? `${alpha(PAL.panel2, 33)}` : "transparent" });
 const TAB_LABEL: Record<KeyMetricsTab, string> = { all: "Cả tháng", ...DAY_TYPE_SHORT };
 
 /** Chú thích màu dùng chung cho mọi bảng có ngưỡng dao động. */
 export const ToneLegend: React.FC<{ extra?: string }> = ({ extra }) => (
-  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] mt-2" style={{ color: PAL.muted }}>
+  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs mt-2" style={{ color: PAL.muted }}>
     {(
       [
         ["down", "suy giảm có ý nghĩa"],
@@ -66,17 +66,17 @@ export const ScoreboardPanel: React.FC<{ rows: ScoreRow[]; campSpans: Partial<Re
         const sub = r.key !== "all" && r.key !== "shop";
         const w = r.pct == null ? 0 : Math.min(r.pct, 130) / 1.3;
         return (
-          <tr key={r.key} style={{ ...rowStyle(idx), borderTop: r.key === "shop" ? `1px solid ${PAL.muted}55` : undefined }}>
+          <tr key={r.key} style={{ ...rowStyle(idx), borderTop: r.key === "shop" ? `1px solid ${alpha(PAL.muted, 33)}` : undefined }}>
             <td className={`py-2 px-3 whitespace-nowrap ${sub ? "pl-7 font-medium" : "font-bold"}`} style={{ color: sub ? PAL.cream : PAL.gold }}>
               {SCORE_LABEL[r.key]}
-              {sub && campSpans[r.key as CampDayBucket] && <span className="text-[11px] font-normal" style={{ color: PAL.muted }}> · {campSpans[r.key as CampDayBucket]}</span>}
-              {r.key === "shop" && <span className="text-[11px] font-normal" style={{ color: PAL.muted }}> · KPI toàn shop, gồm các kênh ngoài livestream</span>}
+              {sub && campSpans[r.key as CampDayBucket] && <span className="text-2xs font-normal" style={{ color: PAL.muted }}> · {campSpans[r.key as CampDayBucket]}</span>}
+              {r.key === "shop" && <span className="text-2xs font-normal" style={{ color: PAL.muted }}> · KPI toàn shop, gồm các kênh ngoài livestream</span>}
             </td>
             <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
               {r.targetToDate != null && r.target && Math.round(r.targetToDate) !== Math.round(r.target) ? (
                 <>
                   {fmtVndShort(r.targetToDate)}
-                  <span className="block text-[11px] font-normal">tới nay · cả tháng {fmtVndShort(r.target)}</span>
+                  <span className="block text-2xs font-normal">tới nay · cả tháng {fmtVndShort(r.target)}</span>
                 </>
               ) : r.target ? fmtVndShort(r.target) : "—"}
             </td>
@@ -92,7 +92,7 @@ export const ScoreboardPanel: React.FC<{ rows: ScoreRow[]; campSpans: Partial<Re
         );
       })}
     </ReportTable>
-    {footnote && <p className="text-[11px] mt-2" style={{ color: PAL.muted }}>{footnote}</p>}
+    {footnote && <p className="text-2xs mt-2" style={{ color: PAL.muted }}>{footnote}</p>}
   </Panel>
 );
 
@@ -113,7 +113,7 @@ export const DayTypeHeatPanel: React.FC<{ rows: DayTypeFactorRow[]; windowLabel:
       {rows.map((r, idx) => (
         <tr key={r.key} style={rowStyle(idx)}>
           <td className="py-2 px-3 font-semibold whitespace-nowrap" style={{ color: PAL.gold }}>
-            {DAY_TYPE_SHORT[r.key]} <span className="text-[11px] font-normal" style={{ color: PAL.muted }}>· {r.sessionsPrev} → {r.sessionsCur} phiên</span>
+            {DAY_TYPE_SHORT[r.key]} <span className="text-2xs font-normal" style={{ color: PAL.muted }}>· {r.sessionsPrev} → {r.sessionsCur} phiên</span>
           </td>
           {DAY_TYPE_FACTORS.map((f) => {
             const tone = f === "hours" ? "noise" : changeTone(r.change[f], r.band, true);
@@ -164,10 +164,10 @@ export const KeyMetricsPanel: React.FC<{ months: KeyMetricsMonth[]; monthLabel: 
             aria-selected={tab === t}
             onClick={() => setTab(t)}
             className="min-h-8 inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold"
-            style={tab === t ? { color: PAL.cream, background: `${PAL.gold}2e`, border: `1px solid ${PAL.gold}73` } : { color: PAL.muted, border: `1px solid ${PAL.line}` }}
+            style={tab === t ? { color: PAL.cream, background: `${alpha(PAL.gold, 18)}`, border: `1px solid ${alpha(PAL.gold, 45)}` } : { color: PAL.muted, border: `1px solid ${PAL.line}` }}
           >
             {TAB_LABEL[t]}
-            <span className="text-[11px] font-black px-1.5 rounded-full" style={{ background: PAL.panel2, color: tables[t].downCount > 0 ? PAL.red : PAL.muted }}>
+            <span className="text-2xs font-black px-1.5 rounded-full" style={{ background: PAL.panel2, color: tables[t].downCount > 0 ? PAL.red : PAL.muted }}>
               {tables[t].downCount}
             </span>
           </button>
@@ -184,15 +184,15 @@ export const KeyMetricsPanel: React.FC<{ months: KeyMetricsMonth[]; monthLabel: 
         <table className="w-full text-xs min-w-[620px]">
           <thead>
             <tr style={{ borderBottom: `1px solid ${PAL.line}` }}>
-              <th className="py-2 px-3 text-left text-[11px] font-semibold" style={{ color: PAL.muted }}>Chỉ số</th>
+              <th className="py-2 px-3 text-left text-2xs font-semibold" style={{ color: PAL.muted }}>Chỉ số</th>
               {months.map((m, i) => (
-                <th key={m.month} className="py-2 px-3 text-right text-[11px] font-semibold whitespace-nowrap" style={{ color: i === last ? PAL.cream : PAL.muted }}>
+                <th key={m.month} className="py-2 px-3 text-right text-2xs font-semibold whitespace-nowrap" style={{ color: i === last ? PAL.cream : PAL.muted }}>
                   {monthLabel(m.month)}
                   <span className="block font-normal">{span(i)} · {m.stats[tab].sessions} phiên</span>
                 </th>
               ))}
               {months.slice(1).map((m, i) => (
-                <th key={`c${m.month}`} className="py-2 px-3 text-right text-[11px] font-semibold whitespace-nowrap" style={{ color: PAL.muted }}>
+                <th key={`c${m.month}`} className="py-2 px-3 text-right text-2xs font-semibold whitespace-nowrap" style={{ color: PAL.muted }}>
                   {monthLabel(m.month)} so {monthLabel(months[i].month)}
                   <span className="block font-normal">ngưỡng {cur.bands[i + 1] == null ? "—" : `±${fmtFixed(cur.bands[i + 1]!, 0)}%`}</span>
                 </th>
@@ -298,7 +298,7 @@ export const AffiliatePanel: React.FC<{ rows: CreatorSessionRow[]; totals: Creat
         );
       })}
     </ReportTable>
-    <p className="text-[11px] mt-2" style={{ color: PAL.muted }}>
+    <p className="text-2xs mt-2" style={{ color: PAL.muted }}>
       {totals.top && totals.creators > 1 && `${totals.top.creator} chiếm ${fmtFixed(totals.top.share, 1)}% Direct GMV của creator. `}
       {shopAffiliate != null && `${CHANNEL.affiliateLive} toàn shop (Shop Analytics) ${fmtVndShort(shopAffiliate)} — gồm cả creator ngoài danh sách. `}
       Mỗi creator chỉ có vài phiên mỗi tháng nên chênh lệch giữa hai phiên có thể là biến động ngẫu nhiên.
@@ -323,7 +323,7 @@ export const CreatorPlanPanel: React.FC<{ rows: CreatorPlanRow[]; monthLabel: st
           <thead>
             <tr style={{ borderBottom: `1px solid ${PAL.line}` }}>
               {["Lịch live", "Creator", "Campaign", "Khung giờ", "Thời lượng", METRIC.targetGmv, "GMV/giờ mục tiêu", "Target (USD)", "Budget Ads", `GMV/giờ ${curLabel} của creator`, `Mục tiêu so với ${curLabel}`, "Note"].map((h, i) => (
-                <th key={h} className={`py-2 px-3 text-[11px] font-semibold whitespace-nowrap ${i >= 4 && i <= 9 ? "text-right" : "text-left"}`} style={{ color: PAL.muted }}>{h}</th>
+                <th key={h} className={`py-2 px-3 text-2xs font-semibold whitespace-nowrap ${i >= 4 && i <= 9 ? "text-right" : "text-left"}`} style={{ color: PAL.muted }}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -347,7 +347,7 @@ export const CreatorPlanPanel: React.FC<{ rows: CreatorPlanRow[]; monthLabel: st
                 </tr>
               );
             })}
-            <tr style={{ borderTop: `1px solid ${PAL.muted}55` }}>
+            <tr style={{ borderTop: `1px solid ${alpha(PAL.muted, 33)}` }}>
               <td colSpan={4} className="py-2 px-3 font-bold" style={{ color: PAL.gold }}>Tổng · {rows.length} phiên · {creators} creator</td>
               <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.cream }}>{fmtHours(total.hours)}</td>
               <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>{fmtVndShort(total.target)}</td>
@@ -360,12 +360,12 @@ export const CreatorPlanPanel: React.FC<{ rows: CreatorPlanRow[]; monthLabel: st
         </table>
       </div>
       {topShare && topShare.share >= 40 && (
-        <p className="text-[11px] mt-2" style={{ color: PAL.gold }}>
+        <p className="text-2xs mt-2" style={{ color: PAL.gold }}>
           Phiên {topShare.row.creator}{topShare.row.date ? ` ${topShare.row.date.slice(8)}/${topShare.row.date.slice(5, 7)}` : ""} chiếm {fmtFixed(topShare.share, 0)}% target affiliate tháng
           {topShare.row.ratio != null ? ` và cần GMV/giờ gấp ${fmtFixed(topShare.row.ratio, 1)} lần phiên tốt nhất của creator này ở ${curLabel}` : ""} — kết quả affiliate cả tháng phụ thuộc lớn vào một phiên.
         </p>
       )}
-      {draftNote && <p className="text-[11px] mt-1" style={{ color: PAL.gold }}>{draftNote}</p>}
+      {draftNote && <p className="text-2xs mt-1" style={{ color: PAL.gold }}>{draftNote}</p>}
     </Panel>
   );
 };
@@ -411,13 +411,13 @@ export const NmvPanel: React.FC<{
         ))}
       </div>
       {(refundStatus?.reasons.length || refundStatus?.definitionWarning || nmvLabel) && (
-        <p className="text-[11px] mt-3" style={{ color: PAL.muted }}>
+        <p className="text-2xs mt-3" style={{ color: PAL.muted }}>
           {refundStatus && refundStatus.reasons.length > 0 ? `${METRIC.refundRate} tạm tính — chưa chốt vì ${refundStatus.reasons.join("; ")}. ` : ""}
           {refundStatus?.definitionWarning ? `${refundStatus.definitionWarning} ` : ""}
           {nmvLabel ? `${METRIC.nmv}: ${nmvLabel}.` : ""}
         </p>
       )}
-      <p className="text-[11px] mt-3" style={{ color: PAL.muted }}>
+      <p className="text-2xs mt-3" style={{ color: PAL.muted }}>
         {shopRefundOnly
           ? `${METRIC.refundRate} chỉ gồm giá trị hoàn tiền, chưa gồm đơn hủy — ${METRIC.nmv} thật sẽ thấp hơn. `
           : ""}

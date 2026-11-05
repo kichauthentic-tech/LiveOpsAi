@@ -52,7 +52,7 @@ export const IdxDelta: React.FC<{ cur: { index: number; n: number }; prev: { ind
   );
 };
 
-export const TH = "px-3 py-2 text-[11px] font-semibold text-[var(--text-faint)] whitespace-nowrap text-right first:text-left";
+export const TH = "px-3 py-2 text-2xs font-semibold text-[var(--text-faint)] whitespace-nowrap text-right first:text-left";
 export const TD = "px-3 py-2 text-right tabular-nums whitespace-nowrap first:text-left";
 
 /** Bảng gọn trong khung (cuộn ngang trong khung khi chật, không đẩy trang tràn). */
@@ -67,8 +67,9 @@ export const Table: React.FC<{ head: React.ReactNode[]; children: React.ReactNod
 );
 
 /** Tiêu đề khối trong thẻ: tên + dòng phụ (kỳ, cách đếm). */
-export const BlockHead: React.FC<{ title: React.ReactNode; sub?: React.ReactNode; right?: React.ReactNode }> = ({ title, sub, right }) => (
-  <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1 mb-3">
+// `nav`: tên ngắn của phần trên mục lục dính (SectionNav) — chỉ khối cấp trang mới đặt.
+export const BlockHead: React.FC<{ title: React.ReactNode; sub?: React.ReactNode; right?: React.ReactNode; nav?: string }> = ({ title, sub, right, nav }) => (
+  <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1 mb-3" data-section={nav}>
     <div className="min-w-0">
       <h3 className="text-sm font-bold text-[var(--text)]">{title}</h3>
       {sub && <p className="text-xs text-[var(--text-faint)] mt-0.5 leading-snug">{sub}</p>}
@@ -78,8 +79,8 @@ export const BlockHead: React.FC<{ title: React.ReactNode; sub?: React.ReactNode
 );
 
 /** Tiêu đề một mục lớn của trang (Shop, Đội live…). */
-export const Sect: React.FC<{ title: string; sub?: React.ReactNode }> = ({ title, sub }) => (
-  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 px-1 pt-2">
+export const Sect: React.FC<{ title: string; sub?: React.ReactNode; nav?: string }> = ({ title, sub, nav }) => (
+  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 px-1 pt-2" data-section={nav}>
     <h3 className="text-sm font-black text-[var(--text)]">{title}</h3>
     {sub && <span className="text-xs text-[var(--text-faint)]">{sub}</span>}
   </div>

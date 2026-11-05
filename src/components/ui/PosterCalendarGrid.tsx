@@ -88,7 +88,7 @@ export const PosterDayCell: React.FC<PosterDayCellProps> = ({
       {isToday && (
         // z-30 > z-20 của CampaignDayRibbon — ngày "hôm nay" rơi vào dải camp (D-Day/Mid-Month/
         // Pay Day) vẫn phải đọc được chữ "Hôm nay", không bị dải banner đè lên.
-        <span className="absolute -top-2 right-1.5 shrink-0 text-[11px] font-black px-2 py-0.5 rounded-full bg-orange-500 text-white leading-none shadow-md z-30">
+        <span className="absolute -top-2 right-1.5 shrink-0 text-2xs font-black px-2 py-0.5 rounded-full bg-orange-500 text-white leading-none shadow-md z-30">
           Hôm nay
         </span>
       )}
@@ -104,7 +104,7 @@ export const PosterDayCell: React.FC<PosterDayCellProps> = ({
         {children}
       </div>
       {footer && (
-        <div className="text-right text-[11px] font-semibold text-[var(--text-faint)] pt-0.5">{footer}</div>
+        <div className="text-right text-2xs font-semibold text-[var(--text-faint)] pt-0.5">{footer}</div>
       )}
     </div>
   );

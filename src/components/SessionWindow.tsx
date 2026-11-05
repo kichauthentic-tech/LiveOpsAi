@@ -333,13 +333,13 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                 <p className="text-sm font-black text-[var(--text)] truncate">
                   {s.brandName} · {fmtDate(s.date)} · {s.startTime}–{s.endTime}
                 </p>
-                <p className="text-[11px] text-[var(--text-muted)] truncate">
+                <p className="text-2xs text-[var(--text-muted)] truncate">
                   Host {s.hostName || (isBrandView ? "—" : "chưa gán")}
                   {!isBrandView && s.coHostName ? ` · Trợ ${s.coHostName}` : ""}
                   {!isBrandView && s.studioName ? ` · ${s.studioName}` : ""}
                 </p>
                 {!isBrandView && hasStaffSegments(s) && (
-                  <p className="text-[11px] text-amber-300 truncate" title={describeStaff(s).join(" · ")}>
+                  <p className="text-2xs text-amber-300 truncate" title={describeStaff(s).join(" · ")}>
                     Đổi người giữa ca — {describeStaff(s).join(" · ")}
                   </p>
                 )}
@@ -347,11 +347,11 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
             </div>
             <div className="flex flex-wrap items-center gap-1.5 mt-2">
               <PlatformChip platform={s.platform} />
-              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${STATUS_CLS[s.status]}`}>{STATUS_LABEL[s.status]}</span>
+              <span className={`text-2xs font-bold px-2 py-0.5 rounded-full border ${STATUS_CLS[s.status]}`}>{STATUS_LABEL[s.status]}</span>
               {/* Nhãn tin cậy nói "số này chốt tới đâu" — vô nghĩa khi chưa được thấy số nào. */}
               {isBrandView ? (
                 hideMetrics ? (
-                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full border bg-[var(--surface-elevated)] text-[var(--text-faint)] border-[var(--border)]">
+                  <span className="text-2xs font-bold px-2 py-0.5 rounded-full border bg-[var(--surface-elevated)] text-[var(--text-faint)] border-[var(--border)]">
                     chưa phát hành
                   </span>
                 ) : (
@@ -361,16 +361,16 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                 <DataSourceBadge dataSource={s.dataSource} platform={s.platform} />
               )}
               {!isBrandView && s.isBackfill && (
-                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full border bg-[var(--surface-elevated)] text-[var(--text-faint)] border-[var(--border)]">nạp bù từ file</span>
+                <span className="text-2xs font-bold px-2 py-0.5 rounded-full border bg-[var(--surface-elevated)] text-[var(--text-faint)] border-[var(--border)]">nạp bù từ file</span>
               )}
               {/* RPC snapshot (0078) cũng ghi reconciled_at — chỉ gọi là "đối soát" khi nguồn số thật sự là tiktok_reconciled. */}
-              {s.reconciledAt && dataSourceTier(s) === "reconciled" && <span className="text-[11px] text-[var(--text-faint)]">đối soát {new Date(s.reconciledAt).toLocaleDateString("vi-VN")}</span>}
-              {isMine && <span className="text-[11px] font-bold px-2 py-0.5 rounded-full border bg-sky-950 text-sky-300 border-sky-800">ca của tôi</span>}
+              {s.reconciledAt && dataSourceTier(s) === "reconciled" && <span className="text-2xs text-[var(--text-faint)]">đối soát {new Date(s.reconciledAt).toLocaleDateString("vi-VN")}</span>}
+              {isMine && <span className="text-2xs font-bold px-2 py-0.5 rounded-full border bg-sky-950 text-sky-300 border-sky-800">ca của tôi</span>}
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
             {canEdit && !editing && (
-              <button onClick={startEdit} className="text-[11px] font-bold text-[var(--accent-text)] px-2.5 py-1.5 rounded-lg border border-[var(--accent)]/40 flex items-center gap-1"><Pencil className="w-3 h-3" /> Sửa ca · thay người</button>
+              <button onClick={startEdit} className="text-2xs font-bold text-[var(--accent-text)] px-2.5 py-1.5 rounded-lg border border-[var(--accent)]/40 flex items-center gap-1"><Pencil className="w-3 h-3" /> Sửa ca · thay người</button>
             )}
             <button onClick={onClose} className="text-[var(--text-faint)] hover:text-[var(--text)] p-1" aria-label="Đóng"><X className="w-5 h-5" /></button>
           </div>
@@ -434,7 +434,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
           {editing && canEdit && (
             <section className="space-y-3 text-xs bg-[var(--surface-base)] p-3 rounded-xl border border-[var(--border)]">
               {(conflicts.studio || conflicts.host || conflicts.coHost) && (
-                <div className="p-2.5 bg-rose-950/80 border border-rose-700/80 rounded-xl text-[11px] space-y-1 text-rose-200 font-medium">
+                <div className="p-2.5 bg-rose-950/80 border border-rose-700/80 rounded-xl text-2xs space-y-1 text-rose-200 font-medium">
                   {conflicts.studio && <p>• Trùng Studio: "{conflicts.studio}"</p>}
                   {conflicts.host && <p>• Trùng Host: {conflicts.host}</p>}
                   {conflicts.coHost && <p>• Trùng Trợ live: {conflicts.coHost}</p>}
@@ -447,7 +447,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                 <label className="block"><span className="font-bold text-[var(--text-muted)] block mb-1">Kết thúc</span><input type="time" disabled={scheduleLocked} value={edit.endTime} onChange={(e) => setEdit({ ...edit, endTime: e.target.value })} className={`${inputCls} font-mono disabled:opacity-60`} /></label>
               </div>
               {scheduleLocked && (
-                <p className="text-[11px] text-[var(--text-muted)]">
+                <p className="text-2xs text-[var(--text-muted)]">
                   {hasSessionData(s)
                     ? "Ca đã có số liệu nên không dời ngày/giờ được — ranh giới snapshot và đối soát tính theo giờ ca. Vẫn đổi được phòng, Host, Trợ live."
                     : "Ca đang chia người theo đoạn giờ nên không dời giờ được — bỏ chia đoạn (Đổi người giữa ca) trước."}
@@ -473,10 +473,10 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                 </label>
               </div>
               {(hasStaffSegments(s, "host") || hasStaffSegments(s, "co_host")) && (
-                <p className="text-[11px] text-[var(--text-muted)]">Vai đang chia theo đoạn giờ nên không đổi ở đây — dùng “Đổi người giữa ca”.</p>
+                <p className="text-2xs text-[var(--text-muted)]">Vai đang chia theo đoạn giờ nên không đổi ở đây — dùng “Đổi người giữa ca”.</p>
               )}
               {sessionActions.setStaffSegments && (
-                <button type="button" onClick={() => setSegOpen((v) => !v)} className="px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] text-[var(--text)] font-bold text-[11px]">
+                <button type="button" onClick={() => setSegOpen((v) => !v)} className="px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] text-[var(--text)] font-bold text-2xs">
                   {segOpen ? "Ẩn “Đổi người giữa ca”" : hasStaffSegments(s) ? "Sửa đổi người giữa ca" : "Đổi người giữa ca (vào thay / ra sớm)"}
                 </button>
               )}
@@ -485,10 +485,10 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                   <input type="text" value={changeReason} onChange={(e) => setChangeReason(e.target.value)} placeholder="Vd: Host báo bận đột xuất" className={inputCls} />
                 </label>
               )}
-              <p className="text-[11px] text-[var(--text-faint)]">{platformText("Target GMV", platformOf(s))} của ca lấy từ Kế Hoạch Tháng đã chốt — không sửa ở đây.</p>
+              <p className="text-2xs text-[var(--text-faint)]">{platformText("Target GMV", platformOf(s))} của ca lấy từ Kế Hoạch Tháng đã chốt — không sửa ở đây.</p>
               <div className="flex justify-end gap-2 pt-1">
-                <button onClick={() => setEditing(false)} className="px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] text-[var(--text-muted)] font-bold text-[11px]">Huỷ</button>
-                <button onClick={saveEdit} disabled={saving || personBlocked} title={personBlocked ? "Trùng người — đổi người hoặc giờ ca" : undefined} className="px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-60 text-white font-bold text-[11px]">{saving ? "Đang lưu..." : "Lưu thay đổi"}</button>
+                <button onClick={() => setEditing(false)} className="px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] text-[var(--text-muted)] font-bold text-2xs">Huỷ</button>
+                <button onClick={saveEdit} disabled={saving || personBlocked} title={personBlocked ? "Trùng người — đổi người hoặc giờ ca" : undefined} className="px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-60 text-white font-bold text-2xs">{saving ? "Đang lưu..." : "Lưu thay đổi"}</button>
               </div>
             </section>
           )}
@@ -525,7 +525,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
             <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface-base)]/60 p-3 space-y-3">
               <div className="flex items-center justify-between gap-2">
                 <h4 className="text-xs font-bold text-[var(--text-muted)]">Giao ca</h4>
-                <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${handoverDone ? "bg-emerald-950 text-emerald-300 border-emerald-800" : notStarted ? "bg-[var(--surface-elevated)] text-[var(--text-muted)] border-[var(--border)]" : "bg-amber-950 text-amber-300 border-amber-800"}`}>
+                <span className={`text-2xs font-bold px-2 py-0.5 rounded-full border ${handoverDone ? "bg-emerald-950 text-emerald-300 border-emerald-800" : notStarted ? "bg-[var(--surface-elevated)] text-[var(--text-muted)] border-[var(--border)]" : "bg-amber-950 text-amber-300 border-amber-800"}`}>
                   {handoverDone ? `đã giao ${new Date(s.report!.handoverAt!).toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" })}` : notStarted ? "chưa tới giờ" : "chưa giao ca"}
                 </span>
               </div>
@@ -533,7 +533,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                 <p className="text-xs text-[var(--text-muted)] flex flex-wrap items-center gap-x-2 gap-y-1">
                   <span>Hết ca lúc {s.endTime.slice(0, 5)} thì tải lên file {prof.reconciliationFile} và giao ca ở đây.</span>
                   {canHandover && (
-                    <button onClick={() => setEarlyHandover(true)} className="text-[11px] font-bold text-[var(--accent-text)] hover:underline">
+                    <button onClick={() => setEarlyHandover(true)} className="text-2xs font-bold text-[var(--accent-text)] hover:underline">
                       Mở giao ca ngay
                     </button>
                   )}
@@ -543,7 +543,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                 <div className="space-y-1.5 text-xs">
                   <p className="text-[var(--text-muted)]">{snapshotDone ? `Đã tải lên file ${prof.reconciliationFile} — số của ca ở "Số liệu ca" bên dưới.` : "Chưa có file số liệu."}</p>
                   {canHandover && (
-                    <button onClick={() => setEditingHandover(true)} className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-emerald-950 text-emerald-300 border border-emerald-800 hover:bg-emerald-900 transition-colors">
+                    <button onClick={() => setEditingHandover(true)} className="text-2xs font-bold px-2.5 py-1 rounded-lg bg-emerald-950 text-emerald-300 border border-emerald-800 hover:bg-emerald-900 transition-colors">
                       Sửa giao ca / tải lại file
                     </button>
                   )}
@@ -582,18 +582,18 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                   <div className="flex flex-wrap gap-1">
                     {incidents.length === 0 && <span className="text-xs text-emerald-300">Không có sự cố</span>}
                     {incidents.map((i) => (
-                      <span key={i.key} className="text-[11px] font-bold px-1.5 py-0.5 rounded border bg-rose-950/60 text-rose-300 border-rose-800">{i.label}</span>
+                      <span key={i.key} className="text-2xs font-bold px-1.5 py-0.5 rounded border bg-rose-950/60 text-rose-300 border-rose-800">{i.label}</span>
                     ))}
                   </div>
                   {s.report.statusNote && <p className="text-xs text-[var(--text)] whitespace-pre-wrap">{s.report.statusNote}</p>}
                   {!s.report.handoverAt && (s.report.dashboardLink1 || s.report.dashboardLink2) && (
-                    <div className="flex flex-wrap gap-2 text-[11px]">
+                    <div className="flex flex-wrap gap-2 text-2xs">
                       {s.report.dashboardLink1 && <a href={s.report.dashboardLink1} target="_blank" rel="noreferrer" className="text-[var(--accent-text)] underline">Dashboard 1</a>}
                       {s.report.dashboardLink2 && <a href={s.report.dashboardLink2} target="_blank" rel="noreferrer" className="text-[var(--accent-text)] underline">Dashboard 2</a>}
                     </div>
                   )}
                   {s.report.submittedAt && (
-                    <p className="text-[11px] text-[var(--text-faint)]">Nhập lúc {new Date(s.report.submittedAt).toLocaleString("vi-VN")}{s.report.submittedByRole ? ` · ${s.report.submittedByRole === "talent" ? "trợ live" : "OPS"}` : ""}</p>
+                    <p className="text-2xs text-[var(--text-faint)]">Nhập lúc {new Date(s.report.submittedAt).toLocaleString("vi-VN")}{s.report.submittedByRole ? ` · ${s.report.submittedByRole === "talent" ? "trợ live" : "OPS"}` : ""}</p>
                   )}
                 </div>
               ) : (
@@ -627,7 +627,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                     </>
                   )}
                 </div>
-                <p className="text-[11px] text-[var(--text-faint)] mt-2">Tỷ lệ tính lại từ số đã tách theo ca, không lấy cột tỷ lệ cộng dồn của file.</p>
+                <p className="text-2xs text-[var(--text-faint)] mt-2">Tỷ lệ tính lại từ số đã tách theo ca, không lấy cột tỷ lệ cộng dồn của file.</p>
               </>
             ) : s.actualGmv || s.totalOrders || s.totalViews ? (
               <>
@@ -636,7 +636,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                   <KV label={prof.viewsLabel} value={fmtInt(s.totalViews)} />
                   {prof.showsTikTokCounters && <KV label="PCU" value={fmtInt(s.peakViewers)} />}
                 </div>
-                <p className="text-[11px] text-amber-300 mt-2">Số tự khai tay — chưa có file nên không tính được tỷ lệ.</p>
+                <p className="text-2xs text-amber-300 mt-2">Số tự khai tay — chưa có file nên không tính được tỷ lệ.</p>
               </>
             ) : null}
           </section> : null}
@@ -687,12 +687,12 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
           {canDropout && (
             <div className="pt-3 border-t border-[var(--border)]">
               {dropoutSent ? (
-                <p className="text-[11px] text-emerald-300 flex items-start gap-1.5">
+                <p className="text-2xs text-emerald-300 flex items-start gap-1.5">
                   <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-px" />
                   Đã báo cho vận hành. <b>Lịch chưa đổi</b> — chờ ops xác nhận người thay, và nhớ theo dõi chuông.
                 </p>
               ) : !dropoutOpen ? (
-                <button onClick={() => setDropoutOpen(true)} className="inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-300 hover:text-amber-200 transition-colors">
+                <button onClick={() => setDropoutOpen(true)} className="inline-flex items-center gap-1.5 text-2xs font-bold text-amber-300 hover:text-amber-200 transition-colors">
                   <Hand className="w-3.5 h-3.5" /> Tôi không đi được ca này
                 </button>
               ) : (
@@ -703,8 +703,8 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                   </p>
                   <input value={dropoutReason} onChange={(e) => setDropoutReason(e.target.value)} placeholder="Lý do (vd: bị bệnh, trùng lịch học, việc gia đình)" className={inputCls} />
                   <div className="flex flex-wrap gap-2 justify-end">
-                    <button onClick={() => { setDropoutOpen(false); setDropoutReason(""); }} className="px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] text-[var(--text-muted)] font-bold text-[11px]">Thôi</button>
-                    <button onClick={doDropout} disabled={dropoutSending} className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 disabled:opacity-60 text-white font-bold text-[11px]">
+                    <button onClick={() => { setDropoutOpen(false); setDropoutReason(""); }} className="px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] text-[var(--text-muted)] font-bold text-2xs">Thôi</button>
+                    <button onClick={doDropout} disabled={dropoutSending} className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 disabled:opacity-60 text-white font-bold text-2xs">
                       {dropoutSending ? "Đang gửi..." : "Gửi cho vận hành"}
                     </button>
                   </div>
@@ -716,7 +716,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
           {isScheduler && (canCancel || canExclude || (isOps && !monthClosed && onDeleteSession && !hasData)) && (
             <div className="pt-3 border-t border-[var(--border)] space-y-2">
               {canCancel && !cancelOpen && (
-                <button onClick={() => setCancelOpen(true)} className="inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-300 hover:text-amber-200 transition-colors">
+                <button onClick={() => setCancelOpen(true)} className="inline-flex items-center gap-1.5 text-2xs font-bold text-amber-300 hover:text-amber-200 transition-colors">
                   <Ban className="w-3.5 h-3.5" /> Huỷ ca này
                 </button>
               )}
@@ -729,11 +729,11 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                       liên kết với ca kế hoạch. Đặt lựa chọn ngay ở đây vì đây đúng là lúc ops biết
                       mình đang bỏ hẳn ca hay chỉ cần đổi người. */}
                   <div className="flex flex-wrap gap-2 justify-end">
-                    <button onClick={() => setCancelOpen(false)} className="px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] text-[var(--text-muted)] font-bold text-[11px]">Không</button>
-                    <button onClick={() => doCancel(false)} disabled={cancelling} className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 disabled:opacity-60 text-white font-bold text-[11px]" title="Ca chờ đăng ký cũng đóng luôn — không live khung này nữa">
+                    <button onClick={() => setCancelOpen(false)} className="px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] text-[var(--text-muted)] font-bold text-2xs">Không</button>
+                    <button onClick={() => doCancel(false)} disabled={cancelling} className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 disabled:opacity-60 text-white font-bold text-2xs" title="Ca chờ đăng ký cũng đóng luôn — không live khung này nữa">
                       {cancelling ? "Đang huỷ..." : "Huỷ hẳn ca"}
                     </button>
-                    <button onClick={() => doCancel(true)} disabled={cancelling} className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white font-bold text-[11px]" title="Ca chờ đăng ký về 'mở' — giữ nguyên đăng ký rảnh cũ và liên kết với Kế Hoạch Tháng">
+                    <button onClick={() => doCancel(true)} disabled={cancelling} className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white font-bold text-2xs" title="Ca chờ đăng ký về 'mở' — giữ nguyên đăng ký rảnh cũ và liên kết với Kế Hoạch Tháng">
                       {cancelling ? "Đang huỷ..." : "Huỷ ca, mở lại tìm người khác"}
                     </button>
                   </div>
@@ -743,7 +743,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                   trước 0114 hệ quả là ca nhập nhầm brand / ca test kẹt vĩnh viễn trong mọi tổng hợp,
                   gỡ được bằng đúng một cách: SQL tay. Đây là đường thứ ba: giữ dòng, bỏ khỏi sổ. */}
               {canExclude && !s.excludedFromReports && !excludeOpen && (
-                <button onClick={() => setExcludeOpen(true)} className="inline-flex items-center gap-1.5 text-[11px] font-bold text-violet-300 hover:text-violet-200 transition-colors">
+                <button onClick={() => setExcludeOpen(true)} className="inline-flex items-center gap-1.5 text-2xs font-bold text-violet-300 hover:text-violet-200 transition-colors">
                   <EyeOff className="w-3.5 h-3.5" /> Loại ca này khỏi báo cáo
                 </button>
               )}
@@ -755,15 +755,15 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                   </p>
                   <input value={excludeReason} onChange={(e) => setExcludeReason(e.target.value)} placeholder="Lý do (bắt buộc — vd: nhập nhầm brand, ca test, trùng room với ca 12/09)" className={inputCls} />
                   <div className="flex flex-wrap gap-2 justify-end">
-                    <button onClick={() => { setExcludeOpen(false); setExcludeReason(""); }} className="px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] text-[var(--text-muted)] font-bold text-[11px]">Không</button>
-                    <button onClick={() => doExclude(true)} disabled={excluding || excludeReason.trim() === ""} className="px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-bold text-[11px]">
+                    <button onClick={() => { setExcludeOpen(false); setExcludeReason(""); }} className="px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] text-[var(--text-muted)] font-bold text-2xs">Không</button>
+                    <button onClick={() => doExclude(true)} disabled={excluding || excludeReason.trim() === ""} className="px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-bold text-2xs">
                       {excluding ? "Đang loại..." : "Loại khỏi báo cáo"}
                     </button>
                   </div>
                 </div>
               )}
               {canExclude && s.excludedFromReports && (
-                <button onClick={() => doExclude(false)} disabled={excluding} className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-300 hover:text-emerald-200 disabled:opacity-50 transition-colors">
+                <button onClick={() => doExclude(false)} disabled={excluding} className="inline-flex items-center gap-1.5 text-2xs font-bold text-emerald-300 hover:text-emerald-200 disabled:opacity-50 transition-colors">
                   <RotateCcw className="w-3.5 h-3.5" /> {excluding ? "Đang đưa lại..." : "Đưa ca trở lại báo cáo"}
                 </button>
               )}
@@ -772,7 +772,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                   onClick={handleDelete}
                   disabled={deleting}
                   title={'Ca mở đang gắn sẽ về "mở" để chốt người khác; ca đã có số liệu không xoá được.'}
-                  className="block text-[11px] text-[var(--text-faint)] hover:text-rose-400 disabled:opacity-40 transition-colors"
+                  className="block text-2xs text-[var(--text-faint)] hover:text-rose-400 disabled:opacity-40 transition-colors"
                 >
                   <span className="inline-flex items-center gap-1.5"><Trash2 className="w-3.5 h-3.5" /> {deleting ? "Đang xoá..." : "Xoá hẳn ca này"}</span>
                 </button>
@@ -790,7 +790,7 @@ const TrustBadge: React.FC<{ session: LiveSession }> = ({ session }) => {
   const label = brandTrustLabel(session);
   const done = label === "Đã chốt";
   return (
-    <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${done ? "bg-emerald-950 text-emerald-300 border-emerald-800" : "bg-amber-950 text-amber-300 border-amber-800"}`} title={done ? "Số đã đối soát với báo cáo TikTok cuối kỳ" : "Số ghi nhận lúc giao ca / tự khai, TikTok còn cập nhật"}>
+    <span className={`inline-flex items-center gap-1 text-2xs font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${done ? "bg-emerald-950 text-emerald-300 border-emerald-800" : "bg-amber-950 text-amber-300 border-amber-800"}`} title={done ? "Số đã đối soát với báo cáo TikTok cuối kỳ" : "Số ghi nhận lúc giao ca / tự khai, TikTok còn cập nhật"}>
       {done ? <CheckCircle2 className="w-3 h-3" /> : <Circle className="w-3 h-3" />} {label}
     </span>
   );
@@ -801,7 +801,7 @@ const TrustBadge: React.FC<{ session: LiveSession }> = ({ session }) => {
 const KV_GRID = "grid grid-cols-3 gap-x-4 gap-y-3 rounded-xl border border-[var(--border)] bg-[var(--surface-base)] p-3";
 const KV: React.FC<{ label: string; value: string; muted?: boolean; accent?: boolean }> = ({ label, value, muted, accent }) => (
   <div className="min-w-0">
-    <p className="text-[11px] text-[var(--text-faint)]" title={metricHint(label)}>{label}</p>
+    <p className="text-2xs text-[var(--text-faint)]" title={metricHint(label)}>{label}</p>
     <p className={`text-xs font-bold ${accent ? "text-[var(--success)]" : muted ? "text-[var(--text-faint)] font-normal italic" : "text-[var(--text)]"}`}>{value}</p>
   </div>
 );

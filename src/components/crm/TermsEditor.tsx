@@ -82,7 +82,7 @@ export const TermsEditor: React.FC<Props> = ({ terms, onChange, canEdit }) => {
       )}
 
       <div className="space-y-2">
-        <p className="text-[11px] font-bold text-[var(--text-muted)]">YFB làm</p>
+        <p className="text-2xs font-bold text-[var(--text-muted)]">YFB làm</p>
         <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Hình thức livestream">
           {LIVE_MODES.map((m) => <Pill key={m.key} on={liveMode === m.key} disabled={!canEdit} onClick={() => setLiveMode(m.key)} title={m.key === "live" ? SERVICE_LABEL.live : undefined}>{m.label}</Pill>)}
         </div>
@@ -92,7 +92,7 @@ export const TermsEditor: React.FC<Props> = ({ terms, onChange, canEdit }) => {
         </div>
         {terms.services.includes("ads") && (
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-[11px] text-[var(--text-muted)]">Ngân sách Ads:</span>
+            <span className="text-2xs text-[var(--text-muted)]">Ngân sách Ads:</span>
             <Pill on={terms.adsBudgetBy === "brand"} disabled={!canEdit} onClick={() => set({ adsBudgetBy: "brand" })}>Brand trả</Pill>
             <Pill on={terms.adsBudgetBy === "yfb"} disabled={!canEdit} onClick={() => set({ adsBudgetBy: "yfb" })}>YFB ứng</Pill>
           </div>
@@ -100,8 +100,8 @@ export const TermsEditor: React.FC<Props> = ({ terms, onChange, canEdit }) => {
       </div>
 
       <div className="space-y-2">
-        <p className="text-[11px] font-bold text-[var(--text-muted)]">Tính phí</p>
-        {terms.fees.length === 0 && <p className="text-[11px] text-[var(--text-faint)]">Chưa có khoản phí. Chọn gói mẫu ở trên hoặc thêm bên dưới.</p>}
+        <p className="text-2xs font-bold text-[var(--text-muted)]">Tính phí</p>
+        {terms.fees.length === 0 && <p className="text-2xs text-[var(--text-faint)]">Chưa có khoản phí. Chọn gói mẫu ở trên hoặc thêm bên dưới.</p>}
         {terms.fees.map((f) => <FeeRow key={f.id} fee={f} canEdit={canEdit} onPatch={(p) => patchFee(f.id, p)} onRemove={() => set({ fees: terms.fees.filter((x) => x.id !== f.id) })} />)}
         {canEdit && kindsAvailable.length > 0 && (
           <select value="" onChange={(e) => e.target.value && addFee(e.target.value as FeeKind)} className={`${inputCls} sm:max-w-xs`} aria-label="Thêm khoản phí">
@@ -136,7 +136,7 @@ export const TermsEditor: React.FC<Props> = ({ terms, onChange, canEdit }) => {
           {terms.shortfall.mode === "credit" && (
             <Field label="Trừ mỗi giờ thiếu"><NumInput label="Số tiền trừ mỗi giờ thiếu" value={terms.shortfall.perHour} step={10000} disabled={!canEdit} onChange={(v) => set({ shortfall: { mode: "credit", perHour: v } })} /></Field>
           )}
-          {terms.shortfall.mode === "prorate" && !terms.fees.some((f) => f.kind === "fixed_monthly") && <p className="text-[11px] text-amber-300">Cần có “Phí cố định hằng tháng” ở trên.</p>}
+          {terms.shortfall.mode === "prorate" && !terms.fees.some((f) => f.kind === "fixed_monthly") && <p className="text-2xs text-amber-300">Cần có “Phí cố định hằng tháng” ở trên.</p>}
 
           <div className="flex flex-wrap gap-1.5">
             <Pill on={!!terms.gmvBonus} disabled={!canEdit} onClick={() => set({ gmvBonus: terms.gmvBonus ? null : { basis: "gmv", cap: 0, tiers: [{ fromPctOfCommit: 100, fromAmount: 0, pct: 3 }] } })}>Thưởng khi vượt GMV</Pill>
@@ -150,7 +150,7 @@ export const TermsEditor: React.FC<Props> = ({ terms, onChange, canEdit }) => {
               <Field label="Giảm phí"><NumInput label="Phần trăm giảm phí" value={terms.gmvPenalty.discountPct} max={100} step={0.5} disabled={!canEdit} suffix="%" onChange={(v) => set({ gmvPenalty: { ...terms.gmvPenalty!, discountPct: v } })} /></Field>
             </div>
           )}
-          {(terms.gmvBonus || terms.gmvPenalty || terms.shortfall.mode !== "none") && <p className="text-[11px] text-[var(--text-faint)]">Giờ và GMV cam kết từng tháng lấy từ khối Hợp đồng.</p>}
+          {(terms.gmvBonus || terms.gmvPenalty || terms.shortfall.mode !== "none") && <p className="text-2xs text-[var(--text-faint)]">Giờ và GMV cam kết từng tháng lấy từ khối Hợp đồng.</p>}
         </div>
       </details>
     </div>
@@ -227,7 +227,7 @@ function RateRules({ rules, base, canEdit, onChange }: { rules: RateRule[]; base
   const patch = (id: string, p: Partial<RateRule>) => onChange(rules.map((r) => (r.id === id ? { ...r, ...p } : r)));
   return (
     <details className="text-xs" open={rules.length > 0}>
-      <summary className="cursor-pointer text-[11px] font-bold text-[var(--text-muted)]">Giá khác theo giờ vàng / cuối tuần / ngày sale ({rules.length})</summary>
+      <summary className="cursor-pointer text-2xs font-bold text-[var(--text-muted)]">Giá khác theo giờ vàng / cuối tuần / ngày sale ({rules.length})</summary>
       <div className="mt-2 space-y-2">
         {rules.map((r) => <RuleRow key={r.id} rule={r} base={base} canEdit={canEdit} onPatch={(p) => patch(r.id, p)} onRemove={() => onChange(rules.filter((x) => x.id !== r.id))} />)}
         {canEdit && (
@@ -235,7 +235,7 @@ function RateRules({ rules, base, canEdit, onChange }: { rules: RateRule[]; base
             <Plus className="w-3 h-3" /> Thêm luật giá
           </button>
         )}
-        {rules.length > 1 && <p className="text-[11px] text-[var(--text-faint)]">Luật ở trên được xét trước.</p>}
+        {rules.length > 1 && <p className="text-2xs text-[var(--text-faint)]">Luật ở trên được xét trước.</p>}
       </div>
     </details>
   );
@@ -292,7 +292,7 @@ function RuleRow({ rule: r, base, canEdit, onPatch, onRemove }: { rule: RateRule
         <Field label={r.mode === "multiplier" ? "Hệ số" : "Số tiền / giờ"} className="w-36">
           <NumInput label={r.mode === "multiplier" ? "Hệ số nhân" : "Số tiền mỗi giờ"} value={r.value} step={r.mode === "multiplier" ? 0.05 : 10000} disabled={!canEdit} onChange={(v) => onPatch({ value: v })} />
         </Field>
-        {base > 0 && <span className="pb-2 text-[11px] text-[var(--text-muted)]">= {fmtVndFull(price)}/giờ</span>}
+        {base > 0 && <span className="pb-2 text-2xs text-[var(--text-muted)]">= {fmtVndFull(price)}/giờ</span>}
         {canEdit && (
           <button type="button" onClick={onRemove} className="ml-auto mb-1 p-1 text-[var(--text-faint)] hover:text-rose-400" aria-label="Xoá luật giá"><Trash2 className="w-3.5 h-3.5" /></button>
         )}
@@ -306,7 +306,7 @@ function BonusEditor({ bonus, canEdit, onChange }: { bonus: NonNullable<Commerci
   const setTier = (i: number, p: Partial<(typeof bonus.tiers)[number]>) => onChange({ ...bonus, tiers: bonus.tiers.map((t, k) => (k === i ? { ...t, ...p } : t)) });
   return (
     <div className="rounded-lg border border-[var(--border)] p-3 space-y-2.5">
-      <p className="text-[11px] font-bold text-[var(--text-muted)]">Thưởng vượt GMV — luỹ tiến theo bậc</p>
+      <p className="text-2xs font-bold text-[var(--text-muted)]">Thưởng vượt GMV — luỹ tiến theo bậc</p>
       {bonus.tiers.map((t, i) => {
         const byAmount = t.fromAmount > 0;
         return (

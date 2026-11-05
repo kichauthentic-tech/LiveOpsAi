@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Undo2 } from "lucide-react";
-import { PAL } from "./theme";
+import { PAL, alpha } from "./theme";
 import { Panel, ReportTable } from "./ui";
 import { fmtFixed, fmtVndShort } from "../../../lib/format";
 import { errorMessage } from "../../../lib/errorMessage";
@@ -14,7 +14,7 @@ import { parseRatePct, type RefundTrackRow } from "../../../lib/report/nextMonth
 // và ô nhập để xem cách tính (lưu trong trình duyệt này, không ghi vào dữ liệu). Việc tháng sau và đánh giá việc tháng trước ở ActionPlan.tsx.
 // Số tính ở lib/report/nextMonthPlan.ts; khối theo dõi hoàn hủy (RefundTrackPanel) ở cuối file.
 
-const rowStyle = (idx: number) => ({ borderBottom: `1px solid ${PAL.line}`, background: idx % 2 ? `${PAL.panel2}55` : "transparent" });
+const rowStyle = (idx: number) => ({ borderBottom: `1px solid ${PAL.line}`, background: idx % 2 ? `${alpha(PAL.panel2, 33)}` : "transparent" });
 
 const parseNum = (v: unknown): number | null => {
   const n = parseFloat(String(v ?? "").replace(/\./g, "").replace(",", "."));
@@ -339,7 +339,7 @@ export const RefundTrackPanel: React.FC<{
             <td className="py-2 px-3 font-semibold whitespace-nowrap" style={{ color: PAL.cream }}>{monthLabel(r.month)}</td>
             <td className="py-2 px-3 text-left whitespace-nowrap" style={{ color: r.needsReupload ? PAL.gold : PAL.muted }}>
               {r.template === "new" ? "mẫu mới" : r.template === "old" ? "mẫu cũ" : "chưa rõ"}
-              {r.exportedAt ? <span className="block text-[11px]" style={{ color: PAL.muted }}>xuất {r.exportedAt.slice(8)}/{r.exportedAt.slice(5, 7)}</span> : null}
+              {r.exportedAt ? <span className="block text-2xs" style={{ color: PAL.muted }}>xuất {r.exportedAt.slice(8)}/{r.exportedAt.slice(5, 7)}</span> : null}
             </td>
             <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.cream }}>{r.fileRate != null ? `${fmtFixed(r.fileRate, 1)}%` : "—"}</td>
             <td className="py-2 px-3 text-left font-semibold whitespace-nowrap" style={{ color: r.status === "final" ? PAL.green : PAL.gold }}>{r.status === "final" ? "chốt" : "tạm tính"}</td>
@@ -354,11 +354,11 @@ export const RefundTrackPanel: React.FC<{
                     className="w-20 rounded-lg px-2 py-1 text-xs font-mono text-right min-h-[28px]"
                     style={{ background: PAL.panel, border: `1px solid ${PAL.line}`, color: PAL.cream }}
                   />
-                  <button onClick={() => save(r.month)} disabled={busy === r.month || !(text[r.month] ?? "").trim()} className="px-2 py-1 rounded-lg text-[11px] font-bold min-h-[28px] disabled:opacity-50" style={{ background: PAL.gold, color: "#1a1500" }}>
+                  <button onClick={() => save(r.month)} disabled={busy === r.month || !(text[r.month] ?? "").trim()} className="px-2 py-1 rounded-lg text-2xs font-bold min-h-[28px] disabled:opacity-50" style={{ background: PAL.gold, color: PAL.onGold }}>
                     Lưu
                   </button>
                   {r.finalRate != null && (
-                    <button onClick={() => save(r.month, true)} disabled={busy === r.month} className="px-2 py-1 rounded-lg text-[11px] font-semibold min-h-[28px]" style={{ color: PAL.muted, border: `1px solid ${PAL.line}` }} title="Bỏ tỷ lệ chốt, quay về tạm tính">
+                    <button onClick={() => save(r.month, true)} disabled={busy === r.month} className="px-2 py-1 rounded-lg text-2xs font-semibold min-h-[28px]" style={{ color: PAL.muted, border: `1px solid ${PAL.line}` }} title="Bỏ tỷ lệ chốt, quay về tạm tính">
                       Bỏ
                     </button>
                   )}
@@ -372,7 +372,7 @@ export const RefundTrackPanel: React.FC<{
         ))}
       </ReportTable>
       {error && <p className="text-xs font-semibold mt-2" style={{ color: PAL.red }}>{error}</p>}
-      <p className="text-[11px] mt-2" style={{ color: PAL.muted }}>
+      <p className="text-2xs mt-2" style={{ color: PAL.muted }}>
         NMV của tháng chưa chốt luôn là ước tính (LIVE GMV × (1 − Refund rate)); khi ops nhập tỷ lệ chốt, tháng đó chuyển sang số thật và các tháng sau dùng tỷ lệ này để ước tính.
         {anyOld && " Các tháng mẫu cũ (28 cột, thiếu cột Tổng doanh thu) chưa so sánh được với mẫu mới cho tới khi tải lại file Shop Analytics của tháng đó."}
       </p>

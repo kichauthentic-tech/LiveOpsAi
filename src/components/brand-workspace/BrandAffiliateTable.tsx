@@ -948,7 +948,7 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
             ) : (
               <>
                 Kế hoạch Affiliate {fmtMonth(planMonth)} chưa được chốt.
-                <span className="block mt-1 text-[11px]">Kế hoạch từng tháng hiện ở đây sau khi agency chốt và gửi cho brand.</span>
+                <span className="block mt-1 text-2xs">Kế hoạch từng tháng hiện ở đây sau khi agency chốt và gửi cho brand.</span>
               </>
             )}
           </div>
@@ -983,7 +983,7 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
           {currentRole === "brand" ? (
             <>
               Chưa có dữ liệu affiliate nào được chốt cho dải tháng này.
-              <span className="block mt-1 text-[11px]">
+              <span className="block mt-1 text-2xs">
                 Số liệu từng tháng hiện ở đây sau khi agency chốt và gửi cho brand.
               </span>
             </>

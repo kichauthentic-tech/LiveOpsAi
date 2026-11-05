@@ -27,9 +27,9 @@ const fmtH = (h: number) => (Math.round(h * 10) / 10).toString().replace(".", ",
 const num = (v: string, fallback: number) => (v.trim() === "" || Number.isNaN(Number(v)) ? fallback : Math.max(0, Number(v)));
 const Metric: React.FC<{ label: string; value: string; sub?: string; tone?: "bad" | "warn" | "good" }> = ({ label, value, sub, tone }) => (
   <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-base)] px-3 py-2">
-    <div className="text-[11px] text-[var(--text-muted)]">{label}</div>
+    <div className="text-2xs text-[var(--text-muted)]">{label}</div>
     <div className={`text-lg font-black tabular-nums ${tone === "bad" ? "text-rose-400" : tone === "warn" ? "text-amber-300" : tone === "good" ? "text-emerald-400" : "text-[var(--text)]"}`}>{value}</div>
-    {sub && <div className="text-[11px] text-[var(--text-muted)]">{sub}</div>}
+    {sub && <div className="text-2xs text-[var(--text-muted)]">{sub}</div>}
   </div>
 );
 
@@ -140,7 +140,7 @@ export const MonthPlanPanel: React.FC<Props> = (p) => {
         <label className="flex items-center gap-1.5 text-[var(--text-muted)]" title="Người đã đăng ký mà dưới giờ tối thiểu sẽ nhận thêm ca từ người đang nhiều giờ hơn">
           <input type="checkbox" checked={guaranteeMin} onChange={(e) => setGuaranteeMin(e.target.checked)} /> Đảm bảo giờ tối thiểu
         </label>
-        <span className="text-[11px] text-[var(--text-faint)]">Mặc định đo giờ live thật T8–T10: tối thiểu ≈ P25, tối đa ≈ P90 của người có ca. Tối đa còn bị chặn bởi luật giờ tuần/ngày.</span>
+        <span className="text-2xs text-[var(--text-faint)]">Mặc định đo giờ live thật T8–T10: tối thiểu ≈ P25, tối đa ≈ P90 của người có ca. Tối đa còn bị chặn bởi luật giờ tuần/ngày.</span>
       </div>
 
       {noOpen ? (
@@ -182,7 +182,7 @@ export const MonthPlanPanel: React.FC<Props> = (p) => {
               </tbody>
             </table>
           </div>
-          <p className="text-[11px] text-[var(--text-faint)]">
+          <p className="text-2xs text-[var(--text-faint)]">
             Chỉ số host: 1,00 = bằng kỳ vọng cùng kênh × khung giờ, đo trên {`90`} ngày gần nhất và co về 1,00 khi ít ca. Thành tích host tháng trước dự báo tháng sau yếu (đo 13/10: r từ −0,13 đến 0,23), nên đây là căn cứ phụ — chênh vài phần trăm đừng coi là hơn kém.
           </p>
 
@@ -240,8 +240,8 @@ export const MonthPlanPanel: React.FC<Props> = (p) => {
                           <span className="text-[var(--text-muted)]">
                             Trợ: {slot("co_host")}
                           </span>
-                          {s.kind === "open" && <span className="text-[11px] text-[var(--text-faint)]">{s.registrants.length} đăng ký · {fmtH(shiftHours(s))}h</span>}
-                          {s.kind === "session" && <span className="text-[11px] text-[var(--text-faint)]">đã lên lịch</span>}
+                          {s.kind === "open" && <span className="text-2xs text-[var(--text-faint)]">{s.registrants.length} đăng ký · {fmtH(shiftHours(s))}h</span>}
+                          {s.kind === "session" && <span className="text-2xs text-[var(--text-faint)]">đã lên lịch</span>}
                         </div>
                       );
                     })}
@@ -250,7 +250,7 @@ export const MonthPlanPanel: React.FC<Props> = (p) => {
               ))}
               {days.length === 0 && <p className="px-3 py-3 text-xs text-[var(--text-muted)]">Không có ca nào trong bộ lọc.</p>}
             </div>
-            <p className="text-[11px] text-[var(--text-faint)]">Chữ màu nhấn = người do gợi ý này chọn. Chữ thường = ca đã lên lịch hoặc nháp có sẵn.</p>
+            <p className="text-2xs text-[var(--text-faint)]">Chữ màu nhấn = người do gợi ý này chọn. Chữ thường = ca đã lên lịch hoặc nháp có sẵn.</p>
           </section>
         </>
       )}

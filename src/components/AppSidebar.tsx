@@ -45,7 +45,8 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
     >
       <div className={sidebarCollapsed ? "md:hidden" : ""}>
         <h1 className="text-xl font-bold tracking-tighter text-[var(--accent-text)]">LIVEOPS AI</h1>
-        <p className="text-[11px] uppercase tracking-widest text-[var(--text-faint)] font-semibold">
+        {/* Daylight đặt chữ nhỏ 13px: giãn chữ widest thì dòng này xuống 2 hàng và đẩy logo ra khỏi khung h-16. */}
+        <p className="text-2xs uppercase tracking-widest [.theme-daylight_&]:tracking-wide whitespace-nowrap text-[var(--text-faint)] font-semibold">
           Agency Operating System
         </p>
       </div>
@@ -91,7 +92,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
           <div key={group.label} className="space-y-0.5">
             {group.label && (
               <p
-                className={`px-3 pb-0.5 text-[11px] font-semibold text-[var(--text-faint)] ${
+                className={`px-3 pb-0.5 text-2xs font-semibold text-[var(--text-faint)] ${
                   sidebarCollapsed ? "md:hidden" : ""
                 }`}
               >
@@ -133,7 +134,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                   <div className={`flex items-center gap-1.5 shrink-0 ${sidebarCollapsed ? "md:hidden" : ""}`}>
                     {item.badge && (
                       // Bố cục 18/10: nhãn đỏ viết hoa "CHƯA DÙNG" là chỗ chói nhất sidebar cho một mục không ai dùng — chữ mờ là đủ báo.
-                      <span className="text-[11px] font-medium text-[var(--text-faint)]">{item.badge}</span>
+                      <span className="text-2xs font-medium text-[var(--text-faint)]">{item.badge}</span>
                     )}
                   </div>
                 </button>
@@ -171,7 +172,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
           <p className="font-bold text-[var(--text)] truncate">{activeUser.name}</p>
           {/* Chức danh đã chứa role ("Quản Trị Viên Hệ Thống (Admin)") — in thêm role phía trước là
               lặp "ADMIN • ... (ADMIN)". Chỉ rơi về tên role khi chưa đặt chức danh. */}
-          <p className="text-[var(--accent-text)] text-[11px] font-bold truncate">
+          <p className="text-[var(--accent-text)] text-2xs font-bold truncate">
             {activeUser.customRoleTitle || currentRole.toUpperCase()}
           </p>
         </div>

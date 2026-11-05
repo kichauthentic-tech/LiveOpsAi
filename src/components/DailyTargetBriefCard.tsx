@@ -73,7 +73,7 @@ export const DailyTargetBriefCard: React.FC<{ sessions: LiveSession[]; date: str
                   {c.monthTarget > 0 && (
                     <div className="space-y-1">
                       <div className="h-1.5 rounded-full bg-[var(--surface-elevated)] overflow-hidden"><div className="h-full bg-[var(--accent)]" style={{ width: `${pct}%` }} /></div>
-                      <p className="text-[11px] text-[var(--text-muted)]">Tháng: {salesTerm(c.platform)} <b className="text-[var(--text)] tabular-nums">{fmtVndShort(c.monthActual)}</b> / {fmtVndShort(c.monthTarget)} · còn thiếu <b className="text-[var(--text)] tabular-nums">{fmtVndShort(gap)}</b> trong {c.remainingDays} ngày</p>
+                      <p className="text-2xs text-[var(--text-muted)]">Tháng: {salesTerm(c.platform)} <b className="text-[var(--text)] tabular-nums">{fmtVndShort(c.monthActual)}</b> / {fmtVndShort(c.monthTarget)} · còn thiếu <b className="text-[var(--text)] tabular-nums">{fmtVndShort(gap)}</b> trong {c.remainingDays} ngày</p>
                     </div>
                   )}
                 </div>

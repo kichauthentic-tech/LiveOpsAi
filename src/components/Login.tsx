@@ -49,7 +49,7 @@ export const Login: React.FC = () => {
       <div className="w-full max-w-sm bg-[var(--surface)]/80 border border-[var(--border)] rounded-2xl p-8 shadow-2xl">
         <div className="mb-6 text-center">
           <h1 className="text-xl font-bold tracking-tighter text-[var(--accent-text)]">LIVEOPS AI</h1>
-          <p className="text-[11px] uppercase tracking-widest text-[var(--text-faint)] font-semibold">
+          <p className="text-2xs uppercase tracking-widest text-[var(--text-faint)] font-semibold">
             Agency Operating System
           </p>
         </div>
@@ -104,7 +104,7 @@ export const Login: React.FC = () => {
                   setError(null);
                   setInfo(null);
                 }}
-                className="text-[11px] text-[var(--text-faint)] hover:text-[var(--accent-text)] font-semibold transition-colors"
+                className="text-2xs text-[var(--text-faint)] hover:text-[var(--accent-text)] font-semibold transition-colors"
               >
                 Quên mật khẩu?
               </button>
@@ -139,7 +139,7 @@ export const Login: React.FC = () => {
                 setError(null);
                 setInfo(null);
               }}
-              className="w-full text-center text-[11px] text-[var(--text-faint)] hover:text-[var(--accent-text)] font-semibold transition-colors"
+              className="w-full text-center text-2xs text-[var(--text-faint)] hover:text-[var(--accent-text)] font-semibold transition-colors"
             >
               ← Quay lại đăng nhập
             </button>

@@ -518,7 +518,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                 >
                   <div className="flex justify-between items-start gap-2">
                     <span
-                      className={`text-[11px] font-black uppercase px-2 sm:px-2.5 py-1 rounded-lg border truncate ${getRoleBadgeStyle(
+                      className={`text-2xs font-black uppercase px-2 sm:px-2.5 py-1 rounded-lg border truncate ${getRoleBadgeStyle(
                         roleKey
                       )}`}
                     >
@@ -538,7 +538,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                       {roleKey === "brand" && "Brand (khách hàng)"}
                       {roleKey === "talent" && "Host / Trợ live"}
                     </h3>
-                    <p className="hidden sm:block text-[11px] text-[var(--text-muted)] line-clamp-2 mt-1">
+                    <p className="hidden sm:block text-2xs text-[var(--text-muted)] line-clamp-2 mt-1">
                       {roleKey === "admin" && "Mọi thứ CEO làm được, thêm AI Training Center (chỉ admin)."}
                       {roleKey === "ceo" && "Toàn bộ màn agency, Finance & P&L, CRM và phân quyền."}
                       {roleKey === "operations" && "Lập kế hoạch tháng, xếp và chốt người cho ca, tải số liệu lên, đối soát, làm report. Không thấy Finance."}
@@ -610,7 +610,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                           }`}
                         >
                           <div className="space-y-1 min-w-0">
-                            <p className="text-[11px] font-semibold text-[var(--text-faint)]">{category}</p>
+                            <p className="text-2xs font-semibold text-[var(--text-faint)]">{category}</p>
                             <div className="flex items-center gap-2">
                               {isAllowed ? (
                                 <Lock className="w-3.5 h-3.5 text-emerald-400" />
@@ -619,7 +619,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                               )}
                               <span className="font-bold text-xs text-[var(--text)]">{def.label}</span>
                             </div>
-                            <p className="text-[11px] text-[var(--text-muted)] line-clamp-2 leading-relaxed">
+                            <p className="text-2xs text-[var(--text-muted)] line-clamp-2 leading-relaxed">
                               {def.description}
                             </p>
                           </div>
@@ -692,7 +692,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
           <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-xl text-[var(--text)]">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="bg-[var(--surface-base)]/80 text-[var(--text-muted)] font-semibold border-b border-[var(--border)] text-[11px]">
+                <thead className="bg-[var(--surface-base)]/80 text-[var(--text-muted)] font-semibold border-b border-[var(--border)] text-2xs">
                   <tr>
                     <th className="p-4">Người dùng</th>
                     <th className="p-4">Vai trò</th>
@@ -726,13 +726,13 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                               <div className="font-bold text-[var(--text)] text-sm flex items-center gap-2">
                                 <span>{u.name}</span>
                                 {customOverridesCount > 0 && (
-                                  <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[11px] font-black px-1.5 py-0.5 rounded inline-flex items-center gap-0.5">
+                                  <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-2xs font-black px-1.5 py-0.5 rounded inline-flex items-center gap-0.5">
                                     <Zap className="w-2.5 h-2.5" /> {customOverridesCount} Override
                                   </span>
                                 )}
                               </div>
                               {isAliasEmail(u.email) ? (
-                                <span className="text-[11px] block text-[var(--text-muted)]">
+                                <span className="text-2xs block text-[var(--text-muted)]">
                                   Tên đăng nhập <span className="font-mono font-bold">{loginLabel(u.email)}</span> ·{" "}
                                   <span className="text-amber-500 font-bold">chưa có email</span>
                                   {canManage(u) && (
@@ -750,7 +750,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                                   )}
                                 </span>
                               ) : (
-                                <span className="text-[var(--text-muted)] text-[11px] block">{u.email}</span>
+                                <span className="text-[var(--text-muted)] text-2xs block">{u.email}</span>
                               )}
                             </div>
                           </div>
@@ -758,34 +758,34 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
 
                         <td className="p-4">
                           <span
-                            className={`px-2.5 py-1 rounded-lg text-[11px] font-black uppercase border ${getRoleBadgeStyle(
+                            className={`px-2.5 py-1 rounded-lg text-2xs font-black uppercase border ${getRoleBadgeStyle(
                               u.role
                             )}`}
                           >
                             {u.role.toUpperCase()}
                           </span>
-                          <span className="text-[var(--text-muted)] text-[11px] block mt-1">{u.customRoleTitle}</span>
+                          <span className="text-[var(--text-muted)] text-2xs block mt-1">{u.customRoleTitle}</span>
                         </td>
 
                         <td className="p-4">
                           {u.role === "brand" && assignedBrand ? (
-                            <span className="bg-emerald-950/85 text-emerald-300 border border-emerald-500/30 px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1.5 w-fit">
+                            <span className="bg-emerald-950/85 text-emerald-300 border border-emerald-500/30 px-2.5 py-1 rounded-lg text-2xs font-bold flex items-center gap-1.5 w-fit">
                               <Building2 className="w-3.5 h-3.5 text-emerald-400" />
                               <span>{assignedBrand.name}</span>
                             </span>
                           ) : u.role === "talent" && assignedTalent ? (
-                            <span className="bg-amber-950/85 text-amber-300 border border-amber-500/30 px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1.5 w-fit">
+                            <span className="bg-amber-950/85 text-amber-300 border border-amber-500/30 px-2.5 py-1 rounded-lg text-2xs font-bold flex items-center gap-1.5 w-fit">
                               <Radio className="w-3.5 h-3.5 text-amber-400" />
                               <span>{assignedTalent.name}</span>
                             </span>
                           ) : (
-                            <span className="text-[var(--text-faint)] text-[11px]">Toàn agency</span>
+                            <span className="text-[var(--text-faint)] text-2xs">Toàn agency</span>
                           )}
                         </td>
 
                         <td className="p-4">
                           <span
-                            className={`px-2 py-0.5 rounded text-[11px] font-bold ${
+                            className={`px-2 py-0.5 rounded text-2xs font-bold ${
                               u.status === "Active"
                                 ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
                                 : "bg-red-500/20 text-red-400 border border-red-500/30"
@@ -804,7 +804,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                               title="Quyền riêng cho tài khoản này"
                             >
                               <Key className="w-3.5 h-3.5" />
-                              <span className="hidden lg:inline text-[11px] font-bold">Quyền riêng</span>
+                              <span className="hidden lg:inline text-2xs font-bold">Quyền riêng</span>
                             </button>
 
                             {/* Edit Button — tài khoản Admin chỉ Admin sửa (0136 chặn ở DB) */}
@@ -826,7 +826,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                                 aria-label={`Đặt lại mật khẩu cho ${u.name}`}
                               >
                                 <KeyRound className="w-3.5 h-3.5" />
-                                <span className="hidden lg:inline text-[11px] font-bold">Đặt lại mật khẩu</span>
+                                <span className="hidden lg:inline text-2xs font-bold">Đặt lại mật khẩu</span>
                               </button>
                             )}
 
@@ -880,7 +880,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-[var(--text)]">{log.action}</span>
                     <span
-                      className={`px-2 py-0.5 rounded text-[11px] font-black ${
+                      className={`px-2 py-0.5 rounded text-2xs font-black ${
                         log.category === "Permission Change"
                           ? "bg-purple-500/20 text-purple-300 border border-purple-500/30"
                           : log.category === "Security Alert"
@@ -891,10 +891,10 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                       {AUDIT_CATEGORY_LABEL[log.category] ?? log.category}
                     </span>
                   </div>
-                  <p className="text-[var(--text-muted)] text-[11px]">{log.details}</p>
-                  <p className="text-[var(--text-faint)] text-[11px]">Thực hiện bởi: {log.performedBy}</p>
+                  <p className="text-[var(--text-muted)] text-2xs">{log.details}</p>
+                  <p className="text-[var(--text-faint)] text-2xs">Thực hiện bởi: {log.performedBy}</p>
                 </div>
-                <span className="text-[var(--text-faint)] text-[11px] font-mono shrink-0">{log.timestamp}</span>
+                <span className="text-[var(--text-faint)] text-2xs font-mono shrink-0">{log.timestamp}</span>
               </div>
             ))}
           </div>
@@ -943,12 +943,12 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                   className="w-full px-3 py-2 bg-[var(--surface-base)] rounded-xl border border-[var(--border)] text-[var(--text)] focus:outline-none focus:border-[var(--accent)] disabled:opacity-50 disabled:cursor-not-allowed"
                 />
                 {editingUser && (
-                  <p className="text-[11px] text-[var(--text-faint)]">
+                  <p className="text-2xs text-[var(--text-faint)]">
                     Không thể đổi email đăng nhập tại đây — email là tên đăng nhập của tài khoản.
                   </p>
                 )}
                 {!editingUser && (
-                  <p className="text-[11px] text-[var(--text-faint)]">
+                  <p className="text-2xs text-[var(--text-faint)]">
                     Hệ thống sẽ gửi email mời tạo mật khẩu đến địa chỉ này.
                   </p>
                 )}
@@ -1041,7 +1041,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                     </div>
                   ) : (
                     <div className="space-y-2">
-                      <p className="text-[11px] text-amber-300/80">
+                      <p className="text-2xs text-amber-300/80">
                         Chỉ dành cho người MỚI chưa có hồ sơ: hệ thống tạo hồ sơ Talent Pool tên "{formData.name || "chưa nhập"}" và gắn tài khoản này.
                         Người đã đứng ca rồi thì đóng lại, cấp ở khối "Host / trợ chưa có tài khoản" — tạo ở đây sẽ ra hồ sơ trùng, không thấy ca cũ.
                       </p>
@@ -1165,13 +1165,13 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-[var(--text)] text-xs">{def.label}</span>
                         {isOverridden && (
-                          <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[11px] font-black px-1.5 py-0.5 rounded">
+                          <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-2xs font-black px-1.5 py-0.5 rounded">
                             QUYỀN RIÊNG
                           </span>
                         )}
                       </div>
-                      <p className="text-[11px] text-[var(--text-muted)]">{def.description}</p>
-                      <span className="text-[11px] text-[var(--text-faint)] font-mono">
+                      <p className="text-2xs text-[var(--text-muted)]">{def.description}</p>
+                      <span className="text-2xs text-[var(--text-faint)] font-mono">
                         Mặc định theo vai trò: {roleDefault ? "được mở" : "bị khoá"}
                       </span>
                     </div>

@@ -59,14 +59,14 @@ function momPct(current: number, previous: number): number | null {
 
 // tone: "up" = tăng là tốt (xanh), "down" = giảm là tốt (chi phí/đơn), "neutral" = không tô màu (chi phí Ads).
 const MomChip: React.FC<{ current: number | null; previous: number | null; tone?: "up" | "down" | "neutral" }> = ({ current, previous, tone = "up" }) => {
-  if (current == null || previous == null) return <div className="text-[11px] text-[var(--text-faint)] mt-0.5">MoM —</div>;
+  if (current == null || previous == null) return <div className="text-2xs text-[var(--text-faint)] mt-0.5">MoM —</div>;
   const pct = momPct(current, previous);
-  if (pct == null) return <div className="text-[11px] text-[var(--text-faint)] mt-0.5">MoM —</div>;
+  if (pct == null) return <div className="text-2xs text-[var(--text-faint)] mt-0.5">MoM —</div>;
   const positive = pct >= 0;
   const good = tone === "up" ? positive : !positive;
   const color = tone === "neutral" ? "text-[var(--text-muted)]" : good ? "text-emerald-400" : "text-red-400";
   return (
-    <div className={`text-[11px] font-bold mt-0.5 ${color}`}>
+    <div className={`text-2xs font-bold mt-0.5 ${color}`}>
       MoM {positive ? "+" : ""}
       {fmtFixed(pct, 1)}%
     </div>
@@ -191,14 +191,14 @@ function TikTokAdsPanel({ brandId, brandName, month, canManage, isPublished, onM
           <h3 className="font-bold text-[var(--text)] text-sm flex items-center gap-2">
             <Target className="w-4 h-4 text-[var(--accent-text)]" /> Ads toàn cửa hàng · tháng {fmtMonth(month)}
           </h3>
-          <p className="text-[11px] text-[var(--text-faint)] mt-1">
+          <p className="text-2xs text-[var(--text-faint)] mt-1">
             Nguồn: file &quot;Campaign overview data&quot; của TikTok Ads (gồm LIVE GMV Max và Product GMV Max), xem theo ngày. ROI = doanh thu
             gộp ÷ chi phí, cùng cách TikTok tính. So với tháng {fmtMonth(prevMonthStr(month))}
             {adsStats?.lastDate && adsStats.lastDate < end ? ` cắt cùng số ngày (1–${Number(adsStats.lastDate.slice(8))})` : ""}.
           </p>
         </div>
         {adsImportOfMonth && canManage && (
-          <button onClick={handleAdsDelete} className="text-[11px] font-bold text-red-400 hover:text-red-300 flex items-center gap-1 px-2 py-1 rounded-lg">
+          <button onClick={handleAdsDelete} className="text-2xs font-bold text-red-400 hover:text-red-300 flex items-center gap-1 px-2 py-1 rounded-lg">
             <Trash2 className="w-3.5 h-3.5" /> Xoá file tháng này
           </button>
         )}
@@ -236,16 +236,16 @@ function TikTokAdsPanel({ brandId, brandName, month, canManage, isPublished, onM
             <b className="text-[var(--text)]">{fmtVndFull(previewStats.cost)}</b> · {fmtVndFull(previewStats.orders)} đơn SKU · doanh thu gộp{" "}
             <b className="text-[var(--text)]">{fmtVndFull(previewStats.revenue)}</b> · ROI {previewStats.roi != null ? `${fmtFixed(previewStats.roi, 1)}x` : "—"}
           </p>
-          <p className="text-[11px] text-amber-300">
+          <p className="text-2xs text-amber-300">
             File không ghi tên shop — kiểm lại đây đúng là Ads của <b>{brandName}</b> trước khi lưu.
           </p>
           {adsPreview.replace && (
-            <p className="text-[11px] text-amber-300">
+            <p className="text-2xs text-amber-300">
               Đã có file tháng này (tải {new Date(adsPreview.replace.importedAt).toLocaleString("vi-VN")}) — lưu sẽ THAY file cũ, không cộng dồn.
             </p>
           )}
           {isPublished && adsPreview.parsed.periodStart?.startsWith(month) && (
-            <p className="text-[11px] text-[var(--text-muted)]">
+            <p className="text-2xs text-[var(--text-muted)]">
               Report Tháng {fmtMonth(month)} đã phát hành: brand vẫn thấy số cũ tới khi thu hồi report và bấm Cập nhật số liệu.
             </p>
           )}
@@ -271,41 +271,41 @@ function TikTokAdsPanel({ brandId, brandName, month, canManage, isPublished, onM
       ) : (
         <>
           {adsImportOfMonth && (
-            <p className="text-[11px] text-[var(--text-faint)]">
+            <p className="text-2xs text-[var(--text-faint)]">
               File: {adsImportOfMonth.fileName ?? "—"} · tải {new Date(adsImportOfMonth.importedAt).toLocaleString("vi-VN")} · {adsStats.days.length} ngày (
               {fmtDateVn(adsStats.firstDate!, false)}–{fmtDateVn(adsStats.lastDate!, false)})
             </p>
           )}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl p-3">
-              <div className="text-[11px] text-[var(--text-faint)]">Chi phí Ads</div>
+              <div className="text-2xs text-[var(--text-faint)]">Chi phí Ads</div>
               <div className="text-base font-black text-[var(--text)]">{fmtVndShort(adsStats.cost)}</div>
               <MomChip current={adsStats.cost} previous={adsPrevStats?.cost ?? null} tone="neutral" />
             </div>
             <div className="bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl p-3">
-              <div className="text-[11px] text-[var(--text-faint)]">ROI</div>
+              <div className="text-2xs text-[var(--text-faint)]">ROI</div>
               <div className="text-base font-black text-[var(--text)]">{adsStats.roi != null ? `${fmtFixed(adsStats.roi, 1)}x` : "—"}</div>
               <MomChip current={adsStats.roi} previous={adsPrevStats?.roi ?? null} />
             </div>
             <div className="bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl p-3">
-              <div className="text-[11px] text-[var(--text-faint)]">Chi phí / đơn SKU ({fmtVndFull(adsStats.orders)} đơn)</div>
+              <div className="text-2xs text-[var(--text-faint)]">Chi phí / đơn SKU ({fmtVndFull(adsStats.orders)} đơn)</div>
               <div className="text-base font-black text-[var(--text)]">{adsStats.costPerOrder != null ? fmtVndFull(adsStats.costPerOrder) : "—"}</div>
               <MomChip current={adsStats.costPerOrder} previous={adsPrevStats?.costPerOrder ?? null} tone="down" />
             </div>
             <div className="bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl p-3">
-              <div className="text-[11px] text-[var(--text-faint)]">Doanh thu gộp từ Ads</div>
+              <div className="text-2xs text-[var(--text-faint)]">Doanh thu gộp từ Ads</div>
               <div className="text-base font-black text-[var(--text)]">{fmtVndShort(adsStats.revenue)}</div>
               <MomChip current={adsStats.revenue} previous={adsPrevStats?.revenue ?? null} />
             </div>
           </div>
           {adsStats.zeroOrderDays.length > 0 && (
-            <div className="flex items-start gap-2 text-[11px] text-amber-300 bg-amber-950/60 border border-amber-800/50 rounded-xl p-2.5">
+            <div className="flex items-start gap-2 text-2xs text-amber-300 bg-amber-950/60 border border-amber-800/50 rounded-xl p-2.5">
               <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
               {adsStats.zeroOrderDays.length} ngày có chi phí Ads nhưng không phát sinh đơn ({adsStats.zeroOrderDays.map((d) => fmtDateVn(d.date, false)).join(", ")}) — tổng{" "}
               {fmtVndFull(adsStats.zeroOrderDays.reduce((a, d) => a + d.cost, 0))}.
             </div>
           )}
-          <p className="text-[11px] text-[var(--text-faint)]">
+          <p className="text-2xs text-[var(--text-faint)]">
             Doanh thu gộp tính theo đơn gốc trước huỷ/hoàn nên có thể lớn hơn GMV của shop — đừng lấy số này chia GMV.
           </p>
           <details className="rounded-xl border border-[var(--border)]">
@@ -388,7 +388,7 @@ export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandNa
           <>
             <MonthPicker value={month} onChange={setMonth} />
             {isPublished && (
-              <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full border bg-emerald-950 text-emerald-300 border-emerald-800">
+              <span className="inline-flex items-center gap-1 text-2xs font-bold px-2.5 py-1 rounded-full border bg-emerald-950 text-emerald-300 border-emerald-800">
                 <Lock className="w-3.5 h-3.5" /> Report tháng đã phát hành
               </span>
             )}

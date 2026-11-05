@@ -8,7 +8,7 @@ import { Sect } from "./ui";
 
 export const TeamSection: React.FC<{ s: Scope; brands: Brand[]; wave?: string }> = ({ s, brands, wave }) => (
   <>
-    <Sect title="Nhân sự live" sub={wave ? `chỉ các ca ${wave} · host tính GMV, trợ live tính giờ · so với ${wave} tháng trước` : "host tính GMV, trợ live tính giờ · theo kỳ đang chọn"} />
+    <Sect nav="Nhân sự" title="Nhân sự live" sub={wave ? `chỉ các ca ${wave} · host tính GMV, trợ live tính giờ · so với ${wave} tháng trước` : "host tính GMV, trợ live tính giờ · theo kỳ đang chọn"} />
     <div className="grid gap-4 xl:grid-cols-2 items-start [&>*]:min-w-0">
       <HostTable s={s} brands={brands} showBrand={false} minSessions={wave ? 1 : 3} title="Host phụ trách kênh này" />
       <CoTable s={s} brands={brands} showBrand={false} />

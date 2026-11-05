@@ -157,7 +157,7 @@ export const AskPanel: React.FC<{ open: boolean; onClose: () => void; buildConte
           {msgs.map((m, i) => (
             <div key={i} className={m.role === "user" ? "ml-8 rounded-xl bg-[var(--surface-muted)] px-3 py-2 text-sm text-[var(--text)] whitespace-pre-wrap" : "text-sm leading-relaxed"}>
               <div className={m.error ? "text-rose-400" : "text-[var(--text)]"}>{m.role === "assistant" && !m.error ? <Answer text={m.text} /> : m.text}</div>
-              {m.meta && <div className="mt-1 text-[11px] text-[var(--text-faint)]">{m.meta}</div>}
+              {m.meta && <div className="mt-1 text-2xs text-[var(--text-faint)]">{m.meta}</div>}
             </div>
           ))}
           {busy && <div className="flex items-center gap-2 text-xs text-[var(--text-faint)]"><Loader2 className="w-3.5 h-3.5 animate-spin" />Đang đọc số…</div>}

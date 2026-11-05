@@ -32,7 +32,7 @@ const TONE_PILL: Record<RowTone | DeskTone, string> = {
 };
 const TONE_TEXT: Record<DeskTone, string> = { bad: "text-rose-400", warn: "text-amber-300", good: "text-emerald-400", off: "text-[var(--text-faint)]" };
 const Pill: React.FC<{ tone: RowTone | DeskTone; children: React.ReactNode }> = ({ tone, children }) => (
-  <span className={`inline-flex items-center text-[11px] font-bold px-2 py-0.5 rounded-full border leading-snug whitespace-nowrap ${TONE_PILL[tone]}`}>{children}</span>
+  <span className={`inline-flex items-center text-2xs font-bold px-2 py-0.5 rounded-full border leading-snug whitespace-nowrap ${TONE_PILL[tone]}`}>{children}</span>
 );
 const h0 = (v: number) => Math.round(v).toLocaleString("vi-VN");
 /** "bán kém 3 · chưa ghi lý do 2" — giờ tắt sớm theo lý do khai lúc giao ca, giờ lớn trước; bỏ phần < 0,5 giờ. */
@@ -102,7 +102,7 @@ const ShrinkCell: React.FC<{ s: ChannelShrinkage }> = ({ s }) => (
     }
   >
     {pct1(s.applied)}
-    {s.source !== "channel" && <span className="ml-1 text-[11px] text-[var(--text-faint)]">{s.source === "agency" ? "trung bình YFB" : "sàn"}</span>}
+    {s.source !== "channel" && <span className="ml-1 text-2xs text-[var(--text-faint)]">{s.source === "agency" ? "trung bình YFB" : "sàn"}</span>}
   </span>
 );
 
@@ -245,10 +245,10 @@ export const NowDesk: React.FC<DeskProps> = (p) => {
             <div className="min-w-0 space-y-1">
               <ChannelName name={name} platform={row.platform} />
               <Pill tone={row.tone}>{row.status}</Pill>
-              {row.target != null && <p className="text-[11px] tabular-nums text-[var(--text-faint)]">{money(row.actual)} / {money(row.target)}{row.forecast != null ? ` · dự báo ${pct(row.forecast / row.target)}` : ""}</p>}
+              {row.target != null && <p className="text-2xs tabular-nums text-[var(--text-faint)]">{money(row.actual)} / {money(row.target)}{row.forecast != null ? ` · dự báo ${pct(row.forecast / row.target)}` : ""}</p>}
             </div>
             <div className="min-w-0">
-              <p className="text-[11px] text-[var(--text-muted)] mb-1.5">
+              <p className="text-2xs text-[var(--text-muted)] mb-1.5">
                 Giờ live thật + trong lịch / cam kết · hao hụt <ShrinkCell s={s} />
               </p>
               <HourBar h={h} />
@@ -374,17 +374,17 @@ export const NextDesk: React.FC<DeskProps & { registrations: ShiftRegistration[]
                     <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
                       <Pill tone={tone}>{r.next}</Pill>
                       {r.gmvSuspicious && p.onOpenCrm && (
-                        <button type="button" onClick={() => p.onOpenCrm!(card.brandId, card.platform)} className="text-[11px] font-bold text-[var(--accent-text)] hover:underline">
+                        <button type="button" onClick={() => p.onOpenCrm!(card.brandId, card.platform)} className="text-2xs font-bold text-[var(--accent-text)] hover:underline">
                           Sửa {platformText("GMV", "all")} ở CRM
                         </button>
                       )}
                       {(r.step === "commit" || r.step === "plan" || r.step === "lock" || r.step === "open") &&
                         (canPlan && p.onOpenMonthPlan ? (
-                          <button type="button" onClick={() => p.onOpenMonthPlan!(card.brandId, card.platform)} className="inline-flex items-center gap-0.5 text-[11px] font-bold text-[var(--accent-text)] hover:underline">
+                          <button type="button" onClick={() => p.onOpenMonthPlan!(card.brandId, card.platform)} className="inline-flex items-center gap-0.5 text-2xs font-bold text-[var(--accent-text)] hover:underline">
                             Kế Hoạch Tháng <ChevronRight className="w-3 h-3" />
                           </button>
                         ) : (
-                          <span className="text-[11px] text-[var(--text-faint)]">làm ở Kế Hoạch Tháng</span>
+                          <span className="text-2xs text-[var(--text-faint)]">làm ở Kế Hoạch Tháng</span>
                         ))}
                     </div>
                   </td>
@@ -394,7 +394,7 @@ export const NextDesk: React.FC<DeskProps & { registrations: ShiftRegistration[]
                     ) : (
                       <>
                         <b className="text-[var(--text)]">{c.hours > 0 ? `${h0(c.hours)} giờ` : "—"}</b>
-                        <p className={`text-[11px] ${r.gmvSuspicious ? "text-amber-300 font-bold" : "text-[var(--text-faint)]"}`}>
+                        <p className={`text-2xs ${r.gmvSuspicious ? "text-amber-300 font-bold" : "text-[var(--text-faint)]"}`}>
                           {r.gmvSuspicious && <AlertTriangle className="inline w-3 h-3 mr-0.5 -mt-0.5" />}
                           {platformText("GMV", "all")} {c.gmv ? (r.gmvSuspicious ? `${c.gmv.toLocaleString("vi-VN")}?` : money(c.gmv)) : "—"}
                         </p>
@@ -408,7 +408,7 @@ export const NextDesk: React.FC<DeskProps & { registrations: ShiftRegistration[]
                     {r.toOpen != null ? (
                       <span title={`${h0(c.hours)} ÷ (1 − ${pct1(s.applied)})`}>
                         <b className="text-[var(--text)]">{h0(Math.ceil(r.toOpen))}</b>
-                        <span className="text-[11px] text-[var(--text-faint)]"> (+{h0(r.buffer)})</span>
+                        <span className="text-2xs text-[var(--text-faint)]"> (+{h0(r.buffer)})</span>
                       </span>
                     ) : (
                       <span className="text-[var(--text-faint)]">—</span>
@@ -418,7 +418,7 @@ export const NextDesk: React.FC<DeskProps & { registrations: ShiftRegistration[]
                     <div className="relative h-2 rounded-full bg-[var(--surface-base)]">
                       <i className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${fill}%`, background: fill >= 99.5 ? "var(--success)" : "var(--warning)" }} />
                     </div>
-                    <p className="mt-1 text-[11px] tabular-nums text-[var(--text-muted)]">
+                    <p className="mt-1 text-2xs tabular-nums text-[var(--text-muted)]">
                       {h0(r.opened)} giờ{r.openSlots > 0 ? ` · ${r.openSlots} ca mở` : ""}
                     </p>
                   </td>
@@ -428,7 +428,7 @@ export const NextDesk: React.FC<DeskProps & { registrations: ShiftRegistration[]
                     ) : (
                       <>
                         <span className="text-[var(--text)] font-bold">{money(card.target)}</span>
-                        <p className="text-[11px] text-[var(--text-faint)]">{card.forecast && card.target ? `dự báo ~${money(card.forecast.p50)} (${pct(card.forecast.p50 / card.target)})` : "chưa đủ ca để dự báo"}</p>
+                        <p className="text-2xs text-[var(--text-faint)]">{card.forecast && card.target ? `dự báo ~${money(card.forecast.p50)} (${pct(card.forecast.p50 / card.target)})` : "chưa đủ ca để dự báo"}</p>
                       </>
                     )}
                   </td>
@@ -438,7 +438,7 @@ export const NextDesk: React.FC<DeskProps & { registrations: ShiftRegistration[]
           </tbody>
         </table>
       </div>
-      <p className="text-[11px] text-[var(--text-faint)]">
+      <p className="text-2xs text-[var(--text-faint)]">
         6 bước: {NEXT_STEPS.map((s) => s.label).join(" → ")}. Cam kết tháng nhập ở Kế Hoạch Tháng (mặc định lấy từ hợp đồng ở CRM). Đăng ký, xếp người, công bố làm ở lịch tuần phía trên.
       </p>
     </div>

@@ -72,7 +72,7 @@ export function SnapshotRoomPicker({ session: s, rows, fileName, untilMin, previ
     <div className="space-y-2.5 rounded-xl border border-[var(--accent)]/40 bg-[var(--surface-base)] p-3">
       <div>
         <p className="text-xs font-bold text-[var(--text)]">{heading ?? `Chọn ${noun} live của ca này`}</p>
-        <p className="text-[11px] text-[var(--text-muted)]">
+        <p className="text-2xs text-[var(--text-muted)]">
           File <span className="font-mono">{fileName}</span> có <b>{rows.length}</b> {noun} (cả ngày). Tick đúng {noun} ca {s.startTime}–{s.endTime}
           {untilMin != null ? ` tính tới ${endClock}` : ""} đang live — ca bị tắt/bật lại stream sẽ có nhiều {noun} liền nhau.
         </p>
@@ -93,15 +93,15 @@ export function SnapshotRoomPicker({ session: s, rows, fileName, untilMin, previ
                   <span className="block font-bold text-[var(--text)]">
                     {vnTime(c.row.startedAt)} → {c.row.endedAt ? vnTime(c.row.endedAt) : "đang live"}
                     {c.row.endedAt && <span className="font-normal text-[var(--text-muted)]"> ({dur(c.row.durationMinutes)})</span>}
-                    {c.suggested && <span className="ml-1.5 rounded bg-emerald-900/60 px-1.5 py-px text-[11px] font-bold text-emerald-200">gợi ý</span>}
+                    {c.suggested && <span className="ml-1.5 rounded bg-emerald-900/60 px-1.5 py-px text-2xs font-bold text-emerald-200">gợi ý</span>}
                   </span>
-                  <span className="block font-mono text-[11px] text-[var(--text-muted)]">
+                  <span className="block font-mono text-2xs text-[var(--text-muted)]">
                     {platformText("GMV", prof.id)} {fmtVndFull(c.row.gmv)} · {fmtCount(c.row.orders)} đơn · {fmtCount(c.row.views)} {viewsWord} · {noun} {shortRoomId(c.row.roomId)}
                     {c.row.roomTitle ? ` · "${c.row.roomTitle}"` : ""}
                   </span>
-                  {!c.inWindow && <span className="block text-[11px] text-[var(--text-faint)]">Ngoài giờ ca theo file — thường là của ca khác.</span>}
+                  {!c.inWindow && <span className="block text-2xs text-[var(--text-faint)]">Ngoài giờ ca theo file — thường là của ca khác.</span>}
                   {c.inWindow && c.overlapShare < 0.5 && c.row.endedAt && !c.suggested && (
-                    <span className="block text-[11px] text-amber-300">Chỉ {Math.round(c.overlapShare * 100)}% {noun} nằm trong ca này — nhiều khả năng của ca kề bên.</span>
+                    <span className="block text-2xs text-amber-300">Chỉ {Math.round(c.overlapShare * 100)}% {noun} nằm trong ca này — nhiều khả năng của ca kề bên.</span>
                   )}
                 </span>
               </label>
@@ -116,19 +116,19 @@ export function SnapshotRoomPicker({ session: s, rows, fileName, untilMin, previ
         ) : (
           <>
             Ca này = <b>{totals.rooms} {noun}</b> · <b className="font-mono">{platformText("GMV", prof.id)} {fmtVndFull(totals.gmv)} · {fmtCount(totals.orders)} đơn · {fmtCount(totals.views)} {viewsWord}</b>
-            <span className="text-[11px] opacity-80"> (số cộng dồn của {noun}; ca nối cùng {noun} app tự trừ lần tải lên trước)</span>
+            <span className="text-2xs opacity-80"> (số cộng dồn của {noun}; ca nối cùng {noun} app tự trừ lần tải lên trước)</span>
           </>
         )}
       </div>
       {edgeTicked.length > 0 && (
-        <p className="text-[11px] text-amber-300 flex items-start gap-1.5">
+        <p className="text-2xs text-amber-300 flex items-start gap-1.5">
           <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
           Bạn đã chọn {noun} chủ yếu nằm ngoài ca. Nếu ca kề bên chưa tải lên file thì số cả {noun} sẽ bị tính cho ca này.
         </p>
       )}
 
       {outsideTicked.length > 0 && (
-        <p className="text-[11px] text-amber-300 flex items-start gap-1.5">
+        <p className="text-2xs text-amber-300 flex items-start gap-1.5">
           <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
           Bạn đã chọn {outsideTicked.length} {noun} nằm ngoài giờ ca theo file ({outsideTicked.map((c) => shortRoomId(c.row.roomId)).join(", ")}). App vẫn tính cho ca này — chỉ chọn khi chắc {noun} đó đúng là của ca.
         </p>
@@ -155,7 +155,7 @@ export function SnapshotRoomPicker({ session: s, rows, fileName, untilMin, previ
       )}
 
       {prevBaseline && missingFromPrev.length > 0 && (
-        <p className="text-[11px] text-amber-300 flex items-start gap-1.5">
+        <p className="text-2xs text-amber-300 flex items-start gap-1.5">
           <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
           {noun[0].toUpperCase() + noun.slice(1)} {missingFromPrev.map(shortRoomId).join(", ")} bắt đầu trước giờ hết ca {prevBaseline.label} nhưng ca đó không có {noun} này — ca này sẽ nhận CẢ {noun}. Nhờ trợ ca trước kiểm tra file của họ.
         </p>

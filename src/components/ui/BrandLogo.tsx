@@ -16,7 +16,7 @@ const BOX_CLASSES: Record<BrandLogoSize, string> = {
 };
 
 const EMOJI_CLASSES: Record<BrandLogoSize, string> = {
-  xs: "text-[11px]",
+  xs: "text-2xs",
   sm: "text-base",
   md: "text-2xl",
   lg: "text-4xl"

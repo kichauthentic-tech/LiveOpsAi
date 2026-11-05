@@ -2,33 +2,23 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
-  Design tokens cho 3 theme preset (YFB mặc định, Midnight, Sand) — dropdown đổi qua src/hooks/useTheme.tsx.
-  "yfb"/"midnight" là theme tối (kèm class .dark để mọi utility dark: hiện có vẫn hoạt động),
-  "sand" là theme sáng. Component mới nên ưu tiên dùng token (var(--surface) qua class bg-[var(--surface)]
-  hoặc utility tương ứng) thay vì hardcode bg-slate-900 để tự động đổi theo cả 3 theme.
+  Chữ nhỏ nhất của app (sàn 11px, audit 26/09). Trước 05/11 viết cứng `text-[11px]` ở 856 chỗ nên không theme nào nâng
+  được; nay là utility `text-2xs` đọc biến này — theme đọc-xa (Daylight) đặt lại 13px trong khối theme của nó.
 */
-.theme-midnight {
-  --surface-base: #020617;
-  --surface: #0f172a;
-  --surface-elevated: #1e293b;
-  --surface-hover: #334155;
-  --surface-muted: rgba(30, 41, 59, 0.6);
-  --text: #f1f5f9;
-  --text-muted: #cbd5e1;
-  /* slate-400: #64748b cũ chỉ 3.1–3.8:1 trên surface/elevated (audit UX 2026-09-26) — nhãn cột/KPI mờ. */
-  --text-faint: #94a3b8;
-  --border: #334155;
-  --border-muted: rgba(51, 65, 85, 0.6);
-  /* blue-600: chữ trắng trên #3b82f6 cũ chỉ 3.7:1. accent-hover chỉ dùng làm nền nút (hover:bg-…)
-     nên đậm hơn chứ không nhạt hơn — nhạt hơn thì chữ trắng lại tụt dưới 4.5:1. */
-  --accent: #2563eb;
-  --accent-hover: #1d4ed8;
-  --accent-text: #93c5fd;
-  --accent-contrast: #ffffff;
-  --success: #10b981;
-  --warning: #f59e0b;
-  --danger: #ef4444;
+@theme {
+  --text-2xs: 11px;
 }
+
+/*
+  Design tokens cho 6 theme preset — dropdown đổi qua src/hooks/useTheme.tsx. Tối: YFB (mặc định), Midnight. Sáng: Sand,
+  Paper, Sage, Daylight. Theme tối kèm class .dark để mọi utility dark: hiện có vẫn hoạt động; theme sáng đi qua lớp
+  chuyển màu html:not(.dark) cuối file. Component mới nên ưu tiên dùng token (var(--surface) qua class bg-[var(--surface)]
+  hoặc utility tương ứng) thay vì hardcode bg-slate-900 để tự động đổi theo mọi theme.
+
+  Từ 05/11 một theme còn đổi được HÌNH KHỐI (--radius-lg/xl/2xl — rounded-lg/xl/2xl của Tailwind v4 đọc thẳng biến này),
+  FONT (--font-sans; font tải lúc chọn theme, xem THEME_FONTS trong useTheme.tsx) và CỠ CHỮ NHỎ (--text-2xs, --text-xs),
+  không phải sửa component. Mật độ (--spacing) KHÔNG đặt trong theme — là lựa chọn riêng của người dùng (html.density-*).
+*/
 
 /* YFB — theo đúng bộ nhận diện đen–vàng report Crocs x YFB Vietnam gốc. */
 :root,
@@ -51,6 +41,31 @@
   --success: #6fcf97;
   --warning: #f2c94c;
   --danger: #eb6b6b;
+}
+
+/* Midnight đứng SAU khối `:root, .theme-yfb`: cùng độ ưu tiên thì khối sau thắng — trước 06/11 nó đứng trước nên chọn Midnight
+   vẫn ra toàn bộ màu YFB (phát hiện khi quét đồng bộ theme). */
+.theme-midnight {
+  --surface-base: #020617;
+  --surface: #0f172a;
+  --surface-elevated: #1e293b;
+  --surface-hover: #334155;
+  --surface-muted: rgba(30, 41, 59, 0.6);
+  --text: #f1f5f9;
+  --text-muted: #cbd5e1;
+  /* slate-400: #64748b cũ chỉ 3.1–3.8:1 trên surface/elevated (audit UX 2026-09-26) — nhãn cột/KPI mờ. */
+  --text-faint: #94a3b8;
+  --border: #334155;
+  --border-muted: rgba(51, 65, 85, 0.6);
+  /* blue-600: chữ trắng trên #3b82f6 cũ chỉ 3.7:1. accent-hover chỉ dùng làm nền nút (hover:bg-…)
+     nên đậm hơn chứ không nhạt hơn — nhạt hơn thì chữ trắng lại tụt dưới 4.5:1. */
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-text: #93c5fd;
+  --accent-contrast: #ffffff;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
 }
 
 .theme-sand {
@@ -76,6 +91,140 @@
 }
 
 /*
+  3 theme sáng thêm 05/11 (đề xuất "10 theme" — artifact BaurhxvVcwg1x36Gon2WwN; user chốt Paper, Sage, Daylight).
+  Cả 3 qua cùng các cặp tương phản của tests/uiReadability.test.ts; nút chính KHÁC màu cảnh báo (OKLab ≥ 10).
+*/
+/* Paper — trắng giấy, chữ mực, nút xanh cobalt, viền mảnh, bo nhỏ: chiếu/xem báo cáo khi họp với brand. */
+.theme-paper {
+  --surface-base: #f5f5f3;
+  --surface: #ffffff;
+  --surface-elevated: #f1f1ee;
+  --surface-hover: #e6e6e1;
+  --surface-muted: rgba(241, 241, 238, 0.8);
+  --text: #18181b;
+  --text-muted: #4a4a52;
+  --text-faint: #5e5e66;
+  --border: #dedfe3;
+  --border-muted: rgba(222, 223, 227, 0.7);
+  --accent: #1f4fd1;
+  --accent-hover: #173ea6;
+  --accent-text: #1f4fd1;
+  --accent-contrast: #ffffff;
+  --success: #0f7b4f;
+  --warning: #b45309;
+  --danger: #c42630;
+  --radius-lg: 0.3125rem;
+  --radius-xl: 0.375rem;
+  --radius-2xl: 0.5rem;
+  --font-sans: "Be Vietnam Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Sage — nền xanh xám nhạt, nút màu mận, bo tròn nhiều: làm ban ngày trong văn phòng sáng, dịu mắt cho người mới. */
+.theme-sage {
+  --surface-base: #f1f4f0;
+  --surface: #ffffff;
+  --surface-elevated: #eaf0e8;
+  --surface-hover: #dde6da;
+  --surface-muted: rgba(234, 240, 232, 0.8);
+  --text: #1c2420;
+  --text-muted: #46534c;
+  --text-faint: #55625a;
+  --border: #d4ddd1;
+  --border-muted: rgba(212, 221, 209, 0.7);
+  --accent: #7a3e9d;
+  --accent-hover: #62307f;
+  --accent-text: #6c358c;
+  --accent-contrast: #ffffff;
+  --success: #2e7d32;
+  --warning: #a15c07;
+  --danger: #c0362c;
+  --radius-lg: 0.625rem;
+  --radius-xl: 0.875rem;
+  --radius-2xl: 1.25rem;
+  --font-sans: "Nunito Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Daylight — trắng-đen tối đa, viền đậm, chữ nhỏ nhất 13px: talent/host xem lịch trên điện thoại kể cả ngoài trời.
+   Font Lexend (Atkinson Hyperlegible không có bộ chữ tiếng Việt trên Google Fonts). */
+.theme-daylight {
+  --surface-base: #ffffff;
+  --surface: #ffffff;
+  --surface-elevated: #f3f4f6;
+  --surface-hover: #e5e7eb;
+  --surface-muted: rgba(243, 244, 246, 0.8);
+  --text: #000000;
+  --text-muted: #27272a;
+  --text-faint: #3f3f46;
+  --border: #a1a1aa;
+  --border-muted: rgba(161, 161, 170, 0.7);
+  --accent: #5b21b6;
+  --accent-hover: #4c1d95;
+  --accent-text: #5b21b6;
+  --accent-contrast: #ffffff;
+  --success: #15803d;
+  --warning: #a16207;
+  --danger: #b91c1c;
+  --text-2xs: 13px;
+  --text-xs: 0.8125rem;
+  --font-sans: Lexend, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/*
+  Màu của Report Tháng (06/11 — user: "sao còn report chưa, đồng bộ toàn bộ"). Trước đây report là skin đen-vàng CỐ ĐỊNH
+  (theme.ts PAL) bất kể theme. Nay xem trong app thì theo theme; FILE HTML/PDF gửi brand vẫn đen-vàng YFB: khung dựng bản xuất có
+  class .rt-skin-yfb (BrandMonthlyReport), và file xuất không có class theme-* trên <html> nên rơi về giá trị :root dưới đây.
+  Biểu đồ recharts tô bằng thuộc tính SVG (không đọc được var()) ⇒ dùng usePal() trong report/theme.ts đổi ra mã màu thật.
+*/
+:root,
+.rt-skin-yfb {
+  --rt-bg: #0b0b0d;
+  --rt-panel: #17171b;
+  --rt-panel2: #1d1d22;
+  --rt-line: #2a2a30;
+  --rt-gold: #f2c94c;
+  --rt-gold-dim: #a9873a;
+  --rt-cream: #f4f1e8;
+  --rt-muted: #93939c;
+  --rt-green: #6fcf97;
+  --rt-red: #eb6b6b;
+  --rt-blue: #7fb0e0;
+  --rt-on-gold: #1a1500;
+  --rt-gc-daily: #9a9aa5;
+  --rt-gc-pd: #e08a4b;
+  --rt-scheme: dark;
+}
+html[class*="theme-"]:not(.theme-yfb) {
+  --rt-bg: var(--surface-base);
+  --rt-panel: var(--surface);
+  --rt-panel2: var(--surface-elevated);
+  --rt-line: var(--border);
+  --rt-gold: var(--accent-text);
+  --rt-gold-dim: var(--text-muted);
+  --rt-cream: var(--text);
+  --rt-muted: var(--text-muted);
+  --rt-green: var(--success);
+  --rt-red: var(--danger);
+  /* Xanh của chuỗi "kế hoạch" pha về phía màu chữ: theme sáng thành xanh đậm đọc được trên nền trắng, theme tối giữ sáng. */
+  --rt-blue: color-mix(in srgb, #7fb0e0 55%, var(--text));
+  --rt-on-gold: var(--surface-base);
+  /* Màu nhóm cột Daily / Pay Day (trang Nguyên nhân) — nguyên màu chỉ 2,6–2,9:1 trên nền trắng. */
+  --rt-gc-daily: color-mix(in srgb, #9a9aa5 45%, var(--text));
+  --rt-gc-pd: color-mix(in srgb, #e08a4b 65%, var(--text));
+}
+html[class*="theme-"]:not(.theme-yfb):not(.dark) { --rt-scheme: light; }
+/* Khung bản xuất nằm trong trang đang theo theme: đặt lại cả color-scheme cho đúng skin YFB. */
+.rt-skin-yfb { color-scheme: dark; }
+
+/*
+  Mật độ (05/11): Tailwind v4 tính mọi p-*, m-*, gap-*, w-*, h-* theo --spacing (mặc định 0.25rem = "Vừa"). Đo trên app thật
+  1440×900: "Gọn" (0.2rem) làm trang ngắn 8–16% (Dashboard 1.607 → 1.351px, Lịch brand 3.335 → 2.857px), 0 tràn ngang ở 8
+  màn. Lớp đặt trên <html> (useTheme.tsx) nhưng biến chỉ đặt lại cho <main>: sidebar (w-64) và thanh trên (h-16) cũng tính
+  theo --spacing, đặt ở :root thì "Gọn" bóp sidebar còn 204px và cắt logo (thấy khi kiểm 06/11).
+*/
+html.density-compact main { --spacing: 0.2rem; }
+html.density-comfy main { --spacing: 0.3rem; }
+
+/*
   Nút nền accent đặc (bg-[var(--accent)]) gần như đều viết text-white (74 chỗ). Theme YFB có accent vàng
   nên chữ trắng chỉ 1.6:1 — đổi sang --accent-contrast (đen) ở đúng các phần tử có CẢ HAI class, không
   sửa 74 call site. Nằm ngoài @layer nên thắng utility của Tailwind. Chỉ khớp token đúng nguyên văn
@@ -95,6 +244,25 @@
   color: var(--text);
   font-weight: 700;
 }
+
+/* Khối có trên mục lục dính (SectionNav): nhảy tới thì chừa chỗ cho thanh, không bị thanh che tiêu đề. */
+[data-section] { scroll-margin-top: 3.5rem; }
+
+/*
+  Cột đầu dính của bảng rộng (05/11). Đo 1440×900: Sổ Ca khuất 137px, bảng Chốt tháng ở Toàn Cảnh Brand khuất 262px — cuộn
+  ngang là mất cột tên ca/kênh. Không thu sidebar theo màn (đã bỏ 29/09: nội dung nhảy 1.184 ↔ 1.376px giữa các tab) mà giữ
+  cột đầu đứng yên. Nền phải ĐẶC (nền hàng rê chuột/đang chọn là màu pha trong suốt — để nguyên thì chữ cột sau chạy xuyên
+  qua), nên pha sẵn với --surface. Hàng đang chọn đánh dấu bằng data-open.
+*/
+.sticky-col {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background-color: var(--surface);
+  box-shadow: inset -1px 0 0 var(--border-muted);
+}
+tr:hover > .sticky-col { background-color: color-mix(in srgb, var(--surface-elevated) 40%, var(--surface)); }
+tr[data-open="true"] > .sticky-col { background-color: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
 
 /*
   Ô nhập chữ < 16px làm iOS Safari tự phóng to cả trang khi chạm vào (252/252 ô nhập của app,

@@ -8,7 +8,7 @@ import type { KeyMetricsMonth, KeyMetricsTab } from "../../../lib/report/brandRe
 import { dayTypeMetrics, sumDayTypeParts, MIN_SESSIONS_TO_COMPARE, type HostDayTypeRow } from "../../../lib/performance/hostPerformance";
 import { DAY_ABS_COLOR, dayAbsRows, heatColor, median, rankBadge, type BridgePoint, type PlanHourRow, type ScatterPoint } from "../../../lib/report/reportVisuals";
 import type { CampDayBucket } from "../../../lib/campaignDays";
-import { chartTooltipStyle, DAY_TYPE_SHORT, PAL } from "./theme";
+import { chartTooltipStyle, DAY_TYPE_SHORT, PAL, alpha, usePal } from "./theme";
 import { chartNum } from "./format";
 import { MethodNote, Panel, ReportTable } from "./ui";
 import { numLocale } from "../../../lib/displayLang";
@@ -16,20 +16,21 @@ import { numLocale } from "../../../lib/displayLang";
 // Khối biểu đồ/bảng GĐ2 của Report Tháng (demo CROCS T10 28/10): cầu GMV, GMV/giờ kế hoạch, bảng dọc theo loại ngày,
 // scatter SKU + ảnh SKU, so sánh cặp chỉ số của host. Tính số nằm ở lib/report/reportVisuals.ts.
 
-const TONE_FILL = { up: PAL.green, down: PAL.red, flat: PAL.gold } as const;
 const vnPct = (v: number, d = 1) => `${v >= 0 ? "+" : "−"}${fmtFixed(Math.abs(v), d)}%`;
 
 // ---------- cầu GMV ----------
 
-export const BridgePanel: React.FC<{ title: string; sub: string; points: BridgePoint[]; axisMin?: number; note?: string; legend?: React.ReactNode }> = ({ title, sub, points, axisMin, note, legend }) => (
+export const BridgePanel: React.FC<{ title: string; sub: string; points: BridgePoint[]; axisMin?: number; note?: string; legend?: React.ReactNode }> = ({ title, sub, points, axisMin, note, legend }) => {
+  const P = usePal();
+  return (
   <Panel title={title} icon={<BarChart3 className="w-4 h-4" />} sub={sub}>
     <div style={{ height: 260 }} role="img" aria-label={`${title}: ${points.map((p) => `${p.label} ${fmtVndShort(p.display)}`).join(", ")}`}>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={points.map((p) => (axisMin != null && p.kind === "total" ? { ...p, base: axisMin, value: Math.max(p.value - axisMin, 0) } : p))} margin={{ top: 18, right: 8 }}>
-          <CartesianGrid stroke={PAL.line} vertical={false} />
-          <XAxis dataKey="label" stroke={PAL.muted} fontSize={11} interval={0} />
-          <YAxis stroke={PAL.muted} fontSize={11} width={64} domain={axisMin != null ? [axisMin, "auto"] : [0, "auto"]} allowDataOverflow tickFormatter={(v) => fmtVndShort(v)} />
-          <Tooltip cursor={false} contentStyle={chartTooltipStyle} itemStyle={{ color: PAL.cream }} labelStyle={{ color: PAL.cream, fontWeight: 700 }} formatter={(_v, _n, item) => fmtVndShort(chartNum((item as { payload?: { display?: number } }).payload?.display))} />
+          <CartesianGrid stroke={P.line} vertical={false} />
+          <XAxis dataKey="label" stroke={P.muted} fontSize={11} interval={0} />
+          <YAxis stroke={P.muted} fontSize={11} width={64} domain={axisMin != null ? [axisMin, "auto"] : [0, "auto"]} allowDataOverflow tickFormatter={(v) => fmtVndShort(v)} />
+          <Tooltip cursor={false} contentStyle={chartTooltipStyle} itemStyle={{ color: P.cream }} labelStyle={{ color: P.cream, fontWeight: 700 }} formatter={(_v, _n, item) => fmtVndShort(chartNum((item as { payload?: { display?: number } }).payload?.display))} />
           <Bar dataKey="base" stackId="w" fill="transparent" isAnimationActive={false} legendType="none" tooltipType="none" />
           <Bar dataKey="value" stackId="w" radius={[4, 4, 0, 0]} name="GMV" isAnimationActive={false} label={(raw) => {
               const l = raw as { x?: number | string; y?: number | string; width?: number | string; index?: number };
@@ -37,11 +38,11 @@ export const BridgePanel: React.FC<{ title: string; sub: string; points: BridgeP
               if (!p || l.x == null || l.y == null || l.width == null) return <g />;
               const txt = p.kind === "total" ? fmtVndShort(p.display) : `${p.display >= 0 ? "+" : "−"}${fmtVndShort(Math.abs(p.display))}`;
               return (
-                <text x={Number(l.x) + Number(l.width) / 2} y={Number(l.y) - 5} textAnchor="middle" fontSize={11} fontWeight={700} fill={p.kind === "total" ? PAL.cream : p.kind === "up" ? PAL.green : PAL.red}>{txt}</text>
+                <text x={Number(l.x) + Number(l.width) / 2} y={Number(l.y) - 5} textAnchor="middle" fontSize={11} fontWeight={700} fill={p.kind === "total" ? P.cream : p.kind === "up" ? P.green : P.red}>{txt}</text>
               );
             }}>
             {points.map((p, i) => (
-              <Cell key={i} fill={p.kind === "total" ? PAL.gold : p.kind === "up" ? PAL.green : PAL.red} />
+              <Cell key={i} fill={p.kind === "total" ? P.gold : p.kind === "up" ? P.green : P.red} />
             ))}
           </Bar>
         </BarChart>
@@ -50,7 +51,8 @@ export const BridgePanel: React.FC<{ title: string; sub: string; points: BridgeP
     {legend}
     {note && <MethodNote>{note}</MethodNote>}
   </Panel>
-);
+  );
+};
 
 // ---------- GMV/giờ kế hoạch so với thực tế ----------
 
@@ -97,7 +99,7 @@ export const DayAbsPanel: React.FC<{ months: KeyMetricsMonth[]; monthLabel: (m: 
   return (
     <Panel title="Số đo từng loại ngày" icon={<Table2 className="w-4 h-4" />} sub={`Mỗi loại ngày là một nhóm cột ${months.map((m) => monthLabel(m.month)).join(", ")} cùng màu nhận diện · ô tô màu theo thay đổi so với tháng liền trước (xanh tăng, đỏ giảm, đậm hơn khi lớn) · viền sáng = vượt ngưỡng dao động`}>
       <div className="overflow-x-auto -mx-1">
-        <table className="w-full text-[11px] border-collapse" style={{ minWidth: 220 + tabs.length * months.length * 74 }}>
+        <table className="w-full text-2xs border-collapse" style={{ minWidth: 220 + tabs.length * months.length * 74 }}>
           <thead>
             <tr>
               <th rowSpan={2} className="text-left px-2 py-1.5 font-semibold sticky left-0 z-[1]" style={{ color: PAL.muted, background: PAL.panel }}>Chỉ số</th>
@@ -137,7 +139,7 @@ export const DayAbsPanel: React.FC<{ months: KeyMetricsMonth[]; monthLabel: (m: 
                       title={c.change != null ? `${vnPct(c.change)} so với tháng liền trước` : "tháng mốc"}
                     >
                       {fmtKeyMetric(label(r.key), c.value)}
-                      {c.change != null && <small className="block text-[11px] opacity-80">{vnPct(c.change, 0)}</small>}
+                      {c.change != null && <small className="block text-2xs opacity-80">{vnPct(c.change, 0)}</small>}
                     </td>
                   ))
                 )}
@@ -146,7 +148,7 @@ export const DayAbsPanel: React.FC<{ months: KeyMetricsMonth[]; monthLabel: (m: 
           </tbody>
         </table>
       </div>
-      <p className="text-[11px] mt-2" style={{ color: PAL.muted }}>
+      <p className="text-2xs mt-2" style={{ color: PAL.muted }}>
         Tháng đầu là mốc, không tô · mỗi loại ngày so với chính nó theo lịch Campaign của từng tháng · {METRIC.liveHours} và {METRIC.upt} tô xanh dương vì không đánh giá tốt hay xấu.
       </p>
     </Panel>
@@ -161,6 +163,8 @@ export interface ScatterAxis {
 }
 
 const ScatterBody: React.FC<{ points: ScatterPoint[]; x: ScatterAxis; y: ScatterAxis; vx: number | null; vy: number | null; sizeLabel: string }> = ({ points, x, y, vx, vy, sizeLabel }) => {
+  const P = usePal();
+  const toneFill = { up: P.green, down: P.red, flat: P.gold } as const;
   const xs = points.map((p) => p.x);
   const ys = points.map((p) => p.y);
   const pad = (a: number[]) => {
@@ -173,12 +177,12 @@ const ScatterBody: React.FC<{ points: ScatterPoint[]; x: ScatterAxis; y: Scatter
     <div style={{ height: 340 }}>
       <ResponsiveContainer width="100%" height="100%">
         <ScatterChart margin={{ top: 14, right: 22, bottom: 24, left: 4 }}>
-          <CartesianGrid stroke={PAL.line} />
-          <XAxis type="number" dataKey="x" name={x.title} domain={pad(xs)} stroke={PAL.muted} fontSize={11} tickFormatter={x.fmt} label={{ value: x.title, position: "insideBottom", offset: -14, fill: PAL.muted, fontSize: 11 }} />
-          <YAxis type="number" dataKey="y" name={y.title} domain={pad(ys)} stroke={PAL.muted} fontSize={11} width={56} tickFormatter={y.fmt} label={{ value: y.title, angle: -90, position: "insideLeft", fill: PAL.muted, fontSize: 11 }} />
+          <CartesianGrid stroke={P.line} />
+          <XAxis type="number" dataKey="x" name={x.title} domain={pad(xs)} stroke={P.muted} fontSize={11} tickFormatter={x.fmt} label={{ value: x.title, position: "insideBottom", offset: -14, fill: P.muted, fontSize: 11 }} />
+          <YAxis type="number" dataKey="y" name={y.title} domain={pad(ys)} stroke={P.muted} fontSize={11} width={56} tickFormatter={y.fmt} label={{ value: y.title, angle: -90, position: "insideLeft", fill: P.muted, fontSize: 11 }} />
           <ZAxis type="number" dataKey="size" range={[70, 520]} name={sizeLabel} />
-          {vx != null && <ReferenceLine x={vx} stroke={PAL.cream} strokeDasharray="4 4" strokeOpacity={0.6} />}
-          {vy != null && <ReferenceLine y={vy} stroke={PAL.cream} strokeDasharray="4 4" strokeOpacity={0.6} />}
+          {vx != null && <ReferenceLine x={vx} stroke={P.cream} strokeDasharray="4 4" strokeOpacity={0.6} />}
+          {vy != null && <ReferenceLine y={vy} stroke={P.cream} strokeDasharray="4 4" strokeOpacity={0.6} />}
           <Tooltip
             cursor={{ strokeDasharray: "3 3" }}
             contentStyle={chartTooltipStyle}
@@ -186,7 +190,7 @@ const ScatterBody: React.FC<{ points: ScatterPoint[]; x: ScatterAxis; y: Scatter
               const p = payload?.[0]?.payload as ScatterPoint | undefined;
               if (!p) return null;
               return (
-                <div className="px-2.5 py-1.5 rounded-lg text-[11px]" style={chartTooltipStyle}>
+                <div className="px-2.5 py-1.5 rounded-lg text-2xs" style={chartTooltipStyle}>
                   <b>{p.label}</b>
                   <div>{x.title}: {x.fmt(p.x)}</div>
                   <div>{y.title}: {y.fmt(p.y)}</div>
@@ -194,9 +198,9 @@ const ScatterBody: React.FC<{ points: ScatterPoint[]; x: ScatterAxis; y: Scatter
               );
             }}
           />
-          <Scatter data={points} isAnimationActive={false} label={{ dataKey: "label", position: "top", fill: PAL.cream, fontSize: 11 }}>
+          <Scatter data={points} isAnimationActive={false} label={{ dataKey: "label", position: "top", fill: P.cream, fontSize: 11 }}>
             {points.map((p) => (
-              <Cell key={p.key} fill={TONE_FILL[p.tone]} fillOpacity={0.75} stroke={TONE_FILL[p.tone]} />
+              <Cell key={p.key} fill={toneFill[p.tone]} fillOpacity={0.75} stroke={toneFill[p.tone]} />
             ))}
           </Scatter>
         </ScatterChart>
@@ -228,7 +232,7 @@ export const RankBadge: React.FC<{ prevRank: number | null; rank: number; prevLi
   const color = b.tone === "up" ? PAL.green : b.tone === "down" ? PAL.red : PAL.muted;
   return (
     <span
-      className="inline-block min-w-[38px] text-center text-[11px] font-extrabold px-1.5 rounded-full ml-1.5"
+      className="inline-block min-w-[38px] text-center text-2xs font-extrabold px-1.5 rounded-full ml-1.5"
       style={{ color, border: `1px solid ${b.tone === "up" || b.tone === "down" ? `${color}66` : PAL.line}`, background: b.tone === "up" || b.tone === "down" ? `${color}29` : undefined }}
       title={prevRank == null ? (prevLimit != null ? `Ngoài top ${prevLimit} tháng trước` : "Không có hạng tháng trước") : `Hạng tháng trước: ${prevRank}`}
     >
@@ -280,7 +284,7 @@ export const SkuThumb: React.FC<{ name: string; src?: string; editable: boolean;
       setBusy(false);
     }
   };
-  const box = "relative w-12 h-12 rounded-lg overflow-hidden flex items-center justify-center text-center text-[11px] leading-tight";
+  const box = "relative w-12 h-12 rounded-lg overflow-hidden flex items-center justify-center text-center text-2xs leading-tight";
   if (!src && !editable) return <span className={box} style={{ border: `1px dashed ${PAL.line}`, color: PAL.muted }}>—</span>;
   return (
     <span className="relative inline-block">
@@ -311,7 +315,7 @@ export const SkuThumb: React.FC<{ name: string; src?: string; editable: boolean;
         </button>
       )}
       <input ref={input} type="file" accept="image/*" hidden onChange={(e) => { void pick(e.target.files?.[0]); e.target.value = ""; }} />
-      {err && <span className="block text-[11px] mt-0.5" style={{ color: PAL.red }}>{err}</span>}
+      {err && <span className="block text-2xs mt-0.5" style={{ color: PAL.red }}>{err}</span>}
     </span>
   );
 };
@@ -355,7 +359,7 @@ export const HostPairPanel: React.FC<{ rows: HostDayTypeRow[]; shortName: (full:
             aria-selected={p.key === k}
             onClick={() => setK(p.key)}
             className="min-h-8 px-3 py-1 rounded-lg text-xs font-bold"
-            style={p.key === k ? { color: PAL.gold, background: `${PAL.gold}2e`, border: `1px solid ${PAL.gold}73` } : { color: PAL.muted, border: `1px solid ${PAL.line}` }}
+            style={p.key === k ? { color: PAL.gold, background: `${alpha(PAL.gold, 18)}`, border: `1px solid ${alpha(PAL.gold, 45)}` } : { color: PAL.muted, border: `1px solid ${PAL.line}` }}
           >
             {p.name}
           </button>

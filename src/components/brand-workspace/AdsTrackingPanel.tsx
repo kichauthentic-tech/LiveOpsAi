@@ -115,13 +115,13 @@ export const AdsTrackingPanel: React.FC<Props> = ({ brandId, brandName, platform
           <h3 className="font-bold text-[var(--text)] text-sm flex items-center gap-2">
             <ClipboardPaste className="w-4 h-4 text-[var(--accent-text)]" /> Target & thực tế Ads theo ngày · tháng {fmtMonth(month)}
           </h3>
-          <p className="text-[11px] text-[var(--text-faint)] mt-1">
+          <p className="text-2xs text-[var(--text-faint)] mt-1">
             Dán từ file tracking của brand (sheet &quot;Daily Ads Report&quot;: Month · Date · Target by TTS · target Total/Live/Product/Creator · actual Total/Live/Product/Creator …).
             Dán được nhiều tháng một lần; ngày đã có thì ghi đè. Cột MTD và runrate của sheet không lấy — app tự tính, cắt ở ngày cuối có số liệu thực tế.
           </p>
         </div>
         {canManage && s && (
-          <button onClick={removeMonth} className="text-[11px] font-bold text-red-400 hover:text-red-300 flex items-center gap-1 px-2 py-1 rounded-lg">
+          <button onClick={removeMonth} className="text-2xs font-bold text-red-400 hover:text-red-300 flex items-center gap-1 px-2 py-1 rounded-lg">
             <Trash2 className="w-3.5 h-3.5" /> Xoá tháng này
           </button>
         )}
@@ -187,14 +187,14 @@ export const AdsTrackingPanel: React.FC<Props> = ({ brandId, brandName, platform
             </table>
           </div>
           {preview.warnings.length > 0 && (
-            <ul className="text-[11px] text-amber-300 list-disc pl-4 space-y-0.5">
+            <ul className="text-2xs text-amber-300 list-disc pl-4 space-y-0.5">
               {preview.warnings.slice(0, 6).map((w) => (
                 <li key={w}>{w}</li>
               ))}
               {preview.warnings.length > 6 && <li>… và {preview.warnings.length - 6} dòng khác</li>}
             </ul>
           )}
-          <p className="text-[11px] text-amber-300">Khối dán không ghi tên brand — kiểm lại đây đúng là Ads của <b>{brandName}</b> trước khi lưu.</p>
+          <p className="text-2xs text-amber-300">Khối dán không ghi tên brand — kiểm lại đây đúng là Ads của <b>{brandName}</b> trước khi lưu.</p>
           <div className="flex gap-2">
             <button onClick={save} disabled={saving} className="bg-[var(--accent)] text-white font-bold px-4 py-2 rounded-xl text-xs disabled:opacity-50">
               {saving ? "Đang lưu..." : `Lưu ${preview.rows.length} ngày`}
@@ -262,7 +262,7 @@ export const AdsTrackingPanel: React.FC<Props> = ({ brandId, brandName, platform
           </div>
 
           {s.offDays.length > 0 && (
-            <div className="flex items-start gap-2 text-[11px] text-amber-300 bg-amber-950/60 border border-amber-800/50 rounded-xl p-2.5">
+            <div className="flex items-start gap-2 text-2xs text-amber-300 bg-amber-950/60 border border-amber-800/50 rounded-xl p-2.5">
               <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
               <span>
                 {s.offDays.length} ngày chi lệch target từ 30%:{" "}
@@ -316,8 +316,8 @@ export const AdsTrackingPanel: React.FC<Props> = ({ brandId, brandName, platform
 
 const Tile: React.FC<{ label: string; value: string; note?: string; tone?: "ok" | "warn" }> = ({ label, value, note, tone }) => (
   <div className="bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl p-3 min-w-0">
-    <div className="text-[11px] text-[var(--text-faint)]">{label}</div>
+    <div className="text-2xs text-[var(--text-faint)]">{label}</div>
     <div className={`text-base font-black ${tone === "warn" ? "text-amber-300" : tone === "ok" ? "text-emerald-400" : "text-[var(--text)]"}`}>{value}</div>
-    {note && <div className="text-[11px] text-[var(--text-faint)] mt-0.5">{note}</div>}
+    {note && <div className="text-2xs text-[var(--text-faint)] mt-0.5">{note}</div>}
   </div>
 );

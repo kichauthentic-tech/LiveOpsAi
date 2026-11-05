@@ -1,4 +1,4 @@
-import { PAL } from "../../components/brand-workspace/report/theme";
+import { PAL_HEX as PAL } from "../../components/brand-workspace/report/theme";
 import { displayLang, t } from "../displayLang";
 
 // Xuất Report Tháng ra MỘT file .html độc lập để gửi brand: giữ nguyên bố cục/biểu đồ của màn report, không còn tham chiếu

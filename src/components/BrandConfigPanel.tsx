@@ -94,8 +94,8 @@ function ServiceScope({ platform, scope, canEdit, onSave }: { platform: ReportPl
   ];
   return (
     <div className="space-y-1.5">
-      <p className="text-[11px] font-bold text-[var(--text-muted)]">Phạm vi dịch vụ {platform}</p>
-      <p className="text-[11px] text-[var(--text-faint)]">Livestream YFB luôn có. Report Tháng chọn trang theo các ô này.</p>
+      <p className="text-2xs font-bold text-[var(--text-muted)]">Phạm vi dịch vụ {platform}</p>
+      <p className="text-2xs text-[var(--text-faint)]">Livestream YFB luôn có. Report Tháng chọn trang theo các ô này.</p>
       {items.map((it) => (
         <label key={it.key} className="flex items-start gap-2 text-xs text-[var(--text)] cursor-pointer">
           <input
@@ -108,7 +108,7 @@ function ServiceScope({ platform, scope, canEdit, onSave }: { platform: ReportPl
               try { await onSave({ [it.key]: e.target.checked }); } finally { setBusy(false); }
             }}
           />
-          <span>{it.label}<span className="block text-[11px] text-[var(--text-faint)]">{it.hint}</span></span>
+          <span>{it.label}<span className="block text-2xs text-[var(--text-faint)]">{it.hint}</span></span>
         </label>
       ))}
     </div>
@@ -125,17 +125,17 @@ function ChannelInfo({ channel, platform, canEdit, onSave }: { channel?: BrandCh
     <div className="bg-[var(--surface-base)]/60 border border-[var(--border)] rounded-xl p-3 flex flex-wrap items-end gap-3">
       <div className="text-xs font-black text-[var(--text)] w-full sm:w-auto sm:self-center">
         Kênh {platform}
-        {real && channel!.status === "paused" && <span className="ml-1.5 text-[11px] font-bold text-amber-300">tạm dừng</span>}
+        {real && channel!.status === "paused" && <span className="ml-1.5 text-2xs font-bold text-amber-300">tạm dừng</span>}
       </div>
       {!real ? (
-        <p className="text-[11px] text-[var(--text-faint)]">Chưa có bảng kênh trên DB (migration 0149) — tên gian hàng, mã shop sẽ nhập được sau khi chạy.</p>
+        <p className="text-2xs text-[var(--text-faint)]">Chưa có bảng kênh trên DB (migration 0149) — tên gian hàng, mã shop sẽ nhập được sau khi chạy.</p>
       ) : (
         <>
-          <label className="flex-1 min-w-[10rem] text-[11px] text-[var(--text-muted)] space-y-1">
+          <label className="flex-1 min-w-[10rem] text-2xs text-[var(--text-muted)] space-y-1">
             <span className="block">Tên gian hàng</span>
             <input id={`ch-name-${platform}`} value={shopName} onChange={(e) => setShopName(e.target.value)} disabled={!canEdit} placeholder={profileOf(platform).shopNamePlaceholder} className={inputCls} />
           </label>
-          <label className="flex-1 min-w-[10rem] text-[11px] text-[var(--text-muted)] space-y-1">
+          <label className="flex-1 min-w-[10rem] text-2xs text-[var(--text-muted)] space-y-1">
             <span className="block">{profileOf(platform).shopRefLabel}</span>
             <input id={`ch-ref-${platform}`} value={shopRef} onChange={(e) => setShopRef(e.target.value)} disabled={!canEdit} placeholder="Để đối chiếu file tải về" className={inputCls} />
           </label>
@@ -312,7 +312,7 @@ export const BrandConfigPanel: React.FC<Props> = ({
         {/* Công tắc cũ (hai kiểu thu phí) chỉ còn khi DB chưa chạy 0191; có bảng điều khoản thì mọi thứ khai ở khối “Điều khoản hợp tác”. */}
         {!termsAvailable && (
           <>
-            <span className="text-[11px] font-bold text-[var(--text-muted)]">Cách thu phí:</span>
+            <span className="text-2xs font-bold text-[var(--text-muted)]">Cách thu phí:</span>
             {(["gmv_commission", "hourly"] as const).map((m) => (
               <button
                 key={m}
@@ -421,7 +421,7 @@ export const BrandConfigPanel: React.FC<Props> = ({
               onSave={(patch) => onSaveServiceScope!(brand.id, platform, patch)}
             />
             {history.length > 0 && (
-              <details className="text-[11px]">
+              <details className="text-2xs">
                 <summary className="cursor-pointer font-bold text-[var(--text-muted)] flex items-center gap-1"><History className="w-3 h-3" /> Lịch sử giá ({history.length})</summary>
                 <div className="mt-1.5 space-y-1">
                   {history.map((h) => (
@@ -449,7 +449,7 @@ export const BrandConfigPanel: React.FC<Props> = ({
           <div className="flex items-center justify-between gap-2">
             <h4 className="text-xs font-black text-[var(--text)] flex items-center gap-1.5"><FileSignature className="w-3.5 h-3.5 text-blue-400" /> Hợp đồng {platform}</h4>
             {canEdit && !draft && (
-              <button onClick={startNew} className="px-2.5 py-1.5 rounded-lg border border-[var(--accent)]/60 text-[11px] font-bold text-[var(--accent-text)] flex items-center gap-1"><Plus className="w-3 h-3" /> Thêm hợp đồng</button>
+              <button onClick={startNew} className="px-2.5 py-1.5 rounded-lg border border-[var(--accent)]/60 text-2xs font-bold text-[var(--accent-text)] flex items-center gap-1"><Plus className="w-3 h-3" /> Thêm hợp đồng</button>
             )}
           </div>
 
@@ -457,15 +457,15 @@ export const BrandConfigPanel: React.FC<Props> = ({
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3 space-y-2">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <label className="flex flex-col gap-1">
-                  <span className="text-[11px] text-[var(--text-faint)]">Mã hợp đồng</span>
+                  <span className="text-2xs text-[var(--text-faint)]">Mã hợp đồng</span>
                   <input value={draft.contractCode} onChange={(e) => setDraft({ ...draft, contractCode: e.target.value })} className={inputCls} />
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-[11px] text-[var(--text-faint)]">Từ tháng</span>
+                  <span className="text-2xs text-[var(--text-faint)]">Từ tháng</span>
                   <MonthPicker value={draft.startMonth.slice(0, 7)} onChange={(m) => setDraft({ ...draft, startMonth: `${m}-01` })} arrows={false} align="left" ariaLabel="Từ tháng" />
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-[11px] text-[var(--text-faint)]">Đến tháng</span>
+                  <span className="text-2xs text-[var(--text-faint)]">Đến tháng</span>
                   <MonthPicker
                     value={draft.endMonth ? draft.endMonth.slice(0, 7) : ""}
                     onChange={(m) => setDraft({ ...draft, endMonth: m ? `${m}-01` : "" })}
@@ -478,7 +478,7 @@ export const BrandConfigPanel: React.FC<Props> = ({
                   />
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-[11px] text-[var(--text-faint)]">Trạng thái</span>
+                  <span className="text-2xs text-[var(--text-faint)]">Trạng thái</span>
                   <select value={draft.status} onChange={(e) => setDraft({ ...draft, status: e.target.value as BrandContract["status"] })} className={inputCls}>
                     <option value="draft">Nháp</option>
                     <option value="active">Đang hiệu lực</option>
@@ -486,28 +486,28 @@ export const BrandConfigPanel: React.FC<Props> = ({
                   </select>
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-[11px] text-[var(--text-faint)]">Giờ cam kết / tháng</span>
+                  <span className="text-2xs text-[var(--text-faint)]">Giờ cam kết / tháng</span>
                   <input type="number" min={0} value={draft.monthlyHours} onChange={(e) => setDraft({ ...draft, monthlyHours: e.target.value })} className={inputCls} />
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-[11px] text-[var(--text-faint)]">{platformText("GMV", platform)} cam kết / tháng (tuỳ chọn)</span>
+                  <span className="text-2xs text-[var(--text-faint)]">{platformText("GMV", platform)} cam kết / tháng (tuỳ chọn)</span>
                   <input type="number" min={0} value={draft.monthlyGmv} onChange={(e) => setDraft({ ...draft, monthlyGmv: e.target.value })} className={inputCls} />
                 </label>
                 <label className="flex flex-col gap-1 col-span-2">
-                  <span className="text-[11px] text-[var(--text-faint)]">Ghi chú</span>
+                  <span className="text-2xs text-[var(--text-faint)]">Ghi chú</span>
                   <input value={draft.note} onChange={(e) => setDraft({ ...draft, note: e.target.value })} className={inputCls} />
                 </label>
               </div>
               <div className="flex items-center gap-2">
                 <button onClick={saveContract} disabled={busy} className={btnCls}>{draft.id ? "Lưu hợp đồng" : "Tạo hợp đồng"}</button>
                 <button onClick={() => setDraft(null)} className="px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] text-[var(--text-muted)] text-xs font-bold">Huỷ</button>
-                <span className="text-[11px] text-[var(--text-faint)]">Đang hiệu lực ⇒ giờ cam kết tự đổ ra từng tháng.</span>
+                <span className="text-2xs text-[var(--text-faint)]">Đang hiệu lực ⇒ giờ cam kết tự đổ ra từng tháng.</span>
               </div>
             </div>
           )}
 
           {myContracts.length === 0 && !draft ? (
-            <p className="text-[11px] text-[var(--text-faint)]">Chưa có hợp đồng {platform}.</p>
+            <p className="text-2xs text-[var(--text-faint)]">Chưa có hợp đồng {platform}.</p>
           ) : (
             <div className="space-y-1.5">
               {myContracts.map((c) => (
@@ -517,7 +517,7 @@ export const BrandConfigPanel: React.FC<Props> = ({
                       {c.contractCode || "Hợp đồng"} · {fmtHours(c.monthlyHours)}/tháng
                       {c.monthlyGmv !== undefined && ` · ${fmtVndShort(c.monthlyGmv)} ${platformText("GMV", platform)}/tháng`}
                     </p>
-                    <p className="text-[11px] text-[var(--text-muted)]">
+                    <p className="text-2xs text-[var(--text-muted)]">
                       {fmtMonth(c.startMonth.slice(0, 7))} → {c.endMonth ? fmtMonth(c.endMonth.slice(0, 7)) : "chưa chốt"} · {STATUS_LABEL[c.status]}
                       {c.note ? ` · ${c.note}` : ""}
                     </p>
@@ -535,20 +535,20 @@ export const BrandConfigPanel: React.FC<Props> = ({
 
           <div className="pt-2 border-t border-[var(--border)]/60">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-[11px] font-bold text-[var(--text-muted)] flex items-center gap-1"><CalendarRange className="w-3 h-3" /> Cam kết từng tháng</span>
+              <span className="text-2xs font-bold text-[var(--text-muted)] flex items-center gap-1"><CalendarRange className="w-3 h-3" /> Cam kết từng tháng</span>
               {onOpenMonthPlan && (
-                <button onClick={() => onOpenMonthPlan(platform)} className="text-[11px] font-bold text-[var(--accent-text)] hover:underline">Sửa riêng một tháng ở Kế Hoạch Tháng →</button>
+                <button onClick={() => onOpenMonthPlan(platform)} className="text-2xs font-bold text-[var(--accent-text)] hover:underline">Sửa riêng một tháng ở Kế Hoạch Tháng →</button>
               )}
             </div>
             {monthRows.length === 0 ? (
-              <p className="text-[11px] text-[var(--text-faint)] mt-1">Chưa có tháng nào.</p>
+              <p className="text-2xs text-[var(--text-faint)] mt-1">Chưa có tháng nào.</p>
             ) : (
               <div className="mt-1.5 flex flex-wrap gap-1.5">
                 {monthRows.map((m) => (
                   <span
                     key={m.id}
                     title={m.isOverride ? "Sửa riêng tháng này ở Kế Hoạch Tháng — sửa hợp đồng không ghi đè" : m.contractId ? "Theo hợp đồng" : "Hợp đồng gốc đã xoá"}
-                    className={`text-[11px] px-2 py-1 rounded-lg border ${m.isOverride ? "border-amber-700 text-amber-200" : "border-[var(--border)] text-[var(--text-muted)]"}`}
+                    className={`text-2xs px-2 py-1 rounded-lg border ${m.isOverride ? "border-amber-700 text-amber-200" : "border-[var(--border)] text-[var(--text-muted)]"}`}
                   >
                     {fmtMonth(m.periodMonth.slice(0, 7))}: <b className="text-[var(--text)]">{fmtHours(m.committedHours)}</b>
                     {m.committedGmv !== undefined && ` · ${fmtVndShort(m.committedGmv)}`}

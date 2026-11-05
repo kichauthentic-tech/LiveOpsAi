@@ -153,7 +153,7 @@ export const TermsPanel: React.FC<Props> = ({ brand, platform, canEdit, today, a
         {canEdit && available && !draft && cur && <button type="button" onClick={() => startEdit(cur)} className={`${btnGhostCls} flex items-center gap-1`}><Pencil className="w-3 h-3" /> Sửa</button>}
       </div>
 
-      {!available && <p className="text-[11px] text-amber-300">Chưa lưu được điều khoản: database chưa chạy migration 0191. Tiền đang tính theo cách cũ ({brand.billingModel === "hourly" ? "theo giờ" : "theo %"}).</p>}
+      {!available && <p className="text-2xs text-amber-300">Chưa lưu được điều khoản: database chưa chạy migration 0191. Tiền đang tính theo cách cũ ({brand.billingModel === "hourly" ? "theo giờ" : "theo %"}).</p>}
       {error && <p className="text-xs text-rose-300">{error}</p>}
       {note && <p className="text-xs text-emerald-300">{note}</p>}
 
@@ -162,11 +162,11 @@ export const TermsPanel: React.FC<Props> = ({ brand, platform, canEdit, today, a
           {cur ? (
             <div className="space-y-1">
               <p className="text-sm font-black text-[var(--text)]">{termsLabel(cur.terms)}</p>
-              <p className="text-[11px] text-[var(--text-muted)]">
+              <p className="text-2xs text-[var(--text-muted)]">
                 {cur.terms.services.map((s) => SERVICE_LABEL[s]).join(" · ")} · từ {fmtDateVn(cur.startDate)}
               </p>
-              {errorsOf(cur.terms).map((i, k) => <p key={k} className="text-[11px] text-rose-300">{i.text}</p>)}
-              <details className="text-[11px]">
+              {errorsOf(cur.terms).map((i, k) => <p key={k} className="text-2xs text-rose-300">{i.text}</p>)}
+              <details className="text-2xs">
                 <summary className="cursor-pointer text-[var(--text-faint)]">Xem đầy đủ{warnings(cur.terms).length > 0 ? ` · ${warnings(cur.terms).length} lưu ý` : ""}</summary>
                 <ul className="mt-1 space-y-0.5 text-[var(--text-muted)] list-disc pl-4">{describeTerms(cur.terms).map((l, i) => <li key={i}>{l}</li>)}</ul>
                 {warnings(cur.terms).map((i, k) => <p key={k} className="mt-1 text-amber-300">{i.text}</p>)}
@@ -189,7 +189,7 @@ export const TermsPanel: React.FC<Props> = ({ brand, platform, canEdit, today, a
 
           {(upcomingOrPast.length > 0 || others.length > 0) && (
             <details className="text-xs">
-              <summary className="cursor-pointer text-[11px] font-bold text-[var(--text-muted)]">Chiến dịch, gói thử, bản cũ ({upcomingOrPast.length + others.length})</summary>
+              <summary className="cursor-pointer text-2xs font-bold text-[var(--text-muted)]">Chiến dịch, gói thử, bản cũ ({upcomingOrPast.length + others.length})</summary>
               <div className="mt-2 space-y-1.5">
                 {[...others, ...upcomingOrPast].sort((a, b) => b.startDate.localeCompare(a.startDate)).map((p) => (
                   <div key={p.id} className="flex items-center justify-between gap-2 rounded-lg border border-[var(--border)] px-3 py-1.5">
@@ -209,7 +209,7 @@ export const TermsPanel: React.FC<Props> = ({ brand, platform, canEdit, today, a
             </details>
           )}
           {canEdit && cur && (
-            <div className="flex flex-wrap gap-3 text-[11px]">
+            <div className="flex flex-wrap gap-3 text-2xs">
               <button type="button" onClick={() => startNew("campaign", JSON.parse(JSON.stringify(cur.terms)) as CommercialTerms)} className="font-bold text-[var(--accent-text)] hover:underline">+ Chiến dịch (11.11…)</button>
               <button type="button" onClick={() => startNew("trial", JSON.parse(JSON.stringify(cur.terms)) as CommercialTerms, "Gói thử")} className="font-bold text-[var(--accent-text)] hover:underline">+ Gói thử</button>
             </div>
@@ -235,7 +235,7 @@ export const TermsPanel: React.FC<Props> = ({ brand, platform, canEdit, today, a
             )}
           </div>
           {draft.kind === "standard" && draft.id && mine.find((p) => p.id === draft.id)?.startDate !== draft.startDate && (
-            <p className="text-[11px] text-[var(--text-faint)]">Tạo điều khoản mới từ ngày này; bản hiện tại khép lại hôm trước, ca cũ giữ nguyên.</p>
+            <p className="text-2xs text-[var(--text-faint)]">Tạo điều khoản mới từ ngày này; bản hiện tại khép lại hôm trước, ca cũ giữ nguyên.</p>
           )}
 
           <TermsEditor terms={draft.terms} onChange={(terms) => setDraft({ ...draft, terms })} canEdit={canEdit} />
@@ -255,14 +255,14 @@ export const TermsPanel: React.FC<Props> = ({ brand, platform, canEdit, today, a
 
           {(issues.some((i) => i.level === "error") || dateProblem) && (
             <div className="space-y-0.5">
-              {issues.filter((i) => i.level === "error").map((i, k) => <p key={k} className="text-[11px] text-rose-300">{i.text}</p>)}
-              {dateProblem && <p className="text-[11px] text-rose-300">{dateProblem}</p>}
+              {issues.filter((i) => i.level === "error").map((i, k) => <p key={k} className="text-2xs text-rose-300">{i.text}</p>)}
+              {dateProblem && <p className="text-2xs text-rose-300">{dateProblem}</p>}
             </div>
           )}
           <div className="flex items-center gap-2">
             <button type="button" onClick={save} disabled={busy || blocking} className={btnCls}>{busy ? "Đang lưu…" : "Lưu"}</button>
             <button type="button" onClick={() => setDraft(null)} disabled={busy} className={btnGhostCls}>Huỷ</button>
-            {!blocking && issues.length > 0 && <span className="text-[11px] text-amber-300">{issues.length} lưu ý — xem ở bản đã lưu</span>}
+            {!blocking && issues.length > 0 && <span className="text-2xs text-amber-300">{issues.length} lưu ý — xem ở bản đã lưu</span>}
           </div>
         </div>
       )}

@@ -49,7 +49,7 @@ const WhatIfBox: React.FC<{ o: MonthOutlook; p: HandlingPlan }> = ({ o, p }) => 
         dự báo <b className="text-[var(--text)]">{money(r.projected)}</b> (vùng tin cậy 80%: {money(r.projected - half)} – {money(r.projected + half)}), xác suất đạt target{" "}
         <b className="text-[var(--text)]">{r.landing.pHit != null ? pct(r.landing.pHit) : "—"}</b> — {LANDING_LABEL[r.landing.key].toLowerCase()}.
       </p>
-      <p className="text-[11px] text-[var(--text-faint)] leading-snug">Giờ thêm được tính theo GMV/giờ × hệ số co giãn ({money(p.marginalRate)}/giờ), không phải GMV/giờ trung bình. Chi phí và lãi của giờ thêm chưa tính vì chưa nhập commission và rate.</p>
+      <p className="text-2xs text-[var(--text-faint)] leading-snug">Giờ thêm được tính theo GMV/giờ × hệ số co giãn ({money(p.marginalRate)}/giờ), không phải GMV/giờ trung bình. Chi phí và lãi của giờ thêm chưa tính vì chưa nhập commission và rate.</p>
     </div>
   );
 };
@@ -65,7 +65,7 @@ const CheckpointStrip: React.FC<{ o: MonthOutlook; p: HandlingPlan; today: strin
       <p className="text-xs font-bold text-[var(--text)]">Mốc điều chỉnh giờ</p>
       <ol className="flex flex-wrap gap-1.5">
         {p.checkpoints.map((k) => (
-          <li key={k.key} className={`text-[11px] px-2 py-1 rounded-lg border ${k.key === active ? "border-[var(--accent)] text-[var(--text)] font-bold" : k.date < today ? "border-[var(--border)] text-[var(--text-faint)]" : "border-[var(--border)] text-[var(--text-muted)]"}`}>
+          <li key={k.key} className={`text-2xs px-2 py-1 rounded-lg border ${k.key === active ? "border-[var(--accent)] text-[var(--text)] font-bold" : k.date < today ? "border-[var(--border)] text-[var(--text-faint)]" : "border-[var(--border)] text-[var(--text-muted)]"}`}>
             {CHECKPOINT_LABEL[k.key]} · {dm(k.date)}{k.date > today ? " (sắp tới)" : ""}
           </li>
         ))}
@@ -77,7 +77,7 @@ const CheckpointStrip: React.FC<{ o: MonthOutlook; p: HandlingPlan; today: strin
             : <>Thiếu <b className="text-[var(--text)]">{money(c.gap)}</b> ⇒ cần <b className="text-[var(--text)]">+{Math.round(c.needPct * 100)}%</b> giờ của phần còn lại{c.capped ? <> (vượt giới hạn, đề xuất <b className="text-[var(--text)]">+{Math.round(c.pct * 100)}%</b> ≈ {hrs(c.extraHours)} và báo brand sớm)</> : <> ≈ <b className="text-[var(--text)]">{hrs(c.extraHours)}</b></>}; thêm đủ thì dự báo ≈ {money(c.projectedAfter)}.</>}
         </p>
       )}
-      <p className="text-[11px] text-[var(--text-faint)] leading-snug">Mô phỏng T7–T9 trên số liệu thực tế: làm đủ 3 mốc (bù tối đa +30% giờ còn lại) thì 9/9 tháng CROCS + VERA đạt ≥ 95% target; không điều chỉnh chỉ 3/9.</p>
+      <p className="text-2xs text-[var(--text-faint)] leading-snug">Mô phỏng T7–T9 trên số liệu thực tế: làm đủ 3 mốc (bù tối đa +30% giờ còn lại) thì 9/9 tháng CROCS + VERA đạt ≥ 95% target; không điều chỉnh chỉ 3/9.</p>
     </div>
   );
 };
@@ -96,11 +96,11 @@ export const ChannelPlan: React.FC<{ o: MonthOutlook; p: HandlingPlan; today: st
       <ul className="space-y-2.5">
         {p.levers.map((l) => (
           <li key={l.id} className="flex gap-2.5">
-            <span className={`shrink-0 mt-0.5 h-fit text-[11px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${TONE_CLS[l.tone]}`}>{TONE_LABEL[l.tone]}</span>
+            <span className={`shrink-0 mt-0.5 h-fit text-2xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${TONE_CLS[l.tone]}`}>{TONE_LABEL[l.tone]}</span>
             <div className="min-w-0">
               <p className="text-sm font-bold text-[var(--text)] leading-snug">{l.title}</p>
               <p className="text-xs text-[var(--text-muted)] leading-snug">{l.detail}</p>
-              <p className="text-[11px] text-[var(--text-faint)] leading-snug mt-0.5">Cơ sở tính: {l.basis}</p>
+              <p className="text-2xs text-[var(--text-faint)] leading-snug mt-0.5">Cơ sở tính: {l.basis}</p>
             </div>
           </li>
         ))}

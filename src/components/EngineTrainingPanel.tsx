@@ -118,7 +118,7 @@ export const EngineTrainingPanel: React.FC<Props> = ({ brands, sessions, shiftSl
         </div>
         <div className="shrink-0 text-xs md:text-right">
           <b className="text-sky-300">{changed} tham số khác mặc định</b>
-          <p className="text-[11px] text-[var(--text-faint)]">{updatedAt ? `Lưu lần cuối ${new Date(updatedAt).toLocaleString("vi-VN")}` : "Đang dùng mặc định"}</p>
+          <p className="text-2xs text-[var(--text-faint)]">{updatedAt ? `Lưu lần cuối ${new Date(updatedAt).toLocaleString("vi-VN")}` : "Đang dùng mặc định"}</p>
         </div>
       </div>
 
@@ -131,7 +131,7 @@ export const EngineTrainingPanel: React.FC<Props> = ({ brands, sessions, shiftSl
           {brandId && <AllocationTrainingCard brandId={brandId} sessions={sessions} params={draft} today={today} />}
           <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 space-y-3">
             <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm font-bold text-[var(--text)] flex items-center gap-1.5"><BrainCircuit className="w-4 h-4 text-[var(--accent-text)]" /> Engine đã học gì</h3>
+              <h3 data-section="Engine đã học" className="text-sm font-bold text-[var(--text)] flex items-center gap-1.5"><BrainCircuit className="w-4 h-4 text-[var(--accent-text)]" /> Engine đã học gì</h3>
               <div className="flex gap-1.5">
                 <select value={brandId} onChange={(e) => setBrandId(e.target.value)} className="bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1 text-xs font-bold text-[var(--text)]">
                   {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
@@ -158,7 +158,7 @@ export const EngineTrainingPanel: React.FC<Props> = ({ brands, sessions, shiftSl
                   {(["dday", "midmonth", "payday"] as const).map((b) => (
                     <div key={b} className="flex justify-between gap-2">
                       <span className="text-[var(--text)]">{{ dday: "D-Day", midmonth: "Mid-Month", payday: "Pay Day" }[b]}</span>
-                      <span className="text-[var(--text)]">{platformText("GMV/giờ", histPlatform)} <b>×{fmtFixed(history.campMultipliers[b], 2)}</b> <span className="text-[11px] text-[var(--text-faint)]">{history.campLearned[b] ? "học" : "mặc định"}</span>{history.campHoursLearned[b] ? <> · <b>{fmtFixed(history.campHoursPerDay[b], 1)}h</b>/ngày</> : ""}</span>
+                      <span className="text-[var(--text)]">{platformText("GMV/giờ", histPlatform)} <b>×{fmtFixed(history.campMultipliers[b], 2)}</b> <span className="text-2xs text-[var(--text-faint)]">{history.campLearned[b] ? "học" : "mặc định"}</span>{history.campHoursLearned[b] ? <> · <b>{fmtFixed(history.campHoursPerDay[b], 1)}h</b>/ngày</> : ""}</span>
                     </div>
                   ))}
                   <div className="flex justify-between gap-2"><span className="text-[var(--text)]">Daily</span><span className="text-[var(--text)]">{history.campHoursLearned.daily ? <><b>{fmtFixed(history.campHoursPerDay.daily, 1)}h</b>/ngày</> : "—"}</span></div>
@@ -167,24 +167,24 @@ export const EngineTrainingPanel: React.FC<Props> = ({ brands, sessions, shiftSl
                 <div>
                   <p className="font-bold text-[var(--text-muted)] mb-1">Lễ / sự kiện / khuyến mãi</p>
                   {(["holiday", "mega_sale", "event"] as const).map((k) => (
-                    <div key={k} className="flex justify-between gap-2"><span className="text-[var(--text)]">{{ holiday: "Ngày lễ", mega_sale: "Mega sale", event: "Sự kiện" }[k]}</span><b className="text-[var(--text)]">×{fmtFixed(history.eventMultipliers[k], 2)} <span className="text-[11px] font-normal text-[var(--text-faint)]">{history.eventLearned[k] ? "học" : "chưa đủ ca"}</span></b></div>
+                    <div key={k} className="flex justify-between gap-2"><span className="text-[var(--text)]">{{ holiday: "Ngày lễ", mega_sale: "Mega sale", event: "Sự kiện" }[k]}</span><b className="text-[var(--text)]">×{fmtFixed(history.eventMultipliers[k], 2)} <span className="text-2xs font-normal text-[var(--text-faint)]">{history.eventLearned[k] ? "học" : "chưa đủ ca"}</span></b></div>
                   ))}
-                  <div className="flex justify-between gap-2"><span className="text-[var(--text)]">Ngày có khuyến mãi</span><b className="text-[var(--text)]">×{fmtFixed(history.schemeMultiplier, 2)} <span className="text-[11px] font-normal text-[var(--text-faint)]">{history.schemeLearned ? "học" : "chưa đủ ca"}</span></b></div>
+                  <div className="flex justify-between gap-2"><span className="text-[var(--text)]">Ngày có khuyến mãi</span><b className="text-[var(--text)]">×{fmtFixed(history.schemeMultiplier, 2)} <span className="text-2xs font-normal text-[var(--text-faint)]">{history.schemeLearned ? "học" : "chưa đủ ca"}</span></b></div>
                 </div>
                 <div>
                   <p className="font-bold text-[var(--text-muted)] mb-1">Khung giờ mạnh (thứ × khối 2h)</p>
                   {strong.length === 0 && <p className="text-[var(--text-faint)]">chưa ô nào có ≥ 2 ca</p>}
                   {strong.map((c) => (
-                    <div key={`${c.weekday}|${c.block}`} className="flex justify-between gap-2"><span className="text-[var(--text)]">{WD[c.weekday]} {c.block * 2}–{c.block * 2 + 2}h <span className="text-[11px] text-[var(--text-faint)]">({c.n} ca)</span></span><b className="text-emerald-400">{fmtM(c.gmvPerHour)}/h</b></div>
+                    <div key={`${c.weekday}|${c.block}`} className="flex justify-between gap-2"><span className="text-[var(--text)]">{WD[c.weekday]} {c.block * 2}–{c.block * 2 + 2}h <span className="text-2xs text-[var(--text-faint)]">({c.n} ca)</span></span><b className="text-emerald-400">{fmtM(c.gmvPerHour)}/h</b></div>
                   ))}
-                  {weak.length > 0 && <p className="mt-1 text-[11px] text-[var(--text-faint)]">Yếu: {weak.map((c) => `${WD[c.weekday]} ${c.block * 2}h`).join(", ")}</p>}
+                  {weak.length > 0 && <p className="mt-1 text-2xs text-[var(--text-faint)]">Yếu: {weak.map((c) => `${WD[c.weekday]} ${c.block * 2}h`).join(", ")}</p>}
                 </div>
               </div>
             )}
           </div>
 
           <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 space-y-2">
-            <h3 className="text-sm font-bold text-[var(--text)]">Kế hoạch vs thực tế (tự hiệu chỉnh)</h3>
+            <h3 data-section="KH vs thực tế" className="text-sm font-bold text-[var(--text)]">Kế hoạch vs thực tế (tự hiệu chỉnh)</h3>
             {!evaluation ? (
               <p className="text-xs text-[var(--text-muted)]">Brand chưa có kế hoạch tháng nào đã chốt → chưa có gì để so. Sau tháng đầu tiên chốt kế hoạch và đối soát, engine tự chỉnh {platformText("GMV/giờ", histPlatform)} từng ô theo sai số.</p>
             ) : (
@@ -214,7 +214,7 @@ export const EngineTrainingPanel: React.FC<Props> = ({ brands, sessions, shiftSl
             <button onClick={() => setShowHelp((v) => !v)} aria-pressed={showHelp} className={`px-3 py-1.5 rounded-lg border text-xs font-bold ${showHelp ? "seg-on" : "border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]"}`}>
               {showHelp ? "Ẩn giải thích" : "Hiện giải thích"}
             </button>
-            <span className="text-[11px] text-[var(--text-muted)]">{loading ? "Đang tải…" : msg ?? (dirty ? "Chưa lưu — nửa trái đang tính theo giá trị đang sửa." : "")}</span>
+            <span className="text-2xs text-[var(--text-muted)]">{loading ? "Đang tải…" : msg ?? (dirty ? "Chưa lưu — nửa trái đang tính theo giá trị đang sửa." : "")}</span>
             <button onClick={resetAll} className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-xs font-bold text-[var(--text)] flex items-center gap-1.5"><RotateCcw className="w-3.5 h-3.5" /> Về mặc định tất cả</button>
             <button onClick={save} disabled={saving || !dirty} className="px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs font-bold disabled:opacity-40 flex items-center gap-1.5"><Save className="w-3.5 h-3.5" /> {saving ? "Đang lưu…" : "Lưu tham số"}</button>
           </div>
@@ -230,7 +230,7 @@ export const EngineTrainingPanel: React.FC<Props> = ({ brands, sessions, shiftSl
                     <div key={m.key} className={`flex items-center gap-3 px-3 py-2 text-xs ${isDef ? "" : "bg-sky-950/20"}`}>
                       <div className="flex-1 min-w-0">
                         <div className="font-bold text-[var(--text)]" title={m.help}>{m.label}</div>
-                        {showHelp && m.help && <div className="text-[11px] text-[var(--text-muted)] leading-snug">{m.help}</div>}
+                        {showHelp && m.help && <div className="text-2xs text-[var(--text-muted)] leading-snug">{m.help}</div>}
                       </div>
                       {m.kind === "boolean" ? (
                         <label className="flex items-center gap-1.5 text-[var(--text)]">
@@ -242,7 +242,7 @@ export const EngineTrainingPanel: React.FC<Props> = ({ brands, sessions, shiftSl
                       )}
                       {/* 38 nút này cao 15px — dưới sàn 24px của WCAG 2.5.8 (audit UX lần 2 — M7).
                           `min-h-6` + padding ngang, dòng vốn đã cao 32px nên không dài thêm. */}
-                      <button onClick={() => set(m.key, def)} disabled={isDef} title={`Mặc định: ${String(def)}`} className="w-16 min-h-6 inline-flex items-center justify-end px-1 rounded text-[11px] text-[var(--text-faint)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)] disabled:opacity-30 disabled:hover:bg-transparent">↺ {String(def)}</button>
+                      <button onClick={() => set(m.key, def)} disabled={isDef} title={`Mặc định: ${String(def)}`} className="w-16 min-h-6 inline-flex items-center justify-end px-1 rounded text-2xs text-[var(--text-faint)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)] disabled:opacity-30 disabled:hover:bg-transparent">↺ {String(def)}</button>
                     </div>
                   );
                 })}

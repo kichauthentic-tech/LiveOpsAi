@@ -33,7 +33,7 @@ export const PageIntro: React.FC<{ children: React.ReactNode; className?: string
           aria-expanded={open}
           // Vùng bấm 17px là dưới sàn 24px của WCAG 2.5.8, mà nút này có mặt ở 11 màn. `-m-1.5 p-1.5`
           // nới vùng bấm ra 24px+ mà không đẩy dòng chữ (cùng cách M5 đã dùng cho nút trong lưới ca).
-          className="shrink-0 -m-1.5 p-1.5 text-[11px] font-bold text-[var(--accent-text)] hover:underline whitespace-nowrap"
+          className="shrink-0 -m-1.5 p-1.5 text-2xs font-bold text-[var(--accent-text)] hover:underline whitespace-nowrap"
         >
           {open ? "Thu gọn" : "Chi tiết"}
         </button>

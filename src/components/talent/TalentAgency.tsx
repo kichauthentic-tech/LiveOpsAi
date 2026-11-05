@@ -107,7 +107,7 @@ export const TalentAgency: React.FC<Props> = ({ sessions, shiftSlots, brands, ta
                 type="button"
                 aria-pressed={on}
                 onClick={() => setDay(d)}
-                className={`flex flex-col items-center gap-0.5 py-1.5 min-h-12 rounded-xl border text-[11px] ${on ? "border-[var(--accent)] bg-[var(--accent)]/10" : "border-[var(--border)] bg-[var(--surface)]"}`}
+                className={`flex flex-col items-center gap-0.5 py-1.5 min-h-12 rounded-xl border text-2xs ${on ? "border-[var(--accent)] bg-[var(--accent)]/10" : "border-[var(--border)] bg-[var(--surface)]"}`}
               >
                 <span className={d === today ? "font-bold text-[var(--accent-text)]" : "text-[var(--text-faint)]"}>{d === today ? "Nay" : wd(d)}</span>
                 <b className="font-mono text-sm text-[var(--text)]">{d.slice(8)}</b>
@@ -123,7 +123,7 @@ export const TalentAgency: React.FC<Props> = ({ sessions, shiftSlots, brands, ta
 
       <div className="flex items-baseline justify-between gap-2 px-1">
         <h3 className="text-xs font-black text-[var(--text)]">{day === today ? "Hôm nay" : wd(day)} · {fmtDateVn(day, false)}</h3>
-        <span className="text-[11px] text-[var(--text-faint)]">{daySessions.length > 0 ? `${daySessions.length} ca · ${rooms} phòng` : ""}</span>
+        <span className="text-2xs text-[var(--text-faint)]">{daySessions.length > 0 ? `${daySessions.length} ca · ${rooms} phòng` : ""}</span>
       </div>
 
       {daySessions.length === 0 ? (

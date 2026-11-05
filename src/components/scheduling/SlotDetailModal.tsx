@@ -150,7 +150,7 @@ export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
         </div>
 
         {studioConflicts.length > 0 && (
-          <div className="p-2.5 bg-rose-950/85 border border-rose-800/60 rounded-xl text-[11px] text-rose-300 flex items-center gap-1.5">
+          <div className="p-2.5 bg-rose-950/85 border border-rose-800/60 rounded-xl text-2xs text-rose-300 flex items-center gap-1.5">
             <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> Trùng Studio với {studioConflicts.length} ca brand khác cùng khung giờ.
           </div>
         )}
@@ -180,7 +180,7 @@ export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
             ) : (
               <div className="flex flex-wrap gap-1.5">
                 {regs.map((r) => (
-                  <span key={r.id} className="text-[11px] bg-[var(--surface-elevated)] text-[var(--text-muted)] px-2 py-0.5 rounded-full">
+                  <span key={r.id} className="text-2xs bg-[var(--surface-elevated)] text-[var(--text-muted)] px-2 py-0.5 rounded-full">
                     {talentsById.get(r.talentId)?.name ?? r.talentId}
                   </span>
                 ))}
@@ -189,7 +189,7 @@ export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
 
             <div className="grid grid-cols-2 gap-2 pt-1">
               <label className="block min-w-0">
-              <span className="block mb-1 text-[11px] font-bold text-[var(--text-muted)]">Host</span>
+              <span className="block mb-1 text-2xs font-bold text-[var(--text-muted)]">Host</span>
               <select
                 value={hostId}
                 onChange={(e) => setHostId(e.target.value)}
@@ -211,7 +211,7 @@ export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
               </select>
               </label>
               <label className="block min-w-0">
-              <span className="block mb-1 text-[11px] font-bold text-[var(--text-muted)]">Trợ live <span className="font-normal text-[var(--text-faint)]">(tuỳ chọn)</span></span>
+              <span className="block mb-1 text-2xs font-bold text-[var(--text-muted)]">Trợ live <span className="font-normal text-[var(--text-faint)]">(tuỳ chọn)</span></span>
               <select
                 value={coHostId}
                 onChange={(e) => setCoHostId(e.target.value)}
@@ -234,24 +234,24 @@ export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
               </label>
             </div>
             {((hostId && !regIds.has(hostId)) || (coHostId && !regIds.has(coHostId))) && (
-              <p className="text-[11px] text-amber-400 flex items-center gap-1">
+              <p className="text-2xs text-amber-400 flex items-center gap-1">
                 <AlertTriangle className="w-3 h-3 shrink-0" /> Người đã chọn CHƯA đăng ký rảnh ca này — xác nhận trước khi chốt.
               </p>
             )}
 
             {hostConflict && (
-              <p className="text-[11px] text-rose-400 flex items-center gap-1">
+              <p className="text-2xs text-rose-400 flex items-center gap-1">
                 <AlertTriangle className="w-3 h-3 shrink-0" /> Host đã chọn đang {hostConflict.hostId === hostId ? "làm Host" : "làm Trợ live"} ca {hostConflict.brandName} {hostConflict.startTime}–{hostConflict.endTime} trùng giờ.
               </p>
             )}
             {coHostConflict && (
-              <p className="text-[11px] text-rose-400 flex items-center gap-1">
+              <p className="text-2xs text-rose-400 flex items-center gap-1">
                 <AlertTriangle className="w-3 h-3 shrink-0" /> Trợ live đã chọn đang {coHostConflict.hostId === coHostId ? "làm Host" : "làm Trợ live"} ca {coHostConflict.brandName} {coHostConflict.startTime}–{coHostConflict.endTime} trùng giờ.
               </p>
             )}
 
             {!!coHostId && coHostId === hostId && (
-              <p className="text-[11px] text-rose-400 flex items-center gap-1">
+              <p className="text-2xs text-rose-400 flex items-center gap-1">
                 <AlertTriangle className="w-3 h-3 shrink-0" /> Host và Trợ live đang là cùng một người — chọn lại Trợ live.
               </p>
             )}

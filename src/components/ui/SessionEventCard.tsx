@@ -100,7 +100,7 @@ export const SessionCardLegend: React.FC<{ showCancelled?: boolean; showTiming?:
   variant = "session",
   className = ""
 }) => (
-  <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-semibold text-[var(--text-muted)] ${className}`}>
+  <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs font-semibold text-[var(--text-muted)] ${className}`}>
     {variant === "session" ? (
       <>
         <span className="inline-flex items-center gap-1.5"><span className="sc-live" /> Đang live</span>
