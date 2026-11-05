@@ -20,3 +20,8 @@ create or replace function auth.role() returns text language sql stable as $$ se
 create or replace function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claims', true), '')::jsonb, '{}'::jsonb) $$;
 grant usage on schema public to anon, authenticated, service_role;
 grant usage on schema auth to anon, authenticated, service_role;
+-- Quyền mặc định của Supabase: mọi bảng/hàm mới trong public tự GRANT ALL cho anon/authenticated/service_role. Thiếu 3 dòng
+-- này thì bảng không có GRANT nào, mọi phép đọc bằng role authenticated ra 0 dòng và bộ kiểm quyền xanh GIẢ (audit 05/11).
+alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
+alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
+alter default privileges in schema public grant all on functions to anon, authenticated, service_role;

@@ -433,3 +433,24 @@ test("migration không chứa ký tự kẻ khung (U+2500–U+257F)", () => {
   const hits = FILES.filter((f) => /[\u2500-\u257f]/.test(readFileSync(join(DIR, f), "utf8")));
   expect(hits).toEqual([]);
 });
+
+// ---------------------------------------------------------------------------
+// View tạo/tạo lại từ 0198 phải tự thu quyền ghi
+// ---------------------------------------------------------------------------
+// Supabase tự GRANT ALL trên mọi view mới cho anon/authenticated. View một bảng (talents_secure) tự cập nhật được và chạy bằng
+// quyền owner ⇒ UPDATE/DELETE/INSERT qua view bỏ qua RLS: đo 05/11 trên replay, mọi phiên đã đăng nhập (talent, brand, không có
+// profile) xoá được host — cascade mất lịch sử rate và giờ làm theo ca. `create or replace view` giữ quyền cũ nhưng `drop` +
+// `create` thì cấp lại ⇒ mọi file từ 0198 có tạo view phải `revoke all on <view>` trong cùng file.
+test("migration từ 0198 tạo view thì phải revoke quyền ghi của view đó", () => {
+  const bad: string[] = [];
+  for (const file of FILES) {
+    if (file.localeCompare("0198_") < 0) continue;
+    const sql = sqlOnly(readFileSync(join(DIR, file), "utf8"));
+    for (const m of sql.matchAll(/create\s+(?:or\s+replace\s+)?view\s+(?:public\.)?([a-z0-9_]+)\s+as\b/gi)) {
+      const name = m[1];
+      const revoked = new RegExp(`revoke\\s+(?:all|[a-z ,]*\\b(?:insert|update|delete)\\b[a-z ,]*)\\s+on\\s+(?:public\\.)?${name}\\b`, "i").test(sql);
+      if (!revoked) bad.push(`${file}: view ${name} chưa revoke quyền ghi`);
+    }
+  }
+  expect(bad).toEqual([]);
+});

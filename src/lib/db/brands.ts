@@ -12,14 +12,14 @@ interface DbBrand {
   name: string;
   logo: string;
   industry: string;
-  contact_name: string;
-  phone: string;
-  email: string;
-  total_gmv: number;
+  contact_name: string | null;
+  phone: string | null;
+  email: string | null;
+  total_gmv: number | null;
   contract_status: Brand["contractStatus"];
   owner: string;
   owner_user_id: string | null;
-  billing_model: Brand["billingModel"];
+  billing_model: Brand["billingModel"] | null;
 }
 
 function fromDb(row: DbBrand): Brand {
@@ -28,10 +28,11 @@ function fromDb(row: DbBrand): Brand {
     name: row.name,
     logo: row.logo,
     industry: row.industry,
-    contactName: row.contact_name,
-    phone: row.phone,
-    email: row.email,
-    totalGmv: row.total_gmv,
+    // null = view che với role talent (0198).
+    contactName: row.contact_name ?? "",
+    phone: row.phone ?? "",
+    email: row.email ?? "",
+    totalGmv: row.total_gmv ?? 0,
     contractStatus: row.contract_status,
     owner: row.owner,
     ownerUserId: row.owner_user_id ?? undefined,
@@ -55,10 +56,21 @@ function toDb(b: Brand) {
   };
 }
 
+// PostgREST báo view chưa có (migration 0198 chưa chạy) bằng PGRST205; Postgres trần là 42P01.
+const VIEW_MISSING = new Set(["PGRST205", "42P01"]);
+
+// Đọc qua view brands_secure (0198): role talent bị đóng bảng gốc, view che liên hệ / tổng GMV / hình thức tính phí với talent.
+// Ghi vẫn vào bảng `brands` (nhân viên agency đọc lại được dòng vừa ghi qua RLS bảng gốc). DB chưa có view ⇒ đọc bảng gốc như cũ,
+// để client deploy trước migration không làm mất danh sách brand.
 export async function fetchBrands(): Promise<Brand[]> {
-  const { data, error } = await supabase.from("brands").select("*").order("created_at", { ascending: false });
-  if (error) throw error;
-  return (data as DbBrand[]).map(fromDb);
+  const viaView = await supabase.from("brands_secure").select("*").order("created_at", { ascending: false });
+  if (viaView.error && VIEW_MISSING.has(viaView.error.code)) {
+    const { data, error } = await supabase.from("brands").select("*").order("created_at", { ascending: false });
+    if (error) throw error;
+    return (data as DbBrand[]).map(fromDb);
+  }
+  if (viaView.error) throw viaView.error;
+  return (viaView.data as DbBrand[]).map(fromDb);
 }
 
 export async function createBrand(b: Brand): Promise<Brand> {
