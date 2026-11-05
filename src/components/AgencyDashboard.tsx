@@ -29,7 +29,7 @@ import { rangeLabel } from "./dashboard/period/ui";
 import type { AccountVM } from "./runrate/types";
 
 // Dashboard agency (demo duyệt 22/10/2026 — thay 3 tab Tháng này / Theo kỳ / Sức khoẻ): MỘT sàn (thanh "Sàn"), kỳ chọn ở thanh trên
-// (Tháng này · 7 ngày + "So với"; 23/10 bỏ "Tháng trước"/"Tự chọn" — Dashboard chỉ xem trong tháng, tháng đã hết xem ở Report Tháng), mọi con số tự so kỳ so sánh (lib/performance/periodCompare.ts). 24/10 thêm tab đầu "Tổng quan account" (mọi sàn, một dòng mỗi kênh, xếp theo rủi ro —
+// (Tháng này · 7 ngày · Tháng trước · Tự chọn + "So với"; 23/10 từng bỏ hai kỳ cuối, 05/11 user cần xem tháng đã hết ở đây nên trả lại), mọi con số tự so kỳ so sánh (lib/performance/periodCompare.ts). 24/10 thêm tab đầu "Tổng quan account" (mọi sàn, một dòng mỗi kênh, xếp theo rủi ro —
 // lib/performance/accountOverview.ts; không theo thanh "Sàn" và bộ chọn kỳ). Hai tab theo sàn:
 // "Toàn sàn" (mọi brand của sàn) và "Brand" (một brand: run-rate + 4 nút xem + Key Metrics + shop/ads/đội live đi theo nút).
 // Run-rate, dự báo, 4 nút xem chỉ có ở "Tháng này" — số đi qua MỘT lần tính (useChannelCards → buildChannelCard).
@@ -37,7 +37,9 @@ import type { AccountVM } from "./runrate/types";
 type View = "overview" | "platform" | "brand";
 const PERIODS: { id: PeriodKey; label: string }[] = [
   { id: "month", label: "Tháng này" },
-  { id: "7d", label: "7 ngày" }
+  { id: "7d", label: "7 ngày" },
+  { id: "prev", label: "Tháng trước" },
+  { id: "custom", label: "Tự chọn" }
 ];
 const MODES: { id: CompareMode; label: string }[] = [
   { id: "auto", label: "Tự động" },
@@ -102,12 +104,13 @@ export const AgencyDashboard: React.FC<AgencyDashboardProps> = (props) => {
   const brandId = lockBrandId ?? brandPick;
   const [periodKey, setPeriodKey] = useState<PeriodKey>("month");
   const [mode, setMode] = useState<CompareMode>("auto");
+  const [custom, setCustom] = useState({ start: `${today.slice(0, 7)}-01`, end: today });
 
   const platSessions = useMemo(() => sessions.filter((s) => platformOf(s) === platform && brands.some((b) => b.id === s.brandId)), [sessions, platform, brands]);
   const coverage = useMemo(() => dataCoverage(platSessions, today), [platSessions, today]);
   const period = useMemo(
-    () => resolvePeriod({ key: periodKey, mode, completeEnd: coverage.completeThrough, today, first: FIRST_DATA }),
-    [periodKey, mode, coverage.completeThrough, today]
+    () => resolvePeriod({ key: periodKey, mode, completeEnd: coverage.completeThrough, today, custom, first: FIRST_DATA }),
+    [periodKey, mode, coverage.completeThrough, today, custom]
   );
 
   // Thẻ kênh tháng đang chạy — MỘT lần tính cho cả hai tab.
@@ -196,6 +199,15 @@ export const AgencyDashboard: React.FC<AgencyDashboardProps> = (props) => {
           {view !== "overview" && <><div className="flex gap-1 rounded-xl border border-[var(--border)] p-1 overflow-x-auto" role="group" aria-label="Kỳ xem">
             {PERIODS.map((x) => <button key={x.id} type="button" aria-pressed={periodKey === x.id} onClick={() => setPeriodKey(x.id)} className={seg(periodKey === x.id)}>{x.label}</button>)}
           </div>
+          {periodKey === "custom" && (
+            <div className="inline-flex items-center gap-1.5 text-xs">
+              <label className="sr-only" htmlFor="dash-from">Từ ngày</label>
+              <input id="dash-from" type="date" value={custom.start} min={FIRST_DATA} max={today} onChange={(e) => e.target.value && setCustom((c) => ({ ...c, start: e.target.value }))} className="bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1 min-h-[30px] text-[var(--text)]" />
+              <span className="text-[var(--text-faint)]">→</span>
+              <label className="sr-only" htmlFor="dash-to">Tới ngày</label>
+              <input id="dash-to" type="date" value={custom.end} min={custom.start} max={today} onChange={(e) => e.target.value && setCustom((c) => ({ ...c, end: e.target.value }))} className="bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1 min-h-[30px] text-[var(--text)]" />
+            </div>
+          )}
           <label className="inline-flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
             So với
             <select value={mode} onChange={(e) => setMode(e.target.value as CompareMode)} className="bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1 min-h-[30px] text-[var(--text)] text-xs font-bold">
@@ -215,7 +227,7 @@ export const AgencyDashboard: React.FC<AgencyDashboardProps> = (props) => {
         ) : (
         <p role="status" className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[var(--text-faint)] mt-2">
           <span>Đang xem <b className="text-[var(--text-muted)]">{label}</b> · {spanDays(period.start, period.end)} ngày · so với <b className="text-[var(--text-muted)]">{prevLabel}</b>{period.mode === "mom" ? " cùng ngày tháng trước" : " ngay trước, cùng độ dài"}</span>
-          <span>· Dữ liệu đầy đủ đến {coverage.completeThrough ? ddmm(coverage.completeThrough) : "—"}</span>
+          <span>· Dữ liệu đầy đủ đến {coverage.completeThrough ? ddmm(coverage.completeThrough) : "—"}{period.cut ? " (kỳ cắt ở đây)" : ""}</span>
           {waiting > 0 && <button type="button" onClick={() => onNavigate("sessions")} className="min-h-[24px] font-bold text-amber-300 hover:underline">· {waiting} ca chưa có số liệu →</button>}
           <span className="sm:ml-auto">Chỉ số trong {platform} · dưới 5 ca không đánh giá tăng/giảm</span>
         </p>
