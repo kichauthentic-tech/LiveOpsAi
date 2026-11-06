@@ -13,6 +13,15 @@
 
 ## 1. Giai đoạn hiện tại (cập nhật 2026-10-31; mục KH Tháng bản gọn 27/10)
 
+- **06/11 (khuya, sau): VERA TIKTOK CA 15–18 NGÀY DAILY + KHUNG "CHƯA ĐỦ TIN CẬY" (đã commit + push 06/11, KHÔNG migration)** — VERA TikTok Daily mọi khung 1,9–2,3M/giờ; khối
+  16–18h chỉ 5 ca (đều ngày Campaign) đứng đầu ô gộp ⇒ 20 ca 15–18 Daily; sau đó 14–16h (3 ca) ⇒ 17 ca 13:00–16:00 (thưởng "giờ neo" khoá cả
+  tháng). Sửa trong `suggestEngine`: (a) ô khung 2h co với K ≥ 20 (`BLOCK_SHRINK_K`) về **85% mức nền** (`BLOCK_PRIOR` — khung ít live coi là
+  hơi kém khung đã chứng minh); (b) `HistorySummary.dailyBlockCells` — ca ngày Daily chấm bằng ô học từ ngày Daily (chưa từng live ⇒ 70%),
+  ngày Campaign vẫn ô gộp × hệ số. Backtest ngày Daily 13 tháng-kênh: 30,7% → 30,5% (riêng Daily đúng hơn 8–9/13 tháng). Bảng "Vì sao gợi ý"
+  hiện ô ngày Daily. Kết quả: VERA TikTok Daily 18–21 + 21–00 (463,5M), CROCS không đổi (5,42B). Test `suggestNoWeekday` (đỏ khi tắt 2 sửa).
+  User: khung ít dữ liệu xếp vào nhóm "chưa đủ tin cậy" ⇒ bảng "Vì sao gợi ý" chỉ xếp hạng khung ≥ `RELIABLE_BLOCK_MIN_CA` (10) ca, khung ít hơn
+  hiện riêng một dòng "Chưa đủ tin cậy (dưới 10 ca): 0–2h (1 ca), 8–10h (1 ca), 14–16h (3 ca)" (VERA TikTok).
+
 - **06/11 (khuya): LƯỚI THÁNG MỚI "VÔ LÝ" + "THÊM CA" THEO HIỆU SUẤT (đã commit + push 06/11, KHÔNG migration)** — user dựng CROCS T12 thấy lịch vô lý. So lịch thật T9–T11
   (Campaign 4,7 ca ~14,3h 09:00→00:00/00:30; Daily 2,2–2,7 ca 11–14 / 18–21 / 21–00): (1) tháng CHƯA có kế hoạch lấy `DEFAULT_SETTINGS`
   09–23 · 3 ca/ngày ⇒ Daily ra 17–20 + 20–23, Campaign 4 ca 11–23 — nay `monthPlanGrid.settingsFromHistory` (khung = giờ mở sớm / đóng muộn

@@ -43,7 +43,7 @@ import { RebasePlan, RebaseSet, activeDrafts, buildRebase, collectRebase, mergeA
 import { PlanGroupTargetsBlock } from "./PlanGroupTargets";
 import { PlanMonthGrid, type GridExtra } from "./monthplan/PlanMonthGrid";
 import type { SlotOutcome } from "../lib/scheduling/planWeeks";
-import { HistorySummary, STRATEGY_LABEL, SuggestResult, SuggestStrategy, buildBorrowedHistory, buildHistory, estimateSlots, suggestMonthPlan } from "../lib/scheduling/suggestEngine";
+import { HistorySummary, RELIABLE_BLOCK_MIN_CA, STRATEGY_LABEL, SuggestResult, SuggestStrategy, buildBorrowedHistory, buildHistory, estimateSlots, suggestMonthPlan } from "../lib/scheduling/suggestEngine";
 import { RELIABILITY_LABEL, buildMonthForecaster, forecastReliability, planOutlook, slotForecasts, targetForChance } from "../lib/performance/monthForecast";
 import { recordForecastSnapshots } from "../lib/db/forecastSnapshots";
 import { EngineParams } from "../lib/scheduling/engineParams";
@@ -1770,8 +1770,12 @@ const CONF_LABEL: Record<SuggestResult["confidence"], string> = { none: "không 
 // Lớp 4 — giải thích gợi ý: lịch sử dùng, hệ số học được, ô giờ mạnh/yếu, đường cong biên, khả thi target.
 function SuggestionPanel({ platform, history: h, result: r, committedHours, targetTotal, compare, current, onPick }: { platform: ReportPlatform; history: HistorySummary; result: SuggestResult; committedHours: number; targetTotal: number; compare: Record<SuggestStrategy, SuggestResult> | null; current: SuggestStrategy; onPick: (k: SuggestStrategy) => void }) {
   // Ô engine chấm điểm thật: khung 2 giờ gộp mọi thứ (06/11 — không xếp theo thứ trong tuần).
-  const top = (h.blockCells ?? []).filter((c) => c.n >= 2).slice(0, 6);
-  const weak = (h.blockCells ?? []).filter((c) => c.tag === "weak").slice(-4);
+  const dailyCells = (h.dailyBlockCells ?? []).length > 0 ? h.dailyBlockCells : (h.blockCells ?? []);
+  // Khung ít ca (< RELIABLE_BLOCK_MIN_CA) để riêng "chưa đủ tin cậy" — không xếp hạng chung với khung đã live nhiều (06/11, user).
+  const reliable = dailyCells.filter((c) => c.n >= RELIABLE_BLOCK_MIN_CA);
+  const thin = dailyCells.filter((c) => c.n > 0 && c.n < RELIABLE_BLOCK_MIN_CA).sort((a, b) => a.block - b.block);
+  const top = reliable.slice(0, 6);
+  const weak = reliable.filter((c) => c.tag === "weak").slice(-4);
   const curve = r.marginal.filter((_, i, arr) => i === arr.length - 1 || i % Math.max(1, Math.floor(arr.length / 5)) === 0);
   return (
     <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 space-y-3 text-xs">
@@ -1820,11 +1824,12 @@ function SuggestionPanel({ platform, history: h, result: r, committedHours, targ
       )}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div>
-          <p className="font-bold text-[var(--text-muted)] mb-1">Khung giờ mạnh nhất (khối 2h, mọi thứ)</p>
+          <p className="font-bold text-[var(--text-muted)] mb-1">Khung giờ mạnh nhất ngày Daily (khối 2h)</p>
           {top.map((c) => (
             <div key={`${c.weekday}-${c.block}`} className="flex justify-between gap-2"><span className="text-[var(--text)]">{c.block * 2}–{c.block * 2 + 2}h <span className="text-[var(--text-faint)]">({c.n} ca)</span></span><b className={c.tag === "strong" ? "text-emerald-400" : "text-[var(--text)]"}>{fmtVndShort(c.gmvPerHour)}/h</b></div>
           ))}
           {weak.length > 0 && <p className="mt-1 text-2xs text-[var(--text-faint)]">Yếu: {weak.map((c) => `${c.block * 2}–${c.block * 2 + 2}h`).join(", ")}</p>}
+          {thin.length > 0 && <p className="mt-1 text-2xs text-amber-300">Chưa đủ tin cậy (dưới {RELIABLE_BLOCK_MIN_CA} ca): {thin.map((c) => `${c.block * 2}–${c.block * 2 + 2}h (${c.n} ca)`).join(", ")} — engine coi là hơi kém hơn khung đã live nhiều.</p>}
         </div>
         <div>
           <p className="font-bold text-[var(--text-muted)] mb-1">Hệ số học từ lịch sử</p>
