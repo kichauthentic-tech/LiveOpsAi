@@ -17,6 +17,11 @@ describe("parseDashNumber", () => {
     expect(parseDashNumber("1.69", true)).toMatchObject({ value: 1690, guessed: true });
     expect(parseDashNumber("537.51k", true)).toMatchObject({ value: 537510, guessed: false });
   });
+  test("K/M mất dấu chấm (Dashboard luôn 2 số thập phân) ⇒ chèn lại, gắn cờ đoán", () => {
+    expect(parseDashNumber("434k", true)).toMatchObject({ value: 4340, guessed: true });
+    expect(parseDashNumber("222M", true)).toMatchObject({ value: 2220000, guessed: true });
+    expect(parseDashNumber("230 82k", true)).toMatchObject({ value: 230820, guessed: true });
+  });
   test("chữ nhầm trong số: a→8, x→K, ghi cờ đoán", () => {
     expect(parseDashNumber("44.a2x", true)).toMatchObject({ value: 44820, guessed: true });
   });
@@ -31,9 +36,15 @@ describe("parseDashPercent", () => {
     expect(parseDashPercent("1,76%")?.value).toBe(1.76);
     expect(parseDashPercent("6.09%")?.value).toBe(6.09);
   });
-  test("thiếu dấu % hoặc quá 100 ⇒ null", () => {
+  test("thiếu dấu % ⇒ null", () => {
     expect(parseDashPercent("41")).toBeNull();
-    expect(parseDashPercent("4193%")).toBeNull();
+  });
+  test("rơi dấu phẩy (Dashboard luôn 2 số thập phân) ⇒ chèn lại, gắn cờ đoán", () => {
+    expect(parseDashPercent("4193%")).toMatchObject({ value: 41.93, guessed: true });
+    expect(parseDashPercent("194%")).toMatchObject({ value: 1.94, guessed: true });
+    expect(parseDashPercent("046%")).toMatchObject({ value: 0.46, guessed: true });
+    expect(parseDashPercent("0,s4%")).toMatchObject({ value: 0.54, guessed: true });
+    expect(parseDashPercent("50%")).toMatchObject({ value: 50, guessed: false });
   });
 });
 
@@ -97,6 +108,29 @@ describe("readDashboard trên Dashboard TikTok tiếng Anh thật (CROCS 01/11, 
     expect(r.ads?.value).toBe(3400000);
     expect(r.ads?.guessed).toBe(true);
   });
+});
+
+describe("readDashboard trên màn LIVE Center TikTok tiếng Việt (CROCS 06/11, trước đây chỉ đọc được 2/7 và số phút sai)", () => {
+  // Bố cục khác Seller Center: Lượt hiển thị đứng TRƯỚC Lượt xem, không có thời lượng live, có GMV/giờ; ảnh qua Zalo nên mờ, OCR dính/tách chữ khác nhau mỗi lần phóng ảnh.
+  for (const file of ["tiktok-livecenter-vi-words.json", "tiktok-livecenter-vi-x3-words.json"]) {
+    const f = JSON.parse(readFileSync(`tests/fixtures/dashboard-ocr/${file}`, "utf8"));
+    const r = readDashboard(f.text, f.words);
+    test(`${file}: đọc đủ 7 số đúng theo nhãn, không theo thứ tự cột`, () => {
+      expect(r.platform).toBeUndefined();
+      expect(r.gmv?.value).toBe(21808103); // "21,808," + "103" bị tách làm hai từ
+      expect(r.impressions?.value).toBe(230820);
+      // Thật là 4.34K. "434k" / "4 34k" / "4sak" (trình duyệt): đúng cỡ nghìn, không được ra 4 hay 434.000; chữ số nhầm (s, a) thì tô vàng.
+      expect(r.views?.value).toBeGreaterThanOrEqual(4000);
+      expect(r.views?.value).toBeLessThan(5000);
+      expect(r.views?.guessed).toBe(true);
+      expect(r.ads?.value).toBe(2220000); // không được ra 222 triệu
+      expect(r.liveCtr?.value).toBe(71.76); // nhãn OCR "CTR của UVE"
+      expect(r.orders?.value).toBe(20);
+    });
+    test(`${file}: không lấy "khoảng thời gian 5 phút" làm phút đã live; suy từ GMV ÷ GMV/giờ và tô vàng`, () => {
+      expect(r.minutes).toMatchObject({ value: 130, guessed: true });
+    });
+  }
 });
 
 describe("nhận sàn", () => {

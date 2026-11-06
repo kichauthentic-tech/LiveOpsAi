@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Gauge, ImageUp } from "lucide-react";
 import type { Brand, LiveSession } from "../../types";
 import { SessionEventCard, SESSION_TONE } from "../ui/SessionEventCard";
@@ -240,7 +240,7 @@ async function readShot(file: Blob, onProgress: (p: number) => void): Promise<Da
   }
 }
 
-interface Shot { url: string; busy: boolean; progress: number; error: string | null; read: number }
+interface Shot { url: string; busy: boolean; progress: number; error: string | null; read: number; note?: string }
 
 const Body: React.FC<{ groups: Group[]; g: Group; sessions: LiveSession[]; today: string; brands: Brand[]; onPick: (k: string) => void; hideChips?: boolean }> = ({ groups, g, sessions, today, brands, onPick, hideChips }) => {
   const bench: ShiftBenchmark | null = useMemo(() => buildShiftBenchmark(sessions, g.brandId, g.platform, today), [sessions, g.brandId, g.platform, today]);
@@ -264,7 +264,8 @@ const Body: React.FC<{ groups: Group[]; g: Group; sessions: LiveSession[]; today
   const [hCounts, setHCounts] = useState<Record<string, string>>({});
   const [hNote, setHNote] = useState("");
 
-  const clearShot = () => setShot((s) => { if (s) URL.revokeObjectURL(s.url); return null; });
+  const shotSeq = useRef(0); // dán ảnh mới khi ảnh cũ còn đang đọc ⇒ bỏ kết quả ảnh cũ, không cho đè số của ảnh mới
+  const clearShot = () => { shotSeq.current++; setShot((s) => { if (s) URL.revokeObjectURL(s.url); return null; }); };
   const clearAll = () => { setMinutes(""); setGmv(""); setAds(""); setCounts({}); setGuessed(new Set()); setManual(false); setCtr(""); setCo(""); setWatch(""); setJoint(false); setHMinutes(""); setHGmv(""); setHAds(""); setHCounts({}); setHNote(""); clearShot(); };
   useEffect(() => {
     let off = false;
@@ -276,11 +277,13 @@ const Body: React.FC<{ groups: Group[]; g: Group; sessions: LiveSession[]; today
   useEffect(() => () => { setShot((s) => { if (s) URL.revokeObjectURL(s.url); return null; }); }, []);
 
   const load = async (file: Blob) => {
+    const seq = ++shotSeq.current;
     const url = URL.createObjectURL(file);
     setManual(true);
     setShot((s) => { if (s) URL.revokeObjectURL(s.url); return { url, busy: true, progress: 0, error: null, read: 0 }; });
     try {
-      const r = await readShot(file, (p) => setShot((s) => (s ? { ...s, progress: p } : s)));
+      const r = await readShot(file, (p) => { if (seq === shotSeq.current) setShot((s) => (s ? { ...s, progress: p } : s)); });
+      if (seq !== shotSeq.current) return;
       const shotPlatform = r.platform ?? g.platform;
       if (shotPlatform !== g.platform) {
         setShot((s) => (s ? { ...s, busy: false, progress: 1, read: 0, error: `Ảnh này là Dashboard ${shotPlatform} nhưng nhóm đang chọn là ${g.platform}. Chọn đúng nhóm rồi dán lại.` } : s));
@@ -288,7 +291,7 @@ const Body: React.FC<{ groups: Group[]; g: Group; sessions: LiveSession[]; today
       }
       const gs = new Set<string>();
       const mark = (k: string, x?: { guessed: boolean }) => { if (x?.guessed) gs.add(k); };
-      mark("views", r.views); mark("imp", r.impressions); mark("ads", r.ads); mark("minutes", r.minutes);
+      mark("views", r.views); mark("imp", r.impressions); mark("ads", r.ads); mark("minutes", r.minutes); mark("gmv", r.gmv); mark("orders", r.orders);
       const clicks = r.views && r.liveCtr ? Math.round((r.views.value * r.liveCtr.value) / 100) : null;
       if (clicks != null) gs.add("clicks"); // suy từ LIVE CTR × Views nên luôn là số ước tính
       setMinutes(fromReading(r.minutes)); setGmv(fromReading(r.gmv)); setAds(fromReading(r.ads));
@@ -296,14 +299,17 @@ const Body: React.FC<{ groups: Group[]; g: Group; sessions: LiveSession[]; today
       setGuessed(gs);
       setCtr(r.ctr ? String(r.ctr.value) : ""); setCo(r.co ? String(r.co.value) : ""); setWatch(r.watchSeconds ? String(Math.round(r.watchSeconds.value)) : "");
       if (r.ctr) gs.add("ctr"); if (r.co) gs.add("co");
-      setShot((s) => (s ? { ...s, busy: false, progress: 1, read: [r.gmv, r.views, r.impressions, r.ads, r.orders, r.liveCtr, r.minutes, r.ctr, r.co, r.watchSeconds].filter(Boolean).length } : s));
+      setShot((s) => (s ? { ...s, busy: false, progress: 1, read: [r.gmv, r.views, r.impressions, r.ads, r.orders, r.liveCtr, r.minutes, r.ctr, r.co, r.watchSeconds].filter(Boolean).length, note: r.minutes?.raw.startsWith("GMV ") ? "Ảnh không có thời lượng live: số phút suy từ GMV ÷ GMV/giờ." : undefined } : s));
     } catch (e) {
+      if (seq !== shotSeq.current) return;
       setShot((s) => (s ? { ...s, busy: false, error: e instanceof Error ? e.message : "Không đọc được ảnh." } : s));
     }
   };
   useEffect(() => {
     const onPaste = (e: ClipboardEvent) => {
-      const f = [...(e.clipboardData?.files ?? [])].find((x) => x.type.startsWith("image/"));
+      // Có app (Zalo, trình xem ảnh) chỉ đưa ảnh qua `items`, `files` rỗng.
+      const f = [...(e.clipboardData?.files ?? [])].find((x) => x.type.startsWith("image/"))
+        ?? [...(e.clipboardData?.items ?? [])].find((x) => x.kind === "file" && x.type.startsWith("image/"))?.getAsFile();
       if (f) { e.preventDefault(); void load(f); }
     };
     document.addEventListener("paste", onPaste);
@@ -388,7 +394,7 @@ const Body: React.FC<{ groups: Group[]; g: Group; sessions: LiveSession[]; today
               <div className="flex gap-3 items-start">
                 <img src={shot.url} alt="Ảnh Dashboard vừa dán" className="w-40 max-h-28 object-cover object-top rounded-lg border border-[var(--border)]" />
                 <div className="text-2xs text-[var(--text-muted)] space-y-1 min-w-0">
-                  {shot.busy ? <p>Đang đọc ảnh… {Math.round(shot.progress * 100)}%</p> : shot.error ? <p className="text-rose-300">{shot.error}</p> : <p>Đọc được {shot.read}/{SHOT_FIELDS[g.platform]} số. Số có viền vàng là số đoán, đối chiếu lại với màn hình rồi sửa ngay trên phễu.</p>}
+                  {shot.busy ? <p>Đang đọc ảnh… {Math.round(shot.progress * 100)}%</p> : shot.error ? <p className="text-rose-300">{shot.error}</p> : <p>Đọc được {shot.read}/{SHOT_FIELDS[g.platform]} số. Số có viền vàng là số đoán, đối chiếu lại với màn hình rồi sửa ngay trên phễu.{shot.note ? ` ${shot.note}` : ""}</p>}
                   <button type="button" className="underline hover:text-[var(--text)]" onClick={clearShot}>Xoá ảnh</button>
                 </div>
               </div>

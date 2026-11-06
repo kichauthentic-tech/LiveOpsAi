@@ -28,12 +28,16 @@ const norm = (s: string): string => s.normalize("NFD").replace(/[̀-ͯ]/g, "").r
 const hasDigit = (s: string) => /\d/.test(s);
 const hOf = (w: OcrWord) => Math.max(1, w.y1 - w.y0);
 
-/** Chữ OCR hay nhầm trong một số: o→0, a→8 (chỉ khi token đã có ≥ 2 chữ số), s/l/i→5/1/1. Trả cờ có sửa hay không. */
+/**
+ * Chữ OCR hay nhầm trong một số: o→0, a→8 (chỉ khi token đã có ≥ 2 chữ số, hoặc bắt đầu bằng chữ số và kết thúc bằng K/M như "4sak" = 4.34K),
+ * s/l/i→5/1/1. Trả cờ có sửa hay không.
+ */
 function cleanNumeric(raw: string): { s: string; fixed: boolean } {
   let fixed = false;
   const digits = (raw.match(/\d/g) ?? []).length;
+  const unitTail = /^\d[a-z\d.,]*[kmb]$/i.test(raw);
   const s = raw.toLowerCase().replace(/[oOaAlIsS]/g, (c) => {
-    if (digits < 2 && !/[oO]/.test(c)) return c;
+    if (digits < 2 && !unitTail && !/[oO]/.test(c)) return c;
     fixed = true;
     return { o: "0", a: "8", l: "1", i: "1", s: "5" }[c.toLowerCase() as "o"] ?? c;
   });
@@ -55,17 +59,25 @@ export function parseDashNumber(rawIn: string, kUnit = false): Reading | null {
   const thousands = /^\d{1,3}(?:[.,]\d{3})+$/.test(num) && !unit;
   const value = thousands ? Number(num.replace(/[.,]/g, "")) : Number(num.replace(",", "."));
   if (!Number.isFinite(value)) return null;
+  // Dashboard luôn hiện K/M với 2 số thập phân ("4.34K", "2.22M"); OCR hay rơi dấu chấm ("434k", "222M") ⇒ chèn lại trước 2 chữ số cuối, gắn cờ đoán.
+  if (unit && kUnit && /^\d{3,}$/.test(num)) return { value: (Number(num) / 100) * MULT[unit], guessed: true, raw: rawIn };
   if (unit) return { value: value * MULT[unit], guessed: fixed || unit === "x", raw: rawIn };
   if (kUnit && !thousands && /[.,]\d{1,2}$/.test(num)) return { value: value * 1e3, guessed: true, raw: rawIn };
-  return { value, guessed: fixed, raw: rawIn };
+  // Còn chữ số/đơn vị sau phần đã đọc ("106z4k"): số đọc được không chắc.
+  return { value, guessed: fixed || /[\dkmb]/.test(s.slice(m[0].length)), raw: rawIn };
 }
 
-/** "41 93%", "41,93%", "1.76%" → 41,93 / 1,76. Không thấy dấu % thì null. */
+/**
+ * "41 93%", "41,93%", "1.76%" → 41,93 / 1,76. Không thấy dấu % thì null. Dashboard hiện % với 2 số thập phân: OCR rơi dấu phẩy ("194%", "046%",
+ * "4193%") ⇒ chèn lại trước 2 chữ số cuối và gắn cờ đoán; chữ nhầm trong số ("0,s4%") sửa như số đếm.
+ */
 export function parseDashPercent(raw: string): Reading | null {
-  const m = raw.replace(/\s+/g, " ").match(/(\d{1,3})(?:[\s.,]+(\d{1,2}))?\s*%/);
+  const { s, fixed } = cleanNumeric(raw.replace(/\s+/g, " "));
+  const m = s.match(/(\d+)(?:[\s.,]+(\d{1,2}))?\s*%/);
   if (!m) return null;
-  const v = Number(`${m[1]}.${m[2] ?? "0"}`);
-  return Number.isFinite(v) && v <= 100 ? { value: v, guessed: false, raw } : null;
+  const lost = m[2] == null && (m[1].length >= 3 || (m[1].length >= 2 && m[1][0] === "0"));
+  const v = lost ? Number(m[1]) / 100 : Number(`${m[1]}.${m[2] ?? "0"}`);
+  return Number.isFinite(v) && v <= 100 ? { value: v, guessed: fixed || lost, raw } : null;
 }
 
 /** Vị trí bắt đầu của chuỗi nhãn (đã bỏ dấu) trong dãy từ liền nhau trên cùng một dòng. */
@@ -106,6 +118,65 @@ function valueBelow(words: OcrWord[], label: { x0: number; y1: number; x1: numbe
     out += dotLost ? `.${line[i].text}` : ` ${line[i].text}`;
   }
   return out;
+}
+
+/**
+ * Ô chữ: các từ liền nhau trên cùng một dòng; khoảng trống ngang > 2,5 lần chiều cao chữ là sang ô khác (cột KPI cách nhau vài trăm px).
+ * `key` = chữ đã bỏ dấu, chỉ giữ chữ + số, viết liền ⇒ khớp được cả khi OCR dính chữ ("Lượthiền thi") hay tách số ("4" "34k").
+ */
+interface Cell { text: string; key: string; x0: number; y0: number; x1: number; y1: number }
+function cellsOf(words: OcrWord[]): Cell[] {
+  const mid = (w: OcrWord) => (w.y0 + w.y1) / 2;
+  const lines: OcrWord[][] = [];
+  for (const w of [...words].sort((a, b) => mid(a) - mid(b))) {
+    const line = lines.find((l) => Math.abs(mid(l[0]) - mid(w)) < Math.min(hOf(l[0]), hOf(w)) * 0.5);
+    if (line) line.push(w); else lines.push([w]);
+  }
+  const out: Cell[] = [];
+  for (const line of lines) {
+    const ws = line.sort((a, b) => a.x0 - b.x0);
+    let cur: OcrWord[] = [];
+    const flush = () => {
+      if (!cur.length) return;
+      const text = cur.map((w) => w.text).join(" ");
+      out.push({ text, key: norm(text).replace(/[^a-z0-9]/g, ""), ...box(cur) });
+      cur = [];
+    };
+    for (const w of ws) {
+      const prev = cur[cur.length - 1];
+      if (prev && w.x0 - prev.x1 > Math.max(hOf(prev), hOf(w)) * 2.5) flush();
+      cur.push(w);
+    }
+    flush();
+  }
+  return out;
+}
+
+/**
+ * Số dưới ô nhãn (lưới KPI TikTok: nhãn chữ nhỏ, số to ngay dưới, căn trái). Nhãn trùng ở chú thích biểu đồ/bảng ⇒ lấy ứng viên có số CAO CHỮ nhất
+ * (số KPI to hơn số trong bảng), không dựa vào thứ tự cột (Seller Center: Lượt xem · Lượt hiển thị; LIVE Center: Lượt hiển thị · Lượt xem).
+ */
+function readCell(cells: Cell[], label: (key: string) => boolean, parse: (text: string) => Reading | null): Reading | undefined {
+  let top: { r: Reading; h: number } | null = null;
+  for (const l of cells.filter((c) => label(c.key))) {
+    const h = l.y1 - l.y0, tol = Math.max(h * 2, (l.x1 - l.x0) * 0.8);
+    const v = cells
+      .filter((c) => /\d/.test(c.text) && c !== l && c.y0 >= l.y1 - h * 0.3 && c.y0 <= l.y1 + h * 3.5 && Math.abs(c.x0 - l.x0) <= tol)
+      .sort((a, b) => a.y0 - b.y0)[0];
+    const r = v ? parse(v.text) : null;
+    if (v && r && (!top || v.y1 - v.y0 > top.h)) top = { r, h: v.y1 - v.y0 };
+  }
+  return top?.r;
+}
+
+/** Số tiền có dấu phẩy nghìn mà OCR tách làm hai từ ("21,808," + "103") ⇒ ghép lại theo dòng. */
+function joinThousands(words: OcrWord[], first: OcrWord): string {
+  let joined = first.text, edge = first.x1;
+  for (const w of words.filter((x) => x !== first && /^\d{3}(?:[.,]\d{3})*[.,]?$/.test(x.text) && x.x0 >= edge - 5 && x.x0 - edge < hOf(first) * 1.2 && x.y1 > first.y0 && x.y0 < first.y1).sort((a, c) => a.x0 - c.x0)) {
+    if (!/[.,]$/.test(joined)) break;
+    joined += w.text; edge = w.x1;
+  }
+  return joined.replace(/[.,]$/, "");
 }
 
 /** Số có chữ số nằm ngay dưới nhãn, nhãn và số CĂN GIỮA nhau (Shopee) nên so theo phần giao nhau theo chiều ngang, không theo mép trái. */
@@ -181,12 +252,7 @@ function readTikTokEnglish(text: string, words: OcrWord[]): DashboardReading {
     const below = words.filter((w) => hasDigit(w.text) && w.y0 >= b.y1 - h * 0.3 && w.y0 <= b.y1 + h * 9 && w.x1 >= b.x0 - h * 6 && w.x0 <= b.x1 + h * 6).sort((a, c) => a.y0 - c.y0 || a.x0 - c.x0);
     const first = below.find((w) => /^\d{1,3}(?:[.,]\d{3})*[.,]?$/.test(w.text) && /[.,]/.test(w.text));
     if (!first) continue;
-    let joined = first.text, edge = first.x1;
-    for (const w of words.filter((x) => x !== first && /^\d{1,3}$/.test(x.text) && x.x0 >= edge - 5 && x.x0 - edge < hOf(first) * 1.2 && x.y1 > first.y0 && x.y0 < first.y1).sort((a, c) => a.x0 - c.x0)) {
-      if (!/[.,]$/.test(joined)) break;
-      joined += w.text; edge = w.x1;
-    }
-    const r = parseDashNumber(joined);
+    const r = parseDashNumber(joinThousands(words, first));
     if (r && (!gmvBest || r.value > gmvBest.value)) gmvBest = r;
   }
   if (gmvBest) out.gmv = gmvBest;
@@ -231,8 +297,10 @@ export function readDashboard(text: string, words: OcrWord[]): DashboardReading 
   const out: DashboardReading = {};
 
   // Tiếng Việt "2 giờ 58 phút" · tiếng Anh "2 hours 58 minutes" / "2h 58m" / "58 min" (Seller Center đặt tiếng Anh, 01/11).
-  const dur = text.match(/(\d+)\s*gi[oờ]\S*[\s,]+(\d+)\s*ph[uú]t/i) ?? text.match(/(\d+)\s*(?:hours?|hrs?|h)\b[\s,]*(\d+)\s*(?:minutes?|mins?|m)\b/i)
-    ?? text.match(/(\d+)\s*ph[uú]t/i) ?? text.match(/(\d+)\s*(?:minutes?|mins?)\b/i);
+  // Bỏ chú thích biểu đồ "khoảng thời gian 5 phút" (06/11: màn LIVE Center không hiện thời lượng, app lấy nhầm số 5 này làm phút đã live).
+  const t = text.replace(/kho[aả]ng\s+th[oờ]i\s+gian\s+\d+\s*ph[uú]t/gi, "");
+  const dur = t.match(/(\d+)\s*gi[oờ]\S*[\s,]+(\d+)\s*ph[uú]t/i) ?? t.match(/(\d+)\s*(?:hours?|hrs?|h)\b[\s,]*(\d+)\s*(?:minutes?|mins?|m)\b/i)
+    ?? t.match(/(\d+)\s*ph[uú]t/i) ?? t.match(/(\d+)\s*(?:minutes?|mins?)\b/i);
   if (dur) out.minutes = { value: dur.length > 2 ? Number(dur[1]) * 60 + Number(dur[2]) : Number(dur[1]), guessed: false, raw: dur[0] };
 
   // GMV: số lớn nhất (nhiều chữ số, có dấu phẩy nghìn) nằm dưới nhãn "GMV đã ghi nhận" — chữ giữa, nên không ràng vị trí ngang.
@@ -241,48 +309,34 @@ export function readDashboard(text: string, words: OcrWord[]): DashboardReading 
   for (const l of gmvLabels) {
     const b = box(l);
     const h = hOf(l[0]);
-    for (const w of words.filter((x) => /^\d{1,3}(?:[.,]\d{3})+$/.test(x.text) && x.y0 >= b.y1 - h * 0.3 && x.y0 <= b.y1 + h * 9)) {
-      const r = parseDashNumber(w.text);
+    for (const w of words.filter((x) => /^\d{1,3}(?:[.,]\d{3})*[.,]?$/.test(x.text) && /[.,]/.test(x.text) && x.y0 >= b.y1 - h * 0.3 && x.y0 <= b.y1 + h * 9)) {
+      const joined = joinThousands(words, w);
+      const r = /^\d{1,3}(?:[.,]\d{3})+$/.test(joined) ? parseDashNumber(joined) : null;
       if (r && (!gmvBest || r.value > gmvBest.value)) gmvBest = r;
     }
   }
   if (gmvBest) out.gmv = gmvBest;
 
-  // Hàng KPI 1: Lượt xem · Lượt hiển thị · Chi phí quảng cáo (cột theo thứ tự trái → phải; "hiển thị" hay bị đọc hỏng nên không dựa vào nó).
-  const ads = findLabels(words, ["chi", "phi"])[0] ?? findLabels(words, ["ad", "spend"])[0] ?? findLabels(words, ["ads", "spend"])[0] ?? findLabels(words, ["ad", "cost"])[0] ?? findLabels(words, ["ads", "cost"])[0];
-  if (ads) {
-    const a = box(ads), h = hOf(ads[0]);
-    const row = words.filter((w) => Math.abs(w.y0 - a.y0) < h * 0.8 && w.x0 < a.x0 - 5 && ["luot", "xem", "hien", "thi", "views", "live", "impressions"].includes(norm(w.text)));
-    // Việt: mỗi cột bắt đầu bằng "Lượt"; Anh: cột 1 = "Views", cột 2 = "Impressions" (đứng sau chữ "LIVE" nếu có).
-    const en = row.filter((w) => ["views", "impressions"].includes(norm(w.text)));
-    const cols = (row.some((w) => norm(w.text) === "luot") ? row.filter((w) => norm(w.text) === "luot") : en).sort((x, y) => x.x0 - y.x0);
-    if (cols[0]) {
-      const v = valueBelow(words, { x0: cols[0].x0, y1: cols[0].y1, x1: cols[0].x1 + h * 3 }, h);
-      out.views = (v && parseDashNumber(v, true)) || undefined;
-    }
-    if (cols[1]) {
-      const v = valueBelow(words, { x0: cols[1].x0, y1: cols[1].y1, x1: cols[1].x1 + h * 3 }, h);
-      out.impressions = (v && parseDashNumber(v, true)) || undefined;
-    }
-    const v = valueBelow(words, { x0: a.x0, y1: a.y1, x1: a.x1 }, h);
-    out.ads = (v && parseDashNumber(v, true)) || undefined;
+  // Lưới KPI: tìm theo chữ của ô nhãn (khớp lỏng, OCR hay dính/rơi chữ: "Lượthiền thi", "Ch phí quảng cáo", "CTR của UVE").
+  const cells = cellsOf(words);
+  const count = (x: string) => (/%/.test(x) ? null : parseDashNumber(x, true));
+  const plain = (x: string) => (/%/.test(x) ? null : parseDashNumber(x));
+  out.impressions = readCell(cells, (k) => /^(?!gpm)[a-z]{0,6}hienthi$|^(live)?impressions$/.test(k), count);
+  out.views = readCell(cells, (k) => /^[a-z]{0,5}xem$|^(live)?views$/.test(k), count);
+  out.ads = readCell(cells, (k) => /quangcao|^chiphi|^ads?(spend|cost)$/.test(k), count);
+  out.liveCtr = readCell(cells, (k) => /^ctrcua|^ctroflive|^livectr$/.test(k), parseDashPercent);
+  out.orders = readCell(cells, (k) => /^donhang(?!.*sku)|^(attributed)?orders$/.test(k), plain);
+  // Màn LIVE Center không hiện thời lượng nhưng có ô "GMV/giờ" ⇒ phút đã live ≈ GMV ÷ GMV/giờ (số ước tính, tô vàng). OCR đọc "GMV/giờ" thành "@MYVv/giờ", "GMvgiờ"…
+  if (!out.minutes && out.gmv) {
+    const gph = readCell(cells, (k) => /^[a-z]{0,4}vgio{0,2}$|^gmvperhour$/.test(k), count);
+    const m = gph && gph.value > 0 ? Math.round((out.gmv.value / gph.value) * 60) : 0;
+    if (m >= 1 && m <= 24 * 60) out.minutes = { value: m, guessed: true, raw: `GMV ${out.gmv.raw} ÷ GMV/giờ ${gph!.raw}` };
   }
-
-  // LIVE CTR dưới nhãn "CTR của LIVE" (hàng KPI 2, cột đầu).
-  const ctr = findLabels(words, ["ctr", "cua", "live"])[0] ?? findLabels(words, ["live", "ctr"])[0] ?? findLabels(words, ["ctr", "of", "live"])[0];
-  if (ctr) {
-    const b = box(ctr), h = hOf(ctr[0]);
-    const v = valueBelow(words, { x0: b.x0, y1: b.y1, x1: b.x1 }, h);
-    out.liveCtr = (v && parseDashPercent(v)) || undefined;
+  // Lượt xem luôn ít hơn lượt hiển thị; ngược lại là đọc sai một trong hai ⇒ tô vàng cả hai.
+  if (out.views && out.impressions && out.views.value > out.impressions.value) {
+    out.views = { ...out.views, guessed: true };
+    out.impressions = { ...out.impressions, guessed: true };
   }
-
-  // Đơn hàng đã ghi nhận.
-  const ord = findLabels(words, ["don", "hang", "da", "ghi"])[0] ?? findLabels(words, ["don", "hang"]).find((l) => l[0].y0 > 1000) ?? findLabels(words, ["don", "hang"])[0]
-    ?? findLabels(words, ["orders"]).find((l) => l[0].y0 > 1000) ?? findLabels(words, ["orders"])[0];
-  if (ord) {
-    const b = box(ord), h = hOf(ord[0]);
-    const v = valueBelow(words, { x0: b.x0, y1: b.y1, x1: b.x1 }, h);
-    out.orders = (v && parseDashNumber(v)) || undefined;
-  }
+  for (const k of Object.keys(out) as (keyof DashboardReading)[]) if (out[k] === undefined) delete out[k];
   return out;
 }
