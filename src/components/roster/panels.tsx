@@ -32,6 +32,8 @@ const CARD_BORDER: Record<string, string> = {
 // ---------------- Lưới tuần ----------------
 export const WeekGrid: React.FC<{
   weekStart: string;
+  /** Chỉ vẽ ngày thuộc tháng này (tuần vắt hai tháng bị cắt) — lịch xếp theo tháng. */
+  month?: string;
   channels: ChannelRow[];
   shifts: RosterShift[];
   analysis: RosterAnalysis;
@@ -42,12 +44,13 @@ export const WeekGrid: React.FC<{
   onAdd: (channel: ChannelRow, date: string) => void;
   /** Bản gọn 25/10: giờ tháng + một kết luận dưới tên kênh (thay chế độ "Tháng này"). */
   channelMeta?: (channel: ChannelRow) => React.ReactNode;
-}> = ({ weekStart, channels, shifts, analysis, nameOf, selectedKey, canAdd, onSelect, onAdd, channelMeta }) => {
-  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+}> = ({ weekStart, month, channels, shifts, analysis, nameOf, selectedKey, canAdd, onSelect, onAdd, channelMeta }) => {
+  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)).filter((d) => !month || d.slice(0, 7) === month);
+  const labelW = channelMeta ? 168 : 140;
   return (
     <div className="space-y-2">
       <div className="overflow-x-auto rounded-xl border border-[var(--border)]">
-        <div className="grid min-w-[1060px]" style={{ gridTemplateColumns: `${channelMeta ? 168 : 140}px repeat(7, minmax(126px, 1fr))` }}>
+        <div className="grid" style={{ minWidth: labelW + days.length * 128, gridTemplateColumns: `${labelW}px repeat(${days.length}, minmax(126px, 1fr))` }}>
           <div className="sticky left-0 z-10 bg-[var(--surface-elevated)] px-2 py-2 text-xs font-bold text-[var(--text-muted)] border-b border-r border-[var(--border)]">Kênh</div>
           {days.map((d) => (
             <div key={d} className="bg-[var(--surface-elevated)] px-2 py-2 text-xs font-bold text-[var(--text)] border-b border-r border-[var(--border)]">

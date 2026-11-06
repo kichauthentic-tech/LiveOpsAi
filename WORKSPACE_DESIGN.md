@@ -13,6 +13,7 @@
 
 ## 1. Giai đoạn hiện tại (cập nhật 2026-10-31; mục KH Tháng bản gọn 27/10)
 
+- **06/11 (cuối): ĐIỀU PHỐI — LƯỚI THEO THÁNG (đã commit + push 06/11, KHÔNG migration)** — user: tuần vắt hai tháng (30/11–6/12) trộn ca tháng 11 vào lịch tháng 12 dễ nhầm. Header đổi từ "‹ tuần ›" sang "‹ Tháng 12/2026 ›" (state `viewMonth` riêng trong `RosterBoard`, không còn suy từ thứ Năm của tuần); trên lưới có dãy tuần trong tháng (1–6 · 7–13 · … · 28–31); `WeekGrid({month})` chỉ vẽ ngày thuộc tháng. Luật lịch/kiểm lỗi và **Công bố vẫn theo tuần ISO** (RPC `publish_roster_week`) — hộp xác nhận báo nếu có ca nháp ngoài tháng (ngày đang ẩn) sẽ công bố kèm. Sang tháng hiện tại thì nhảy tới tuần có hôm nay; `goWeekOf(date)` (việc cần làm, Thêm ca) đổi cả tháng. Verify: tsc/eslint, trình duyệt dev T11/T12.
 - **06/11 (khuya, sau): VERA TIKTOK CA 15–18 NGÀY DAILY + KHUNG "CHƯA ĐỦ TIN CẬY" (đã commit + push 06/11, KHÔNG migration)** — VERA TikTok Daily mọi khung 1,9–2,3M/giờ; khối
   16–18h chỉ 5 ca (đều ngày Campaign) đứng đầu ô gộp ⇒ 20 ca 15–18 Daily; sau đó 14–16h (3 ca) ⇒ 17 ca 13:00–16:00 (thưởng "giờ neo" khoá cả
   tháng). Sửa trong `suggestEngine`: (a) ô khung 2h co với K ≥ 20 (`BLOCK_SHRINK_K`) về **85% mức nền** (`BLOCK_PRIOR` — khung ít live coi là

@@ -128,6 +128,9 @@ export const RosterBoard: React.FC<Props> = (p) => {
   const prompt = usePrompt();
   const canWrite = STAFF.includes(p.currentRole);
   const [weekStart, setWeekStart] = useState(() => isoWeekStart(addDays(getTodayDate(), 7)));
+  // 06/11: lịch xếp theo THÁNG — chọn tháng trước rồi tới tuần trong tháng; lưới chỉ vẽ ngày của tháng đang chọn
+  // (tuần vắt hai tháng không còn trộn ca tháng trước vào). Mặc định: tháng chứa thứ Năm của tuần tới.
+  const [viewMonth, setViewMonth] = useState(() => addDays(isoWeekStart(addDays(getTodayDate(), 7)), 3).slice(0, 7));
   const [section, setSectionState] = useState<Section | null>(null);
   const sectionRef = useRef<HTMLDivElement>(null);
   const moreRef = useRef<HTMLDetailsElement>(null);
@@ -232,11 +235,28 @@ export const RosterBoard: React.FC<Props> = (p) => {
 
   const readOnly = !canWrite || backendMissing;
   const weekEnd = addDays(weekStart, 6);
-  const goWeek = (delta: number) => {
-    setWeekStart(addDays(weekStart, delta));
+  const goMonth = (delta: number) => {
+    const [y, m] = viewMonth.split("-").map(Number);
+    const d = new Date(Date.UTC(y, m - 1 + delta, 1));
+    const next = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+    const now = getTodayDate();
+    setViewMonth(next);
+    setWeekStart(isoWeekStart(now.slice(0, 7) === next ? now : `${next}-01`));
     setSelectedKey(null);
     setCostPlan(null);
   };
+  /** Các tuần (thứ Hai) chạm tháng đang xem, kèm nhãn ngày trong tháng ("1–6", "7–13"…). */
+  const monthWeeks = useMemo(() => {
+    const first = `${viewMonth}-01`;
+    const last = `${viewMonth}-${String(daysInMonth(viewMonth)).padStart(2, "0")}`;
+    const out: { start: string; label: string }[] = [];
+    for (let w = isoWeekStart(first); w <= last; w = addDays(w, 7)) {
+      const a = w < first ? first : w;
+      const b = addDays(w, 6) > last ? last : addDays(w, 6);
+      out.push({ start: w, label: a === b ? String(Number(a.slice(8))) : `${Number(a.slice(8))}–${Number(b.slice(8))}` });
+    }
+    return out;
+  }, [viewMonth]);
 
   const talentById = useMemo(() => new Map(p.talents.map((t) => [t.id, t])), [p.talents]);
   const nameOf = useCallback((id: string) => talentShortName(talentById.get(id)) || "?", [talentById]);
@@ -276,6 +296,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
   const warns = weekIssues.filter((i) => i.severity === "warn");
   const openShifts = wk.filter((s) => s.kind === "open");
   const draftedCount = openShifts.filter((s) => s.drafted).length;
+  const outsideDrafts = openShifts.filter((s) => s.drafted && s.date.slice(0, 7) !== viewMonth).length;
   const weekCost = wk.reduce((s, x) => s + shiftCost(x, p.talents, p.talentRateHistory).amount, 0);
   const costMissing = wk.filter((x) => shiftCost(x, p.talents, p.talentRateHistory).missing).length;
   const selected = selectedKey ? shifts.find((s) => s.key === selectedKey) ?? null : null;
@@ -326,7 +347,6 @@ export const RosterBoard: React.FC<Props> = (p) => {
   const st0 = useMemo(() => statusOf(m0), [statusOf, m0]);
   const st1 = useMemo(() => statusOf(m1), [statusOf, m1]);
   const st2 = useMemo(() => statusOf(m2), [statusOf, m2]);
-  const viewMonth = addDays(weekStart, 3).slice(0, 7);
   const short = desk.nowRows.filter((r) => r.verdict && r.verdict.add > 0.5).sort((a, b) => b.verdict!.add - a.verdict!.add);
   const monthEndDay = (m: string) => new Date(Date.UTC(Number(m.slice(0, 4)), Number(m.slice(5)), 0)).getUTCDate();
   const daysLeft = monthEndDay(m0) - Number(today.slice(8, 10)) + 1;
@@ -619,6 +639,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
       const msg = [
         `Công bố lịch tuần ${dayLabel(weekStart)} – ${dayLabel(weekEnd)}?`,
         `${draftedCount} ca nháp sẽ thành ca thật, mỗi host/trợ nhận MỘT tin liệt kê ca của mình.`,
+        outsideDrafts > 0 ? `Công bố theo tuần nên gồm cả ${outsideDrafts} ca nháp ngoài tháng ${Number(viewMonth.slice(5))} (ngày đang ẩn trên lưới).` : "",
         holes > 0 ? `${holes} ca mở chưa có host sẽ vẫn mở (không công bố).` : "",
         warns.length > 0 ? `Còn ${warns.length} cảnh báo (không chặn).` : ""
       ]
@@ -650,6 +671,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
 
   // ---- việc cần làm: mỗi việc một nút ----
   const goWeekOf = (date: string) => {
+    setViewMonth(date.slice(0, 7));
     setWeekStart(isoWeekStart(date));
     setSelectedKey(null);
     setCostPlan(null);
@@ -802,13 +824,13 @@ export const RosterBoard: React.FC<Props> = (p) => {
         actions={
           <>
             <div className="flex items-center gap-1 rounded-xl border border-[var(--border)] bg-[var(--surface-base)] p-1">
-              <button type="button" onClick={() => goWeek(-7)} className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text)]" aria-label="Tuần trước">
+              <button type="button" onClick={() => goMonth(-1)} className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text)]" aria-label="Tháng trước">
                 <ChevronLeft className="w-4 h-4" />
               </button>
               <span className="px-2 text-xs font-bold text-[var(--text)] whitespace-nowrap">
-                {dayLabel(weekStart)} – {dayLabel(weekEnd)}
+                Tháng {Number(viewMonth.slice(5))}/{viewMonth.slice(0, 4)}
               </span>
-              <button type="button" onClick={() => goWeek(7)} className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text)]" aria-label="Tuần sau">
+              <button type="button" onClick={() => goMonth(1)} className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text)]" aria-label="Tháng sau">
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>
@@ -883,7 +905,18 @@ export const RosterBoard: React.FC<Props> = (p) => {
             </div>
             <p className="text-2xs text-[var(--text-muted)]">{planNote ?? "Chỉ lấy người đã đăng ký đúng ca, giữ giờ tối thiểu/tối đa và luật lịch. Bấm là ghi NHÁP ngay, talent chưa thấy; ô bạn tự xếp không bị ghi đè."}</p>
           </div>
-          <WeekGrid weekStart={weekStart} channels={channels} shifts={wk} analysis={analysis} nameOf={nameOf} selectedKey={selectedKey} canAdd={!readOnly} onSelect={setSelectedKey} onAdd={addShift} channelMeta={channelMeta} />
+          <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs" aria-label="Tuần trong tháng">
+            <span className="font-black text-[var(--text)]">Tháng {Number(viewMonth.slice(5))} · tuần</span>
+            <div className="flex flex-wrap items-center rounded-xl border border-[var(--border)] bg-[var(--surface-base)] p-1 font-bold" role="group">
+              {monthWeeks.map((w) => (
+                <button key={w.start} type="button" aria-pressed={weekStart === w.start} onClick={() => goWeekOf(w.start < `${viewMonth}-01` ? `${viewMonth}-01` : w.start)} className={`px-2.5 py-1 rounded-lg tabular-nums ${weekStart === w.start ? "seg-on" : "text-[var(--text-muted)] hover:text-[var(--text)]"}`}>
+                  {w.label}
+                </button>
+              ))}
+            </div>
+            {!monthWeeks.some((w) => w.start === weekStart) && <span className="text-amber-300">Tuần {dayLabel(weekStart)} – {dayLabel(weekEnd)} không thuộc tháng này — chọn một tuần.</span>}
+          </div>
+          <WeekGrid weekStart={weekStart} month={viewMonth} channels={channels} shifts={wk} analysis={analysis} nameOf={nameOf} selectedKey={selectedKey} canAdd={!readOnly} onSelect={setSelectedKey} onAdd={addShift} channelMeta={channelMeta} />
         </div>
         <section className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 space-y-2" aria-label="Khối lượng nhân sự">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
