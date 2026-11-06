@@ -9,6 +9,7 @@ import { loadRememberedBrandId } from "../lib/defaultBrand";
 import { errorMessage } from "../lib/errorMessage";
 import { PlanSettings, calendarEventsRead, deleteMonthPlan, fetchBoostSlots, fetchBrandLockedPlanSlots, fetchMonthPlan, fetchPlanStatuses, fetchRetargetHistory, lockMonthPlan, lockedPlanSlotsRead, monthPlanRead, openExtraPlanSlots, planStatusesRead, replacePlanSlots, rebaseMonthPlan, setBoostTargets, upsertMonthPlan } from "../lib/db/monthPlans";
 import { INTAKE_ADD_MAX, INTAKE_ALLOCATE_MAX, pickExtraSlots, targetIntake } from "../lib/scheduling/targetIntake";
+import { channelHourCost } from "../lib/scheduling/extraHoursCost";
 import { buildCalibration, evaluatePlan } from "../lib/scheduling/planEvaluation";
 import { computeCommitmentProgress, contractCovering, monthCommitmentOf, todayVn } from "../lib/performance/brandCommitment";
 import { useDefaultBrand } from "../hooks/useDefaultBrand";
@@ -41,7 +42,7 @@ import { PlanGroupTargetsBlock } from "./PlanGroupTargets";
 import { PlanMonthGrid, type GridExtra } from "./monthplan/PlanMonthGrid";
 import type { SlotOutcome } from "../lib/scheduling/planWeeks";
 import { HistorySummary, STRATEGY_LABEL, SuggestResult, SuggestStrategy, buildBorrowedHistory, buildHistory, estimateSlots, suggestMonthPlan } from "../lib/scheduling/suggestEngine";
-import { buildMonthForecaster, planOutlook, slotForecasts } from "../lib/performance/monthForecast";
+import { RELIABILITY_LABEL, buildMonthForecaster, forecastReliability, planOutlook, slotForecasts, targetForChance } from "../lib/performance/monthForecast";
 import { recordForecastSnapshots } from "../lib/db/forecastSnapshots";
 import { EngineParams } from "../lib/scheduling/engineParams";
 import { findBrandStudioId } from "../lib/db/brandStudios";
@@ -129,6 +130,8 @@ export default function MonthPlan({
 }: MonthPlanProps) {
   const confirm = useConfirm();
   const canRetarget = role === "ceo" || role === "admin";
+  // Độ tin dự báo từng kênh: CHỈ admin (06/11, user: các role khác đỡ rối chữ).
+  const isAdmin = role === "admin";
   const today = todayVn();
   const [brandId, setBrandId] = useDefaultBrand(brands, sessions, today);
   // Kế hoạch theo sàn (0140): mỗi brand × tháng × sàn một kế hoạch, target riêng (user chốt 06/10). Đổi brand mà sàn đã
@@ -711,11 +714,27 @@ export default function MonthPlan({
       setMsg(`Nhập ${platformText("Target GMV", platform)} tháng ở Tham số lập kế hoạch trước.`);
       return;
     }
-    // Xếp theo target: quy target về thang dự báo của bộ xếp lịch (lưới đang có làm mẫu; lưới trống thì chạy thử một lượt).
-    const pilot = mode === "target" && drafts.length === 0 ? suggestMonthPlan(engineHistory, { ...baseConstraints, mode, strategy }).slots : drafts;
-    const base = { ...baseConstraints, mode, targetGmv: mode === "target" ? schedulerTarget(targetTotal, pilot) : baseConstraints.targetGmv };
-    // Dự báo hiện trên bảng so sánh = engine v3 của cả lưới kết quả (không phải dự báo nội bộ của bộ xếp lịch).
-    const v3 = (r: SuggestResult): SuggestResult => (forecaster && r.slots.length ? { ...r, forecastGmv: sumOf(forecastsFor(r.slots)), targetGapGmv: targetTotal - sumOf(forecastsFor(r.slots)) } : r);
+    // Target quy về thang dự báo của bộ xếp lịch (lưới đang có làm mẫu; lưới trống thì chạy thử một lượt) — cả hai chế độ, để "cần ~Xh"
+    // của bộ xếp lịch nói cùng một target với ô dự báo chính.
+    const pilot = drafts.length === 0 && targetTotal > 0 ? suggestMonthPlan(engineHistory, { ...baseConstraints, mode, strategy }).slots : drafts;
+    const base = { ...baseConstraints, mode, targetGmv: targetTotal > 0 ? schedulerTarget(targetTotal, pilot) : 0 };
+    // MỘT con số (06/11): mọi số tiền của gợi ý đi qua engine v3 — backtest 14 tháng-kênh T8–T10 lúc lập: tổng tháng v3 28,4% vs bộ xếp
+    // lịch 27,3% (v3 đúng hơn 8/14), theo ca v3 29,1% vs 30,6%, và chỉ v3 có dải + xác suất. Bộ xếp lịch chỉ còn chọn GIỜ; đường cong
+    // biên của nó nhân cùng tỷ lệ v3/xếp-lịch của lưới kết quả; câu target của nó thay bằng câu tính trên số v3.
+    const v3 = (r: SuggestResult): SuggestResult => {
+      if (!forecaster || r.slots.length === 0) return r;
+      const fc = sumOf(forecastsFor(r.slots));
+      const k = r.forecastGmv > 0 ? fc / r.forecastGmv : 1;
+      const gap = targetTotal - fc;
+      const notes = r.notes.filter((n) => !/^(Dự báo thiếu|Dự báo vượt target|Xếp theo target:)/.test(n));
+      if (targetTotal > 0)
+        notes.push(
+          gap > 0
+            ? `Dự báo ${fmtVndShort(fc)} thiếu ${fmtVndShort(gap)} so với target ${fmtVndShort(targetTotal)}${r.hoursToHitTarget !== null ? ` — cần ~${Math.ceil(r.hoursToHitTarget)}h theo cùng cách xếp.` : " — xếp thêm trong khung giờ / số ca mỗi ngày hiện có cũng không đạt."}`
+            : `Dự báo ${fmtVndShort(fc)} đạt target ${fmtVndShort(targetTotal)} (dư ${fmtVndShort(-gap)}).`
+        );
+      return { ...r, forecastGmv: fc, targetGapGmv: gap, marginal: r.marginal.map((p) => ({ hours: p.hours, gmv: p.gmv * k })), notes };
+    };
     // Chạy cả 3 phương án để so sánh; áp phương án đang chọn vào lưới.
     const all: Record<SuggestStrategy, SuggestResult> = {
       max: v3(suggestMonthPlan(engineHistory, { ...base, strategy: "max" })),
@@ -1103,6 +1122,17 @@ export default function MonthPlan({
   ];
   const stepNow = steps.findIndex((x) => !x.done);
   const boostInfo = locked && boostSlots.length > 0 && boostSlots[0].planId === plan?.id ? summarizeBoost(boostSlots, today) : null;
+  // Chi phí giờ thêm (06/11): lương host + trợ / giờ theo người đã live kênh 60 ngày qua; null khi không đọc được rate.
+  const hourCost = useMemo(() => (brandId ? channelHourCost(platformSessions, talents, brandId, platform, today) : null), [platformSessions, talents, brandId, platform, today]);
+  const costLine = (hours: number, gain?: number) =>
+    hourCost?.perHour != null && hours > 0
+      ? ` Chi phí host + trợ ~${fmtVndShort(hours * hourCost.perHour)} (≈ ${fmtVndShort(hourCost.perHour)}/giờ theo người live kênh 60 ngày qua)${gain && gain > 0 ? ` · mỗi 1 đồng lương ≈ ${fmtFixed(gain / (hours * hourCost.perHour), 0)} đồng GMV dự báo` : ""}.`
+      : "";
+  const reliability = forecaster ? forecastReliability(forecaster.pastErrors) : null;
+  const reliabilityText = reliability && reliability.level !== "unknown"
+    ? `Độ tin dự báo kênh: ${RELIABILITY_LABEL[reliability.level]} · lệch TB ${Math.round(reliability.meanAbs! * 100)}% (${reliability.months} tháng)${reliability.bias !== null ? ` · thường ${reliability.bias > 0 ? "cao" : "thấp"} hơn thực tế ~${Math.round(Math.abs(reliability.bias) * 100)}%` : ""}`
+    : reliability ? "Độ tin dự báo kênh: chưa đủ tháng để chấm" : null;
+  const reliabilityTone = reliability?.level === "high" ? "text-emerald-400" : reliability?.level === "mid" ? "text-sky-400" : reliability?.level === "low" ? "text-amber-300" : "text-[var(--text-faint)]";
   const pastErrorsText = forecaster && forecaster.pastErrors.length > 0
     ? ` Dự báo lúc lập các tháng trước lệch: ${forecaster.pastErrors.map((e) => `T${Number(e.month.slice(5))} ${e.error > 0 ? "+" : ""}${Math.round(e.error * 100)}%`).join(" · ")}${forecaster.biasFactor !== 1 ? ` — đã tự hiệu chỉnh ×${fmtFixed(forecaster.biasFactor, 2)}` : ""}.`
     : "";
@@ -1213,12 +1243,14 @@ export default function MonthPlan({
           </div>
         ) : (
           <div className={TILE} data-testid="grid-forecast">
-            <span className={TILE_LABEL}>Dự báo lưới <Info text={`Engine target v3: giờ × loại ngày × khung giờ × vị trí ngày, mức = trung bình nhân 28 ngày gần nhất và 3 tháng gần nhất. Backtest lúc lập: sai ~13% với kênh lớn.${pastErrorsText}${calibration ? ` Đã hiệu chỉnh từ ${calibration.observations} ca kế hoạch có thực tế ở các tháng khác.` : ""}`} /></span>
+            <span className={TILE_LABEL}>Dự báo lưới <Info text={`Engine target v3: giờ × loại ngày × khung giờ × vị trí ngày, mức = trung bình nhân 28 ngày gần nhất và 3 tháng gần nhất. Backtest 06/11 (14 tháng-kênh T8–T10, lúc lập): lệch TB ~28%, dải chứa thực tế 10/14 tháng.${isAdmin ? pastErrorsText : ""}${calibration ? ` Đã hiệu chỉnh từ ${calibration.observations} ca kế hoạch có thực tế ở các tháng khác.` : ""}`} /></span>
             <b className="text-xl font-black tabular-nums text-[var(--text)]">{gridOutlook ? fmtVndShort(gridOutlook.p50) : "—"}</b>
             <span className="text-2xs text-[var(--text-faint)] tabular-nums">
               {gridOutlook ? <>dải {fmtVndShort(gridOutlook.lo)} – {fmtVndShort(gridOutlook.hi)}</> : forecaster ? "lưới trống" : "kênh chưa đủ lịch sử"}
               {gridOutlook?.pHit != null && <> · đạt target <b className={gridOutlook.pHit >= 0.8 ? "text-emerald-400" : gridOutlook.pHit >= 0.5 ? "text-sky-400" : gridOutlook.pHit >= 0.2 ? "text-amber-400" : "text-rose-400"}>{Math.round(gridOutlook.pHit * 100)}%</b></>}
             </span>
+            {gridOutlook && canRetarget && <span className="text-2xs text-[var(--text-faint)] tabular-nums">target khả thi: 80% ≈ {fmtVndShort(targetForChance(gridOutlook, 0.8))} · 50% ≈ {fmtVndShort(gridOutlook.p50)}</span>}
+            {isAdmin && reliabilityText && <span className={`text-2xs tabular-nums ${reliabilityTone}`}>{reliabilityText}</span>}
           </div>
         )}
 
@@ -1443,6 +1475,12 @@ export default function MonthPlan({
                   {intake.outlook ? <span className="text-[var(--text-faint)]"> (dải {fmtVndShort(intake.outlook.lo)} – {fmtVndShort(intake.outlook.hi)})</span> : null} · {intake.slots} ca {fmtH(intake.hours)}h
                   {pct !== null && <> · target {pct >= 0 ? "cao hơn" : "thấp hơn"} dự báo <b className={intake.tier === "renegotiate" ? "text-rose-400" : intake.tier === "add" ? "text-amber-300" : "text-[var(--text)]"}>{Math.abs(pct)}%</b></>}
                 </p>
+                {intake.outlook && (
+                  <p className="text-2xs text-[var(--text-muted)] tabular-nums">
+                    Khả năng đạt target này <b className="text-[var(--text)]">{Math.round((intake.outlook.pHit ?? 0) * 100)}%</b> · mức đạt 80% ≈ {fmtVndShort(targetForChance(intake.outlook, 0.8))} · 50% ≈ {fmtVndShort(intake.outlook.p50)}. Lịch và target ca vẫn xếp để GMV dự báo cao nhất.
+                  </p>
+                )}
+                {isAdmin && reliabilityText && <p className={`text-2xs tabular-nums ${reliabilityTone}`}>{reliabilityText}</p>}
                 {intake.tier === "no_forecast" && <p className="text-[var(--text-muted)]">Kênh chưa đủ lịch sử để dự báo — chỉ chia target xuống các ca.</p>}
                 {intake.tier === "allocate" && <p className="text-[var(--text-muted)]">Lệch trong ±{Math.round(INTAKE_ALLOCATE_MAX * 100)}% (sai số dự báo lúc lập kế hoạch ~13%) — không cần thêm ca, bấm Xem trước để chia target.</p>}
                 {intake.tier === "renegotiate" && (
@@ -1478,7 +1516,7 @@ export default function MonthPlan({
                           const cover = intake.gapGmv > 0 ? Math.round((gain / intake.gapGmv) * 100) : 0;
                           return (
                             <p className="text-2xs text-[var(--text-muted)] tabular-nums">
-                              Ca đã chọn dự báo thêm ~{fmtVndShort(gain)} — bù ~{cover}% phần chênh {fmtVndShort(intake.gapGmv)}. Giờ thêm ở khung còn trống thường bán kém hơn giờ đang có, nên phần còn lại nằm ở target các ca.
+                              Ca đã chọn dự báo thêm ~{fmtVndShort(gain)} — bù ~{cover}% phần chênh {fmtVndShort(intake.gapGmv)}. Giờ thêm ở khung còn trống thường bán kém hơn giờ đang có, nên phần còn lại nằm ở target các ca.{costLine(pickedExtras.reduce((x, e) => x + e.hours, 0), gain)}
                             </p>
                           );
                         })()}
@@ -1644,7 +1682,7 @@ export default function MonthPlan({
             </p>
             <p className="text-amber-300/90">
               {targetGap.fill
-                ? `Bù: thêm ~${fmtH(targetGap.extraHours)}h (${targetGap.extraSlots.length} ca) → ${targetGap.extraSlots.slice(0, 6).map((sl) => `${Number(sl.date.slice(8, 10))}/${Number(sl.date.slice(5, 7))} ${sl.startTime}–${sl.endTime}`).join(", ")}${targetGap.extraSlots.length > 6 ? ` +${targetGap.extraSlots.length - 6} ca` : ""}.`
+                ? `Bù: thêm ~${fmtH(targetGap.extraHours)}h (${targetGap.extraSlots.length} ca) → ${targetGap.extraSlots.slice(0, 6).map((sl) => `${Number(sl.date.slice(8, 10))}/${Number(sl.date.slice(5, 7))} ${sl.startTime}–${sl.endTime}`).join(", ")}${targetGap.extraSlots.length > 6 ? ` +${targetGap.extraSlots.length - 6} ca` : ""}.${costLine(targetGap.extraHours, sumOf(forecastsFor(targetGap.extraSlots)))}`
                 : "Xếp kín mọi khung giờ vẫn chưa đạt target theo dữ liệu lịch sử — cần tăng CVR/AOV (khuyến mãi, Ads) hoặc điều chỉnh target."}
             </p>
           </div>
@@ -1721,8 +1759,8 @@ const CONF_LABEL: Record<SuggestResult["confidence"], string> = { none: "không 
 // Lớp 4 — giải thích gợi ý: lịch sử dùng, hệ số học được, ô giờ mạnh/yếu, đường cong biên, khả thi target.
 function SuggestionPanel({ platform, history: h, result: r, committedHours, targetTotal, compare, current, onPick }: { platform: ReportPlatform; history: HistorySummary; result: SuggestResult; committedHours: number; targetTotal: number; compare: Record<SuggestStrategy, SuggestResult> | null; current: SuggestStrategy; onPick: (k: SuggestStrategy) => void }) {
   // Ô engine chấm điểm thật: khung 2 giờ gộp mọi thứ (06/11 — không xếp theo thứ trong tuần).
-  const top = h.blockCells.filter((c) => c.n >= 2).slice(0, 6);
-  const weak = h.blockCells.filter((c) => c.tag === "weak").slice(-4);
+  const top = (h.blockCells ?? []).filter((c) => c.n >= 2).slice(0, 6);
+  const weak = (h.blockCells ?? []).filter((c) => c.tag === "weak").slice(-4);
   const curve = r.marginal.filter((_, i, arr) => i === arr.length - 1 || i % Math.max(1, Math.floor(arr.length / 5)) === 0);
   return (
     <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 space-y-3 text-xs">

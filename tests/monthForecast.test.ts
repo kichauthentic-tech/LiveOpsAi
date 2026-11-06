@@ -231,3 +231,25 @@ describe("backtest + tín hiệu dẫn", () => {
     expect(schemeShareOf("2026-09", [])).toBe(0);
   });
 });
+
+describe("06/11 — độ tin dự báo kênh + target theo khả năng đạt (chỉ hiển thị)", () => {
+  test("độ tin theo sai số lúc lập các tháng trước", async () => {
+    const { forecastReliability } = await import("../src/lib/performance/monthForecast");
+    // CROCS T8–T10 thật: −14%, +17%, +18% ⇒ vừa, không cùng chiều.
+    expect(forecastReliability([{ error: -0.14 }, { error: 0.17 }, { error: 0.18 }])).toMatchObject({ level: "mid", bias: null, months: 3 });
+    // VERA TikTok: +6%, +23%, +57% ⇒ thấp, thường cao hơn thực tế ~29%.
+    const v = forecastReliability([{ error: 0.06 }, { error: 0.23 }, { error: 0.57 }]);
+    expect(v.level).toBe("low");
+    expect(v.bias).toBeCloseTo(0.287, 2);
+    expect(forecastReliability([{ error: 0.05 }, { error: -0.08 }]).level).toBe("high");
+    expect(forecastReliability([{ error: 0.3 }]).level).toBe("unknown");
+  });
+  test("target theo khả năng đạt khớp ngược với pHit", async () => {
+    const { targetForChance } = await import("../src/lib/performance/monthForecast");
+    const o = { p50: 4850, band: 0.22 };
+    expect(targetForChance(o, 0.5)).toBe(4850);
+    const t80 = targetForChance(o, 0.8);
+    // σ = 0,22 × 4850 / 1,2816 ≈ 832,6 ⇒ T80 ≈ 4850 − 0,8416σ ≈ 4149
+    expect(Math.round(t80)).toBe(4149);
+  });
+});

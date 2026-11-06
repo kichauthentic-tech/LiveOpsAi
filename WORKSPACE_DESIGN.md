@@ -13,6 +13,20 @@
 
 ## 1. Giai đoạn hiện tại (cập nhật 2026-10-31; mục KH Tháng bản gọn 27/10)
 
+- **06/11 (tối): KẾ HOẠCH THÁNG — MỘT CON SỐ + ĐỘ TIN KÊNH + CHI PHÍ GIỜ THÊM (đã commit + push 06/11, KHÔNG migration)** — user duyệt 5 điểm đánh giá.
+  (2) Backtest lúc lập 14 tháng-kênh T8–T10 (`scratchpad/dow/models.ts`): tổng tháng v3 lệch TB 28,4% vs bộ xếp lịch 27,3% (v3 đúng hơn
+  8/14), theo ca v3 29,1% vs 30,6%; trung bình 2 mô hình 27,8%, mức nền 14/42 ngày 28,9/28,7%, tự hiệu chỉnh 28,6% ⇒ không gì hơn rõ ⇒ MỌI
+  số tiền đi qua v3: `suggest()` quy target về thang bộ xếp lịch ở cả 2 chế độ, đường cong biên × tỷ lệ v3/xếp-lịch, câu target của bộ xếp
+  lịch thay bằng câu tính trên v3 (CROCS T12 270h: bảng "Vì sao" 5,43B → 4,85B, "target 5,8B cần ~330h" khớp đề xuất bù 60h). Dải 80% chứa
+  thực tế 10/14 — chưa đủ căn cứ đổi dải; câu ⓘ "sai ~13%" sửa thành số đo. (1) `forecastReliability(pastErrors)` (≤12% cao, ≤25% vừa,
+  cùng chiều > 5% ghi "thường cao/thấp hơn thực tế") — CHỈ role admin (ô dự báo + khối Nhận target). (4) `targetForChance` — ceo/admin thấy
+  "target khả thi: 80% ≈ … · 50% ≈ …" và khả năng đạt của target nhập; chỉ hiển thị, xếp/chia vẫn tối đa GMV. (3) `lib/scheduling/
+  extraHoursCost.ts` `channelHourCost` (rate host TB/giờ + rate trợ TB × tỷ lệ ca có trợ, người live kênh 60 ngày; rate bị che ⇒ null) —
+  dòng chi phí ở đề xuất bù giờ + ca bổ sung (CROCS 60h ≈ 23,7M, 395K/giờ, ~45 đồng GMV dự báo / 1 đồng lương). Rate có 48/50 talent.
+  (5) T12 sẵn sàng: 0 ca, 0 kế hoạch; giờ cam kết T12 chỉ CROCS 270h + FUJIWA 180h — 6 kênh còn lại dùng nút "Điền như tháng 11" ở wizard.
+  Test: `monthForecast` (+2), `extraHoursCost` (2); `monthDesk.test` thêm mock client (đỏ khi chạy như CI từ 3ca9999). Verify dev (admin,
+  không lưu): CROCS T12 như trên, 375px 0 tràn, tải mới 0 lỗi console. Chưa thử bằng role khác admin (dòng độ tin chỉ admin — chặn bằng `role`).
+
 - **06/11 (sau): CA QUA 0h + BỘ XẾP CA BỎ THỨ TRONG TUẦN (đã commit + push 06/11, KHÔNG migration)** — (1) user: logic ràng 23:59, không gợi ý/chia target
   ca main campaign tới 00:30–01:00. Đo T6–T11: 240/2.028 ca qua 0h (12%), 70% ngày Campaign; ca nhập từ lịch vẫn vào kế hoạch có target
   (89/94 từ T10) — hỏng ở GỢI Ý: khung live chỉ tới 23:59 (`addHours` chặn 23:59, gõ 00:30 thì mọi ca "ngoài khung", dựng lưới từ ca

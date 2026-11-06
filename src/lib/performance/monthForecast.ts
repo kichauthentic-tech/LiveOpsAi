@@ -216,6 +216,40 @@ export function planOutlook(f: MonthForecaster, slots: SlotLike[], bucketOf: Buc
   return { p50, lo: Math.max(0, p50 - half), hi: p50 + half, pHit, perSlot, excessHours, band: f.band };
 }
 
+/**
+ * Target ứng với một khả năng đạt (06/11, user: "ghi ra thôi, vẫn phân bổ tối đa GMV"): cùng phân phối với `pHit`, ngược lại —
+ * GMV tháng ≥ T với xác suất `chance`. 50% = P50; 80% = P50 − 0,84σ. Chỉ để HIỂN THỊ cho người đặt target, không đổi cách xếp/chia.
+ */
+export function targetForChance(o: Pick<PlanOutlook, "p50" | "band">, chance: 0.5 | 0.8): number {
+  const sigma = (o.band * o.p50) / Z80;
+  return Math.max(0, o.p50 - (chance === 0.8 ? 0.8416 : 0) * sigma);
+}
+
+export type ReliabilityLevel = "high" | "mid" | "low" | "unknown";
+export interface ForecastReliability {
+  level: ReliabilityLevel;
+  /** Trung bình |dự báo lúc lập ÷ thực tế − 1| các tháng trước (≤ 3). */
+  meanAbs: number | null;
+  /** Lệch cùng chiều mọi tháng (> 5%): dương = dự báo cao hơn thực tế. null khi không cùng chiều. */
+  bias: number | null;
+  months: number;
+}
+export const RELIABILITY_LABEL: Record<ReliabilityLevel, string> = { high: "cao", mid: "vừa", low: "thấp", unknown: "chưa đủ tháng" };
+
+/**
+ * Độ tin dự báo của MỘT kênh từ chính sai số lúc lập các tháng trước (`MonthForecaster.pastErrors`). Ngưỡng: ≤ 12% cao, ≤ 25% vừa —
+ * backtest 06/11 14 tháng-kênh T8–T10 lệch TB 28% (CROCS 14–18%, VERA TikTok tới +57%, Franklin TikTok ±45%). < 2 tháng = chưa đủ.
+ * Chỉ HIỂN THỊ (admin): hiệu chỉnh tự động đã thử và làm CROCS T9 sai hơn (10/10).
+ */
+export function forecastReliability(pastErrors: readonly { error: number }[]): ForecastReliability {
+  const xs = pastErrors.slice(-3).map((e) => e.error);
+  if (xs.length < 2) return { level: "unknown", meanAbs: null, bias: null, months: xs.length };
+  const meanAbs = xs.reduce((a, v) => a + Math.abs(v), 0) / xs.length;
+  const mean = xs.reduce((a, v) => a + v, 0) / xs.length;
+  const sameSign = xs.every((v) => v > 0) || xs.every((v) => v < 0);
+  return { level: meanAbs <= 0.12 ? "high" : meanAbs <= 0.25 ? "mid" : "low", meanAbs, bias: sameSign && Math.abs(mean) > 0.05 ? mean : null, months: xs.length };
+}
+
 export interface MonthItem extends SlotLike {
   /** GMV thật khi ca đã có số; null = chưa có (sắp tới, hoặc đã qua mà số chưa về). */
   actual: number | null;

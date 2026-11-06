@@ -1,5 +1,8 @@
 // Điều Phối Lịch Live đợt 1 (24/10): hao hụt kênh, giờ cần xếp, việc nên làm tháng này, 6 bước mở lịch tháng sau.
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
+
+// CI không có .env: test import lớp db (signupDeadlineOf) ⇒ phải mock client (WORKSPACE §5.1).
+vi.mock("../src/lib/supabaseClient", () => ({ supabase: {} }));
 import { channelShrinkage, hoursToSchedule, nextRow, nowActions, nowHours, shrinkSums, SHRINK_CAP, SHRINK_FLOOR, type NextInput } from "../src/lib/roster/monthDesk";
 import type { AccountRow } from "../src/lib/performance/accountOverview";
 import type { LiveSession, ShiftSlot } from "../src/types";
