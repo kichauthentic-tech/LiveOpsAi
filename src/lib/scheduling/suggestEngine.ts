@@ -655,6 +655,12 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
   const weeksInMonth = Math.ceil((daysInMonth + weekdayOf(`${y}-${pad2(m)}-01`)) / 7);
   const weekOf = (date: string) => Math.floor((Number(date.slice(-2)) - 1 + weekdayOf(`${y}-${pad2(m)}-01`)) / 7);
 
+  // Số ngày còn xếp được của mỗi tuần × loại ngày — mẫu số khi rải ca bằng điểm (xem `take`).
+  const bucketDays = new Map<string, number>();
+  for (const d of new Set(candidates.map((x) => x.date))) {
+    const key = `${weekOf(d)}|${resolveCampBucketType(d, c.camp)}`;
+    bucketDays.set(key, (bucketDays.get(key) ?? 0) + 1);
+  }
   const overlaps = (a: Candidate, b: Candidate) => a.date === b.date && a.start < b.end && b.start < a.end;
 
   // Điểm biên của 1 ứng viên trong trạng thái hiện tại.
@@ -700,11 +706,31 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
     const take = (pool: Candidate[]): boolean => {
       let best: Candidate | null = null;
       let bestScore = 0;
+      let bestLoad = Infinity;
+      // Điểm bằng nhau (ngày Daily cùng khung giờ — từ 06/11 ô không theo thứ nên rất hay bằng) ⇒ chọn tuần có ÍT ca / ngày cùng loại hơn.
+      // Trước đó chọn ngày sớm nhất: CROCS T12 270h dồn ca thứ 3 vào 1–5/12. Đếm theo ngày cùng loại (không theo tổng giờ tuần): tuần
+      // đầu tháng 12 chỉ 6 ngày và tuần có ngày Campaign luôn nhiều giờ — so tổng giờ vẫn dồn về tuần đầu.
+      // Cùng tải tuần thì ưu tiên THỨ đang ít ca nhất cả tháng — không thì trong tuần luôn lấy ngày sớm nhất, hết giờ là thứ 7 mất ca.
+      let bestWd = Infinity;
+      const slotsByKey = new Map<string, number>();
+      const byWeekday = new Map<string, number>();
+      for (const s of state) {
+        slotsByKey.set(`${weekOf(s.date)}|${s.bucket}`, (slotsByKey.get(`${weekOf(s.date)}|${s.bucket}`) ?? 0) + 1);
+        byWeekday.set(`${weekdayOf(s.date)}|${s.bucket}`, (byWeekday.get(`${weekdayOf(s.date)}|${s.bucket}`) ?? 0) + 1);
+      }
       for (const cand of pool) {
         const sc = marginalScore(cand, state, targetHours);
-        if (sc > bestScore) {
+        if (sc <= 0) continue;
+        const key = `${weekOf(cand.date)}|${cand.bucket}`;
+        const load = (slotsByKey.get(key) ?? 0) / (bucketDays.get(key) ?? 1);
+        const wd = byWeekday.get(`${weekdayOf(cand.date)}|${cand.bucket}`) ?? 0;
+        const tie = Math.abs(sc - bestScore) <= bestScore * 1e-9;
+        const better = !tie ? sc > bestScore : load < bestLoad - 1e-9 || (Math.abs(load - bestLoad) <= 1e-9 && wd < bestWd);
+        if (better) {
           bestScore = sc;
           best = cand;
+          bestLoad = load;
+          bestWd = wd;
         }
       }
       if (!best) return false;

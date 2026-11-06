@@ -26,3 +26,26 @@ test("thứ 7 lịch sử thấp hơn 12% vẫn được số ca như ngày Dail
   // Ngày Daily nào cũng có ca; thứ 7 không ít hơn ngày khác quá nửa ca.
   expect(avg((d) => wd(d) === 6)).toBeGreaterThan(avg((d) => wd(d) !== 6) - 0.5);
 });
+
+test("ca dư khi điểm bằng nhau rải ra nhiều tuần, không dồn vào đầu tháng (CROCS T12 270h: ca thứ 3 dồn 1–5/12)", () => {
+  const hist: LiveSession[] = [];
+  for (let d = new Date("2026-08-03T00:00:00"); d <= new Date("2026-10-31T00:00:00"); d.setDate(d.getDate() + 1)) {
+    const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    if (getCampaignDayInfo(date)) continue;
+    hist.push(mk(`${date}a`, date, "11:00", "14:00", 30e6), mk(`${date}b`, date, "17:00", "20:00", 60e6), mk(`${date}c`, date, "20:00", "23:00", 60e6));
+  }
+  const h = buildHistory(hist, "b", "2026-11-06", {});
+  const base = { month: "2026-12", today: "2026-11-06", targetGmv: 0, liveWindowStart: "09:00", liveWindowEnd: "23:00", defaultSlotHours: 3, maxSlotsPerDay: 3 };
+  // Giờ đủ cho 2 ca tối mọi ngày + ca thứ 3 ngày Campaign; tìm mức giờ để còn đúng vài ca thứ 3 cho ngày Daily.
+  const triplesAt = (hours: number) => {
+    const r = suggestMonthPlan(h, { ...base, committedHours: hours });
+    const per = new Map<string, number>();
+    for (const s of r.slots) if (!getCampaignDayInfo(s.date)) per.set(s.date, (per.get(s.date) ?? 0) + 1);
+    return [...per].filter(([, n]) => n >= 3).map(([d]) => d);
+  };
+  const triples = triplesAt(240);
+  expect(triples.length).toBeGreaterThanOrEqual(4);
+  expect(triples.length).toBeLessThanOrEqual(12);
+  const weekOf = (d: string) => Math.floor((Number(d.slice(8)) - 1 + 2) / 7); // 1/12/2026 là thứ 3
+  expect(new Set(triples.map(weekOf)).size).toBeGreaterThanOrEqual(3);
+});

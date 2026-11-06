@@ -9,6 +9,7 @@ import { fmtVndShort } from "../lib/format";
 import { talentShortName } from "../lib/talentName";
 import { addDays, getTodayDate, isoWeekStart } from "../lib/dateUtils";
 import { halfRange } from "../lib/roster/milestones";
+import { suggestNextShift } from "../lib/scheduling/nextShift";
 import { updateOpenSlotTime } from "../lib/db/shiftSlots";
 import {
   fetchRosterChanges,
@@ -445,11 +446,11 @@ export const RosterBoard: React.FC<Props> = (p) => {
       if (await p.onCancelSession(shift.sessionId!, reason.trim(), false)) setSelectedKey(null);
     });
 
-  const addShift = (ch: ChannelRow, date: string) =>
+  const addShift = (ch: ChannelRow, date: string, hint?: { start: string; end: string; note: string }) =>
     run(async () => {
-      const start = await prompt(`Thêm ca ${ch.brandName} ${ch.platform} ${dayLabel(date)} — giờ bắt đầu`, { inputType: "time", defaultValue: "19:00" });
+      const start = await prompt(`Thêm ca ${ch.brandName} ${ch.platform} ${dayLabel(date)} — giờ bắt đầu${hint ? `\n${hint.note}` : ""}`, { inputType: "time", defaultValue: hint?.start ?? "19:00" });
       if (!start) return;
-      const end = await prompt(`Giờ kết thúc (bắt đầu ${start})`, { inputType: "time", defaultValue: `${String((Number(start.slice(0, 2)) + 3) % 24).padStart(2, "0")}:${start.slice(3, 5)}` });
+      const end = await prompt(`Giờ kết thúc (bắt đầu ${start})`, { inputType: "time", defaultValue: hint && start === hint.start ? hint.end : `${String((Number(start.slice(0, 2)) + 3) % 24).padStart(2, "0")}:${start.slice(3, 5)}` });
       if (!end || end === start) return;
       const studioId = p.brandStudios.find((b) => b.brandId === ch.brandId && b.platform === ch.platform)?.studioId;
       const studio = p.studios.find((s) => s.id === studioId);
@@ -661,8 +662,16 @@ export const RosterBoard: React.FC<Props> = (p) => {
       showToast("Trình duyệt chặn chép — thử lại bằng Chrome/Safari bản mới");
     }
   };
-  /** Thêm ca cho kênh thiếu giờ: ngày còn lại trong tháng mà kênh ít ca nhất (sớm nhất nếu bằng nhau), rồi hỏi giờ như nút "+ ca". */
+  /** Thêm ca cho kênh thiếu giờ: ca tốt nhất còn trống theo bộ xếp ca của Kế Hoạch Tháng (06/11); kênh chưa có lịch sử thì như cũ —
+   *  ngày còn lại kênh ít ca nhất, giờ 19:00. Người dùng vẫn sửa giờ trước khi tạo. */
   const addShiftFor = (r: NowChannel) => {
+    const ch = { key: channelKeyOf(r.brandId, r.platform), brandId: r.brandId, brandName: r.brandName, platform: r.platform as ChannelRow["platform"] };
+    const next = suggestNextShift(p.sessions, p.shiftSlots, r.brandId, r.platform as ReportPlatform, m0, today, p.engineParams);
+    if (next) {
+      goWeekOf(next.date);
+      void addShift(ch, next.date, { start: next.startTime, end: next.endTime, note: `Gợi ý: ${next.startTime}–${next.endTime} — khung còn trống hiệu quả nhất theo lịch sử kênh (dự báo ~${fmtVndShort(next.expectedGmv)}).` });
+      return;
+    }
     const end = `${m0}-${String(monthEndDay(m0)).padStart(2, "0")}`;
     let best: string | null = null;
     let bestN = Infinity;
@@ -677,7 +686,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
     }
     if (!best) return;
     goWeekOf(best);
-    void addShift({ key: channelKeyOf(r.brandId, r.platform), brandId: r.brandId, brandName: r.brandName, platform: r.platform as ChannelRow["platform"] }, best);
+    void addShift(ch, best);
   };
   const nudge = (month: string) => {
     const st = statusOf(month);

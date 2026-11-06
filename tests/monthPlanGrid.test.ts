@@ -6,6 +6,7 @@
 // kết với brand và tổng target các ca mà host nhận, tức đúng họ lỗi Đ5/E2E#1 đã phải vá 2 lần.
 import { expect, test } from "vitest";
 import {
+  settingsFromHistory,
   windowBounds,
   widenWindow,
   addHours,
@@ -120,6 +121,19 @@ test("06/11: nới khung theo ca đã nhập — ca tới 00:30 ⇒ khung đóng
   expect(widenWindow({ liveWindowStart: "09:00", liveWindowEnd: "23:00" }, [d("x", "08:00", "11:00"), d("x", "21:00", "00:30")])).toEqual({ liveWindowStart: "08:00", liveWindowEnd: "00:30" });
   expect(widenWindow({ liveWindowStart: "09:00", liveWindowEnd: "01:00" }, [d("x", "21:00", "00:30")])).toEqual({ liveWindowStart: "09:00", liveWindowEnd: "01:00" });
   expect(widenWindow({ liveWindowStart: "09:00", liveWindowEnd: "23:00" }, [d("x", "19:00", "22:00")])).toEqual({ liveWindowStart: "09:00", liveWindowEnd: "23:00" });
+});
+
+test("06/11: tháng chưa có kế hoạch lấy khung / ca mỗi ngày / độ dài ca theo lịch thật của kênh", () => {
+  const base = { liveWindowStart: "09:00", liveWindowEnd: "23:00", maxSlotsPerDay: 3, defaultSlotHours: 3 };
+  const real: PlanDraftSlot[] = [];
+  for (let i = 1; i <= 9; i++) {
+    const day = `2026-11-0${i}`;
+    real.push(d(day, "11:00", "14:00"), d(day, "18:00", "21:00"), d(day, "21:00", "00:00"));
+    if (i <= 3) real.push(d(day, "09:00", "12:00"), d(day, "14:00", "17:00"), d(day, "21:30", "00:30"));
+  }
+  real.push(d("2026-11-09", "06:00", "08:00")); // dùng 1 lần ⇒ không kéo giờ mở về 06:00
+  expect(settingsFromHistory(base, real)).toEqual({ liveWindowStart: "09:00", liveWindowEnd: "00:30", maxSlotsPerDay: 6, defaultSlotHours: 3 });
+  expect(settingsFromHistory(base, real.slice(0, 5))).toEqual(base); // ít ca ⇒ giữ mặc định
 });
 
 // ── allocateDraftTargets: TIỀN ────────────────────────────────────────────────────────────────────

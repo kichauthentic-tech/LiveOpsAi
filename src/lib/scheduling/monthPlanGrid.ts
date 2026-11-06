@@ -68,6 +68,28 @@ export function widenWindow(base: Pick<BrandMonthPlan, "liveWindowStart" | "live
   return { liveWindowStart, liveWindowEnd: fromMin(Math.min(end, 30 * 60)) };
 }
 
+/**
+ * Tham số cho tháng CHƯA có kế hoạch, học từ lịch thật gần đây của kênh (06/11, user: "dựng cái lịch vô lý" — tháng mới lấy mặc định
+ * 09:00–23:00 · 3 ca/ngày trong khi CROCS live 09:00–00:30 ngày Campaign, ~4,7 ca/ngày). Khung = giờ mở sớm nhất / đóng muộn nhất có ít
+ * nhất `minUse` ca dùng; ca/ngày = nhiều nhất trong lịch; độ dài ca = trung vị (làm tròn 0,5h). Không đủ ca thì giữ `base`.
+ */
+export function settingsFromHistory<T extends Pick<BrandMonthPlan, "liveWindowStart" | "liveWindowEnd" | "maxSlotsPerDay" | "defaultSlotHours">>(base: T, sessions: readonly Pick<PlanDraftSlot, "date" | "startTime" | "endTime">[], minUse = 3): T {
+  if (sessions.length < 10) return base;
+  const count = <K>(xs: K[]) => { const m = new Map<K, number>(); for (const x of xs) m.set(x, (m.get(x) ?? 0) + 1); return m; };
+  const starts = [...count(sessions.map((s) => s.startTime))].filter(([, n]) => n >= minUse).map(([t]) => t).sort();
+  const ends = [...count(sessions.map(slotEndMin))].filter(([, n]) => n >= minUse).map(([m]) => m).sort((a, b) => a - b);
+  const perDay = count(sessions.map((s) => s.date));
+  const lens = sessions.map(slotHours).filter((h) => h > 0).sort((a, b) => a - b);
+  const med = lens[Math.floor(lens.length / 2)] ?? base.defaultSlotHours;
+  return {
+    ...base,
+    liveWindowStart: starts[0] ?? base.liveWindowStart,
+    liveWindowEnd: ends.length ? fromMin(Math.min(ends[ends.length - 1], 30 * 60)) : base.liveWindowEnd,
+    maxSlotsPerDay: Math.min(8, Math.max(base.maxSlotsPerDay, ...perDay.values())),
+    defaultSlotHours: Math.max(1, Math.round(med * 2) / 2)
+  };
+}
+
 // Ca mới cho 1 ngày: nối sau ca cuối của ngày (hoặc đầu khung giờ), dài = mặc định, không vượt cuối khung (khung qua 0h thì ca mới
 // được vắt sang hôm sau). Sau ca cuối không đủ một ca trọn (audit 27/10: ngày chỉ có ca 19–22 ⇒ "+ ca" ra ca 1 giờ 22–23) thì lấp
 // khoảng trống ĐỦ dài đầu tiên trong khung; không có thì mới cắt ngắn như cũ.

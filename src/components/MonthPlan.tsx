@@ -10,6 +10,7 @@ import { errorMessage } from "../lib/errorMessage";
 import { PlanSettings, calendarEventsRead, deleteMonthPlan, fetchBoostSlots, fetchBrandLockedPlanSlots, fetchMonthPlan, fetchPlanStatuses, fetchRetargetHistory, lockMonthPlan, lockedPlanSlotsRead, monthPlanRead, openExtraPlanSlots, planStatusesRead, replacePlanSlots, rebaseMonthPlan, setBoostTargets, upsertMonthPlan } from "../lib/db/monthPlans";
 import { INTAKE_ADD_MAX, INTAKE_ALLOCATE_MAX, pickExtraSlots, targetIntake } from "../lib/scheduling/targetIntake";
 import { channelHourCost } from "../lib/scheduling/extraHoursCost";
+import { addDays } from "../lib/dateUtils";
 import { buildCalibration, evaluatePlan } from "../lib/scheduling/planEvaluation";
 import { computeCommitmentProgress, contractCovering, monthCommitmentOf, todayVn } from "../lib/performance/brandCommitment";
 import { useDefaultBrand } from "../hooks/useDefaultBrand";
@@ -29,6 +30,7 @@ import {
   sumGroupTargets,
   draftsFromSuggestion,
   nextSlotForDay,
+  settingsFromHistory,
   widenWindow,
   windowBounds,
   slotHours,
@@ -265,6 +267,11 @@ export default function MonthPlan({
     return cal.observations > 0 ? cal : null;
   }, [lockedSlots, month, shiftSlots, sessions, engineParams]);
 
+  const recentRef = useRef({ list: platformSessions, today });
+  // Chạy TRƯỚC effect nạp kế hoạch bên dưới (cùng lượt commit, theo thứ tự khai báo).
+  useEffect(() => {
+    recentRef.current = { list: platformSessions, today };
+  }, [platformSessions, today]);
   useEffect(() => {
     if (!brandId) return;
     let alive = true;
@@ -279,7 +286,11 @@ export default function MonthPlan({
           setDrafts(draftsFromSaved(r.slots));
         } else {
           setPlan(null);
-          setSettings(DEFAULT_SETTINGS);
+          // Tháng chưa có kế hoạch: khung giờ / ca mỗi ngày / độ dài ca lấy theo lịch thật 60 ngày gần nhất của kênh (06/11).
+          // Đọc qua ref: ca nạp lại (sessions đổi) KHÔNG được chạy lại effect này — nó xoá lưới nháp đang sửa.
+          const { list, today: t } = recentRef.current;
+          const from = addDays(t, -60);
+          setSettings(settingsFromHistory(DEFAULT_SETTINGS, list.filter((x) => x.brandId === brandId && x.status !== "Cancelled" && x.date >= from && x.date <= t)));
           setDrafts([]);
         }
         setDirty(false);
@@ -1516,7 +1527,7 @@ export default function MonthPlan({
                           const cover = intake.gapGmv > 0 ? Math.round((gain / intake.gapGmv) * 100) : 0;
                           return (
                             <p className="text-2xs text-[var(--text-muted)] tabular-nums">
-                              Ca đã chọn dự báo thêm ~{fmtVndShort(gain)} — bù ~{cover}% phần chênh {fmtVndShort(intake.gapGmv)}. Giờ thêm ở khung còn trống thường bán kém hơn giờ đang có, nên phần còn lại nằm ở target các ca.{costLine(pickedExtras.reduce((x, e) => x + e.hours, 0), gain)}
+                              Ca đã chọn dự báo thêm ~{fmtVndShort(gain)} — bù ~{cover}% phần chênh {fmtVndShort(intake.gapGmv)}. Giờ thêm ở khung còn trống thường hiệu suất thấp hơn giờ đang có, nên phần còn lại nằm ở target các ca.{costLine(pickedExtras.reduce((x, e) => x + e.hours, 0), gain)}
                             </p>
                           );
                         })()}

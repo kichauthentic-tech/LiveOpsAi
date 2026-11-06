@@ -13,6 +13,21 @@
 
 ## 1. Giai đoạn hiện tại (cập nhật 2026-10-31; mục KH Tháng bản gọn 27/10)
 
+- **06/11 (khuya): LƯỚI THÁNG MỚI "VÔ LÝ" + "THÊM CA" THEO HIỆU SUẤT (đã commit + push 06/11, KHÔNG migration)** — user dựng CROCS T12 thấy lịch vô lý. So lịch thật T9–T11
+  (Campaign 4,7 ca ~14,3h 09:00→00:00/00:30; Daily 2,2–2,7 ca 11–14 / 18–21 / 21–00): (1) tháng CHƯA có kế hoạch lấy `DEFAULT_SETTINGS`
+  09–23 · 3 ca/ngày ⇒ Daily ra 17–20 + 20–23, Campaign 4 ca 11–23 — nay `monthPlanGrid.settingsFromHistory` (khung = giờ mở sớm / đóng muộn
+  có ≥ 3 ca dùng, ca/ngày = nhiều nhất, độ dài = trung vị; 60 ngày gần nhất của kênh; đọc qua ref để ca nạp lại không xoá lưới) ⇒ CROCS
+  "ca 3h · tối đa 5/ngày · 09:00–00:30 hôm sau"; (2) điểm bằng nhau ⇒ engine lấy ngày sớm nhất ⇒ ca thứ 3 Daily dồn 1–5/12 — nay `take()`
+  chọn tuần có ít ca / ngày cùng loại hơn, rồi thứ đang ít ca nhất cả tháng (chỉ so tổng giờ tuần thì vẫn dồn tuần đầu 6 ngày; chỉ so tuần
+  thì thứ 7 mất ca). Test `settingsFromHistory`, `suggestNoWeekday` (đỏ khi tắt rải ca). Dữ liệu thật sau sửa: 300h ⇒ ca thứ 3 Daily ở 3, 6,
+  18, 21, 27/12. **User giữ D-Day 1/1** (30–31/12 là D-Day theo lịch cố định — bỏ thì nhập khoảng D-Day riêng ở Kế Hoạch Tháng).
+  (3) "Ca gợi ý đã tốt nhất chưa": khung Daily CROCS theo engine 21–00 21,1M · 18–21 19,2M · 11–14 18,0M · 09–12 17,8M · 15–18 15,7M /giờ;
+  backtest 13 tháng-kênh: biết khung giờ gần như không giúp đoán ca Daily nào bán hơn (sai theo ca 30,7% vs coi mọi khung như nhau 31,1%;
+  học riêng ngày Daily 30,5% — không đổi). (4) "Thêm ca" ở Điều Phối (kênh thiếu giờ) trước chọn ngày ít ca + 19:00 ⇒ nay
+  `lib/scheduling/nextShift.ts` `suggestNextShift` (bộ xếp ca, lịch tháng là ca cố định, xin thêm 1 ca, từ ngày mai, số dự báo theo v3)
+  điền sẵn ngày + giờ, người dùng vẫn sửa; kênh chưa có lịch sử giữ cách cũ. Verify dev: VERA Shopee thiếu ~65h ⇒ gợi ý T2 23/11 (Pay
+  Day) 15:00–17:30 dự báo ~6,1M (bấm Huỷ, không tạo). Test `nextShift` (2).
+
 - **06/11 (tối): KẾ HOẠCH THÁNG — MỘT CON SỐ + ĐỘ TIN KÊNH + CHI PHÍ GIỜ THÊM (đã commit + push 06/11, KHÔNG migration)** — user duyệt 5 điểm đánh giá.
   (2) Backtest lúc lập 14 tháng-kênh T8–T10 (`scratchpad/dow/models.ts`): tổng tháng v3 lệch TB 28,4% vs bộ xếp lịch 27,3% (v3 đúng hơn
   8/14), theo ca v3 29,1% vs 30,6%; trung bình 2 mô hình 27,8%, mức nền 14/42 ngày 28,9/28,7%, tự hiệu chỉnh 28,6% ⇒ không gì hơn rõ ⇒ MỌI
