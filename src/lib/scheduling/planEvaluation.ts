@@ -71,7 +71,9 @@ export function evaluatePlan(planSlots: BrandMonthPlanSlot[], shiftSlots: ShiftS
 }
 
 export interface Calibration {
-  factors: Map<string, number>; // "weekday|block" → hệ số
+  factors: Map<string, number>; // "weekday|block" → hệ số TƯƠNG ĐỐI so với lệch chung của kênh (≈ 1 khi mọi khung lệch như nhau)
+  /** Hệ số theo KHUNG 2h gộp mọi thứ, co với ≥ 20 ca — thứ bộ xếp ca dùng (khoá "-1|khối"). Ô thứ × khung chỉ để xem. */
+  blockFactors: Map<string, number>;
   observations: number; // số ca đã có thực tế tham gia
   overallBias: number | null;
 }
@@ -82,6 +84,7 @@ export const calibrationKey = (weekday: number, block: number) => `${weekday}|${
 // vào các khối nó phủ, giống buildHistory, để cùng một ca dài 6h không chỉ hiệu chỉnh 1 ô.
 export function buildCalibration(evals: PlanEvaluation[], params: EngineParams = DEFAULT_ENGINE_PARAMS): Calibration {
   const acc = new Map<string, { expected: number; actual: number; n: number }>();
+  const accBlock = new Map<number, { expected: number; actual: number; n: number }>();
   let obs = 0;
   let sumE = 0;
   let sumA = 0;
@@ -114,17 +117,36 @@ export function buildCalibration(evals: PlanEvaluation[], params: EngineParams =
         c.actual += r.actualGmv * frac;
         c.n += frac;
         acc.set(key, c);
+        const cb = accBlock.get(block) ?? { expected: 0, actual: 0, n: 0 };
+        cb.expected += r.expectedGmv * frac;
+        cb.actual += r.actualGmv * frac;
+        cb.n += frac;
+        accBlock.set(block, cb);
         cur += seg;
       }
     }
   }
   const factors = new Map<string, number>();
+  // Hệ số TƯƠNG ĐỐI (06/11): chia cho tỷ lệ thực tế ÷ dự báo chung của kênh trước khi co về 1. Bản cũ để nguyên lệch chung trong từng ô:
+  // VERA TikTok thực tế thấp hơn kế hoạch 39% ở MỌI khung ⇒ khung live nhiều (18–22h, 10–14h) bị phạt ×0,77–0,83, khung hiếm live (16–18h)
+  // co về ×1,02 ⇒ bộ xếp ca dời ca sang 14–17 / 17–20. Mức chung đã do engine v3 lo; ô chỉ còn nói khung này hơn/kém khung khác.
+  const overall = sumE > 0 && sumA > 0 ? sumA / sumE : 1;
   for (const [key, c] of acc) {
     if (c.expected <= 0) continue;
     // shrink về 1 theo số quan sát (n theo phần ca), clamp.
-    const raw = c.actual / c.expected;
+    const raw = c.actual / c.expected / overall;
     const f = (c.n * raw + params.calibrationK * 1) / (c.n + params.calibrationK);
     factors.set(key, Math.min(params.calibrationMax, Math.max(params.calibrationMin, f)));
   }
-  return { factors, observations: obs, overallBias: sumE > 0 ? sumA / sumE - 1 : null };
+  // Theo khung gộp: co với ít nhất 20 ca như ô khung của bộ xếp ca (suggestEngine BLOCK_SHRINK_K) — VERA TikTok khối 16–18h chỉ vài ca
+  // kế hoạch (10/10 D-Day bán tốt) mà ô thứ × khung co K = 3 cho ×1,15.
+  const blockFactors = new Map<string, number>();
+  const kBlock = Math.max(params.calibrationK, 20);
+  for (const [block, c] of accBlock) {
+    if (c.expected <= 0) continue;
+    const raw = c.actual / c.expected / overall;
+    const f = (c.n * raw + kBlock) / (c.n + kBlock);
+    blockFactors.set(`-1|${block}`, Math.min(params.calibrationMax, Math.max(params.calibrationMin, f)));
+  }
+  return { factors, blockFactors, observations: obs, overallBias: sumE > 0 ? sumA / sumE - 1 : null };
 }

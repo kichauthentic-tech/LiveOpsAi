@@ -80,6 +80,12 @@ export interface HistorySummary {
    * tháng-kênh: riêng Daily 30,6% = gộp 30,6% theo ca, đúng hơn 9/13 tháng. Rỗng (kênh chưa live ngày Daily) ⇒ dùng ô gộp.
    */
   dailyBlockCells: HistoryCell[];
+  /**
+   * Giờ BẮT ĐẦU đội hay dùng (06/11): tỷ trọng so với giờ hay dùng nhất, riêng ngày Daily / ngày Campaign. Chỉ để phá thế ngang điểm —
+   * xem HABIT_BONUS. VERA TikTok ngày Campaign: ca 15–18 chỉ 5 ca (đều ngày D-Day lớn), so cùng ngày ×0,94, mà điểm khung chênh ±3% ⇒
+   * bộ xếp ca vẫn ra 15–18 cho Pay Day.
+   */
+  startHabit: { daily: Record<number, number>; camp: Record<number, number> };
   enough: boolean;
   // Lớp 2 — học từ lịch sử nếu đủ ca (≥ 5), không thì 1.0 và chỉ ghi nhãn.
   eventMultipliers: Record<CalendarEventKind, number>;
@@ -212,6 +218,7 @@ export function buildHistory(sessions: LiveSession[], brandId: string, asOf: str
     cells: [],
     blockCells: [],
     dailyBlockCells: [],
+    startHabit: { daily: {}, camp: {} },
     enough: false,
     eventMultipliers: { holiday: 1, mega_sale: 1, event: 1 },
     eventLearned: { holiday: false, mega_sale: false, event: false },
@@ -338,7 +345,11 @@ export function buildHistory(sessions: LiveSession[], brandId: string, asOf: str
   let baseH = 0;
   // Ô khung 2h chỉ từ ngày Daily (06/11) — ca ngày Daily chấm bằng ô này (xem `dailyBlockCells`).
   const accDaily = new Map<number, { hours: number; gmv: number; views: number; orders: number; n: Set<string> }>();
+  const habit = { daily: {} as Record<number, number>, camp: {} as Record<number, number> };
   for (const s of usable) {
+    const hk = resolveCampBucketType(s.date) === "daily" ? habit.daily : habit.camp;
+    const sh = Math.floor(toMin(s.startTime) / 60) % 24;
+    hk[sh] = (hk[sh] ?? 0) + weightOf(s);
     const hours = sessionDurationHours(s.startTime, s.endTime);
     const w = weightOf(s);
     const ek = eventKindOf(s.date);
@@ -417,6 +428,7 @@ export function buildHistory(sessions: LiveSession[], brandId: string, asOf: str
     campHoursLearned,
     cells: cells.sort((a, b) => b.gmvPerHour - a.gmvPerHour),
     blockCells: poolByBlock(cells, baseGmvPerHour, P.shrinkK),
+    startHabit: { daily: shareOfMax(habit.daily), camp: shareOfMax(habit.camp) },
     dailyBlockCells: poolByBlock(
       [...accDaily].map(([block, d]) => ({ weekday: -1, block, hours: d.hours, gmv: d.gmv, views: d.views, orders: d.orders, n: d.n.size, gmvPerHour: 0, rawGmvPerHour: 0, viewsPerHour: 0, conversion: 0, tag: "thin" as const })),
       baseGmvPerHour,
@@ -513,6 +525,15 @@ export const RELIABLE_BLOCK_MIN_CA = 10;
  * lịch sử = 70%". VERA TikTok Daily mọi khung 1,9–2,3M/giờ: khối 14–16h 3 ca co về 100% vẫn ngang khung 18–21 (134 ca) ⇒ 17 ca 13:00–16:00.
  */
 const BLOCK_PRIOR = 0.85;
+/**
+ * Thưởng tối đa +5% cho giờ bắt đầu đội hay dùng (theo loại ngày) — CHỈ khi xếp hạng ca, không vào dự báo. Nhỏ hơn mức dao động giữa các
+ * khung (backtest: biết khung giờ chỉ giảm sai số theo ca 31,1% → 30,5%), nên chỉ đổi kết quả khi các khung gần ngang nhau.
+ */
+const HABIT_BONUS = 0.05;
+const shareOfMax = (m: Record<number, number>): Record<number, number> => {
+  const max = Math.max(0, ...Object.values(m));
+  return max > 0 ? Object.fromEntries(Object.entries(m).map(([h, v]) => [h, v / max])) : {};
+};
 
 /** Gộp ô thứ × khung thành ô theo khung (mọi thứ), co về mức nền; nhãn giải thích tính lại trên ô gộp. */
 function poolByBlock(cells: readonly HistoryCell[], base: number, shrinkParam: number): HistoryCell[] {
@@ -715,12 +736,14 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
   };
 
   // Điểm biên = kỳ vọng × các phạt/thưởng mềm — chỉ để XẾP HẠNG, không phải dự báo.
+  // Thói quen giờ bắt đầu theo loại ngày — chỉ để xếp hạng (HABIT_BONUS).
+  const habitOf = (cand: Candidate) => 1 + HABIT_BONUS * ((cand.bucket === "daily" ? history.startHabit?.daily : history.startHabit?.camp)?.[Math.floor(cand.start / 60) % 24] ?? 0);
   const marginalScore = (cand: Candidate, state: Candidate[], targetHours: number) => {
     const sameDay = state.filter((s) => s.date === cand.date);
     if (sameDay.length >= dayCapOf(cand.bucket)) return -1;
     if (sameDay.some((s) => overlaps(s, cand))) return -1;
     const target = targetHours;
-    let score = expectedGph(cand, state);
+    let score = expectedGph(cand, state) * habitOf(cand);
     // Phương án: "lean" dồn vào ngày đã có ca (mở ngày mới ×0.92); "balanced" phạt ngày ≥ 2 ca ×0.9.
     if (strategy === "lean" && sameDay.length === 0 && state.length > 0) score *= P.leanNewDayPenalty;
     if (strategy === "balanced" && sameDay.length >= 1) score *= P.balancedSecondSlotPenalty;
@@ -796,11 +819,9 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
     };
 
     // Pha 1 — khuôn ngày camp: lịch sử cho thấy brand live đủ ~N giờ mỗi ngày camp bất kể loại
-    // (Mid-Month GMV/giờ thấp hơn ngày thường vẫn live 12h) và live LIỀN MẠCH (1–2 room kéo dài).
-    // Đó là cách vận hành, không phải hiệu suất, nên lấp ngày camp đủ giờ TRƯỚC — bằng một khối ca
-    // liên tục có tổng GMV/giờ cao nhất trong khung — rồi mới chia phần còn lại; nếu tổng giờ cam kết
-    // không đủ cho mọi ngày camp thì co đều các ngày camp lại. Nhặt từng ca theo ô tốt nhất sẽ để
-    // lại khe 1–2h không nhét ca nào được (10–13, 15–18, 20–23 → ngày chỉ 9h).
+    // (Mid-Month GMV/giờ thấp hơn ngày thường vẫn live 12h). Số ca của ngày theo khuôn giờ; ca nào thì chọn k ca tốt nhất (không bắt liền).
+    // Đó là cách vận hành, không phải hiệu suất, nên lấp ngày camp đủ giờ TRƯỚC — bằng bộ k ca có tổng GMV/giờ cao nhất trong khung —
+    // rồi mới chia phần còn lại; nếu tổng giờ cam kết không đủ cho mọi ngày camp thì co đều các ngày camp lại.
     const campDates = [...new Set(candidates.filter((x) => x.bucket !== "daily" && history.campHoursPerDay[x.bucket] > 0).map((x) => x.date))].sort();
     const campGoalTotal = campDates.reduce((a, d) => a + history.campHoursPerDay[resolveCampBucketType(d, c.camp)], 0);
     const campScale = campGoalTotal > 0 ? Math.min(1, Math.max(0, targetHours - hours) / campGoalTotal) : 0;
@@ -815,21 +836,37 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
       const already = state.filter((x) => x.date === date);
       const k = Math.min(Math.round(goal / slotHoursEff), Math.floor((winEnd - winStart) / slotMin), dayCapOf(bucket)) - already.length;
       if (k <= 0) continue;
-      // Khối k ca liền nhau, không đè ca ops đã đặt, tổng GMV/giờ nền cao nhất.
+      // k ca KHÔNG cần liền nhau, không chồng nhau, không đè ca ops đã đặt, tổng GMV/giờ nền cao nhất (quy hoạch động trên lưới bắt đầu
+      // 60'). 06/11: bản cũ bắt khối LIỀN MẠCH (theo CROCS live kín ngày) ⇒ VERA TikTok Pay Day 3 ca luôn ra 15–18 + 18–21 + 21–00 (khối
+      // muộn nhất vừa khung), trong khi lịch thật là ca sáng + ca tối, bỏ trống 15–18 trừ D-Day lớn. Chọn đúng k ca tối ưu nên không còn
+      // khe 1–2h "kẹt" như khi nhặt từng ca tốt nhất (lý do bản cũ dùng khối liền).
+      const slots: Candidate[] = [];
+      for (let st = winStart; st + slotMin <= winEnd; st += 60) {
+        const { gph, cells } = expectedGphFor(st, st + slotMin, history, look, bucket);
+        const cand: Candidate = { date, start: st, end: st + slotMin, hours: slotHoursEff, bucket, baseGph: gph, cellRefs: cells };
+        if (!already.some((a) => overlaps(a, cand))) slots.push(cand);
+      }
+      const nextFree = slots.map((x, i) => { let j = i + 1; while (j < slots.length && slots[j].start < x.end) j++; return j; });
+      const memo = new Map<string, number>();
+      const best = (i: number, left: number): number => {
+        if (left === 0) return 0;
+        if (i >= slots.length) return -Infinity;
+        const key = `${i}|${left}`;
+        const hit = memo.get(key);
+        if (hit !== undefined) return hit;
+        const v = Math.max(best(i + 1, left), slots[i].baseGph * habitOf(slots[i]) + best(nextFree[i], left - 1));
+        memo.set(key, v);
+        return v;
+      };
       let bestBlock: Candidate[] | null = null;
-      let bestSum = 0;
-      for (let start = winStart; start + k * slotMin <= winEnd; start += 60) {
-        const block: Candidate[] = [];
-        for (let i = 0; i < k; i++) {
-          const st = start + i * slotMin;
-          const { gph, cells } = expectedGphFor(st, st + slotMin, history, look, bucket);
-          block.push({ date, start: st, end: st + slotMin, hours: slotHoursEff, bucket, baseGph: gph, cellRefs: cells });
-        }
-        if (block.some((b) => already.some((a) => overlaps(a, b)))) continue;
-        const sum = block.reduce((a, b) => a + b.baseGph, 0);
-        if (sum > bestSum) {
-          bestSum = sum;
-          bestBlock = block;
+      if (Number.isFinite(best(0, k))) {
+        bestBlock = [];
+        for (let i = 0, left = k; left > 0 && i < slots.length; ) {
+          if (best(i, left) === slots[i].baseGph * habitOf(slots[i]) + best(nextFree[i], left - 1)) {
+            bestBlock.push(slots[i]);
+            left--;
+            i = nextFree[i];
+          } else i++;
         }
       }
       if (!bestBlock) continue;
@@ -856,7 +893,7 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
       notes.push(`Khuôn ngày Campaign học từ lịch sử: ${raised.map((b) => `${label[b]} ~${fmtFixed(history.campHoursPerDay[b], 0)}h/ngày`).join(", ")} → xếp đủ giờ ngày Campaign trước (tới ${raised.map((b) => `${dayCapOf(b)} ca`).join("/")}), phần còn lại mới chia cho ngày Daily (tối đa ${maxPerDay} ca); tối đa ca/ngày của kế hoạch được nâng theo khi áp gợi ý.`);
     }
   }
-  if (c.calibration && c.calibration.size > 0) notes.push(`Đã hiệu chỉnh GMV/giờ theo kế hoạch vs thực tế các tháng trước (${c.calibration.size} ô thứ × giờ có dữ liệu, gộp theo khung giờ).`);
+  if (c.calibration && c.calibration.size > 0) notes.push(`Đã hiệu chỉnh GMV/giờ theo kế hoạch vs thực tế các tháng trước (${c.calibration.size} khung 2 giờ có dữ liệu, so với lệch chung của kênh).`);
   // Chế độ target: trần giờ = sức chứa khung (mọi ngày còn lại × giờ khung), dừng khi dự báo chạm target.
   const capacityHours = [...new Set(candidates.map((x) => x.date))].length * ((winEnd - winStart) / 60);
   const main = greedy(stopAtTarget ? capacityHours : committed);

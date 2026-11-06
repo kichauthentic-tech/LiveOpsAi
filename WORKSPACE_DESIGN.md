@@ -14,6 +14,16 @@
 ## 1. Giai đoạn hiện tại (cập nhật 2026-10-31; mục KH Tháng bản gọn 27/10)
 
 - **06/11 (cuối): ĐIỀU PHỐI — LƯỚI THEO THÁNG (đã commit + push 06/11, KHÔNG migration)** — user: tuần vắt hai tháng (30/11–6/12) trộn ca tháng 11 vào lịch tháng 12 dễ nhầm. Header đổi từ "‹ tuần ›" sang "‹ Tháng 12/2026 ›" (state `viewMonth` riêng trong `RosterBoard`, không còn suy từ thứ Năm của tuần); trên lưới có dãy tuần trong tháng (1–6 · 7–13 · … · 28–31); `WeekGrid({month})` chỉ vẽ ngày thuộc tháng. Luật lịch/kiểm lỗi và **Công bố vẫn theo tuần ISO** (RPC `publish_roster_week`) — hộp xác nhận báo nếu có ca nháp ngoài tháng (ngày đang ẩn) sẽ công bố kèm. Sang tháng hiện tại thì nhảy tới tuần có hôm nay; `goWeekOf(date)` (việc cần làm, Thêm ca) đổi cả tháng. Verify: tsc/eslint, trình duyệt dev T11/T12.
+- **06/11 (đêm): VERA TIKTOK 15–18 NGÀY PAY DAY — HIỆU CHỈNH + KHUÔN CAMPAIGN + THÓI QUEN GIỜ (đã commit + push 06/11, KHÔNG migration)** — sau sửa
+  Daily, Pay Day vẫn 15–18 + 18–21 + 21–00. Gốc 1: **hiệu chỉnh kế hoạch-vs-thực tế mang cả lệch chung** — VERA TikTok thực tế thấp hơn kế
+  hoạch 39% mọi khung ⇒ khung live nhiều ×0,77–0,83, khung hiếm live co về ×1,02 ⇒ khung hiếm thắng. `planEvaluation.buildCalibration` nay
+  chia cho tỷ lệ chung trước khi co (hệ số TƯƠNG ĐỐI) + thêm `blockFactors` (khung 2h gộp, K ≥ 20) — Kế Hoạch Tháng truyền `blockFactors`
+  cho bộ xếp ca (VERA TikTok ×0,93–1,04). Gốc 2: **Pha 1 bắt khối ca LIỀN MẠCH** (theo CROCS) ⇒ Pay Day 3 ca kết thúc 00:00 buộc gồm 15–18;
+  nay quy hoạch động chọn k ca tốt nhất không chồng. Gốc 3: các khung chênh ±3% (ca 15–18 VERA chỉ 5 ca, đều D-Day chính, so cùng ngày
+  ×0,94) ⇒ `HistorySummary.startHabit` + `HABIT_BONUS` +≤5% cho giờ bắt đầu đội hay dùng theo loại ngày, CHỈ khi xếp hạng. Kết quả dev:
+  VERA TikTok Pay Day 09–12 + 18–21 + 21–00, Daily 18–21 + 21–00 (487M ~ −0,2%); CROCS ca thứ 3 Daily 11–14 (đội dùng 16/21 ngày T11), 5,40B
+  (−0,4%). Test `planEvaluation` (hệ số tương đối), `suggestNoWeekday` (+2, test thói quen đỏ khi tắt).
+
 - **06/11 (khuya, sau): VERA TIKTOK CA 15–18 NGÀY DAILY + KHUNG "CHƯA ĐỦ TIN CẬY" (đã commit + push 06/11, KHÔNG migration)** — VERA TikTok Daily mọi khung 1,9–2,3M/giờ; khối
   16–18h chỉ 5 ca (đều ngày Campaign) đứng đầu ô gộp ⇒ 20 ca 15–18 Daily; sau đó 14–16h (3 ca) ⇒ 17 ca 13:00–16:00 (thưởng "giờ neo" khoá cả
   tháng). Sửa trong `suggestEngine`: (a) ô khung 2h co với K ≥ 20 (`BLOCK_SHRINK_K`) về **85% mức nền** (`BLOCK_PRIOR` — khung ít live coi là

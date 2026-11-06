@@ -65,3 +65,38 @@ test("VERA TikTok: khung chỉ có vài ca ngày Campaign (15–18h) không chi�
   expect(daily.length).toBeGreaterThan(15);
   expect(daily.filter((s) => s.startTime >= "13:00" && s.startTime < "18:00").length).toBe(0);
 });
+
+test("ngày Campaign chọn k ca tốt nhất không bắt liền + ưu tiên giờ đội hay dùng (VERA TikTok Pay Day: sáng + tối, không 15–18)", () => {
+  const hist: LiveSession[] = [];
+  for (let d = new Date("2026-08-03T00:00:00"); d <= new Date("2026-10-31T00:00:00"); d.setDate(d.getDate() + 1)) {
+    const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const info = getCampaignDayInfo(date);
+    if (!info) { hist.push(mk(`${date}a`, date, "18:00", "21:00", 6e6), mk(`${date}b`, date, "21:00", "00:00", 6.3e6)); continue; }
+    // Ngày Campaign đội chạy sáng + tối; 15–18 chỉ ở ngày D-Day chính (bán ngang các ca khác cùng ngày).
+    // Bán ngang ngày Daily (VERA TikTok thật: Pay Day ×0,90) ⇒ không có giờ dư dồn thêm vào ngày Campaign.
+    hist.push(mk(`${date}a`, date, "09:00", "12:00", 6e6), mk(`${date}b`, date, "18:00", "21:00", 6e6), mk(`${date}c`, date, "21:00", "00:00", 6.3e6));
+    if (info.type === "dday" && info.spanIndex === 2) hist.push(mk(`${date}d`, date, "15:00", "18:00", 6.3e6));
+  }
+  const h = buildHistory(hist, "b", "2026-11-06", {});
+  const r = suggestMonthPlan(h, { month: "2026-12", today: "2026-11-06", committedHours: 160, targetGmv: 0, liveWindowStart: "09:00", liveWindowEnd: "00:30", defaultSlotHours: 3, maxSlotsPerDay: 5 });
+  const payday = r.slots.filter((s) => getCampaignDayInfo(s.date)?.type === "payday");
+  expect(payday.length).toBeGreaterThan(0);
+  expect(payday.some((s) => s.startTime === "15:00")).toBe(false);
+  expect(payday.some((s) => s.startTime === "09:00")).toBe(true);
+});
+
+test("hai khung bán ngang nhau ⇒ chọn giờ bắt đầu đội hay dùng (CROCS: ca thứ 3 ngày Daily 11–14, không 09–12)", () => {
+  const hist: LiveSession[] = [];
+  let i = 0;
+  for (let d = new Date("2026-08-03T00:00:00"); d <= new Date("2026-10-31T00:00:00"); d.setDate(d.getDate() + 1)) {
+    const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    hist.push(mk(`${date}b`, date, "18:00", "21:00", 60e6), mk(`${date}c`, date, "21:00", "00:00", 60e6));
+    // Cùng GMV/giờ: 11–14 dùng 2/3 số ngày, 09–12 1/3.
+    hist.push(i++ % 3 === 0 ? mk(`${date}a`, date, "09:00", "12:00", 45e6) : mk(`${date}a`, date, "11:00", "14:00", 45e6));
+  }
+  const h = buildHistory(hist, "b", "2026-11-06", {});
+  const r = suggestMonthPlan(h, { month: "2026-12", today: "2026-11-06", committedHours: 230, targetGmv: 0, liveWindowStart: "09:00", liveWindowEnd: "00:00", defaultSlotHours: 3, maxSlotsPerDay: 3 });
+  const mid = r.slots.filter((s) => !getCampaignDayInfo(s.date) && s.startTime < "15:00");
+  expect(mid.length).toBeGreaterThan(3);
+  expect(mid.filter((s) => s.startTime === "11:00").length).toBeGreaterThan(mid.filter((s) => s.startTime === "09:00").length);
+});

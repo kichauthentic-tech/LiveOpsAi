@@ -176,8 +176,30 @@ test("ca 2h TRÙNG KHÍT 1 khối ⇒ hiệu chỉnh đúng 1 ô, kéo về 1 th
   expect(cal.observations).toBe(1);
   expect(cal.overallBias).toBeCloseTo(1, 6);
   expect([...cal.factors.keys()]).toEqual([calibrationKey(4, 4)]);
+  // Một ô duy nhất: lệch của nó CHÍNH LÀ lệch chung ⇒ hệ số tương đối = 1 (06/11).
+  expect(cal.factors.get(calibrationKey(4, 4))).toBeCloseTo(1, 6);
+});
+
+test("06/11: mọi khung cùng lệch (thực tế thấp hơn kế hoạch 40%) ⇒ không khung nào bị phạt; chỉ chênh TƯƠNG ĐỐI mới thành hệ số", () => {
+  const a = { startTime: "08:00", endTime: "10:00" }, b = { startTime: "20:00", endTime: "22:00" };
   const k = DEFAULT_ENGINE_PARAMS.calibrationK;
-  expect(cal.factors.get(calibrationKey(4, 4))).toBeCloseTo((1 * 2 + k) / (1 + k), 6);
+  // Khung a 10 ca, khung b 1 ca — đều thực tế = 60% kế hoạch.
+  const evs = [
+    ...Array.from({ length: 10 }, (_, i) => evaluatePlan([ps(`a${i}`, 100, 100, "s1", a)], [slot("s1", { sessionId: "x1", ...a })], [ses("x1", 60, a)])),
+    evaluatePlan([ps("b", 100, 100, "s2", b)], [slot("s2", { sessionId: "x2", ...b })], [ses("x2", 60, b)])
+  ];
+  const cal = buildCalibration(evs);
+  expect(cal.overallBias).toBeCloseTo(-0.4, 6);
+  for (const f of cal.factors.values()) expect(f).toBeCloseTo(1, 6);
+  // Khung a bán đúng kế hoạch, khung b chỉ 50% ⇒ a > 1 > b, co theo số ca.
+  const evs2 = [
+    ...Array.from({ length: 10 }, (_, i) => evaluatePlan([ps(`a${i}`, 100, 100, "s1", a)], [slot("s1", { sessionId: "x1", ...a })], [ses("x1", 100, a)])),
+    ...Array.from({ length: 10 }, (_, i) => evaluatePlan([ps(`b${i}`, 100, 100, "s2", b)], [slot("s2", { sessionId: "x2", ...b })], [ses("x2", 50, b)]))
+  ];
+  const c2 = buildCalibration(evs2);
+  const overall = 150 / 200;
+  expect(c2.factors.get(calibrationKey(4, 4))).toBeCloseTo((10 * (1 / overall) + k) / (10 + k), 6);
+  expect(c2.factors.get(calibrationKey(4, 10))).toBeCloseTo((10 * (0.5 / overall) + k) / (10 + k), 6);
 });
 
 test("ca 2h lệch giờ chẵn nằm vắt 2 khối — đúng thiết kế, không phải lỗi", () => {

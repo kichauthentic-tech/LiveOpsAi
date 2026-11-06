@@ -419,7 +419,7 @@ export default function MonthPlan({
   // đè lên dữ liệu của chính brand.
   const engineHistory = coldStart && borrowedHistory ? borrowedHistory : history;
 
-  const estimateCtx = useMemo(() => ({ camp: campRanges, events, schemes: brandSchemes, calibration: calibration?.factors }), [campRanges, events, brandSchemes, calibration]);
+  const estimateCtx = useMemo(() => ({ camp: campRanges, events, schemes: brandSchemes, calibration: calibration?.blockFactors }), [campRanges, events, brandSchemes, calibration]);
   // Chia target ca bằng engine v2 (2026-10-09, lib/performance/allocationModel.ts): giờ × loại ngày × khung giờ bắt đầu × vị trí ngày
   // trong đợt, fit đồng thời, trộn với cách cũ (user chốt 2026-09-28: ca 11–13h lịch sử chỉ ~0,8 lần mặt bằng mà nhận target ngang ca
   // 19–20h thì % Target đỏ vì KHUNG, không vì host). Tham số + bảng backtest ở AI Training Center.
@@ -696,7 +696,7 @@ export default function MonthPlan({
     fixedSlots: drafts.map((d) => ({ date: d.date, startTime: d.startTime, endTime: d.endTime })),
     events,
     schemes: brandSchemes,
-    calibration: calibration?.factors
+    calibration: calibration?.blockFactors
   }), [month, today, engineParams, planHours, targetTotal, campRanges, settings, drafts, events, brandSchemes, calibration]);
   // Lưới nháp vs target: dự báo cả lưới hụt quá ngưỡng → cảnh báo kèm phương án bù giờ (engine chạy
   // chế độ target với lưới hiện tại là ca cố định → phần xếp thêm chính là ca cần bù). Chỉ ở nháp.
