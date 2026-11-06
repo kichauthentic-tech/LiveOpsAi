@@ -46,29 +46,49 @@ export function draftsFromSaved(slots: BrandMonthPlanSlot[]): PlanDraftSlot[] {
   return slots.map((s) => ({ key: s.id, id: s.id, date: s.date, startTime: s.startTime, endTime: s.endTime, targetGmv: s.targetGmv, note: s.note, slotId: s.slotId, expectedGmv: s.expectedGmv > 0 ? s.expectedGmv : undefined }));
 }
 
-// Ca mới cho 1 ngày: nối sau ca cuối của ngày (hoặc đầu khung giờ), dài = mặc định, không vượt cuối khung. Sau ca cuối không
-// đủ một ca trọn (audit 27/10: ngày chỉ có ca 19–22 ⇒ "+ ca" ra ca 1 giờ 22–23) thì lấp khoảng trống ĐỦ dài đầu tiên trong khung;
-// không có thì mới cắt ngắn như cũ. Ca cuối qua nửa đêm thì không còn chỗ "sau" nó (trước đây sinh ca 00:30–03:30 ngoài khung).
+/**
+ * Khung live tính bằng phút từ 0h ngày ca. Giờ đóng khung ≤ 06:00 và sớm hơn giờ mở = rạng sáng HÔM SAU (06/11, user: ca main campaign
+ * live tới 00:30–01:00): 09:00–01:00 ⇒ 540..1500. Trước đó khung chỉ tới 23:59 nên engine không bao giờ gợi ý ca qua 0h, còn gõ
+ * 00:30 vào ô giờ đóng thì mọi ca bị báo "ngoài khung". Cùng luật rạng sáng với `endsAfterMidnight`.
+ */
+export function windowBounds(plan: Pick<BrandMonthPlan, "liveWindowStart" | "liveWindowEnd">): { start: number; end: number } {
+  const start = toMin(plan.liveWindowStart);
+  const raw = toMin(plan.liveWindowEnd);
+  return { start, end: raw < start && plan.liveWindowEnd <= "06:00" ? raw + 24 * 60 : raw };
+}
+/** Phút kết thúc của ca tính từ 0h ngày ca (ca qua 0h cộng 24h). */
+export const slotEndMin = (s: Pick<PlanDraftSlot, "startTime" | "endTime">) => toMin(s.endTime) + (endsAfterMidnight(s) ? 24 * 60 : 0);
+const fromMin = (m: number) => `${pad2(Math.floor(m / 60) % 24)}:${pad2(m % 60)}`;
+
+/** Nới khung live cho vừa mọi ca (dựng lưới từ ca đã nhập / lịch dán): mở sớm nhất, đóng muộn nhất — ca tới 00:30 thì khung đóng 00:30
+ *  hôm sau (trước 06/11 ghi "23:59", nên engine vẫn không gợi ý được ca qua 0h của chính kênh đó). */
+export function widenWindow(base: Pick<BrandMonthPlan, "liveWindowStart" | "liveWindowEnd">, slots: readonly Pick<PlanDraftSlot, "startTime" | "endTime">[]): Pick<BrandMonthPlan, "liveWindowStart" | "liveWindowEnd"> {
+  const liveWindowStart = [base.liveWindowStart, ...slots.map((d) => d.startTime)].sort()[0];
+  const end = Math.max(windowBounds({ liveWindowStart, liveWindowEnd: base.liveWindowEnd }).end, ...slots.map(slotEndMin));
+  return { liveWindowStart, liveWindowEnd: fromMin(Math.min(end, 30 * 60)) };
+}
+
+// Ca mới cho 1 ngày: nối sau ca cuối của ngày (hoặc đầu khung giờ), dài = mặc định, không vượt cuối khung (khung qua 0h thì ca mới
+// được vắt sang hôm sau). Sau ca cuối không đủ một ca trọn (audit 27/10: ngày chỉ có ca 19–22 ⇒ "+ ca" ra ca 1 giờ 22–23) thì lấp
+// khoảng trống ĐỦ dài đầu tiên trong khung; không có thì mới cắt ngắn như cũ.
 // Trả null nếu đã đủ số ca tối đa hoặc hết chỗ trong khung.
 export function nextSlotForDay(day: string, drafts: PlanDraftSlot[], plan: Pick<BrandMonthPlan, "defaultSlotHours" | "liveWindowStart" | "liveWindowEnd" | "maxSlotsPerDay">): PlanDraftSlot | null {
   const sameDay = drafts.filter((d) => d.date === day).sort((a, b) => a.startTime.localeCompare(b.startTime));
   if (sameDay.length >= plan.maxSlotsPerDay) return null;
-  const make = (start: string, end: string): PlanDraftSlot => ({ key: newKey(), date: day, startTime: start, endTime: end, targetGmv: 0, note: "" });
-  const full = (start: string) => addHours(start, plan.defaultSlotHours);
+  const w = windowBounds(plan);
+  const len = Math.round(plan.defaultSlotHours * 60);
+  const make = (a: number, b: number): PlanDraftSlot => ({ key: newKey(), date: day, startTime: fromMin(a), endTime: fromMin(b), targetGmv: 0, note: "" });
   const last = sameDay.at(-1);
-  const after = !last ? plan.liveWindowStart : endsAfterMidnight(last) ? null : last.endTime;
-  if (after !== null && after < plan.liveWindowEnd && full(after) <= plan.liveWindowEnd && full(after) > after) return make(after, full(after));
+  const after = last ? slotEndMin(last) : w.start;
+  if (len > 0 && after + len <= w.end) return make(after, after + len);
   // Khoảng trống đủ một ca trọn, từ đầu khung giờ.
-  let cursor = plan.liveWindowStart;
+  let cursor = w.start;
   for (const s of sameDay) {
-    if (s.startTime > cursor && full(cursor) <= s.startTime && full(cursor) > cursor) return make(cursor, full(cursor));
-    const end = endsAfterMidnight(s) ? "23:59" : s.endTime;
-    if (end > cursor) cursor = end;
+    if (len > 0 && toMin(s.startTime) >= cursor + len) return make(cursor, cursor + len);
+    cursor = Math.max(cursor, slotEndMin(s));
   }
-  if (after === null || after >= plan.liveWindowEnd) return null;
-  const end = full(after) > plan.liveWindowEnd ? plan.liveWindowEnd : full(after);
-  if (end <= after) return null;
-  return make(after, end);
+  if (after >= w.end) return null;
+  return make(after, Math.min(after + len, w.end));
 }
 
 // Dựng lưới từ CA ĐÃ NHẬP (live_sessions nạp từ file/tạo tay trước khi có kế hoạch — 07/10: lịch T10 của 6 kênh). Mỗi ca chưa huỷ
@@ -223,8 +243,11 @@ export function validateDrafts(drafts: PlanDraftSlot[], plan: Pick<BrandMonthPla
   for (const d of drafts) {
     const overnight = endsAfterMidnight(d);
     if (d.endTime <= d.startTime && !overnight) errors.push(`${d.date}: ca ${d.startTime}-${d.endTime} kết thúc trước khi bắt đầu`);
-    // Ca qua nửa đêm: chỉ giờ BẮT ĐẦU phải nằm trong khung (giờ kết thúc ở ngày hôm sau).
-    if (d.startTime < plan.liveWindowStart || (overnight ? d.startTime >= plan.liveWindowEnd : d.endTime > plan.liveWindowEnd)) errors.push(`${d.date}: ca ${d.startTime}-${d.endTime} ngoài khung ${plan.liveWindowStart}-${plan.liveWindowEnd}`);
+    // Khung đóng trong ngày mà ca qua 0h: chỉ giờ BẮT ĐẦU phải nằm trong khung (như trước 06/11). Khung qua 0h: cả giờ kết thúc.
+    const w = windowBounds(plan);
+    const st = toMin(d.startTime);
+    const out = st < w.start || (overnight && w.end <= 24 * 60 ? st >= w.end : slotEndMin(d) > w.end);
+    if (out) errors.push(`${d.date}: ca ${d.startTime}-${d.endTime} ngoài khung ${plan.liveWindowStart}-${plan.liveWindowEnd}${w.end > 24 * 60 ? " hôm sau" : ""}`);
     const list = byDay.get(d.date) ?? [];
     list.push(d);
     byDay.set(d.date, list);
@@ -234,7 +257,7 @@ export function validateDrafts(drafts: PlanDraftSlot[], plan: Pick<BrandMonthPla
     const sorted = [...list].sort((a, b) => a.startTime.localeCompare(b.startTime));
     for (let i = 1; i < sorted.length; i++) {
       const prev = sorted[i - 1];
-      const prevEnd = toMin(prev.endTime) + (endsAfterMidnight(prev) ? 24 * 60 : 0);
+      const prevEnd = slotEndMin(prev);
       if (toMin(sorted[i].startTime) < prevEnd) errors.push(`${day}: ca ${sorted[i].startTime} chồng giờ với ca ${prev.startTime}-${prev.endTime}`);
     }
   }

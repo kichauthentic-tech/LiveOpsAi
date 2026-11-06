@@ -365,6 +365,25 @@ export interface RebaseResult extends RetargetResult {
   zeroed: number;
 }
 
+/**
+ * Ca bổ sung (0200): thêm ca vào kế hoạch ĐÃ CHỐT khi target brand cao hơn dự báo 10–30% (lib/scheduling/targetIntake.ts). Ca vào
+ * kế hoạch với target 0 (chia ngay sau bằng rebaseMonthPlan), DB chốt lại im lặng để sinh ca mở, đặt hạn đăng ký riêng cho các ca đó
+ * và báo MỘT tin cho người từng live kênh 90 ngày qua. Ca trùng giờ ca kế hoạch có sẵn / ngày đã qua bị bỏ qua (`skipped`).
+ */
+export async function openExtraPlanSlots(planId: string, slots: { date: string; startTime: string; endTime: string; expectedGmv?: number }[], deadlineIso: string): Promise<{ added: number; opened: number; skipped: number; notified: number }> {
+  const { data, error } = await supabase.rpc("open_extra_plan_slots", {
+    p_plan_id: planId,
+    p_slots: slots.map((s) => ({ date: s.date, start_time: s.startTime, end_time: s.endTime, expected_gmv: Math.round(s.expectedGmv ?? 0) })),
+    p_deadline: deadlineIso
+  });
+  if (error) {
+    if (error.code === "PGRST202") throw new Error("DB chưa chạy migration 0200 (ca bổ sung) — chạy SQL trong Supabase rồi thử lại.");
+    throw error;
+  }
+  const d = (data ?? {}) as { added?: number; opened?: number; skipped?: number; notified?: number };
+  return { added: Number(d.added ?? 0), opened: Number(d.opened ?? 0), skipped: Number(d.skipped ?? 0), notified: Number(d.notified ?? 0) };
+}
+
 export async function rebaseMonthPlan(planId: string, items: RebaseItem[], note = ""): Promise<RebaseResult> {
   const { data, error } = await supabase.rpc("rebase_month_plan", { p_plan_id: planId, p_items: items, p_note: note });
   if (error) {

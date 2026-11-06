@@ -6,6 +6,8 @@
 // kết với brand và tổng target các ca mà host nhận, tức đúng họ lỗi Đ5/E2E#1 đã phải vá 2 lần.
 import { expect, test } from "vitest";
 import {
+  windowBounds,
+  widenWindow,
   addHours,
   allocateDraftTargets,
   daysOfMonth,
@@ -102,6 +104,22 @@ test("audit 27/10: ca cuối qua nửa đêm ⇒ không sinh ca 00:30–03:30 ng
   expect(s).toMatchObject({ startTime: "09:00", endTime: "12:00" });
   expect(validateDrafts([d("2026-11-05", "21:00", "00:30"), s!], win)).toEqual([]);
   expect(nextSlotForDay("2026-11-05", [d("2026-11-05", "09:00", "21:00"), d("2026-11-05", "21:00", "00:30")], win)).toBeNull();
+});
+
+test("06/11: khung qua 0h (09:00–01:00) — nút + ca vắt sang hôm sau, kiểm lỗi theo giờ kết thúc hôm sau", () => {
+  const win = { ...PLAN, defaultSlotHours: 3, liveWindowStart: "09:00", liveWindowEnd: "01:00" };
+  expect(windowBounds(win)).toEqual({ start: 540, end: 1500 });
+  expect(nextSlotForDay("2026-11-11", [d("2026-11-11", "09:00", "19:00"), d("2026-11-11", "19:00", "22:00")], win)).toMatchObject({ startTime: "22:00", endTime: "01:00" });
+  expect(validateDrafts([d("2026-11-11", "21:00", "00:30"), d("2026-11-11", "10:00", "13:00")], win)).toEqual([]);
+  expect(validateDrafts([d("2026-11-11", "22:00", "01:30")], win)[0]).toMatch("ngoài khung 09:00-01:00 hôm sau");
+  // Khung đóng trong ngày: ca qua 0h vẫn chỉ cần giờ bắt đầu trong khung (như trước).
+  expect(validateDrafts([d("2026-11-11", "21:00", "00:30")], { ...win, liveWindowEnd: "23:00" })).toEqual([]);
+});
+
+test("06/11: nới khung theo ca đã nhập — ca tới 00:30 ⇒ khung đóng 00:30 hôm sau (trước ghi 23:59)", () => {
+  expect(widenWindow({ liveWindowStart: "09:00", liveWindowEnd: "23:00" }, [d("x", "08:00", "11:00"), d("x", "21:00", "00:30")])).toEqual({ liveWindowStart: "08:00", liveWindowEnd: "00:30" });
+  expect(widenWindow({ liveWindowStart: "09:00", liveWindowEnd: "01:00" }, [d("x", "21:00", "00:30")])).toEqual({ liveWindowStart: "09:00", liveWindowEnd: "01:00" });
+  expect(widenWindow({ liveWindowStart: "09:00", liveWindowEnd: "23:00" }, [d("x", "19:00", "22:00")])).toEqual({ liveWindowStart: "09:00", liveWindowEnd: "23:00" });
 });
 
 // ── allocateDraftTargets: TIỀN ────────────────────────────────────────────────────────────────────

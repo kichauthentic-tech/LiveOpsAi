@@ -8,6 +8,7 @@ import { errorMessage } from "../lib/errorMessage";
 import { fmtVndShort } from "../lib/format";
 import { talentShortName } from "../lib/talentName";
 import { addDays, getTodayDate, isoWeekStart } from "../lib/dateUtils";
+import { halfRange } from "../lib/roster/milestones";
 import { updateOpenSlotTime } from "../lib/db/shiftSlots";
 import {
   fetchRosterChanges,
@@ -316,7 +317,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
   const nowIso = new Date().toISOString();
   const statusOf = useCallback(
     (month: string) =>
-      monthStatus({ month, today, now: nowIso, sessions: p.sessions, slots: p.shiftSlots, registrations: p.shiftRegistrations, drafts, weeks, deadline: months.find((m) => m.month === month)?.signupDeadline }),
+      monthStatus({ month, today, now: nowIso, sessions: p.sessions, slots: p.shiftSlots, registrations: p.shiftRegistrations, drafts, weeks, milestones: months.find((m) => m.month === month) }),
     // nowIso đổi mỗi lần vẽ — chỉ dùng để so với hạn đăng ký, không cần vào deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [today, p.sessions, p.shiftSlots, p.shiftRegistrations, drafts, weeks, months]
@@ -721,6 +722,18 @@ export const RosterBoard: React.FC<Props> = (p) => {
     todos.push({ key: "next", tone: "bad", text: `${mNext[0].toUpperCase()}${mNext.slice(1)}: còn ${st1.noHost} ca mở chưa có host.`, sub: `${st1.noHostWithSignup} ca có người báo rảnh. Mỗi tuần bấm Tự xếp người rồi Công bố.`, action: { label: "Tới tuần còn trống", run: () => onMonthAction("staff", m1) } });
   else if (st1.phase === "publish")
     todos.push({ key: "next", tone: "warn", text: `${mNext[0].toUpperCase()}${mNext.slice(1)}: ${st1.weeksToPublish.length} tuần có ca nháp chưa công bố.`, action: { label: "Tới tuần chưa công bố", run: () => onMonthAction("publish", m1) } });
+  // Mốc chốt lịch từng đợt (0200, user chốt 06/11: chốt ca 1–15 ngày 15, ca 16–cuối ngày 25 tháng trước). Nhắc từ 2 ngày trước mốc.
+  for (const h of st1.halves) {
+    if (!h.publishBy || (h.noHost === 0 && h.toPublish === 0) || addDays(h.publishBy, -2) > today) continue;
+    const when = h.publishBy < today ? `đã quá hạn chốt ${dayLabel(h.publishBy)}` : h.publishBy === today ? "hôm nay phải chốt" : `chốt trước ${dayLabel(h.publishBy)}`;
+    const firstWeek = h.weeksToPublish[0];
+    todos.push({
+      key: `half-${h.half}`,
+      tone: h.publishBy <= today ? "bad" : "warn",
+      text: `Lịch đợt ${h.half} ${mNext} (ca ${halfRange(m1, h.half)}) ${when}: ${[h.noHost > 0 ? `${h.noHost} ca chưa có host` : "", h.toPublish > 0 ? `${h.toPublish} ca nháp chưa công bố` : ""].filter(Boolean).join(", ")}.`,
+      action: h.noHost > 0 && h.firstNoHostDate ? { label: "Tới tuần còn trống", run: () => goWeekOf(h.firstNoHostDate!) } : firstWeek ? { label: "Tới tuần chưa công bố", run: () => goWeekOf(firstWeek) } : undefined
+    });
+  }
   for (const r of short.slice(0, 3))
     todos.push({
       key: `short-${r.brandId}-${r.platform}`,
@@ -814,7 +827,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
         {desk.commitError && <p className="text-xs text-amber-300">Không đọc được cam kết hợp đồng — giờ cam kết để trống.</p>}
       </PageHeader>
 
-      <MonthStrip cards={monthCards} viewMonth={viewMonth} onAction={onMonthAction} />
+      <MonthStrip cards={monthCards} viewMonth={viewMonth} today={today} onAction={onMonthAction} />
 
       <div className="space-y-3">
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-2 sm:p-3 min-w-0">
@@ -1016,7 +1029,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
           channels={wizardChannels}
           sessions={p.sessions}
           shiftSlots={p.shiftSlots}
-          deadline={months.find((m) => m.month === m1)?.signupDeadline}
+          saved={months.find((m) => m.month === m1)}
           onClose={() => setWizardOpen(false)}
           onDone={async () => {
             await Promise.all([p.onScheduleChanged(), reloadRoster()]);

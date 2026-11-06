@@ -3,11 +3,12 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useToast } from "../../hooks/useToast";
 import { useConfirm } from "../../hooks/useConfirm";
 import { errorMessage } from "../../lib/errorMessage";
-import { addDays } from "../../lib/dateUtils";
 import { AlertTriangle, ChevronRight } from "lucide-react";
 import type { Brand, BrandChannel, BrandContract, BrandMonthlyCommitment, LiveSession, ShiftRegistration, ShiftSlot, UserRole } from "../../types";
 import type { EngineParams } from "../../lib/scheduling/engineParams";
-import { fetchRosterMonths, isRosterBackendMissing, setRosterMonthDeadline, type RosterDraft, type RosterMonth, type RosterWeek } from "../../lib/db/roster";
+import { fetchRosterMonths, isRosterBackendMissing, setRosterMonthDeadline, setRosterMonthMilestones, type RosterDraft, type RosterMonth, type RosterWeek } from "../../lib/db/roster";
+import { draftFromSaved, milestoneError, milestonePayload, milestonesChanged, type MilestoneDraft } from "../../lib/roster/milestones";
+import { MilestonesEditor } from "./MilestonesEditor";
 import { commitmentsRead, contractsRead } from "../../lib/db/brandContracts";
 import { monthCommitmentOf } from "../../lib/performance/brandCommitment";
 import { accountRow, sortAccounts, type AccountRow, type RowTone } from "../../lib/performance/accountOverview";
@@ -452,13 +453,14 @@ const fmtWhen = (iso: string) => {
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")} ${d.getDate()}/${d.getMonth() + 1}`;
 };
 
-/** Một hạn đăng ký cho cả tháng (0180, user chốt 24/10). Qua hạn DB chặn talent đăng ký/rút; người xếp lịch vẫn đăng ký hộ được. */
+/** Mốc lịch của tháng (0200, user chốt 06/11): hạn đăng ký + ngày chốt lịch cho ca 1–15 và ca 16–cuối. Qua hạn đợt nào DB chặn talent
+ * đăng ký/rút ca đợt đó; người xếp lịch vẫn đăng ký hộ được. DB chưa chạy 0200 ⇒ chỉ ghi được hạn đợt 1 cho cả tháng. */
 const MonthDeadline: React.FC<{ month: string; today: string; openSlots: number; canWrite: boolean }> = ({ month, today, openSlots, canWrite }) => {
   const { showToast } = useToast();
   const confirm = useConfirm();
   const [state, setState] = useState<{ month: string; list: RosterMonth[]; missing: boolean } | null>(null);
   const [nonce, setNonce] = useState(0);
-  const [edit, setEdit] = useState<{ month: string; date?: string; time?: string } | null>(null);
+  const [edit, setEdit] = useState<{ month: string; v: MilestoneDraft } | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     let alive = true;
@@ -469,26 +471,31 @@ const MonthDeadline: React.FC<{ month: string; today: string; openSlots: number;
       alive = false;
     };
   }, [month, nonce]);
-  const saved = state?.month === month ? state.list.find((x) => x.month === month)?.signupDeadline : undefined;
-  const savedD = saved ? new Date(saved) : null;
-  // Gợi ý khi chưa có hạn: 17:00 năm ngày trước đầu tháng (đủ thời gian xếp người + công bố); ngày đó đã qua thì 17:00 ngày kia.
-  const suggest = addDays(`${month}-01`, -5) > today ? addDays(`${month}-01`, -5) : addDays(today, 2);
-  const cur = edit?.month === month ? edit : null;
-  const date = cur?.date ?? (savedD ? `${savedD.getFullYear()}-${String(savedD.getMonth() + 1).padStart(2, "0")}-${String(savedD.getDate()).padStart(2, "0")}` : suggest);
-  const time = cur?.time ?? (savedD ? `${String(savedD.getHours()).padStart(2, "0")}:${String(savedD.getMinutes()).padStart(2, "0")}` : "17:00");
-  const passed = !!saved && new Date(saved) <= new Date();
-  const missing = !!state?.missing;
   const loaded = state?.month === month;
+  const saved = loaded ? state.list.find((x) => x.month === month) : undefined;
+  const value = edit?.month === month ? edit.v : draftFromSaved(saved, month, today);
+  const missing = !!state?.missing;
+  const err = milestoneError(value);
+  const changed = !err && milestonesChanged(value, saved);
+  const status = (iso?: string) => (!iso ? "chưa đặt" : new Date(iso) <= new Date() ? `đã đóng ${fmtWhen(iso)}` : `tới ${fmtWhen(iso)}`);
 
   const save = async () => {
-    const iso = new Date(`${date}T${time}:00`).toISOString();
-    if (new Date(iso) <= new Date() && !(await confirm("Hạn này đã qua — host/trợ sẽ không đăng ký được nữa cho tháng này. Vẫn đặt?"))) return;
+    const pl = milestonePayload(value);
+    if (new Date(pl.deadline1) <= new Date() && !(await confirm("Hạn đợt 1 đã qua — host/trợ sẽ không đăng ký được ca ngày 1–15 nữa. Vẫn đặt?"))) return;
     setBusy(true);
     try {
-      const r = await setRosterMonthDeadline(month, iso);
+      let r: { notified: number; openSlots: number };
+      let note = "";
+      try {
+        r = await setRosterMonthMilestones(month, pl);
+      } catch (e) {
+        if (!isRosterBackendMissing(e)) throw e;
+        r = await setRosterMonthDeadline(month, pl.deadline1);
+        note = " — DB chưa chạy 0200: hạn đợt 1 áp cả tháng";
+      }
       setEdit(null);
       setNonce((n) => n + 1);
-      showToast(`Đã đặt hạn ${fmtWhen(iso)}${r.notified > 0 ? ` — đã báo ${r.notified} host/trợ (${r.openSlots} ca mở)` : r.openSlots === 0 ? " — chưa có ca mở nên chưa báo ai" : ""}`);
+      showToast(`Đã đặt mốc tháng ${Number(month.slice(5))}${r.notified > 0 ? ` — đã báo ${r.notified} host/trợ (${r.openSlots} ca mở)` : r.openSlots === 0 ? " — chưa có ca mở nên chưa báo ai" : ""}${note}`);
     } catch (e) {
       showToast(errorMessage(e));
     } finally {
@@ -497,23 +504,20 @@ const MonthDeadline: React.FC<{ month: string; today: string; openSlots: number;
   };
 
   return (
-    <div className="flex flex-wrap items-end gap-x-4 gap-y-2 rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-xs">
-      <div className="flex flex-col gap-0.5">
-        <b className="text-sm text-[var(--text)]">Hạn đăng ký {monthLabel(month)}</b>
-        <span className={missing ? "text-amber-300" : !saved ? "text-[var(--text-faint)]" : passed ? "text-amber-300" : "text-emerald-400"}>
-          {!loaded ? "Đang tải hạn đăng ký…" : missing ? "Chưa chạy migration 0180 — chưa đặt được hạn theo tháng" : !saved ? "Chưa đặt hạn" : passed ? `Đã đóng đăng ký lúc ${fmtWhen(saved)}` : `Đang nhận đăng ký tới ${fmtWhen(saved)}`}
+    <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-xs space-y-2">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <b className="text-sm text-[var(--text)]">Mốc đăng ký & chốt lịch {monthLabel(month)}</b>
+        <span className={missing ? "text-amber-300" : "text-[var(--text-muted)]"}>
+          {!loaded ? "Đang tải mốc…" : missing ? "Chưa chạy migration 0180 — chưa đặt được hạn theo tháng" : `Đợt 1 ${status(saved?.signupDeadline)} · đợt 2 ${status(saved?.signupDeadline2 ?? saved?.signupDeadline)}`}
           {" · "}
           {openSlots > 0 ? `${openSlots} ca mở chờ đăng ký` : "chưa có ca mở — chốt Kế Hoạch Tháng để có ca cho talent đăng ký"}
         </span>
       </div>
+      {loaded && !missing && <MilestonesEditor month={month} value={value} onChange={(v) => setEdit({ month, v })} disabled={!canWrite || busy} />}
       {canWrite && loaded && !missing && (
-        <span className="flex flex-wrap items-end gap-2">
-          <input type="date" aria-label="Ngày hạn đăng ký" value={date} onChange={(e) => setEdit({ month, date: e.target.value, time: cur?.time })} className="px-2 py-1 rounded-lg bg-[var(--surface-base)] border border-[var(--border)] text-[var(--text)]" />
-          <input type="time" aria-label="Giờ hạn đăng ký" value={time} onChange={(e) => setEdit({ month, date: cur?.date, time: e.target.value })} className="px-2 py-1 rounded-lg bg-[var(--surface-base)] border border-[var(--border)] text-[var(--text)]" />
-          <button type="button" disabled={busy || !date || !time} onClick={() => void save()} className="px-3 py-1.5 rounded-lg border border-[var(--border)] font-bold text-[var(--text)] disabled:opacity-40">
-            {saved ? "Đổi hạn" : "Đặt hạn + báo talent"}
-          </button>
-        </span>
+        <button type="button" disabled={busy || !changed} onClick={() => void save()} className="px-3 py-1.5 rounded-lg border border-[var(--border)] font-bold text-[var(--text)] disabled:opacity-40">
+          {saved ? "Lưu mốc + báo talent" : "Đặt mốc + báo talent"}
+        </button>
       )}
     </div>
   );

@@ -19,6 +19,9 @@ import { TargetWeightModel, targetWeightModel, targetWeights } from "./slotInsig
 // Mỗi nhóm hệ số đóng góp ~1,3 điểm %; cả hai ~3 điểm %. Phần sai số còn lại (~22%, trần fit ngay trên tháng test 18%) là nhiễu từng
 // ca. Đã thử và KHÔNG giúp (đừng thử lại không có lý do mới): thứ trong tuần, tuần trong tháng, tương tác loại ngày × khung, ô trực
 // tiếp khi n ≥ 5, vị trí ngày trong D-Day, log giờ, trọng số tháng gần, cắt ngoại lệ, cập nhật bằng nửa đầu tháng, học chung nhiều brand.
+// Đo lại "thứ trong tuần" 06/11 (user nghi T7–CN bị target thấp): 5 kênh × T8–T10, 14 tháng-kênh — thêm hệ số T7–CN (ngày Daily, so
+// trong cùng khung, co về 1) sai số ca 28,60% → 28,57–28,61%, theo ngày 21,5% → 21,6%. GMV/giờ T7–CN ÷ T2–T6 cùng khung: CROCS 0,99,
+// VERA Shopee 1,06, VERA TikTok 1,08, Franklin TikTok 0,87 — đổi dấu giữa các tháng (VERA TikTok 0,70–1,30). Vẫn không giúp.
 
 type BucketOf = (date: string) => CampDayBucket;
 export type SlotLike = { date: string; startTime: string; endTime: string };

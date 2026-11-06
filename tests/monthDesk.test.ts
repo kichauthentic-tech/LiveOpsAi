@@ -80,11 +80,11 @@ test("giờ tắt sớm theo lý do khai lúc giao ca (0180)", () => {
 test("hạn đăng ký của một ngày = hạn sớm hơn giữa hạn tháng và hạn tuần cũ", () => {
   const wk = (d: string) => isoWeekStart(d);
   const months = [{ month: "2026-11", signupDeadline: "2026-10-28T10:00:00Z" }];
-  expect(signupDeadlineOf("2026-11-03", months, [], wk)).toBe("2026-10-28T10:00:00Z");
-  expect(signupDeadlineOf("2026-11-03", months, [{ weekStart: "2026-11-02", signupDeadline: "2026-10-27T10:00:00Z" }], wk)).toBe("2026-10-27T10:00:00Z");
+  expect(signupDeadlineOf({ date: "2026-11-03" }, months, [], wk)).toBe("2026-10-28T10:00:00Z");
+  expect(signupDeadlineOf({ date: "2026-11-03" }, months, [{ weekStart: "2026-11-02", signupDeadline: "2026-10-27T10:00:00Z" }], wk)).toBe("2026-10-27T10:00:00Z");
   // Tuần 26/10–01/11: ngày 01/11 lấy hạn THÁNG 11 dù thứ Hai thuộc tháng 10.
-  expect(signupDeadlineOf("2026-11-01", months, [], wk)).toBe("2026-10-28T10:00:00Z");
-  expect(signupDeadlineOf("2026-10-30", months, [], wk)).toBeUndefined();
+  expect(signupDeadlineOf({ date: "2026-11-01" }, months, [], wk)).toBe("2026-10-28T10:00:00Z");
+  expect(signupDeadlineOf({ date: "2026-10-30" }, months, [], wk)).toBeUndefined();
 });
 
 const row = (rescue: Partial<AccountRow["rescue"]>): AccountRow =>

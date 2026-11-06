@@ -6,17 +6,20 @@ import { PlatformChip } from "../common/PlatformChip";
 import { errorMessage } from "../../lib/errorMessage";
 import { fetchBrandContracts, fetchBrandMonthlyCommitments, upsertMonthlyCommitment } from "../../lib/db/brandContracts";
 import { fetchMonthPlan, fetchPlanStatuses, lockMonthPlan, lockMonthPlans, replacePlanSlots, upsertMonthPlan, type LockPlanResult, type PlanSettings } from "../../lib/db/monthPlans";
-import { isRosterBackendMissing, setRosterMonthDeadline } from "../../lib/db/roster";
+import { isRosterBackendMissing, setRosterMonthDeadline, setRosterMonthMilestones, type RosterMonth } from "../../lib/db/roster";
+import { draftFromSaved, milestoneError, milestonePayload, milestonesChanged, type MilestoneDraft } from "../../lib/roster/milestones";
+import { MilestonesEditor } from "./MilestonesEditor";
 import { contractCovering, monthCommitmentOf } from "../../lib/performance/brandCommitment";
 import { brandPlatformKey, type ReportPlatform } from "../../lib/reportPlatform";
-import { addDays } from "../../lib/dateUtils";
 import { hoursToSchedule } from "../../lib/roster/monthDesk";
+import { widenWindow } from "../../lib/scheduling/monthPlanGrid";
 import { expandPattern, fitToHours, parsePastedSchedule, totalHours, weekPattern, type TimeFrame } from "../../lib/roster/openMonth";
 
 // "Mở lịch tháng sau" 3 bước (Điều Phối Lịch Live bản gọn — đợt 2, 25/10; user chốt: tháng 11 lập lịch TRONG APP, giờ cam kết
 // nhập tại chỗ, target vẫn ở Kế Hoạch Tháng). Ghi qua ĐÚNG đường của Kế Hoạch Tháng để Dashboard / dự báo / chia target sau
 // này không lệch: cam kết tháng (upsertMonthlyCommitment, cùng luật isOverride), lưới ca kế hoạch (upsertMonthPlan +
-// replacePlanSlots, target ca = 0), chốt (lock_month_plan sinh ca mở), rồi đặt MỘT hạn đăng ký cho tháng (0180).
+// replacePlanSlots, target ca = 0), chốt (lock_month_plan sinh ca mở), rồi đặt 4 mốc của tháng (0200: hạn đăng ký + ngày chốt lịch
+// cho ca 1–15 và ca 16–cuối; mặc định ngày 10/15/20/25 tháng trước — user chốt 06/11). Target đến sau buổi họp monthly với brand.
 // Trainer ghi được cả 4 từ 0180. Kênh đã chốt kế hoạch thì bỏ qua; kênh có lưới nháp sẵn (CEO lập, có target) thì giữ lưới đó.
 
 export interface WizardChannel {
@@ -53,19 +56,18 @@ export const OpenMonthWizard: React.FC<{
   channels: WizardChannel[];
   sessions: LiveSession[];
   shiftSlots: ShiftSlot[];
-  deadline?: string;
+  /** Mốc đã lưu của tháng (hạn đăng ký 2 đợt + ngày chốt lịch). */
+  saved?: RosterMonth;
   onClose: () => void;
   /** Sau khi tạo: nạp lại ca/ca mở + hạn tháng. */
   onDone: () => Promise<void>;
-}> = ({ month, today, channels, sessions, shiftSlots, deadline, onClose, onDone }) => {
+}> = ({ month, today, channels, sessions, shiftSlots, saved, onClose, onDone }) => {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [step, setStep] = useState(1);
   const [fit, setFit] = useState(true);
   const monthStart = `${month}-01`;
-  const defDeadline = deadline ? new Date(deadline) : null;
-  const [dlDate, setDlDate] = useState(defDeadline ? `${defDeadline.getFullYear()}-${String(defDeadline.getMonth() + 1).padStart(2, "0")}-${String(defDeadline.getDate()).padStart(2, "0")}` : addDays(monthStart, -3) > today ? addDays(monthStart, -3) : addDays(today, 1));
-  const [dlTime, setDlTime] = useState(defDeadline ? `${String(defDeadline.getHours()).padStart(2, "0")}:${String(defDeadline.getMinutes()).padStart(2, "0")}` : "17:00");
+  const [ms, setMs] = useState<MilestoneDraft>(() => draftFromSaved(saved, month, today));
   const [running, setRunning] = useState(false);
   const [results, setResults] = useState<RunState[] | null>(null);
 
@@ -132,11 +134,11 @@ export const OpenMonthWizard: React.FC<{
   const summary = active.map((r) => ({ r, ...framesOf(r) }));
   const totalSlots = summary.reduce((a, x) => a + x.frames.length, 0);
   const totalH = summary.reduce((a, x) => a + totalHours(x.frames), 0);
-  const deadlineIso = dlDate && dlTime ? new Date(`${dlDate}T${dlTime}:00`).toISOString() : null;
-  const deadlineChanged = !!deadlineIso && (!deadline || new Date(deadline).getTime() !== new Date(deadlineIso).getTime());
+  const msErr = milestoneError(ms);
+  const deadlineChanged = !msErr && milestonesChanged(ms, saved);
 
   const run = async () => {
-    if (!rows || !deadlineIso) return;
+    if (!rows || msErr) return;
     setRunning(true);
     const res: RunState[] = [];
     const toLock: { key: string; planId: string }[] = [];
@@ -163,19 +165,16 @@ export const OpenMonthWizard: React.FC<{
         if (r.src !== "plan" || !planId) {
           const perDay = new Map<string, number>();
           for (const f of frames) perDay.set(f.date, (perDay.get(f.date) ?? 0) + 1);
-          const overnight = frames.some((f) => f.endTime <= f.startTime);
           const base: PlanSettings = r.plan
             ? { defaultSlotHours: r.plan.defaultSlotHours, liveWindowStart: r.plan.liveWindowStart, liveWindowEnd: r.plan.liveWindowEnd, maxSlotsPerDay: r.plan.maxSlotsPerDay, notes: r.plan.notes, blackoutDates: r.plan.blackoutDates, targetGmv: r.plan.targetGmv, campRanges: r.plan.campRanges, groupTargets: r.plan.groupTargets, shopTargetGmv: r.plan.shopTargetGmv, adsBudget: r.plan.adsBudget }
             : DEFAULT_SETTINGS;
-          const ends = frames.filter((f) => f.endTime > f.startTime).map((f) => f.endTime);
           const plan = await upsertMonthPlan(
             r.brandId,
             month,
             {
               ...base,
               maxSlotsPerDay: Math.min(8, Math.max(base.maxSlotsPerDay, ...perDay.values())),
-              liveWindowStart: [base.liveWindowStart, ...frames.map((f) => f.startTime)].sort()[0],
-              liveWindowEnd: [base.liveWindowEnd, ...ends, ...(overnight ? ["23:59"] : [])].sort().at(-1) ?? base.liveWindowEnd
+              ...widenWindow(base, frames)
             },
             r.platform
           );
@@ -212,11 +211,21 @@ export const OpenMonthWizard: React.FC<{
     }
     try {
       if (deadlineChanged) {
-        const d = await setRosterMonthDeadline(month, deadlineIso);
-        res.push({ key: "deadline", ok: true, text: `Hạn đăng ký ${dlTime} ${ddmm(dlDate)} — đã báo ${d.notified} host/trợ` });
+        const pl = milestonePayload(ms);
+        let d: { notified: number };
+        let note = "";
+        try {
+          d = await setRosterMonthMilestones(month, pl);
+        } catch (e) {
+          if (!isRosterBackendMissing(e)) throw e;
+          // DB chưa chạy 0200: chỉ đặt được MỘT hạn cho cả tháng — lấy hạn đợt 1.
+          d = await setRosterMonthDeadline(month, pl.deadline1);
+          note = " (DB chưa có 0200: hạn đợt 1 áp cả tháng)";
+        }
+        res.push({ key: "deadline", ok: true, text: `Hạn đăng ký ${ms.d1Time} ${ddmm(ms.d1Date)} (ca 1–15) · ${ms.d2Time} ${ddmm(ms.d2Date)} (ca 16–cuối); chốt lịch ${ddmm(ms.p1)} / ${ddmm(ms.p2)} — đã báo ${d.notified} host/trợ${note}` });
       }
     } catch (e) {
-      res.push({ key: "deadline", ok: false, text: `Chưa đặt được hạn: ${errorMessage(e)}` });
+      res.push({ key: "deadline", ok: false, text: `Chưa đặt được mốc: ${errorMessage(e)}` });
     }
     setResults([...res]);
     await onDone();
@@ -224,7 +233,7 @@ export const OpenMonthWizard: React.FC<{
   };
 
   const m = Number(month.slice(5));
-  const stepper = ["Giờ cam kết", "Khung giờ", "Hạn đăng ký"].map((t, i) => (
+  const stepper = ["Giờ cam kết", "Khung giờ", "Mốc đăng ký & chốt"].map((t, i) => (
     <span key={t} className={`text-xs px-2.5 py-1 rounded-full border ${i + 1 === step ? "border-[var(--accent)] bg-[var(--accent)]/15 text-[var(--text)] font-bold" : i + 1 < step ? "border-emerald-500/40 text-emerald-400" : "border-[var(--border)] text-[var(--text-muted)]"}`}>
       {i + 1 < step ? "✓ " : `${i + 1} · `}
       {t}
@@ -400,20 +409,12 @@ export const OpenMonthWizard: React.FC<{
                   <p className="text-xs text-[var(--text-muted)]">chốt kế hoạch</p>
                 </div>
               </div>
-              <div className="flex flex-wrap items-end gap-3 text-xs">
-                <label className="flex flex-col gap-1 text-[var(--text-muted)]">
-                  Hạn đăng ký (một hạn cho cả tháng)
-                  <input type="date" value={dlDate} min={today} max={addDays(monthStart, 27)} onChange={(e) => setDlDate(e.target.value)} className={FIELD} />
-                </label>
-                <label className="flex flex-col gap-1 text-[var(--text-muted)]">
-                  Giờ
-                  <input type="time" value={dlTime} onChange={(e) => setDlTime(e.target.value)} className={FIELD} />
-                </label>
-              </div>
+              <MilestonesEditor month={month} value={ms} onChange={setMs} disabled={running || !!results} />
               <ul className="text-xs text-[var(--text-muted)] space-y-1 list-disc pl-4">
                 <li>Mỗi kênh: lưu giờ cam kết, lưu lưới ca vào Kế Hoạch Tháng rồi chốt — ca mở hiện ở app talent (Đăng ký ca).</li>
-                <li>Đặt hạn xong mỗi host/trợ nhận một tin. Qua hạn talent không đăng ký thêm được; bạn vẫn xếp hộ.</li>
-                <li>{platformText("Target GMV", "all")}: CEO/admin vào Kế Hoạch Tháng — thẻ "Bước tiếp: đặt target tháng" chia target xuống từng ca (ca mới có target 0 tới lúc đó).</li>
+                <li>Lịch mở cả tháng một lần; mỗi host/trợ nhận MỘT tin ghi cả hai hạn. Qua hạn của đợt nào thì talent không đăng ký thêm ca đợt đó; bạn vẫn xếp hộ.</li>
+                <li>Ngày chốt lịch: Việc cần làm nhắc công bố ca của đợt đó trước ngày này.</li>
+                <li>{platformText("Target GMV", "all")}: có sau buổi họp monthly với brand — CEO/admin vào Kế Hoạch Tháng, thẻ "Nhận target brand" so target với dự báo của lịch rồi chia xuống từng ca (ca mới có target 0 tới lúc đó).</li>
               </ul>
               {results && (
                 <ul className="rounded-xl border border-[var(--border)] divide-y divide-[var(--border)] text-sm">
@@ -422,7 +423,7 @@ export const OpenMonthWizard: React.FC<{
                     return (
                       <li key={x.key} className="px-3 py-2 flex flex-wrap gap-x-2">
                         <span className={x.ok ? "text-emerald-400" : "text-rose-400"}>{x.ok ? "✓" : "✗"}</span>
-                        <b className="text-[var(--text)]">{r ? `${r.brandName} ${r.platform}` : "Hạn đăng ký"}</b>
+                        <b className="text-[var(--text)]">{r ? `${r.brandName} ${r.platform}` : "Mốc đăng ký & chốt"}</b>
                         <span className="text-[var(--text-muted)]">{x.text}</span>
                       </li>
                     );
@@ -443,7 +444,7 @@ export const OpenMonthWizard: React.FC<{
           )}
           {step < 3 && (
             <button type="button" disabled={!rows || !!hourErr} onClick={() => setStep(step + 1)} className="text-xs font-black px-3 py-2 rounded-xl bg-[var(--accent)] text-[var(--accent-contrast)] disabled:opacity-40">
-              {step === 1 ? "Tiếp: khung giờ" : "Tiếp: hạn đăng ký"}
+              {step === 1 ? "Tiếp: khung giờ" : "Tiếp: mốc đăng ký & chốt"}
             </button>
           )}
           {step === 3 &&
@@ -452,8 +453,8 @@ export const OpenMonthWizard: React.FC<{
                 Xong
               </button>
             ) : (
-              <button type="button" disabled={running || !deadlineIso || (totalSlots === 0 && !deadlineChanged)} onClick={() => void run()} className="text-xs font-black px-3 py-2 rounded-xl bg-[var(--accent)] text-[var(--accent-contrast)] disabled:opacity-40">
-                {running ? "Đang tạo…" : totalSlots > 0 ? `Tạo ${vn(totalSlots)} ca mở + báo talent` : "Đặt hạn đăng ký + báo talent"}
+              <button type="button" disabled={running || !!msErr || (totalSlots === 0 && !deadlineChanged)} onClick={() => void run()} className="text-xs font-black px-3 py-2 rounded-xl bg-[var(--accent)] text-[var(--accent-contrast)] disabled:opacity-40">
+                {running ? "Đang tạo…" : totalSlots > 0 ? `Tạo ${vn(totalSlots)} ca mở + báo talent` : "Đặt mốc + báo talent"}
               </button>
             ))}
         </div>

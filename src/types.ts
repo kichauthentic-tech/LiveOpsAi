@@ -643,6 +643,8 @@ export interface ShiftSlot {
    * kế hoạch kỹ nhất là ca chữa cháy (lỗi E2E 28/09 #5).
    */
   planId?: string;
+  /** Hạn đăng ký riêng của ca (0200 — ca bổ sung mở sau khi tháng đã đóng đăng ký). Có thì thay hạn tháng/tuần. */
+  signupDeadline?: string;
 }
 
 export interface ShiftRegistration {

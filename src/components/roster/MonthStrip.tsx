@@ -1,5 +1,6 @@
 import React from "react";
-import { MONTH_STEPS, type MonthStatus } from "../../lib/roster/monthStatus";
+import { MONTH_STEPS, type HalfStatus, type MonthStatus } from "../../lib/roster/monthStatus";
+import { halfRange } from "../../lib/roster/milestones";
 
 // Dải trạng thái theo tháng của Điều Phối Lịch Live (bản gọn 25/10): mỗi tháng một thẻ — 5 bước Mở ca → Đăng ký → Xếp người →
 // Công bố → Live, MỘT trạng thái và MỘT nút. Trả lời "tháng nào đã xong đăng ký" mà không phải mở màn khác.
@@ -64,7 +65,24 @@ function describe(c: MonthCard): { tone: keyof typeof PILL; label: string; text:
   }
 }
 
-export const MonthStrip: React.FC<{ cards: MonthCard[]; viewMonth: string; onAction: (kind: MonthAction, month: string) => void }> = ({ cards, viewMonth, onAction }) => (
+const ddmm = (d: string) => `${+d.slice(8, 10)}/${+d.slice(5, 7)}`;
+
+/** Một dòng mỗi đợt (0200): hạn đăng ký · ngày chốt lịch · việc còn lại của ca trong đợt. */
+const HalfLine: React.FC<{ month: string; h: HalfStatus; today: string }> = ({ month, h, today }) => {
+  const left = h.noHost > 0 ? `${h.noHost} ca chưa có host` : h.toPublish > 0 ? `${h.toPublish} ca chưa công bố` : "xong";
+  const late = !!h.publishBy && h.publishBy < today && left !== "xong";
+  return (
+    <li className="flex flex-wrap gap-x-1.5 tabular-nums">
+      <b className="text-[var(--text)]">Đợt {h.half}</b>
+      <span className="text-[var(--text-faint)]">ca {halfRange(month, h.half)}:</span>
+      <span>hạn đăng ký {h.deadline ? fmtWhen(h.deadline) : "chưa đặt"}</span>
+      <span>· chốt {h.publishBy ? ddmm(h.publishBy) : "chưa đặt"}</span>
+      <span className={late ? "text-rose-400 font-bold" : left === "xong" ? "text-emerald-400" : "text-amber-300"}>· {late ? `quá hạn chốt — ${left}` : left}</span>
+    </li>
+  );
+};
+
+export const MonthStrip: React.FC<{ cards: MonthCard[]; viewMonth: string; today: string; onAction: (kind: MonthAction, month: string) => void }> = ({ cards, viewMonth, today, onAction }) => (
   <section className="grid gap-2 md:grid-cols-3" aria-label="Lịch theo tháng">
     {cards.map((c) => {
       const d = describe(c);
@@ -81,6 +99,11 @@ export const MonthStrip: React.FC<{ cards: MonthCard[]; viewMonth: string; onAct
           </div>
           <p className="text-2xs text-[var(--text-faint)]">{MONTH_STEPS.join(" · ")}</p>
           {d.text && <p className="text-xs text-[var(--text-muted)] tabular-nums">{d.text}</p>}
+          {c.status.month > today.slice(0, 7) && c.status.phase !== "none" && (
+            <ul className="text-2xs text-[var(--text-muted)] space-y-0.5" aria-label={`Mốc tháng ${Number(c.status.month.slice(5))}`}>
+              {c.status.halves.map((h) => <HalfLine key={h.half} month={c.status.month} h={h} today={today} />)}
+            </ul>
+          )}
           {d.action && (
             <button type="button" onClick={() => onAction(d.action!.kind, c.status.month)} className="text-xs font-bold px-2.5 py-1 rounded-lg border border-[var(--accent)]/60 bg-[var(--accent)]/10 text-[var(--text)] hover:bg-[var(--accent)]/20">
               {d.action.label}

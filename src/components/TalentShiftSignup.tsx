@@ -54,7 +54,7 @@ export default function TalentShiftSignup({ mode, onOpenTab, brands, shiftSlots,
   const today = getTodayDate();
   const [busy, setBusy] = useState<string | null>(null);
   const brandById = useMemo(() => new Map(brands.map((b) => [b.id, b])), [brands]);
-  // Hạn đăng ký do trainer đặt: theo THÁNG (0180, 24/10) — hạn tuần cũ (0176) vẫn xét nếu còn dòng. Qua hạn thì DB chặn — màn khoá ô
+  // Hạn đăng ký do trainer đặt: theo THÁNG (0180, 24/10; 0200 tách 2 đợt) — hạn tuần cũ (0176) vẫn xét nếu còn dòng. Qua hạn thì DB chặn — màn khoá ô
   // trước cho khỏi bấm vô ích. Chưa chạy migration ⇒ không có hạn.
   const [weeks, setWeeks] = useState<RosterWeek[]>([]);
   const [rosterMonths, setRosterMonths] = useState<RosterMonth[]>([]);
@@ -70,9 +70,10 @@ export default function TalentShiftSignup({ mode, onOpenTab, brands, shiftSlots,
       cancelled = true;
     };
   }, [today]);
-  const deadlineOf = (date: string) => signupDeadlineOf(date, rosterMonths, weeks, isoWeekStart);
-  const closed = (date: string) => {
-    const d = deadlineOf(date);
+  // Hạn theo ĐỢT của ngày ca (0200: ca 1–15 / 16–cuối có hạn riêng) hoặc hạn riêng của ca bổ sung.
+  const deadlineOf = (slot: ShiftSlot) => signupDeadlineOf(slot, rosterMonths, weeks, isoWeekStart);
+  const closed = (slot: ShiftSlot) => {
+    const d = deadlineOf(slot);
     return !!d && new Date(d) <= new Date();
   };
 
@@ -114,9 +115,9 @@ export default function TalentShiftSignup({ mode, onOpenTab, brands, shiftSlots,
 
   const monthAll = allOpen.filter((s) => s.date.startsWith(month));
   const registeredInMonth = monthAll.filter((s) => mineBySlot.has(s.id));
-  const bulkTargets = mode === "open" ? shown.filter((s) => !closed(s.date)) : [];
+  const bulkTargets = mode === "open" ? shown.filter((s) => !closed(s)) : [];
   // Theo NGÀY của ca (không theo thứ Hai đầu tuần): tuần 27/10–02/11 có thứ Hai thuộc tháng trước, hạn tháng phải lấy theo tháng của ca.
-  const deadlines = [...new Set(inMonth.filter(byWeek).map((s) => deadlineOf(s.date)).filter((d): d is string => !!d))].sort();
+  const deadlines = [...new Set(inMonth.filter(byWeek).map((s) => deadlineOf(s)).filter((d): d is string => !!d))].sort();
   const nextDeadline = deadlines.find((d) => new Date(d) > new Date());
   const filtered = weekPick !== "all" || part !== "all" || brandFilter !== "all";
 
@@ -136,7 +137,7 @@ export default function TalentShiftSignup({ mode, onOpenTab, brands, shiftSlots,
 
   const slotTile = (slot: ShiftSlot) => {
     const mine = mineBySlot.has(slot.id);
-    const locked = closed(slot.date);
+    const locked = closed(slot);
     const head = (
       <>
         <div className="flex items-center gap-2 min-w-0">

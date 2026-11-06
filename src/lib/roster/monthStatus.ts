@@ -2,6 +2,7 @@ import type { LiveSession, ShiftRegistration, ShiftSlot } from "../../types";
 import type { RosterDraft, RosterWeek } from "../db/roster";
 import { isoWeekStart } from "../dateUtils";
 import type { NowHours } from "./monthDesk";
+import { halfOf, slotDeadline, type Half, type MonthMilestones } from "./milestones";
 
 // Điều Phối Lịch Live bản gọn (đợt 1, 25/10 — user chốt theo demo https://claude.ai/artifact/6YoM6U3rE89iGcSNESPUyq):
 // một màn Lịch tuần + dải trạng thái theo tháng + "Việc cần làm". File này là phần tính thuần: tháng đang ở bước nào
@@ -15,7 +16,7 @@ export type MonthPhase =
   | "past"
   /** Chưa có ca nào (cả ca đã chốt lẫn ca mở). */
   | "none"
-  /** Có ca mở nhưng chưa đặt hạn đăng ký. */
+  /** Có ca mở chưa có host mà chưa có hạn đăng ký (đợt của ca chưa đặt hạn). */
   | "no_deadline"
   /** Hạn đăng ký còn ở tương lai, còn ca mở chưa có host nháp. */
   | "signup"
@@ -48,7 +49,24 @@ export interface MonthStatus {
   drafted: number;
   /** Tuần (Thứ 2) có ca nháp chưa công bố. */
   weeksToPublish: string[];
+  /** Hạn đăng ký sắp tới gần nhất của các ca còn chờ host (hết hạn cả thì hạn muộn nhất đã qua). */
   deadline?: string;
+  /** Hai đợt của tháng (0200): mốc + việc còn lại của ca trong đợt. */
+  halves: HalfStatus[];
+}
+
+export interface HalfStatus {
+  half: Half;
+  deadline?: string;
+  publishBy?: string;
+  /** Ca mở trong đợt chưa có host nháp. */
+  noHost: number;
+  /** Ca nháp (có host) trong đợt mà tuần chưa công bố. */
+  toPublish: number;
+  /** Thứ Hai của các tuần có ca nháp chưa công bố trong đợt. */
+  weeksToPublish: string[];
+  /** Ngày sớm nhất trong đợt có ca chưa host (để nhảy tới tuần đó). */
+  firstNoHostDate?: string;
 }
 
 export interface MonthStatusInput {
@@ -61,7 +79,7 @@ export interface MonthStatusInput {
   registrations: readonly ShiftRegistration[];
   drafts: readonly RosterDraft[];
   weeks: readonly RosterWeek[];
-  deadline?: string;
+  milestones?: MonthMilestones;
 }
 
 const STEP_OF: Record<MonthPhase, number> = { none: 0, no_deadline: 0, signup: 1, staff: 2, publish: 3, done: 4, live: 4, past: 5 };
@@ -79,14 +97,34 @@ export function monthStatus(x: MonthStatusInput): MonthStatus {
   const noHostSlots = open.filter((sl) => !draftBy.get(sl.id)?.hostId);
   const published = new Set(x.weeks.filter((w) => w.publishedAt).map((w) => w.weekStart));
   const weeksToPublish = [...new Set(withHost.map((sl) => isoWeekStart(sl.date)).filter((w) => !published.has(w)))].sort();
+  const dl = (sl: ShiftSlot) => slotDeadline(sl.date, x.milestones, undefined, sl.signupDeadline);
+  const noHostDl = noHostSlots.map(dl);
+  const future = noHostDl.filter((d): d is string => !!d && d > x.now).sort();
+  const past = noHostDl.filter((d): d is string => !!d && d <= x.now).sort();
+  const deadline = future[0] ?? past.at(-1);
+  const halves: HalfStatus[] = ([1, 2] as const).map((half) => {
+    const inHalf = (sl: ShiftSlot) => halfOf(sl.date) === half;
+    const pub = withHost.filter((sl) => inHalf(sl) && !published.has(isoWeekStart(sl.date)));
+    const nh = noHostSlots.filter(inHalf);
+    const m = x.milestones;
+    return {
+      half,
+      deadline: m ? (half === 2 && m.signupDeadline2 ? m.signupDeadline2 : m.signupDeadline) : undefined,
+      publishBy: half === 1 ? m?.publishBy1 : m?.publishBy2,
+      noHost: nh.length,
+      toPublish: pub.length,
+      weeksToPublish: [...new Set(pub.map((sl) => isoWeekStart(sl.date)))].sort(),
+      firstNoHostDate: nh.map((sl) => sl.date).sort()[0]
+    };
+  });
 
   const thisMonth = x.today.slice(0, 7);
   let phase: MonthPhase;
   if (x.month < thisMonth) phase = "past";
   else if (x.month === thisMonth) phase = "live";
   else if (open.length === 0 && sessions === 0) phase = "none";
-  else if (noHostSlots.length > 0 && !x.deadline) phase = "no_deadline";
-  else if (noHostSlots.length > 0 && x.deadline && x.deadline > x.now) phase = "signup";
+  else if (noHostSlots.length > 0 && noHostDl.some((d) => !d)) phase = "no_deadline";
+  else if (noHostSlots.length > 0 && future.length > 0) phase = "signup";
   else if (noHostSlots.length > 0) phase = "staff";
   else if (weeksToPublish.length > 0) phase = "publish";
   else phase = "done";
@@ -106,7 +144,8 @@ export function monthStatus(x: MonthStatusInput): MonthStatus {
     noHostWithSignup: noHostSlots.filter((sl) => regSlots.has(sl.id)).length,
     drafted: withHost.length,
     weeksToPublish,
-    deadline: x.deadline
+    deadline,
+    halves
   };
 }
 

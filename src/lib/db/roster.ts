@@ -3,6 +3,7 @@ import { assertAffected } from "./assertAffected";
 import { fetchSessionById } from "./sessions";
 import type { LiveSession } from "../../types";
 import { DEFAULT_ROSTER_RULES, type RosterRules } from "../roster/rules";
+import { slotDeadline, type MonthMilestones } from "../roster/milestones";
 
 // Điều Phối Lịch Live (migration 0176): tuần xếp lịch (hạn đăng ký, đã công bố), nháp người cho ca mở, ngưỡng luật, nhật ký đổi lịch sau
 // công bố. Đặt hạn / công bố / đổi người / dời giờ chỉ qua RPC (guard + thông báo ở DB); nháp và ngưỡng ghi thẳng bằng RLS.
@@ -163,20 +164,33 @@ export async function fetchRosterChanges(fromIso: string): Promise<RosterChange[
   }));
 }
 
-export interface RosterMonth {
-  /** "YYYY-MM" */
+/** Mốc lịch của một tháng (0180 hạn đợt 1 + 0200 hạn đợt 2 và 2 ngày chốt lịch) — xem lib/roster/milestones.ts. */
+export type RosterMonth = MonthMilestones;
+
+interface DbRosterMonth {
   month: string;
-  signupDeadline?: string;
+  signup_deadline: string | null;
+  signup_deadline_2?: string | null;
+  publish_by_1?: string | null;
+  publish_by_2?: string | null;
 }
 
-/** Hạn đăng ký theo THÁNG (0180, user chốt 24/10: một hạn cho cả tháng). Chưa chạy 0180 ⇒ lỗi PGRST205 (isRosterBackendMissing). */
+/** Mốc theo THÁNG. Chưa chạy 0180 ⇒ lỗi PGRST205 (isRosterBackendMissing); chưa chạy 0200 ⇒ đọc lại chỉ hạn đợt 1. */
 export async function fetchRosterMonths(fromMonth: string): Promise<RosterMonth[]> {
-  const { data, error } = await supabase.from("roster_months").select("month, signup_deadline").gte("month", `${fromMonth}-01`).order("month");
-  if (error) throw error;
-  return (data as { month: string; signup_deadline: string | null }[]).map((r) => ({ month: r.month.slice(0, 7), signupDeadline: r.signup_deadline ?? undefined }));
+  const read = (cols: string) => supabase.from("roster_months").select(cols).gte("month", `${fromMonth}-01`).order("month");
+  let res = await read("month, signup_deadline, signup_deadline_2, publish_by_1, publish_by_2");
+  if (res.error?.code === "42703") res = await read("month, signup_deadline");
+  if (res.error) throw res.error;
+  return (res.data as unknown as DbRosterMonth[]).map((r) => ({
+    month: r.month.slice(0, 7),
+    signupDeadline: r.signup_deadline ?? undefined,
+    signupDeadline2: r.signup_deadline_2 ?? undefined,
+    publishBy1: r.publish_by_1 ?? undefined,
+    publishBy2: r.publish_by_2 ?? undefined
+  }));
 }
 
-/** Đặt (hoặc xoá, deadline = null) hạn đăng ký của THÁNG. DB báo mỗi host/trợ một tin khi đặt một hạn mới ở tương lai và tháng còn ca mở. */
+/** Đặt (hoặc xoá, deadline = null) hạn đăng ký của THÁNG — một hạn cho cả tháng (dùng khi DB chưa chạy 0200). */
 export async function setRosterMonthDeadline(month: string, deadlineIso: string | null): Promise<{ notified: number; openSlots: number }> {
   const { data, error } = await supabase.rpc("set_roster_month_deadline", { p_month: `${month}-01`, p_deadline: deadlineIso });
   if (error) throw error;
@@ -184,13 +198,27 @@ export async function setRosterMonthDeadline(month: string, deadlineIso: string 
   return { notified: Number(d.notified ?? 0), openSlots: Number(d.open_slots ?? 0) };
 }
 
-/** Hạn đăng ký đang áp cho một ngày: hạn THÁNG (0180) hoặc hạn tuần cũ (0176, không còn UI đặt) — lấy hạn sớm hơn, đúng như DB chặn. */
-export function signupDeadlineOf(date: string, months: readonly RosterMonth[], weeks: readonly RosterWeek[], weekStartOf: (d: string) => string): string | undefined {
-  const m = months.find((x) => x.month === date.slice(0, 7))?.signupDeadline;
-  const w = weeks.find((x) => x.weekStart === weekStartOf(date))?.signupDeadline;
-  if (!m) return w;
-  if (!w) return m;
-  return new Date(m) <= new Date(w) ? m : w;
+/**
+ * Đặt 4 mốc của tháng (0200): hạn đăng ký đợt 1 (ca 1–15), đợt 2 (ca 16–cuối), ngày chốt lịch mỗi đợt. DB báo mỗi host/trợ MỘT tin
+ * khi có hạn mới ở tương lai và tháng còn ca mở. Chưa chạy 0200 ⇒ PGRST202 (isRosterBackendMissing).
+ */
+export async function setRosterMonthMilestones(month: string, m: { deadline1: string | null; deadline2: string | null; publishBy1: string | null; publishBy2: string | null }): Promise<{ notified: number; openSlots: number }> {
+  const { data, error } = await supabase.rpc("set_roster_month_milestones", {
+    p_month: `${month}-01`,
+    p_deadline_1: m.deadline1,
+    p_deadline_2: m.deadline2,
+    p_publish_1: m.publishBy1,
+    p_publish_2: m.publishBy2
+  });
+  if (error) throw error;
+  const d = (data as { notified?: number; open_slots?: number } | null) ?? {};
+  return { notified: Number(d.notified ?? 0), openSlots: Number(d.open_slots ?? 0) };
+}
+
+/** Hạn đăng ký đang áp cho một ca, đúng như DB chặn (0200): hạn riêng của ca → hạn đợt theo ngày → hạn tuần cũ (lấy hạn sớm hơn). */
+export function signupDeadlineOf(slot: { date: string; signupDeadline?: string }, months: readonly RosterMonth[], weeks: readonly RosterWeek[], weekStartOf: (d: string) => string): string | undefined {
+  const w = weeks.find((x) => x.weekStart === weekStartOf(slot.date))?.signupDeadline;
+  return slotDeadline(slot.date, months.find((x) => x.month === slot.date.slice(0, 7)), w, slot.signupDeadline);
 }
 
 /** Đặt (hoặc xoá, deadline = null) hạn đăng ký của tuần. DB báo talent khi đặt một hạn mới ở tương lai. Trả về số tin đã gửi. */

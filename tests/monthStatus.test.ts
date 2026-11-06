@@ -34,7 +34,7 @@ test("tháng chưa có ca nào = Chưa mở ca; tháng chứa hôm nay = Live; t
 test("có ca mở mà chưa đặt hạn → no_deadline; hạn còn ở tương lai → đang nhận đăng ký, đếm ca có người + số người", () => {
   const slots = [slot("a", "2026-11-02"), slot("b", "2026-11-03"), slot("c", "2026-11-04"), slot("x", "2026-12-01")];
   expect(monthStatus(base({ slots })).phase).toBe("no_deadline");
-  const st = monthStatus(base({ slots, deadline: "2026-10-30T10:00:00.000Z", registrations: [reg("a", "t1"), reg("a", "t2"), reg("b", "t1"), reg("x", "t9")] }));
+  const st = monthStatus(base({ slots, milestones: { month: "2026-11", signupDeadline: "2026-10-30T10:00:00.000Z" }, registrations: [reg("a", "t1"), reg("a", "t2"), reg("b", "t1"), reg("x", "t9")] }));
   expect(st.phase).toBe("signup");
   expect(st.openSlots).toBe(3);
   expect(st.slotsWithSignup).toBe(2);
@@ -45,7 +45,7 @@ test("có ca mở mà chưa đặt hạn → no_deadline; hạn còn ở tương
 test("qua hạn còn ca chưa host → đang xếp người; đủ host nháp → chờ công bố theo tuần; công bố hết → xong", () => {
   const slots = [slot("a", "2026-11-02"), slot("b", "2026-11-10")];
   const deadline = "2026-10-24T10:00:00.000Z";
-  const staff = monthStatus(base({ slots, deadline, registrations: [reg("b", "t1")], drafts: [{ slotId: "a", hostId: "t3" }] }));
+  const staff = monthStatus(base({ slots, milestones: { month: "2026-11", signupDeadline: deadline }, registrations: [reg("b", "t1")], drafts: [{ slotId: "a", hostId: "t3" }] }));
   expect(staff.phase).toBe("staff");
   expect(staff.noHost).toBe(1);
   expect(staff.noHostWithSignup).toBe(1);
@@ -53,7 +53,7 @@ test("qua hạn còn ca chưa host → đang xếp người; đủ host nháp �
     { slotId: "a", hostId: "t3" },
     { slotId: "b", hostId: "t1" }
   ];
-  const pub = monthStatus(base({ slots, deadline, drafts, weeks: [{ weekStart: "2026-11-02", publishedAt: "2026-10-25T00:00:00Z" }] as never }));
+  const pub = monthStatus(base({ slots, milestones: { month: "2026-11", signupDeadline: deadline }, drafts, weeks: [{ weekStart: "2026-11-02", publishedAt: "2026-10-25T00:00:00Z" }] as never }));
   expect(pub.phase).toBe("publish");
   expect(pub.weeksToPublish).toEqual(["2026-11-09"]);
   // Ca nhập sẵn (không ca mở) cũng là "xong"; ca huỷ không đếm.
@@ -63,7 +63,7 @@ test("qua hạn còn ca chưa host → đang xếp người; đủ host nháp �
 });
 
 test("hạn đã đặt nhưng chưa có ca mở nào chưa người → không kẹt ở đăng ký", () => {
-  const st = monthStatus(base({ slots: [slot("a", "2026-11-02")], drafts: [{ slotId: "a", hostId: "t1" }], deadline: "2026-10-30T10:00:00.000Z" }));
+  const st = monthStatus(base({ slots: [slot("a", "2026-11-02")], drafts: [{ slotId: "a", hostId: "t1" }], milestones: { month: "2026-11", signupDeadline: "2026-10-30T10:00:00.000Z" } }));
   expect(st.phase).toBe("publish");
 });
 
@@ -75,4 +75,22 @@ test("một kết luận giờ mỗi kênh: thiếu / thêm là kịp target / d
   expect(channelVerdict(h({ extra: -9 }), null)).toEqual({ tone: "muted", text: "dư ~9 giờ", add: 0 });
   expect(channelVerdict(h({ extra: 0.2 }), null)?.text).toBe("đủ giờ");
   expect(channelVerdict(null, null)).toBeNull();
+});
+
+test("2 đợt (0200): ca 16–cuối theo hạn đợt 2; đợt 1 đã đóng mà đợt 2 còn hạn ⇒ vẫn đang nhận đăng ký; mỗi đợt đếm việc riêng", () => {
+  const milestones = { month: "2026-11", signupDeadline: "2026-10-20T10:00:00.000Z", signupDeadline2: "2026-10-30T10:00:00.000Z", publishBy1: "2026-10-25", publishBy2: "2026-10-28" };
+  const slots = [slot("a", "2026-11-03"), slot("b", "2026-11-04"), slot("c", "2026-11-20")];
+  const st = monthStatus(base({ slots, milestones, drafts: [{ slotId: "a", hostId: "t1" }] }));
+  expect(st.phase).toBe("signup");
+  expect(st.deadline).toBe("2026-10-30T10:00:00.000Z");
+  expect(st.halves.map((h) => ({ half: h.half, noHost: h.noHost, toPublish: h.toPublish, publishBy: h.publishBy, first: h.firstNoHostDate }))).toEqual([
+    { half: 1, noHost: 1, toPublish: 1, publishBy: "2026-10-25", first: "2026-11-04" },
+    { half: 2, noHost: 1, toPublish: 0, publishBy: "2026-10-28", first: "2026-11-20" }
+  ]);
+  // Chỉ đặt hạn đợt 1 ⇒ áp cả tháng (đã qua) ⇒ xếp người.
+  expect(monthStatus(base({ slots, milestones: { month: "2026-11", signupDeadline: "2026-10-20T10:00:00.000Z" } })).phase).toBe("staff");
+  // Ca bổ sung có hạn riêng còn ở tương lai ⇒ đang nhận đăng ký dù tháng đã đóng.
+  const extra = monthStatus(base({ slots: [slot("z", "2026-11-20", { signupDeadline: "2026-10-27T10:00:00.000Z" })], milestones: { month: "2026-11", signupDeadline: "2026-10-20T10:00:00.000Z" } }));
+  expect(extra.phase).toBe("signup");
+  expect(extra.deadline).toBe("2026-10-27T10:00:00.000Z");
 });

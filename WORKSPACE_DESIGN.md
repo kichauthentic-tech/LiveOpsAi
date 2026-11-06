@@ -13,7 +13,42 @@
 
 ## 1. Giai đoạn hiện tại (cập nhật 2026-10-31; mục KH Tháng bản gọn 27/10)
 
-- **06/11: LEADER BOARD — 3 GIẢI HOST/TRỢ LIVE (đã commit, chưa push, KHÔNG migration)** — công ty có thưởng nóng ngày Campaign + giải tháng
+- **06/11 (sau): CA QUA 0h + BỘ XẾP CA BỎ THỨ TRONG TUẦN (đã commit + push 06/11, KHÔNG migration)** — (1) user: logic ràng 23:59, không gợi ý/chia target
+  ca main campaign tới 00:30–01:00. Đo T6–T11: 240/2.028 ca qua 0h (12%), 70% ngày Campaign; ca nhập từ lịch vẫn vào kế hoạch có target
+  (89/94 từ T10) — hỏng ở GỢI Ý: khung live chỉ tới 23:59 (`addHours` chặn 23:59, gõ 00:30 thì mọi ca "ngoài khung", dựng lưới từ ca
+  đã nhập ghi khung "23:59"). Sửa: `monthPlanGrid.windowBounds` (giờ đóng ≤ 06:00 và sớm hơn giờ mở = rạng sáng hôm sau), `slotEndMin`,
+  `widenWindow` (dựng lưới / wizard nới khung tới giờ kết thúc thật), `nextSlotForDay` + `validateDrafts` tính theo phút, bộ xếp ca dùng
+  `windowBounds`; **ca kết thúc SAU 00:00 chỉ tự gợi ý ở ngày Campaign** (21–00 vẫn mọi ngày; Daily thêm tay được). Ô "đến" ghi "(rạng sáng
+  hôm sau)". Verify dev: VERA TikTok T12 khung 09–01, 270h ⇒ 90 ca, 9 ca 22–01 đúng 9 ngày Campaign, target 1B chia 22–01 D-Day 15,4M ≈ ca
+  19–22 15M; không lưu. (2) user nghi engine xếp T7–CN ít ca/target thấp: kế hoạch T11 tính cả ngày Campaign thì T7–CN thấp hơn (11/11 là
+  thứ 4); chỉ ngày Daily: T7–CN NHIỀU ca hơn (VERA Shopee 3,0 vs 2,3 ca/ngày) và target/giờ ngang (2,58 vs 2,54M; CROCS −3%; Franklin
+  Shopee −21%, FUJIWA −16% vì ít lịch sử + nhiều ca khung sáng). Backtest hệ số thứ cho BỘ CHIA target: không giúp (đầu `allocationModel.ts`).
+  (3) Demo CROCS T12 270h lộ lỗi ở BỘ XẾP CA: chấm ô thứ × khung ⇒ thứ 7 Daily chỉ 1 ca (5/19/26), T2/T4/CN 3 ca; backtest thứ × khung 28,1%
+  vs chỉ khung 28,2% ⇒ user "sửa": `HistorySummary.blockCells` (khung 2h gộp mọi thứ, co K như ô cũ, hiệu chỉnh gộp theo khung) dùng cho
+  `suggestMonthPlan` + `estimateSlots`; `cells` thứ × khung chỉ còn cho benchmark ca (opsSupport `cellsForWindow`) + AI Training. Test
+  `suggestNoWeekday`. Demo lại: 90 ca 270h, Daily đều 2 ca (18–21 + 21–00), Campaign 4–5 ca có 22–01, dự báo 4,74B → 4,85B; target 5,8B ⇒
+  "bù ~60h (20 ca)" khung 10–13 ⇒ 110 ca 330h dự báo 5,92B, đạt target 53% (trước sửa 113 ca 339h 5,84B 51%). Vì sao 270h chỉ 4,85B:
+  GMV/giờ CROCS T8 25,8M → T9 20,0 → T10 18,2 → 1–5/11 14,3M (Daily); GMV thật T6 4,56B, T10 4,90B. Còn lệch số: bảng "Vì sao gợi ý"
+  ("270h → 5,43B", mô hình bộ xếp ca) khác ô dự báo chính (v3) — chưa gộp.
+
+- **06/11: LỊCH THÁNG SAU 2 ĐỢT + "NHẬN TARGET BRAND" (đã commit + push 06/11; migration `0200` ĐÃ CHẠY 06/11 — đo: 5 cột có, 2 RPC có + chặn role trống)** — user: lịch tháng sau phải lập từ đầu
+  tháng, mà target chỉ có sau họp monthly cuối tháng. Chốt: **lập cả tháng một lần, chốt theo mốc** (tháng trước: ngày 10 hết hạn đăng ký ca
+  1–15, ngày 15 chốt lịch 1–15, ngày 20 hết hạn ca 16–cuối, ngày 25 chốt phần còn lại); **lịch theo GIỜ, target chia sau**; target về thì so với
+  dự báo của lịch đã chốt: ≤ 10% chỉ chia, 10–30% **ca bổ sung**, > 30% báo thống nhất lại với brand. Số đo: T11 451/477 ca vào app đêm 31/10
+  cùng lúc target; target T11 so với dự báo của chính lịch: CROCS +3%, Franklin TikTok 0%, VERA Shopee +20%, Franklin Shopee +47%, VERA
+  TikTok +108% (giờ cam kết giữ 250h). **DB `0200`:** `roster_months.signup_deadline_2/publish_by_1/publish_by_2` (hạn đợt 1 = cột cũ; đợt 2
+  trống ⇒ hạn đợt 1 áp cả tháng), `shift_slots.signup_deadline` (hạn riêng ca bổ sung, thay mọi hạn khác), `slot_open_for_registration` xét
+  cả hai, RPC `set_roster_month_milestones` (1 tin/người) + `open_extra_plan_slots` (thêm dòng kế hoạch target 0 → `lock_month_plan` im lặng
+  sinh ca mở → hạn riêng → 1 tin cho người live kênh 90 ngày qua, không có thì mọi host/trợ). Test `supabase/tests/0200_*.sql` 16/16 trên
+  replay; 0180/0181/0185/0186 vẫn xanh. **Client:** `lib/roster/milestones.ts` (mốc mặc định, `slotDeadline`), `lib/scheduling/targetIntake.ts`
+  (3 mức, `pickExtraSlots` trần +30% giờ, từ ngày mai), `roster/MilestonesEditor.tsx` (bước 3 "Mở lịch tháng sau" + mục Tháng sau),
+  `monthStatus.halves` + dòng mốc ở MonthStrip + việc "chốt lịch đợt N" (nhắc từ 2 ngày trước), Kế Hoạch Tháng thẻ "Chờ target… / Nhận target
+  brand…" + khối mức chênh trong bảng chia lại (chọn ca bổ sung, hạn mặc định 48h, dòng "bù ~X% phần chênh"). DB chưa có 0200 ⇒ đọc mốc lùi về
+  1 hạn/tháng, mở ca bổ sung báo "chưa chạy 0200". **Verify (dev, admin, DB thật chưa 0200):** wizard T12 mặc định 10/11·15/11·20/11·25/11,
+  sai thứ tự ⇒ khoá nút; VERA Shopee T11 target 1,23B vs dự báo 1,01B = +22% ⇒ 20 ca (60h) dự báo thêm 132,7M = bù 61%; 1,05B ⇒ chỉ chia;
+  2B ⇒ cần ~266h, báo lại brand; 375px 0 tràn, 0 lỗi console. Chưa bấm ghi (cần 0200). Test `monthMilestones` + `monthStatus` (2 đợt).
+
+- **06/11: LEADER BOARD — 3 GIẢI HOST/TRỢ LIVE (đã push 14fdc2f, KHÔNG migration)** — công ty có thưởng nóng ngày Campaign + giải tháng
   theo account. User chốt 3 giải: **Ca đạt target**, **Host hiệu suất**, **Trợ live xuất sắc**; bố cục ghép 2 phương án Google Stitch
   (project 14383689191872090120, design system "LiveOps · YFB"): tab **Campaign** = thẻ ca + vòng % target (C), tab **Giải tháng** = bục
   top 3 (A). Menu "Phân tích" → Leader Board (`leaderboard`, route `leader-board`, quyền `manage_sessions`). **Logic thuần**
@@ -267,12 +302,14 @@
 ## 2. Việc còn treo
 
 **Cần user làm:**
+- **Lịch 2 đợt + Nhận target brand (06/11, `0200` ĐÃ CHẠY, đã push):** kiểm bản deploy. Rồi: Điều Phối → "Mở lịch tháng 12" đặt 4 mốc; sau họp monthly vào Kế Hoạch
+  Tháng từng kênh → "Nhận target brand…". Chưa thử ghi thật (mở ca bổ sung, đặt mốc).
 - **Đổi sàn khi kéo ca (06/11, `0199` đã chạy, đã push):** deploy client.
 - **0197 + 0198 (05/11):** chạy `0197_rate_privacy.sql` rồi `0198_talent_read_scope.sql` ở SQL Editor TRƯỚC khi phát tài khoản cho host
   (client lùi về bảng `brands` nếu chưa có view nên thứ tự với deploy không quan trọng). Kiểm: ops → Điều Phối "Chi phí người" = chưa tính
   được; host đăng nhập → lịch agency vẫn có tên brand + tên host.
 - **Điều khoản hợp tác (31/10, `0191` ĐÃ CHẠY):** CRM → Hợp đồng & giá từng brand × sàn → "Tạo từ cấu hình hiện tại" (hoặc chọn gói mẫu) → đặt ngày áp dụng (gợi ý: đầu tháng) → Lưu. Brand có Ads/booking: nhập chi tiêu Ads / số creator ở khối "Tính phí tháng". Rồi mở Kế Toán so doanh thu hợp đồng với sổ. **HOÃN theo user (31/10) tới khi có hình thức hợp tác thật của từng brand:** hình thức live (trọn ca/cấp host/thuê phòng/không có ca) mới là nhãn; khoản cả tháng chưa vào Finance & P&L từng ca; bù giờ chưa tự cộng sang tháng sau; chi tiêu Ads/creator nhập tay ở tab Tính phí tháng; chưa brand nào khai điều khoản. Bố cục CRM = 4 tab (Điều khoản · Hợp đồng · Tính phí tháng · Kênh, host, phòng); Kế Toán có "chi tiết phí" chỉ đọc.
-- **Kế Hoạch Tháng bản gọn (27/10, đã push `db5311c`):** deploy; sau khi "Mở lịch tháng 11" ở Điều Phối, vào Kế Hoạch Tháng từng kênh bấm "Đặt target…" (ceo/admin).
+- **Kế Hoạch Tháng bản gọn (27/10, đã push `db5311c`):** deploy; sau khi "Mở lịch tháng 11" ở Điều Phối, vào Kế Hoạch Tháng từng kênh bấm "Nhận target brand…" (ceo/admin; nút đổi tên 06/11).
 - **Kế Hoạch Tháng (28/10, `0185` ĐÃ CHẠY + push `ff61f96`):** còn thử bằng tài khoản ops: ô target ca đã chốt bị khoá, DB từ chối đổi target. T11 chưa có kế
   hoạch nào (27/10) — "Mở lịch tháng 11" ở Điều Phối Lịch Live.
 - **Ads theo ngày (28/10, 0184 ĐÃ CHẠY, CROCS T3→T10 đã dán):** cuối mỗi ngày/tháng dán lại khối "Daily Ads Report" để cập nhật actual (ghi đè ngày trùng).
@@ -626,6 +663,9 @@ live = `sessionHours`. GMV/giờ đem NHÂN với giờ lịch thì chia trên g
   cuối có số thực (`adsTrackingMonth`). Hai nguồn không cộng nhau: file TikTok Ads = chi phí cả cửa hàng do TikTok xuất; bảng dán = kế hoạch brand.
 - **Run-rate chỉ tính bằng `planRunRate`** (28/09): target = Σ target ca của Kế Hoạch Tháng đã chốt (không chia lại khi lịch
   đổi); ca kế hoạch huỷ GIỮ target; ca ngoài kế hoạch target 0; ca thêm vào lưới sau khi chốt nhận target = dự báo. **Ca tăng cường (0165, 10/10):** ca OP mở thêm sau chốt có dòng ở `plan_boost_slots` với target đề xuất của engine, KHÔNG cộng vào target tháng/run-rate — mọi chỗ cộng target tháng chỉ đọc `brand_month_plan_slots`, đừng đưa bảng boost vào đó. **Từ 27/10:** ca tăng cường mang target đề xuất trên `LiveSession.targetGmv` kèm cờ `boostTarget` (để hiện) ⇒ MỌI phép cộng target ca (ngày/kỳ/tháng/run-rate, bản chụp report brand) đọc `planTargetOf(s)`, không đọc thẳng `targetGmv` (`tests/noCrossPlatformPerf` canh cả `planTargetOf`); target tạm do DB tính lúc tạo ca (0186), engine thay khi mở Kế Hoạch Tháng. **Ngoại lệ do user chủ động "Chia lại theo lịch hiện có" (0164, 10/10):** ca huỷ về 0, ca OP thêm (kể cả đã qua) vào kế hoạch, Σ target = target mới.
+- **Ca bổ sung ≠ ca tăng cường (0200, 06/11):** ca mở vì target brand cao hơn dự báo lịch 10–30% đi qua `open_extra_plan_slots` — là dòng
+  `brand_month_plan_slots` (tính giờ + được chia target bằng "Chia lại theo lịch hiện có" NGAY SAU khi mở), không vào `plan_boost_slots`.
+  Ngưỡng chỉ ở `targetIntake.ts`. Hạn đăng ký của một ca chỉ tính qua `slotDeadline`/`signupDeadlineOf` (hạn riêng → đợt theo ngày → tuần cũ).
 - **Report Tháng là nơi DUY NHẤT nói số một tháng SAU khi hết tháng** (đọc bản chụp; so cùng kỳ cắt 1..N khi tháng chưa hết).
 - **Trang/khối theo PHẠM VI DỊCH VỤ, không theo "có file"** (0190): mảng YFB không làm (Ads, Affiliate) hay brand tự live đọc `reportScopeOf(rates, brand, sàn)` (tự live KHÔNG bỏ nhóm đối chứng — phía livestream là phiên YFB, phía còn lại đã trừ cả Seller LIVE; số lấy Seller LIVE cả tài khoản như Direct/Indirect thì ẩn); trang/khối/Insight mới thuộc Ads/Affiliate/nhóm đối chứng phải tôn trọng `scope`. Phạm vi đọc sống từ CRM, không lưu vào bản chụp.
   Dashboard brand là màn TRONG tháng, dùng chung hàm. Phân tích mới thì thêm vào 1 trong 10 trang, không dựng trang riêng.

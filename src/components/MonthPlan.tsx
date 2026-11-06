@@ -7,7 +7,8 @@ import { commitmentsRead, contractsRead, upsertMonthlyCommitment } from "../lib/
 import type { TabPrefetchCtx } from "../lib/db/prefetch";
 import { loadRememberedBrandId } from "../lib/defaultBrand";
 import { errorMessage } from "../lib/errorMessage";
-import { PlanSettings, calendarEventsRead, deleteMonthPlan, fetchBoostSlots, fetchBrandLockedPlanSlots, fetchMonthPlan, fetchPlanStatuses, fetchRetargetHistory, lockMonthPlan, lockedPlanSlotsRead, monthPlanRead, planStatusesRead, replacePlanSlots, rebaseMonthPlan, setBoostTargets, upsertMonthPlan } from "../lib/db/monthPlans";
+import { PlanSettings, calendarEventsRead, deleteMonthPlan, fetchBoostSlots, fetchBrandLockedPlanSlots, fetchMonthPlan, fetchPlanStatuses, fetchRetargetHistory, lockMonthPlan, lockedPlanSlotsRead, monthPlanRead, openExtraPlanSlots, planStatusesRead, replacePlanSlots, rebaseMonthPlan, setBoostTargets, upsertMonthPlan } from "../lib/db/monthPlans";
+import { INTAKE_ADD_MAX, INTAKE_ALLOCATE_MAX, pickExtraSlots, targetIntake } from "../lib/scheduling/targetIntake";
 import { buildCalibration, evaluatePlan } from "../lib/scheduling/planEvaluation";
 import { computeCommitmentProgress, contractCovering, monthCommitmentOf, todayVn } from "../lib/performance/brandCommitment";
 import { useDefaultBrand } from "../hooks/useDefaultBrand";
@@ -26,8 +27,9 @@ import {
   groupBreakdown,
   sumGroupTargets,
   draftsFromSuggestion,
-  endsAfterMidnight,
   nextSlotForDay,
+  widenWindow,
+  windowBounds,
   slotHours,
   totalsOf,
   validateDrafts
@@ -175,6 +177,10 @@ export default function MonthPlan({
   const [retargetPreview, setRetargetPreview] = useState<{ set: RebaseSet; plan: RebasePlan; after: PlanDraftSlot[]; basis: "v2" | "engine" } | null>(null);
   const [retargetBusy, setRetargetBusy] = useState(false);
   const [retargetHistory, setRetargetHistory] = useState<RetargetBatch[]>([]);
+  // Ca bổ sung (0200): bỏ chọn theo khoá ngày|giờ; hạn đăng ký mặc định 48 giờ sau lúc mở bảng.
+  const [extraOff, setExtraOff] = useState<Set<string>>(new Set());
+  const [extraDeadline, setExtraDeadline] = useState("");
+  const [extraBusy, setExtraBusy] = useState(false);
   const [commitments, setCommitments] = useState<BrandMonthlyCommitment[]>([]);
   const [contracts, setContracts] = useState<BrandContract[]>([]);
   const [suggestion, setSuggestion] = useState<{ history: HistorySummary; result: SuggestResult } | null>(null);
@@ -581,13 +587,10 @@ export default function MonthPlan({
     const { next, added, duplicates } = draftsFromSessions(usable, locked ? drafts : []);
     const perDay = new Map<string, number>();
     for (const d of next) perDay.set(d.date, (perDay.get(d.date) ?? 0) + 1);
-    const overnight = next.some((d) => endsAfterMidnight(d));
-    const ends = next.filter((d) => !endsAfterMidnight(d)).map((d) => d.endTime);
     setSettings((st) => ({
       ...st,
       maxSlotsPerDay: Math.min(8, Math.max(st.maxSlotsPerDay, ...perDay.values())),
-      liveWindowStart: [st.liveWindowStart, ...next.map((d) => d.startTime)].sort()[0],
-      liveWindowEnd: [st.liveWindowEnd, ...ends, ...(overnight ? ["23:59"] : [])].sort().at(-1) ?? st.liveWindowEnd
+      ...widenWindow(st, next)
     }));
     const fileTarget = totalsOf(next).target;
     let result: PlanDraftSlot[];
@@ -748,7 +751,69 @@ export default function MonthPlan({
     setRetargetNote("");
     setRetargetPreview(null);
     setRetargetHistory([]);
+    setExtraOff(new Set());
+    const dl = new Date(Date.now() + 48 * 3600 * 1000);
+    setExtraDeadline(`${dl.getFullYear()}-${String(dl.getMonth() + 1).padStart(2, "0")}-${String(dl.getDate()).padStart(2, "0")}T${String(dl.getHours()).padStart(2, "0")}:00`);
     if (plan) fetchRetargetHistory(plan.id, today).then(setRetargetHistory).catch(() => setRetargetHistory([]));
+  };
+  // ---- Nhận target brand (06/11, user chốt): so target với DỰ BÁO của lịch đã chốt → 3 mức (lib/scheduling/targetIntake.ts) ----
+  const intake = useMemo(() => {
+    if (!retargetOpen || !rebaseSet) return null;
+    const total = Math.max(Number(retargetTotal) || 0, sumGroupTargets(retargetGroups));
+    const act = activeDrafts(rebaseSet);
+    if (total <= 0 || act.length === 0) return null;
+    const bucket = (d: string) => resolveCampBucketType(d, campRanges);
+    const outlook = forecaster ? planOutlook(forecaster, act, bucket, total) : null;
+    const forecast = outlook ? outlook.p50 : sumOf(estimateSlots(engineHistory, act, estimateCtx));
+    const hours = act.reduce((a, d) => a + slotHours(d), 0);
+    const r = targetIntake(total, forecast, hours);
+    let extras: SuggestResult["slots"] = [];
+    if (r.tier === "add" && engineHistory.brandGmvPerHour > 0) {
+      // Bộ xếp lịch chạy chế độ target với lịch đã chốt là ca cố định ⇒ phần xếp thêm là ứng viên; xếp theo dự báo GMV/giờ giảm dần.
+      const fixed = act.map((d) => ({ date: d.date, startTime: d.startTime, endTime: d.endTime }));
+      const fill = suggestMonthPlan(engineHistory, { ...baseConstraints, fixedSlots: fixed, targetGmv: schedulerTarget(total, act), mode: "target", strategy });
+      const seen = new Set(fixed.map((f) => `${f.date}|${f.startTime}|${f.endTime}`));
+      const cands = fill.slots.filter((sl) => !seen.has(`${sl.date}|${sl.startTime}|${sl.endTime}`));
+      const fc = forecastsFor(cands);
+      const ranked = cands.map((c, i) => ({ ...c, expectedGmv: fc[i] ?? c.expectedGmv })).sort((a, b) => b.expectedGmv / Math.max(0.5, b.hours) - a.expectedGmv / Math.max(0.5, a.hours));
+      extras = pickExtraSlots(ranked, r.hoursNeeded, r.hoursCap, today).sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime));
+    }
+    return { ...r, total, forecast, hours, slots: act.length, outlook, extras };
+  }, [retargetOpen, rebaseSet, retargetTotal, retargetGroups, campRanges, forecaster, engineHistory, estimateCtx, baseConstraints, strategy, today]); // eslint-disable-line react-hooks/exhaustive-deps
+  const extraKey = (sl: { date: string; startTime: string; endTime: string }) => `${sl.date}|${sl.startTime}|${sl.endTime}`;
+  const pickedExtras = intake ? intake.extras.filter((sl) => !extraOff.has(extraKey(sl))) : [];
+  const openExtras = async () => {
+    if (!plan || pickedExtras.length === 0) return;
+    const dl = extraDeadline ? new Date(extraDeadline) : null;
+    if (!dl || Number.isNaN(dl.getTime()) || dl <= new Date()) {
+      setMsg("Hạn đăng ký ca bổ sung phải ở tương lai.");
+      return;
+    }
+    const h = pickedExtras.reduce((a, x) => a + x.hours, 0);
+    if (!(await confirm(
+      `Mở ${pickedExtras.length} ca bổ sung (${fmtH(h)}h) cho ${brandLabel(brand?.name)} tháng ${fmtMonth(month)}?\n\n` +
+        "• Ca vào Kế Hoạch Tháng như ca kế hoạch (tính giờ + được chia target ở bước sau), không phải ca tăng cường.\n" +
+        `• Talent đăng ký tới ${String(dl.getHours()).padStart(2, "0")}:${String(dl.getMinutes()).padStart(2, "0")} ${dl.getDate()}/${dl.getMonth() + 1}; người từng live kênh này 90 ngày qua nhận một tin.\n` +
+        "• Sau đó bấm Xem trước để chia target gồm cả ca mới."
+    ))) return;
+    setExtraBusy(true);
+    try {
+      const r = await openExtraPlanSlots(plan.id, pickedExtras.map((x) => ({ date: x.date, startTime: x.startTime, endTime: x.endTime, expectedGmv: x.expectedGmv })), dl.toISOString());
+      await onPlanLocked();
+      const fresh = await fetchMonthPlan(brandId, month, platform);
+      if (fresh) {
+        setPlan(fresh.plan);
+        setDrafts(draftsFromSaved(fresh.slots));
+        setDirty(false);
+      }
+      setLockedSlotsTick((t) => t + 1);
+      setRetargetPreview(null);
+      setMsg(`Đã mở ${r.opened} ca bổ sung chờ đăng ký${r.skipped ? ` (bỏ ${r.skipped} ca trùng giờ/ngày đã qua)` : ""}, báo ${r.notified} host/trợ. Bấm Xem trước để chia target gồm cả ca mới.`);
+    } catch (e) {
+      setMsg(`Không mở được ca bổ sung: ${errorMessage(e)}`);
+    } finally {
+      setExtraBusy(false);
+    }
   };
   const previewRetarget = () => {
     const total = Math.max(Number(retargetTotal) || 0, sumGroupTargets(retargetGroups));
@@ -1200,7 +1265,7 @@ export default function MonthPlan({
       {/* Một dòng tham số; "sửa" mở khung đầy đủ (kế hoạch mới thì mở sẵn). */}
       <div className="rounded-xl border border-dashed border-[var(--border)] px-3 py-2 text-xs space-y-3">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[var(--text-muted)]">
-          <span>Ca <b className="text-[var(--text)]">{fmtH(settings.defaultSlotHours)}h</b> · tối đa <b className="text-[var(--text)]">{settings.maxSlotsPerDay}</b>/ngày · live <b className="text-[var(--text)]">{settings.liveWindowStart}–{settings.liveWindowEnd}</b></span>
+          <span>Ca <b className="text-[var(--text)]">{fmtH(settings.defaultSlotHours)}h</b> · tối đa <b className="text-[var(--text)]">{settings.maxSlotsPerDay}</b>/ngày · live <b className="text-[var(--text)]">{settings.liveWindowStart}–{settings.liveWindowEnd}{windowBounds(settings).end > 24 * 60 ? " hôm sau" : ""}</b></span>
           <span>Phòng {brandStudio ? <b className="text-[var(--text)]">{brandStudio.name} ({brandStudio.roomNumber})</b> : <b className="text-amber-300">chưa chọn</b>}</span>
           <span>Campaign: <b className="text-[var(--text)]">{campSummary || "lịch cố định"}</b></span>
           {settings.adsBudget > 0 && <span>Ads <b className="text-[var(--text)]">{fmtVndShort(settings.adsBudget)}</b></span>}
@@ -1225,8 +1290,8 @@ export default function MonthPlan({
                   <input type="time" disabled={!editable} value={settings.liveWindowStart} onChange={(e) => { setSettings((s) => ({ ...s, liveWindowStart: e.target.value })); setDirty(true); }} className={FIELD} />
                 </label>
                 <label className="block">
-                  <span className="font-medium text-[var(--text-muted)] block mb-1">đến</span>
-                  <input type="time" disabled={!editable} value={settings.liveWindowEnd} onChange={(e) => { setSettings((s) => ({ ...s, liveWindowEnd: e.target.value })); setDirty(true); }} className={FIELD} />
+                  <span className="font-medium text-[var(--text-muted)] block mb-1">đến{windowBounds(settings).end > 24 * 60 ? " (rạng sáng hôm sau)" : ""}</span>
+                  <input type="time" title="Ca main campaign live qua 0h: gõ giờ rạng sáng (vd 01:00) — engine hiểu là hôm sau và gợi ý được ca vắt qua 0h" disabled={!editable} value={settings.liveWindowEnd} onChange={(e) => { setSettings((s) => ({ ...s, liveWindowEnd: e.target.value })); setDirty(true); }} className={FIELD} />
                 </label>
               </div>
               <p className="text-[var(--text-muted)]">
@@ -1280,13 +1345,13 @@ export default function MonthPlan({
       {needsTarget && !retargetOpen && (
         <div className="rounded-2xl border border-[var(--accent)]/60 bg-[var(--accent)]/10 p-3 flex flex-wrap items-center gap-3 text-xs" data-testid="needs-target">
           <p className="flex-1 min-w-[240px] text-[var(--text)]">
-            <b>Bước tiếp: đặt target tháng {fmtMonth(month)}.</b> Lưới đã chốt {drafts.length} ca nhưng target đang 0 — Dashboard và run-rate chưa có mốc. Nhập target, engine chia xuống từng ca; ghi có nhật ký.
+            <b>Chờ target tháng {fmtMonth(month)} từ buổi họp monthly với brand.</b> Lịch đã chốt {drafts.length} ca · {fmtH(totals.hours)}h{gridOutlook ? <> · dự báo {fmtVndShort(gridOutlook.p50)} (dải {fmtVndShort(gridOutlook.lo)} – {fmtVndShort(gridOutlook.hi)})</> : ""}. Có target thì nhập vào đây: app so với dự báo của lịch — lệch ≤ {Math.round(INTAKE_ALLOCATE_MAX * 100)}% chỉ chia target, {Math.round(INTAKE_ALLOCATE_MAX * 100)}–{Math.round(INTAKE_ADD_MAX * 100)}% gợi ý ca bổ sung, trên {Math.round(INTAKE_ADD_MAX * 100)}% báo cần thống nhất lại với brand.
           </p>
           {canRetarget ? (
             <>
               <input type="number" min="0" step="1000000" aria-label="Target tháng cần đặt" value={firstTarget} placeholder={committedGmv > 0 ? String(committedGmv) : "vd 5000000000"} onChange={(e) => setFirstTarget(e.target.value)} className="w-44 bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1.5 font-mono text-[var(--text)]" />
               <span className="text-[var(--text-faint)] tabular-nums">{Number(firstTarget) > 0 ? `= ${fmtVndShort(Number(firstTarget))}` : ""}</span>
-              <button onClick={() => openRetarget(Number(firstTarget) || 0)} className="px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold">Đặt target…</button>
+              <button onClick={() => openRetarget(Number(firstTarget) || 0)} className="px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold">Nhận target brand…</button>
             </>
           ) : (
             <span className="text-amber-300 font-bold">Chỉ ceo/admin đặt được — báo ceo/admin.</span>
@@ -1345,7 +1410,7 @@ export default function MonthPlan({
         <div className="bg-[var(--surface)] border border-[var(--accent)]/50 rounded-2xl p-4 space-y-3 text-xs">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
-              <h3 className="text-sm font-bold text-[var(--text)]">{totals.target <= 0 ? `Đặt target tháng ${fmtMonth(month)} — chia xuống mọi ca trên lịch` : "Chia lại target theo lịch hiện có — gồm ca OP thêm và ca đã qua"}</h3>
+              <h3 className="text-sm font-bold text-[var(--text)]">{totals.target <= 0 ? `Nhận target brand tháng ${fmtMonth(month)} — so với dự báo lịch, rồi chia xuống mọi ca` : "Chia lại target theo lịch hiện có — gồm ca OP thêm và ca đã qua"}</h3>
               <p className="text-2xs text-[var(--text-muted)] leading-relaxed max-w-3xl">
                 Lấy MỌI ca đang có trên lịch của kênh trong tháng (ca đã trong kế hoạch + ca OP thêm ngoài kế hoạch, kể cả ngày đã qua), bỏ ca đã huỷ, rồi chia target mới xuống các ca còn chạy theo bộ chia engine (v2 nếu brand đủ lịch sử, không thì dự báo engine). Ca OP thêm được đưa vào kế hoạch ngay (tính vào giờ + tổng target); ca huỷ về target 0. Giờ ca không đổi. Ghi xong thì % Target ca đã xong, run-rate và Dashboard của tháng này đổi theo; mỗi lần có nhật ký target cũ → mới. Chỉ ceo/admin ghi được.
               </p>
@@ -1366,6 +1431,73 @@ export default function MonthPlan({
             </div>
             <PlanGroupTargetsBlock rows={groupBreakdown(rebaseSet ? activeDrafts(rebaseSet) : drafts, (d) => resolveCampBucketType(d, campRanges), retargetGroups)} targets={retargetGroups} targetTotal={Number(retargetTotal) || 0} historyRate={allocator?.old?.bucketRate ?? null} editable locked={false} onChange={(g) => { setRetargetGroups(g); setRetargetPreview(null); }} />
           </div>
+          {intake && (() => {
+            const pct = intake.gapPct === null ? null : Math.round(intake.gapPct * 100);
+            const pickedH = pickedExtras.reduce((a, x) => a + x.hours, 0);
+            const perSlot = Math.max(1, settings.defaultSlotHours);
+            const tone = intake.tier === "renegotiate" ? "border-rose-500/40 bg-rose-500/10" : intake.tier === "add" ? "border-amber-500/40 bg-amber-500/10" : "border-[var(--border)] bg-[var(--surface-base)]";
+            return (
+              <div className={`rounded-xl border p-3 space-y-2 ${tone}`} data-testid="target-intake">
+                <p className="text-[var(--text)] tabular-nums">
+                  Target <b>{fmtVndShort(intake.total)}</b> · dự báo của lịch <b>{fmtVndShort(intake.forecast)}</b>
+                  {intake.outlook ? <span className="text-[var(--text-faint)]"> (dải {fmtVndShort(intake.outlook.lo)} – {fmtVndShort(intake.outlook.hi)})</span> : null} · {intake.slots} ca {fmtH(intake.hours)}h
+                  {pct !== null && <> · target {pct >= 0 ? "cao hơn" : "thấp hơn"} dự báo <b className={intake.tier === "renegotiate" ? "text-rose-400" : intake.tier === "add" ? "text-amber-300" : "text-[var(--text)]"}>{Math.abs(pct)}%</b></>}
+                </p>
+                {intake.tier === "no_forecast" && <p className="text-[var(--text-muted)]">Kênh chưa đủ lịch sử để dự báo — chỉ chia target xuống các ca.</p>}
+                {intake.tier === "allocate" && <p className="text-[var(--text-muted)]">Lệch trong ±{Math.round(INTAKE_ALLOCATE_MAX * 100)}% (sai số dự báo lúc lập kế hoạch ~13%) — không cần thêm ca, bấm Xem trước để chia target.</p>}
+                {intake.tier === "renegotiate" && (
+                  <p className="text-[var(--text)]">
+                    Cần thêm ~<b>{fmtH(intake.hoursNeeded)}h</b> (~{Math.ceil(intake.hoursNeeded / perSlot)} ca {fmtH(perSlot)}h) để dự báo bằng target — vượt mức +{Math.round(INTAKE_ADD_MAX * 100)}% giờ ({fmtH(intake.hoursCap)}h), không bù bằng ca bổ sung. Thống nhất lại với brand: brand mua thêm giờ (sửa giờ cam kết ở ô bên trên rồi mở lại bước này) hoặc giữ target cao. Vẫn chia target được để Dashboard có mốc.
+                  </p>
+                )}
+                {intake.tier === "add" && (
+                  <>
+                    <p className="text-[var(--text)]">
+                      Cần thêm ~<b>{fmtH(intake.hoursNeeded)}h</b> (trần +{Math.round(INTAKE_ADD_MAX * 100)}% = {fmtH(intake.hoursCap)}h). Gợi ý {intake.extras.length} ca bổ sung ở khung có dự báo GMV/giờ cao nhất, từ ngày mai. Ca bổ sung nằm TRONG kế hoạch (tính giờ + được chia target), không phải ca tăng cường. Mở ca trước, rồi mới chia target.
+                    </p>
+                    {intake.extras.length === 0 ? (
+                      <p className="text-amber-300">Khung giờ hiện có không còn chỗ để xếp thêm — nới khung live / số ca mỗi ngày ở Tham số, hoặc thêm ca tay trên lưới.</p>
+                    ) : (
+                      <>
+                        <ul className="grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
+                          {intake.extras.map((sl) => {
+                            const k = extraKey(sl);
+                            const on = !extraOff.has(k);
+                            return (
+                              <li key={k}>
+                                <label className="flex items-center gap-2 font-mono text-2xs text-[var(--text)]">
+                                  <input type="checkbox" checked={on} onChange={() => setExtraOff((prev) => { const n = new Set(prev); if (on) n.add(k); else n.delete(k); return n; })} />
+                                  {sl.date.slice(8)}/{sl.date.slice(5, 7)} {sl.startTime}–{sl.endTime} · dự báo {fmtVndShort(sl.expectedGmv)}
+                                </label>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                        {(() => {
+                          const gain = pickedExtras.reduce((a, x) => a + x.expectedGmv, 0);
+                          const cover = intake.gapGmv > 0 ? Math.round((gain / intake.gapGmv) * 100) : 0;
+                          return (
+                            <p className="text-2xs text-[var(--text-muted)] tabular-nums">
+                              Ca đã chọn dự báo thêm ~{fmtVndShort(gain)} — bù ~{cover}% phần chênh {fmtVndShort(intake.gapGmv)}. Giờ thêm ở khung còn trống thường bán kém hơn giờ đang có, nên phần còn lại nằm ở target các ca.
+                            </p>
+                          );
+                        })()}
+                        <div className="flex flex-wrap items-end gap-2">
+                          <label className="flex flex-col gap-1 text-2xs text-[var(--text-muted)]">
+                            Hạn đăng ký ca bổ sung
+                            <input type="datetime-local" value={extraDeadline} onChange={(e) => setExtraDeadline(e.target.value)} className="px-2 py-1 rounded-lg bg-[var(--surface-base)] border border-[var(--border)] text-[var(--text)]" />
+                          </label>
+                          <button onClick={() => void openExtras()} disabled={extraBusy || pickedExtras.length === 0 || retargetBusy} className="px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold disabled:opacity-40">
+                            {extraBusy ? "Đang mở…" : `Mở ${pickedExtras.length} ca bổ sung (${fmtH(pickedH)}h) + báo talent`}
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
+            );
+          })()}
           <div className="flex flex-wrap items-center gap-2">
             <button onClick={previewRetarget} disabled={retargetBusy} className="px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] border border-[var(--accent)]/60 font-bold text-[var(--accent-text)] disabled:opacity-40">Xem trước</button>
             <button onClick={() => void applyRetarget()} disabled={!retargetPreview || retargetBusy || loading || saving} className="px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold disabled:opacity-40">{retargetBusy ? "Đang ghi…" : "Áp dụng & ghi nhật ký"}</button>
@@ -1583,14 +1715,14 @@ export default function MonthPlan({
 const Info = ({ text }: { text: string }) => <span className="text-[var(--text-faint)] cursor-help" title={text} aria-label={text}>ⓘ</span>;
 const FIELD = "w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] font-mono disabled:opacity-60";
 
-const WD = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
 const BUCKET_LABEL: Record<string, string> = { daily: "Daily", dday: "D-Day", midmonth: "Mid-Month", payday: "Pay Day" };
 const CONF_LABEL: Record<SuggestResult["confidence"], string> = { none: "không có lịch sử", low: "thấp", medium: "vừa", high: "cao" };
 
 // Lớp 4 — giải thích gợi ý: lịch sử dùng, hệ số học được, ô giờ mạnh/yếu, đường cong biên, khả thi target.
 function SuggestionPanel({ platform, history: h, result: r, committedHours, targetTotal, compare, current, onPick }: { platform: ReportPlatform; history: HistorySummary; result: SuggestResult; committedHours: number; targetTotal: number; compare: Record<SuggestStrategy, SuggestResult> | null; current: SuggestStrategy; onPick: (k: SuggestStrategy) => void }) {
-  const top = h.cells.filter((c) => c.n >= 2).slice(0, 6);
-  const weak = h.cells.filter((c) => c.tag === "weak").slice(-4);
+  // Ô engine chấm điểm thật: khung 2 giờ gộp mọi thứ (06/11 — không xếp theo thứ trong tuần).
+  const top = h.blockCells.filter((c) => c.n >= 2).slice(0, 6);
+  const weak = h.blockCells.filter((c) => c.tag === "weak").slice(-4);
   const curve = r.marginal.filter((_, i, arr) => i === arr.length - 1 || i % Math.max(1, Math.floor(arr.length / 5)) === 0);
   return (
     <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 space-y-3 text-xs">
@@ -1639,11 +1771,11 @@ function SuggestionPanel({ platform, history: h, result: r, committedHours, targ
       )}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div>
-          <p className="font-bold text-[var(--text-muted)] mb-1">Khung giờ mạnh nhất (thứ × khối 2h)</p>
+          <p className="font-bold text-[var(--text-muted)] mb-1">Khung giờ mạnh nhất (khối 2h, mọi thứ)</p>
           {top.map((c) => (
-            <div key={`${c.weekday}-${c.block}`} className="flex justify-between gap-2"><span className="text-[var(--text)]">{WD[c.weekday]} {c.block * 2}–{c.block * 2 + 2}h <span className="text-[var(--text-faint)]">({c.n} ca)</span></span><b className={c.tag === "strong" ? "text-emerald-400" : "text-[var(--text)]"}>{fmtVndShort(c.gmvPerHour)}/h</b></div>
+            <div key={`${c.weekday}-${c.block}`} className="flex justify-between gap-2"><span className="text-[var(--text)]">{c.block * 2}–{c.block * 2 + 2}h <span className="text-[var(--text-faint)]">({c.n} ca)</span></span><b className={c.tag === "strong" ? "text-emerald-400" : "text-[var(--text)]"}>{fmtVndShort(c.gmvPerHour)}/h</b></div>
           ))}
-          {weak.length > 0 && <p className="mt-1 text-2xs text-[var(--text-faint)]">Yếu: {weak.map((c) => `${WD[c.weekday]} ${c.block * 2}h`).join(", ")}</p>}
+          {weak.length > 0 && <p className="mt-1 text-2xs text-[var(--text-faint)]">Yếu: {weak.map((c) => `${c.block * 2}–${c.block * 2 + 2}h`).join(", ")}</p>}
         </div>
         <div>
           <p className="font-bold text-[var(--text-muted)] mb-1">Hệ số học từ lịch sử</p>

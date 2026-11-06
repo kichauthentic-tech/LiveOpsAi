@@ -14,6 +14,7 @@ import { LiveSession } from "../../types";
 import { CampDayBucket, CampOverrides, resolveCampBucketType } from "../campaignDays";
 import { DEFAULT_ENGINE_PARAMS, EngineParams } from "./engineParams";
 import { sessionDurationHours } from "../pnl";
+import { windowBounds } from "./monthPlanGrid";
 import { assertOnePlatform } from "../platforms/perf";
 
 import { fmtFixed, fmtVndShort, fmtVndFull } from "../format";
@@ -23,7 +24,7 @@ const MIN_CELL_MINUTES = 30; // ca phủ ô ít hơn chừng này phút thì kh�
 // Các hằng số học/xếp nằm ở engineParams.ts (admin vặn được trong AI Training Center).
 
 export interface HistoryCell {
-  weekday: number; // 0=CN
+  weekday: number; // 0=CN; -1 = ô gộp mọi thứ (`blockCells`)
   block: number; // 0..11
   hours: number; // giờ có trọng số
   gmv: number; // GMV có trọng số
@@ -66,6 +67,13 @@ export interface HistorySummary {
   campHoursPerDay: Record<CampDayBucket, number>;
   campHoursLearned: Record<CampDayBucket, boolean>;
   cells: HistoryCell[];
+  /**
+   * Ô theo KHUNG 2 GIỜ gộp mọi thứ trong tuần (06/11) — bộ xếp ca + `estimateSlots` chấm điểm bằng ô này, nhân hệ số loại ngày
+   * (`campMultipliers`). Ô thứ × khung (`cells`) chỉ còn cho benchmark từng ca (opsSupport) và màn giải thích. Lý do: chấm theo thứ
+   * làm CROCS T12 (270h) thứ 7 Daily chỉ còn 1 ca/ngày, trong khi backtest 5 kênh T7–T10 thứ × khung sai 28,1% vs chỉ khung 28,2%
+   * và thứ hạng giữa các thứ đổi theo tháng (CROCS T4 ×0,75–1,92) — tín hiệu thứ là nhiễu.
+   */
+  blockCells: HistoryCell[];
   enough: boolean;
   // Lớp 2 — học từ lịch sử nếu đủ ca (≥ 5), không thì 1.0 và chỉ ghi nhãn.
   eventMultipliers: Record<CalendarEventKind, number>;
@@ -196,6 +204,7 @@ export function buildHistory(sessions: LiveSession[], brandId: string, asOf: str
     campHoursPerDay: { daily: 0, dday: 0, midmonth: 0, payday: 0 },
     campHoursLearned: { daily: false, dday: false, midmonth: false, payday: false },
     cells: [],
+    blockCells: [],
     enough: false,
     eventMultipliers: { holiday: 1, mega_sale: 1, event: 1 },
     eventLearned: { holiday: false, mega_sale: false, event: false },
@@ -389,6 +398,7 @@ export function buildHistory(sessions: LiveSession[], brandId: string, asOf: str
     campHoursPerDay,
     campHoursLearned,
     cells: cells.sort((a, b) => b.gmvPerHour - a.gmvPerHour),
+    blockCells: poolByBlock(cells, baseGmvPerHour, P.shrinkK),
     enough: usable.length >= P.minHistorySessions && months >= P.minHistoryMonths,
     eventMultipliers,
     eventLearned,
@@ -439,6 +449,7 @@ export function buildBorrowedHistory(
     // lại), và engine xếp lịch không đọc tới chúng — chỉ benchmark từng ca mới đọc, mà benchmark
     // thì cố ý KHÔNG dùng lịch sử mượn (xem chú thích ở `borrowedFrom`).
     cells: agency.cells.map((c) => ({ ...c, gmv: c.gmv * k, gmvPerHour: c.gmvPerHour * k, rawGmvPerHour: c.rawGmvPerHour * k })),
+    blockCells: agency.blockCells.map((c) => ({ ...c, gmv: c.gmv * k, gmvPerHour: c.gmvPerHour * k, rawGmvPerHour: c.rawGmvPerHour * k })),
     // `enough` = false có chủ đích dù agency có 228 ca: độ tin cậy phải bị kẹp xuống "low", và nhãn
     // "lịch sử mỏng" bị thay bằng nhãn "đang mượn" ở `suggestMonthPlan`.
     enough: false,
@@ -465,8 +476,50 @@ function cellLookup(h: HistorySummary) {
   return (wd: number, block: number) => m.get(`${wd}|${block}`);
 }
 
-function expectedGphFor(date: string, start: number, end: number, h: HistorySummary, get: ReturnType<typeof cellLookup>, calibration?: Map<string, number>): { gph: number; cells: HistoryCell[] } {
-  const wd = weekdayOf(date);
+/** Gộp ô thứ × khung thành ô theo khung (mọi thứ), co về mức nền như từng ô; nhãn giải thích tính lại trên ô gộp. */
+function poolByBlock(cells: readonly HistoryCell[], base: number, shrinkK: number): HistoryCell[] {
+  const acc = new Map<number, { hours: number; gmv: number; views: number; orders: number; n: number }>();
+  for (const c of cells) {
+    const a = acc.get(c.block) ?? { hours: 0, gmv: 0, views: 0, orders: 0, n: 0 };
+    a.hours += c.hours;
+    a.gmv += c.gmv;
+    a.views += c.views;
+    a.orders += c.orders;
+    a.n += c.n;
+    acc.set(c.block, a);
+  }
+  const out: HistoryCell[] = [...acc].map(([block, a]) => {
+    const raw = a.hours > 0 ? a.gmv / a.hours : 0;
+    return { weekday: -1, block, hours: a.hours, gmv: a.gmv, views: a.views, orders: a.orders, n: a.n, gmvPerHour: (a.n * raw + shrinkK * base) / (a.n + shrinkK), rawGmvPerHour: raw, viewsPerHour: a.hours > 0 ? a.views / a.hours : 0, conversion: a.views > 0 ? a.orders / a.views : 0, tag: "thin" as HistoryCell["tag"] };
+  });
+  const medGph = percentile(out.map((c) => c.gmvPerHour), 0.5);
+  const medVph = percentile(out.filter((c) => c.views > 0).map((c) => c.viewsPerHour), 0.5);
+  const medConv = percentile(out.filter((c) => c.views > 0).map((c) => c.conversion), 0.5);
+  for (const c of out) {
+    if (c.n < 2) c.tag = "thin";
+    else if (c.gmvPerHour >= medGph * 1.15) c.tag = "strong";
+    else if (medVph > 0 && c.viewsPerHour >= medVph * 1.15 && c.conversion < medConv * 0.85) c.tag = "traffic_low_cvr";
+    else c.tag = c.gmvPerHour < medGph * 0.85 ? "weak" : "thin";
+  }
+  return out.sort((a, b) => b.gmvPerHour - a.gmvPerHour);
+}
+
+/** Ô theo khung (mọi thứ) + hệ số hiệu chỉnh kế hoạch-vs-thực tế gộp theo khung (trung bình các thứ có dữ liệu). */
+function blockLookup(h: HistorySummary, calibration?: Map<string, number>) {
+  const m = new Map<number, HistoryCell>();
+  for (const c of h.blockCells ?? []) m.set(c.block, c);
+  const cal = new Map<number, { sum: number; n: number }>();
+  for (const [key, f] of calibration ?? []) {
+    const block = Number(key.split("|")[1]);
+    const a = cal.get(block) ?? { sum: 0, n: 0 };
+    a.sum += f;
+    a.n += 1;
+    cal.set(block, a);
+  }
+  return { cell: (block: number) => m.get(block), cal: (block: number) => { const a = cal.get(block); return a ? a.sum / a.n : 1; } };
+}
+
+function expectedGphFor(start: number, end: number, h: HistorySummary, look: ReturnType<typeof blockLookup>): { gph: number; cells: HistoryCell[] } {
   let cur = start;
   let sum = 0;
   const cells: HistoryCell[] = [];
@@ -474,12 +527,9 @@ function expectedGphFor(date: string, start: number, end: number, h: HistorySumm
     const blockEnd = (Math.floor(cur / (BLOCK_HOURS * 60)) + 1) * BLOCK_HOURS * 60;
     const seg = Math.min(blockEnd, end) - cur;
     const block = Math.floor((cur % (24 * 60)) / (BLOCK_HOURS * 60));
-    // Phần sau nửa đêm của ca qua đêm thuộc thứ kế tiếp (cùng cách với đoạn xếp ca ở trên).
-    const wdCur = cur >= 24 * 60 ? (wd + 1) % 7 : wd;
-    const c = get(wdCur, block);
-    const cal = calibration?.get(`${wdCur}|${block}`) ?? 1;
+    const c = look.cell(block);
     // Ô chưa có lịch sử: 70% trung bình brand — vẫn chọn được nhưng thua ô đã chứng minh.
-    sum += (c ? c.gmvPerHour : h.baseGmvPerHour * 0.7) * cal * (seg / 60);
+    sum += (c ? c.gmvPerHour : h.baseGmvPerHour * 0.7) * look.cal(block) * (seg / 60);
     if (c) cells.push(c);
     cur += seg;
   }
@@ -513,8 +563,8 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
   const [y, m] = c.month.split("-").map(Number);
   const daysInMonth = new Date(y, m, 0).getDate();
   const blackout = new Set(c.blackoutDates ?? []);
-  const winStart = toMin(c.liveWindowStart);
-  const winEnd = toMin(c.liveWindowEnd);
+  // Khung qua 0h (09:00–01:00 ngày main campaign): giờ đóng tính sang rạng sáng hôm sau ⇒ ứng viên được vắt qua 0h (06/11).
+  const { start: winStart, end: winEnd } = windowBounds(c);
   const strategy: SuggestStrategy = c.strategy ?? "max";
   const slotHoursEff = strategy === "lean" ? c.defaultSlotHours + P.leanExtraHours : c.defaultSlotHours;
   const maxPerDay = strategy === "balanced" ? Math.min(c.maxSlotsPerDay, P.balancedMaxPerDay) : c.maxSlotsPerDay;
@@ -547,7 +597,7 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
     const sch = schemeOf(date);
     return [e?.label, sch ? `Khuyến mãi: ${sch.label ?? "scheme"}` : ""].filter(Boolean).join(" · ") || undefined;
   };
-  const get = cellLookup(history);
+  const look = blockLookup(history, c.calibration);
   const brandGph = history.brandGmvPerHour;
 
   if (history.borrowedFrom) {
@@ -581,7 +631,7 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
     const rawEnd = toMin(f.endTime);
     const end = rawEnd < start || rawEnd === 0 ? 24 * 60 + rawEnd : rawEnd;
     if (end <= start) continue;
-    const { gph, cells } = expectedGphFor(f.date, start, end, history, get, c.calibration);
+    const { gph, cells } = expectedGphFor(start, end, history, look);
     chosen.push({ date: f.date, start, end, hours: (end - start) / 60, bucket: resolveCampBucketType(f.date, c.camp), baseGph: gph, cellRefs: cells });
     fixedKeys.add(`${f.date}|${f.startTime}`);
   }
@@ -594,7 +644,10 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
     const bucket = resolveCampBucketType(date, c.camp);
     for (let start = winStart; start + slotMin <= winEnd; start += 60) {
       const end = start + slotMin;
-      const { gph, cells } = expectedGphFor(date, start, end, history, get, c.calibration);
+      // Ca kết thúc SAU 00:00 chỉ TỰ gợi ý ở ngày Campaign (06/11, user: "campaign main live tới 00:30–01:00"; T6–T11 VERA TikTok
+      // 36/38 ca qua 0h là ngày Campaign). Kết thúc đúng 00:00 (21–00, CROCS hay dùng ngày Daily) thì mọi ngày. Ngày Daily vẫn thêm tay được.
+      if (end > 24 * 60 && bucket === "daily") continue;
+      const { gph, cells } = expectedGphFor(start, end, history, look);
       candidates.push({ date, start, end, hours: slotMin / 60, bucket, baseGph: gph, cellRefs: cells });
     }
   }
@@ -660,7 +713,7 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
       if (remaining < best.hours) {
         if (remaining < 1) return false;
         const end = best.start + Math.round(remaining * 60);
-        const { gph, cells } = expectedGphFor(best.date, best.start, end, history, get, c.calibration);
+        const { gph, cells } = expectedGphFor(best.start, end, history, look);
         pick = { ...best, end, hours: remaining, baseGph: gph, cellRefs: cells };
       }
       const exp = expectedGph(pick, state) * pick.hours;
@@ -699,7 +752,7 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
         const block: Candidate[] = [];
         for (let i = 0; i < k; i++) {
           const st = start + i * slotMin;
-          const { gph, cells } = expectedGphFor(date, st, st + slotMin, history, get, c.calibration);
+          const { gph, cells } = expectedGphFor(st, st + slotMin, history, look);
           block.push({ date, start: st, end: st + slotMin, hours: slotHoursEff, bucket, baseGph: gph, cellRefs: cells });
         }
         if (block.some((b) => already.some((a) => overlaps(a, b)))) continue;
@@ -733,7 +786,7 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
       notes.push(`Khuôn ngày Campaign học từ lịch sử: ${raised.map((b) => `${label[b]} ~${fmtFixed(history.campHoursPerDay[b], 0)}h/ngày`).join(", ")} → xếp đủ giờ ngày Campaign trước (tới ${raised.map((b) => `${dayCapOf(b)} ca`).join("/")}), phần còn lại mới chia cho ngày Daily (tối đa ${maxPerDay} ca); tối đa ca/ngày của kế hoạch được nâng theo khi áp gợi ý.`);
     }
   }
-  if (c.calibration && c.calibration.size > 0) notes.push(`Đã hiệu chỉnh GMV/giờ theo kế hoạch vs thực tế các tháng trước (${c.calibration.size} ô thứ × giờ có dữ liệu).`);
+  if (c.calibration && c.calibration.size > 0) notes.push(`Đã hiệu chỉnh GMV/giờ theo kế hoạch vs thực tế các tháng trước (${c.calibration.size} ô thứ × giờ có dữ liệu, gộp theo khung giờ).`);
   // Chế độ target: trần giờ = sức chứa khung (mọi ngày còn lại × giờ khung), dừng khi dự báo chạm target.
   const capacityHours = [...new Set(candidates.map((x) => x.date))].length * ((winEnd - winStart) / 60);
   const main = greedy(stopAtTarget ? capacityHours : committed);
@@ -829,7 +882,7 @@ export function estimateSlots(
   ctx: Pick<SuggestConstraints, "camp" | "events" | "schemes" | "calibration">
 ): number[] {
   if (history.brandGmvPerHour <= 0) return slots.map(() => 0);
-  const get = cellLookup(history);
+  const look = blockLookup(history, ctx.calibration);
   const eventByDate = new Map<string, CalendarEvent>();
   for (const e of ctx.events ?? []) if (!eventByDate.has(e.date)) eventByDate.set(e.date, e);
   const dayFactor = (date: string) => {
@@ -848,7 +901,7 @@ export function estimateSlots(
   return parsed.map((s) => {
     const hours = (s.end - s.start) / 60;
     if (hours <= 0) return 0;
-    const { gph } = expectedGphFor(s.date, s.start, s.end, history, get, ctx.calibration);
+    const { gph } = expectedGphFor(s.start, s.end, history, look);
     const before = parsed.filter((x) => x.date === s.date && x.start < s.start);
     const hoursBefore = before.reduce((a, x) => a + Math.max(0, (x.end - x.start) / 60), 0);
     const goal = history.campHoursPerDay[s.bucket];
