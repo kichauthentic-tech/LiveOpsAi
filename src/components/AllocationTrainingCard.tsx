@@ -36,6 +36,11 @@ export const AllocationTrainingCard: React.FC<Props> = ({ brandId, sessions, par
   const prepared = useMemo(() => prepareBacktest(channel, params.allocMinMonths), [channel, params.allocMinMonths]);
   const result = useMemo(() => scoreBacktest(prepared, params, today), [prepared, params, today]);
   const model = useMemo(() => fitAllocationModel(channel, nextMonthOf(today.slice(0, 7)), params), [channel, params, today]);
+  // Hệ số T7–CN kênh này học được — tính cả khi đang tắt, để thấy cuối tuần thật sự bán hơn/kém bao nhiêu.
+  const weekendPeek = useMemo(
+    () => (params.allocUseWeekend ? model : fitAllocationModel(channel, nextMonthOf(today.slice(0, 7)), { ...params, allocUseWeekend: true })),
+    [channel, params, today, model]
+  );
 
   const best = ALLOC_METHODS.filter((k) => result.pooled[k]).sort((a, b) => result.pooled[a]!.slot - result.pooled[b]!.slot)[0];
 
@@ -82,6 +87,15 @@ export const AllocationTrainingCard: React.FC<Props> = ({ brandId, sessions, par
                         <b className={model.band[k] >= 1.03 ? "text-emerald-400" : model.band[k] <= 0.9 ? "text-amber-400" : "text-[var(--text)]"}>{mult(model.band[k])}</b>
                       </div>
                     ))}
+                  </div>
+                )}
+                {weekendPeek && (
+                  <div className="flex justify-between gap-2">
+                    <span className="text-[var(--text-muted)]">
+                      T7–CN so với T2–T6 (ngày Daily, cùng khung giờ){" "}
+                      <span className="text-2xs text-[var(--text-faint)]">({weekendPeek.weekendSessions.weekend} / {weekendPeek.weekendSessions.weekday} ca{params.allocUseWeekend ? "" : " · đang tắt, chưa nhân vào target"})</span>
+                    </span>
+                    <b className={params.allocUseWeekend ? "text-[var(--text)]" : "text-[var(--text-faint)]"}>{mult(weekendPeek.weekend)}</b>
                   </div>
                 )}
                 {model.useCampPos && (

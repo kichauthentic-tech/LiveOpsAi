@@ -26,7 +26,7 @@ export type ForecastParams = Pick<
   EngineParams,
   | "fcRecentDays" | "fcCredibility" | "fcBandBig" | "fcBandSmall" | "fcOutOfRangeFactor" | "fcBiasCorrect" | "fcCheckpointCap"
   | "allocRidge" | "allocUseBand" | "allocUseCampPos"
->;
+> & Partial<Pick<EngineParams, "allocUseWeekend" | "allocWeekendRidge">>;
 type BucketOf = (date: string) => CampDayBucket;
 
 const BUCKETS: CampDayBucket[] = ["daily", "dday", "midmonth", "payday"];
@@ -108,7 +108,7 @@ export interface MonthForecaster {
 /** Mức + mô hình, KHÔNG có hiệu chỉnh lệch (dùng nội bộ để đo lệch của chính các tháng trước). */
 function coreFit(history: LiveSession[], month: string, params: ForecastParams) {
   const hist = history.filter((s) => s.date < `${month}-01` && validHistory(s));
-  const model = fitAllocationModel(hist, month, { allocEnsembleShare: 1, allocRidge: params.allocRidge, allocMinMonths: 1, allocUseBand: params.allocUseBand, allocUseCampPos: params.allocUseCampPos });
+  const model = fitAllocationModel(hist, month, { allocEnsembleShare: 1, allocRidge: params.allocRidge, allocMinMonths: 1, allocUseBand: params.allocUseBand, allocUseCampPos: params.allocUseCampPos, allocUseWeekend: params.allocUseWeekend, allocWeekendRidge: params.allocWeekendRidge });
   if (!model) return null;
   const W = (xs: LiveSession[]) => glmWeights(xs, model, fixedBucket).reduce((a, v) => a + v, 0);
   const byMonth = new Map<string, LiveSession[]>();

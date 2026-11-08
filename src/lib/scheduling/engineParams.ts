@@ -51,6 +51,8 @@ export interface EngineParams {
   allocMinMonths: number; // tháng lịch sử tối thiểu để dùng mô hình v2
   allocUseBand: boolean; // hệ số khung giờ bắt đầu
   allocUseCampPos: boolean; // hệ số vị trí ngày trong đợt Mid-Month/Pay Day
+  allocUseWeekend: boolean; // hệ số T7–CN của ngày Daily (tự học theo kênh, co mạnh về 1)
+  allocWeekendRidge: number; // độ co riêng của hệ số T7–CN (đơn vị "ca ảo")
   // --- Dự báo GMV tháng (engine target v3, lib/performance/monthForecast.ts) ---
   fcRecentDays: number; // mức "gần đây" = GMV ÷ trọng số của N ngày cuối lịch sử
   fcCredibility: number; // trong tháng: số đã có kéo về mức lập kế hoạch bao nhiêu (0 = tin hẳn số đã có)
@@ -107,6 +109,8 @@ export const DEFAULT_ENGINE_PARAMS: EngineParams = {
   allocMinMonths: 2,
   allocUseBand: true,
   allocUseCampPos: true,
+  allocUseWeekend: false,
+  allocWeekendRidge: 40,
   fcRecentDays: 28,
   fcCredibility: 0.1,
   fcBandBig: 0.22,
@@ -181,6 +185,8 @@ export const ENGINE_PARAM_META: EngineParamMeta[] = [
   { key: "allocMinMonths", group: "target", label: "Chia target ca: tháng lịch sử tối thiểu cho v2", help: "Dưới mức này chỉ dùng cách cũ (hoặc chia theo dự báo engine nếu cách cũ cũng chưa đủ).", kind: "number", min: 1, max: 6, step: 1 },
   { key: "allocUseBand", group: "target", label: "Chia target ca: dùng hệ số khung giờ", help: "Ca bắt đầu 11–14h lịch sử CROCS chỉ ~0,8× trung bình nhóm, 18–21h ~1,07×; áp cho cả D-Day, Mid-Month, Pay Day. Tắt để thấy khung giờ đóng góp bao nhiêu điểm sai số.", kind: "boolean" },
   { key: "allocUseCampPos", group: "target", label: "Chia target ca: dùng hệ số vị trí ngày trong đợt", help: "Ngày 1 của Mid-Month/Pay Day mạnh hơn ngày 3 (CROCS ~1,3× so với ~0,8×). Brand có mẫu hình khác thì hệ số tự học theo brand; tắt nếu thấy bảng backtest không cải thiện.", kind: "boolean" },
+  { key: "allocUseWeekend", group: "target", label: "Chia target ca: dùng hệ số T7–CN (ngày Daily)", help: "Engine tự học T7–CN bán mỗi giờ hơn/kém T2–T6 bao nhiêu trên chính kênh đó (so cùng tháng, cùng khung giờ) rồi nhân vào target ca Daily cuối tuần (ngày Campaign không áp). Mặc định TẮT: backtest 08/11 trên 6 kênh, bật ở mọi độ co đều kém hơn tắt (sai số theo ngày 21,48% → 21,53–21,96%); hệ số học được: CROCS ×0,96, Franklin TikTok ×0,91, VERA TikTok ×1,04, JOCKEY TikTok ×1,03, VERA Shopee ×1,00. Hệ số của kênh đang xem hiện ở khối “Đã học gì” kể cả khi tắt.", kind: "boolean" },
+  { key: "allocWeekendRidge", group: "target", label: "Chia target ca: độ co hệ số T7–CN", help: "Hệ số T7–CN bị kéo về 1 như có thêm X ca ảo — đặt cao vì từng ca lệch nhau ±50% còn chênh cuối tuần chỉ vài %. Giảm thì hệ số bám dữ liệu kênh hơn (dễ nhiễu).", kind: "number", min: 0, max: 200, step: 5 },
   { key: "fcRecentDays", group: "target", label: "Dự báo tháng: số ngày của mức gần đây", help: "Mức GMV tháng tới = trung bình nhân của (mức N ngày gần nhất) và (mức 3 tháng gần nhất), mỗi mức đã chia theo hình dạng tháng (loại ngày, khung giờ). Backtest 10/10: 28 ngày; 14–56 chênh ≤1,5 điểm %.", kind: "number", min: 7, max: 90, step: 1 },
   { key: "fcCredibility", group: "target", label: "Dự báo trong tháng: kéo về mức lập kế hoạch", help: "Số đã có của tháng được tin bao nhiêu so với mức lúc lập. 0 = tin hẳn số đã có; 0.1 là mức backtest tốt nhất (sai số tổng tháng CROCS+VERA ngày 8: 8%, ngày 15: 5%, ngày 18: 3%; Dashboard cũ 12% / 8% / 6%). Tăng khi đầu tháng hay có ngày đột biến.", kind: "number", min: 0, max: 1, step: 0.05 },
   { key: "fcBandBig", group: "target", label: "Dải 80% lúc lập — kênh đủ lịch sử", help: "Nửa dải ±X × dự báo cho kênh có ≥ 3 tháng, mỗi tháng ≥ 40 ca. Backtest walk-forward: 80% tháng lệch ≤ 22%. Trong tháng dải thu lại theo phần còn lại (X × phần chưa về).", kind: "number", min: 0.05, max: 1, step: 0.01 },

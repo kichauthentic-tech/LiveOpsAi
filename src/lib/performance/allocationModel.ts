@@ -22,10 +22,19 @@ import { TargetWeightModel, targetWeightModel, targetWeights } from "./slotInsig
 // Đo lại "thứ trong tuần" 06/11 (user nghi T7–CN bị target thấp): 5 kênh × T8–T10, 14 tháng-kênh — thêm hệ số T7–CN (ngày Daily, so
 // trong cùng khung, co về 1) sai số ca 28,60% → 28,57–28,61%, theo ngày 21,5% → 21,6%. GMV/giờ T7–CN ÷ T2–T6 cùng khung: CROCS 0,99,
 // VERA Shopee 1,06, VERA TikTok 1,08, Franklin TikTok 0,87 — đổi dấu giữa các tháng (VERA TikTok 0,70–1,30). Vẫn không giúp.
+// 08/11 (user hỏi lại "T7–CN traffic cao sao chia như Daily"): đưa hệ số T7–CN vào chính GLM (`allocUseWeekend`, co riêng
+// `allocWeekendRidge`, cũng nhân vào nửa "cách cũ" của phần trộn). Mô tả thô gộp kênh: GMV/giờ ×1,03 (95%: 0,96–1,11), lượt xem/giờ
+// ×1,04. Hệ số GLM học được (đã khử tháng + khung): CROCS 0,96, Franklin TT 0,91, VERA TT 1,04, JOCKEY TT 1,03, VERA Shopee 1,00.
+// Backtest 6 kênh tháng đủ ngày: tắt ca 28,60% / ngày 21,48%; bật co 0→150: ca 28,76→28,59%, ngày 21,96→21,53% ⇒ mặc định TẮT.
 
 type BucketOf = (date: string) => CampDayBucket;
 export type SlotLike = { date: string; startTime: string; endTime: string };
-export type AllocParams = Pick<EngineParams, "allocEnsembleShare" | "allocRidge" | "allocMinMonths" | "allocUseBand" | "allocUseCampPos">;
+export type AllocParams = Pick<EngineParams, "allocEnsembleShare" | "allocRidge" | "allocMinMonths" | "allocUseBand" | "allocUseCampPos"> &
+  Partial<Pick<EngineParams, "allocUseWeekend" | "allocWeekendRidge">>;
+
+/** T7–CN của NGÀY DAILY (ngày Campaign rơi vào cuối tuần không tính — hệ số loại ngày đã lo). */
+const WEEKEND_DOW = new Set([0, 6]);
+export const isWeekendDate = (date: string): boolean => WEEKEND_DOW.has(new Date(`${date}T00:00:00`).getDay());
 
 /** Khung theo GIỜ BẮT ĐẦU ca. Ranh giới không ảnh hưởng độ chính xác (21,9–22,5% với mọi cách cắt đã thử) — chọn theo vận hành. */
 export const ALLOC_BAND_LABEL = ["Sáng (đến 11h)", "Trưa 11–14h", "Chiều 14–18h", "Giờ vàng 18–21h", "Đêm từ 21h"] as const;
@@ -47,7 +56,7 @@ const MIN_ROWS = 15;
 const POS = 3;
 const isPosBucket = (b: CampDayBucket) => b === "midmonth" || b === "payday";
 
-interface Row { month: string; bucket: CampDayBucket; band: number; pos: number; hours: number; y: number }
+interface Row { month: string; bucket: CampDayBucket; band: number; pos: number; wkd: boolean; hours: number; y: number }
 
 /** Vị trí 0..2 trong đợt từ lịch cố định; ngày camp tay (ngoài lịch) thì -1 và để caller xếp theo thứ tự ngày. */
 const calendarPos = (date: string, bucket: CampDayBucket): number => {
@@ -66,12 +75,17 @@ export interface AllocationModel {
   bandSessions: number[];
   /** Hệ số vị trí ngày 1/2/3 trong đợt Mid-Month/Pay Day, chuẩn hoá trung bình = 1. Tắt ⇒ toàn 1. */
   pos: number[];
+  /** Hệ số T7–CN ngày Daily so với T2–T6 ngày Daily (=1 khi tắt). */
+  weekend: number;
+  /** Số ca Daily T7–CN / T2–T6 trong lịch sử đã học. */
+  weekendSessions: { weekend: number; weekday: number };
+  useWeekend: boolean;
   months: string[];
   sessions: number;
   useBand: boolean;
   useCampPos: boolean;
   /** log-hệ số thô, đúng thứ tự cột — dùng để tính trọng số. */
-  coef: { bucket: Record<CampDayBucket, number>; band: number[]; pos: number[] };
+  coef: { bucket: Record<CampDayBucket, number>; band: number[]; pos: number[]; weekend: number };
 }
 
 function solve(A: number[][], b: number[]): number[] {
@@ -97,15 +111,17 @@ export function fitAllocationModel(history: LiveSession[], month: string, params
     .filter((s) => s.date < `${month}-01` && validHistory(s))
     .map((s) => {
       const bucket = bucketOfFixed(s.date);
-      return { month: s.date.slice(0, 7), bucket, band: allocBand(s.startTime), pos: Math.max(0, calendarPos(s.date, bucket)), hours: sessionDurationHours(s.startTime, s.endTime), y: s.actualGmv / 1e6 };
+      return { month: s.date.slice(0, 7), bucket, band: allocBand(s.startTime), pos: Math.max(0, calendarPos(s.date, bucket)), wkd: bucket === "daily" && isWeekendDate(s.date), hours: sessionDurationHours(s.startTime, s.endTime), y: s.actualGmv / 1e6 };
     })
     .filter((r) => r.hours > 0);
   const months = [...new Set(rows.map((r) => r.month))].sort();
   if (months.length < Math.max(1, params.allocMinMonths) || rows.length < MIN_ROWS) return null;
 
   const { allocUseBand: useBand, allocUseCampPos: useCampPos } = params;
+  const useWeekend = params.allocUseWeekend ?? false;
+  const weekendRidge = params.allocWeekendRidge ?? params.allocRidge;
   const nMonth = months.length - 1;
-  const cols = 1 + nMonth + 3 + (useBand ? BANDS : 0) + (useCampPos ? POS : 0);
+  const cols = 1 + nMonth + 3 + (useBand ? BANDS : 0) + (useCampPos ? POS : 0) + (useWeekend ? 1 : 0);
   const pen = new Array<number>(cols).fill(0);
   const x = rows.map((r) => {
     const v = new Array<number>(cols).fill(0);
@@ -115,6 +131,7 @@ export function fitAllocationModel(history: LiveSession[], month: string, params
     for (const b of ["dday", "midmonth", "payday"] as CampDayBucket[]) { pen[c] = params.allocRidge; v[c++] = r.bucket === b ? 1 : 0; }
     if (useBand) for (let k = 0; k < BANDS; k++) { pen[c] = params.allocRidge; v[c++] = r.band === k ? 1 : 0; }
     if (useCampPos) for (let p = 0; p < POS; p++) { pen[c] = params.allocRidge; v[c++] = isPosBucket(r.bucket) && r.pos === p ? 1 : 0; }
+    if (useWeekend) { pen[c] = weekendRidge; v[c++] = r.wkd ? 1 : 0; }
     return v;
   });
   const off = rows.map((r) => Math.log(r.hours));
@@ -145,7 +162,8 @@ export function fitAllocationModel(history: LiveSession[], month: string, params
   let c = 1 + nMonth;
   const coefBucket: Record<CampDayBucket, number> = { daily: 0, dday: beta[c++], midmonth: beta[c++], payday: beta[c++] };
   const coefBand = useBand ? beta.slice(c, (c += BANDS)) : new Array<number>(BANDS).fill(0);
-  const coefPos = useCampPos ? beta.slice(c, c + POS) : new Array<number>(POS).fill(0);
+  const coefPos = useCampPos ? beta.slice(c, (c += POS)) : new Array<number>(POS).fill(0);
+  const coefWeekend = useWeekend ? beta[c] : 0;
 
   // Chuẩn hoá hệ số hiển thị: trung bình theo giờ lịch sử = 1 (hệ số thô chỉ có nghĩa tương đối).
   const hrs = rows.reduce((a, r) => a + r.hours, 0);
@@ -158,11 +176,14 @@ export function fitAllocationModel(history: LiveSession[], month: string, params
     band: coefBand.map((v) => Math.exp(v) / bandMean),
     bandSessions: Array.from({ length: BANDS }, (_, k) => rows.filter((r) => r.band === k).length),
     pos: coefPos.map((v) => Math.exp(v) / posMean),
+    weekend: Math.exp(coefWeekend),
+    weekendSessions: { weekend: rows.filter((r) => r.wkd).length, weekday: rows.filter((r) => r.bucket === "daily" && !r.wkd).length },
+    useWeekend,
     months,
     sessions: rows.length,
     useBand,
     useCampPos,
-    coef: { bucket: coefBucket, band: coefBand, pos: coefPos }
+    coef: { bucket: coefBucket, band: coefBand, pos: coefPos, weekend: coefWeekend }
   };
 }
 
@@ -180,6 +201,7 @@ export function glmWeights(slots: SlotLike[], model: AllocationModel, bucketOf: 
   return slots.map((s) => {
     const b = bucketOf(s.date);
     let logw = model.coef.bucket[b] + model.coef.band[allocBand(s.startTime)];
+    if (b === "daily" && model.coef.weekend && isWeekendDate(s.date)) logw += model.coef.weekend;
     if (isPosBucket(b)) {
       const cal = calendarPos(s.date, b);
       const p = cal >= 0 ? cal : Math.min(POS - 1, Math.max(0, (campDays.get(b) ?? []).indexOf(s.date)));
@@ -223,7 +245,10 @@ export interface AllocatorWeights {
 
 export function allocatorWeights(a: Allocator, slots: SlotLike[], bucketOf: BucketOf): AllocatorWeights {
   const glm = a.glm ? normalize(glmWeights(slots, a.glm, bucketOf)) : null;
-  const old = a.old ? normalize(targetWeights(slots, a.old, bucketOf)) : null;
+  // Cách cũ không biết thứ trong tuần ⇒ nhân hệ số T7–CN của v2 vào nó luôn, để phần trộn mang đủ hệ số (không bị chia đôi).
+  const wk = a.glm?.coef.weekend ? Math.exp(a.glm.coef.weekend) : 1;
+  const oldRaw = a.old ? targetWeights(slots, a.old, bucketOf) : null;
+  const old = oldRaw ? normalize(wk === 1 ? oldRaw : oldRaw.map((v, i) => (bucketOf(slots[i].date) === "daily" && isWeekendDate(slots[i].date) ? v * wk : v))) : null;
   const blended = glm && old ? glm.map((v, i) => a.share * v + (1 - a.share) * old[i]) : glm ?? old ?? slots.map(() => 0);
   return { glm, old, blended };
 }

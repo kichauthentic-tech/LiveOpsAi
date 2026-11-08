@@ -200,3 +200,42 @@ describe("tham số engine lưu ở DB", () => {
     expect(back.allocMinMonths).toBe(P.allocMinMonths);
   });
 });
+
+describe("hệ số T7–CN ngày Daily (allocUseWeekend, 08/11)", () => {
+  // Thế giới giả: ngày Daily T7–CN bán ×1,3; ngày Campaign không đổi theo thứ.
+  const isWe = (d: string) => [0, 6].includes(new Date(`${d}T00:00:00`).getDay());
+  const hist = world(["2026-06", "2026-07", "2026-08"]).map((s) =>
+    bucketOf(s.date) === "daily" && isWe(s.date) ? { ...s, actualGmv: s.actualGmv * 1.3 } : s
+  );
+  const slots = [
+    { date: "2026-09-04", startTime: "20:00", endTime: "23:00" }, // T6 Daily
+    { date: "2026-09-05", startTime: "20:00", endTime: "23:00" }, // T7 Daily
+    { date: "2026-09-09", startTime: "20:00", endTime: "23:00" } // 9/9 D-Day
+  ];
+  test("tắt (mặc định) ⇒ ×1 và T7 = T6", () => {
+    expect(P.allocUseWeekend).toBe(false);
+    const m = fitAllocationModel(hist, "2026-09", P)!;
+    expect(m.weekend).toBe(1);
+    const w = glmWeights(slots, m, bucketOf);
+    expect(w[1]).toBeCloseTo(w[0], 9);
+  });
+  test("bật, co thấp ⇒ học lại ~×1,3; co rất cao ⇒ về gần 1", () => {
+    const m = fitAllocationModel(hist, "2026-09", { ...P, allocUseWeekend: true, allocWeekendRidge: 0.5 })!;
+    expect(m.weekend).toBeGreaterThan(1.2);
+    expect(m.weekend).toBeLessThan(1.4);
+    expect(m.weekendSessions.weekend).toBeGreaterThan(0);
+    const tight = fitAllocationModel(hist, "2026-09", { ...P, allocUseWeekend: true, allocWeekendRidge: 1e5 })!;
+    expect(tight.weekend).toBeLessThan(1.02);
+  });
+  test("bật ⇒ cả hai nửa của phần trộn đều nhân hệ số T7–CN; ngày Campaign không đổi", () => {
+    const prm = { ...P, allocUseWeekend: true, allocWeekendRidge: 0.5 };
+    for (const share of [0, 1]) {
+      const a = buildAllocator(hist, "2026-09", { ...prm, allocEnsembleShare: share })!;
+      const w = allocatorWeights(a, slots, bucketOf).blended;
+      expect(w[1] / w[0]).toBeGreaterThan(1.2);
+    }
+    const g = glmWeights(slots, fitAllocationModel(hist, "2026-09", prm)!, bucketOf);
+    const g0 = glmWeights(slots, fitAllocationModel(hist, "2026-09", P)!, bucketOf);
+    expect(g[1] / g[2]).toBeGreaterThan(1.2 * (g0[1] / g0[2])); // T7 Daily tăng so với D-Day; ngày Campaign không nhân hệ số
+  });
+});
