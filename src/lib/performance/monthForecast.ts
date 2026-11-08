@@ -38,8 +38,21 @@ const BIG_MONTHS = 3;
 const BIG_SESSIONS = 40;
 /** Dải 80% ⇒ biên = 1,28 độ lệch chuẩn. */
 const Z80 = 1.2816;
+/** Khoảng bình thường của một ca: p10–p90 của GMV ca ÷ kỳ vọng ca khi đã biết đúng tổng tháng, 3 tháng gần nhất, cần ≥ 30 ca. */
+const SLOT_BAND_MIN = 30;
+const quantile = (sorted: number[], q: number) => {
+  if (sorted.length === 0) return NaN;
+  const pos = q * (sorted.length - 1);
+  const i = Math.floor(pos);
+  return sorted[i] + (sorted[Math.min(sorted.length - 1, i + 1)] - sorted[i]) * (pos - i);
+};
 
-const validHistory = (s: LiveSession) => !s.excludedFromReports && s.status === "Completed" && isCountable(s) && (s.actualGmv ?? 0) > 0 && sessionHours(s) > 0.5;
+// Ca bán 0 đồng mà CÓ diễn ra (có lượt xem, có giờ live thật, hoặc số từ giao ca/đối soát) là kết quả thật — trước 07/11 bị bỏ khỏi
+// lịch sử nên mức GMV/giờ của kênh nhỏ bị đẩy lên (Franklin Shopee 17/35 ca, JOCKEY 5%, Franklin TikTok 7%). Ca 0 đồng không có bằng
+// chứng nào vẫn bị bỏ (chưa biết có live hay không).
+const soldZeroForReal = (s: LiveSession) => (s.totalViews ?? 0) > 0 || (s.liveDurationMinutes ?? 0) > 0 || dataSourceTier(s) !== "manual";
+const validHistory = (s: LiveSession) =>
+  !s.excludedFromReports && s.status === "Completed" && isCountable(s) && ((s.actualGmv ?? 0) > 0 || soldZeroForReal(s)) && sessionHours(s) > 0.5;
 const geo = (xs: number[]) => (xs.length ? Math.exp(xs.reduce((a, v) => a + Math.log(v), 0) / xs.length) : 0);
 const addDaysIso = (d: string, n: number) => {
   const t = new Date(`${d}T00:00:00Z`);
@@ -68,6 +81,16 @@ export interface MonthForecaster {
   levelRecent: number | null;
   /** Nửa dải 80% lúc lập, tỷ lệ của dự báo. Trong tháng: nửa dải = band × phần dự báo chưa về. */
   band: number;
+  /** Nửa dải theo cỡ kênh (trước khi nới theo sai số thật của kênh). */
+  bandBase: number;
+  /** Dải đã nới vì kênh sai thật nhiều hơn mức chung (≥ 3 tháng chấm được). */
+  bandFromErrors: boolean;
+  /**
+   * Khoảng bình thường của MỘT ca (07/11): thực tế ÷ kỳ vọng ca nằm trong [lo, hi] ở 80% ca lịch sử (p10–p90), khi đã biết đúng tổng
+   * tháng. Ca có target T: khoảng = T × lo … T × hi. Ca rơi ra ngoài mới đáng xem — trong khoảng là dao động bình thường (~20 đơn/ca
+   * ⇒ may rủi riêng đã ±16%). null khi kênh dưới 30 ca trong 3 tháng gần nhất.
+   */
+  slotBand: { lo: number; hi: number; n: number } | null;
   big: boolean;
   /** p90 tổng giờ live/ngày theo loại ngày trong 3 tháng gần nhất — vượt thì phần vượt ra ít GMV hơn. */
   dayHoursP90: Record<CampDayBucket, number>;
@@ -111,9 +134,29 @@ function coreFit(history: LiveSession[], month: string, params: ForecastParams) 
   for (const s of hist) if (recentMonths.has(s.date.slice(0, 7))) dayHours.set(s.date, (dayHours.get(s.date) ?? 0) + sessionDurationHours(s.startTime, s.endTime));
   const dayHoursP90 = Object.fromEntries(BUCKETS.map((b) => [b, p90([...dayHours.entries()].filter(([d]) => fixedBucket(d) === b).map(([, h]) => h))])) as Record<CampDayBucket, number>;
 
-  const big = usable.length >= BIG_MONTHS && usable.slice(-BIG_MONTHS).every((p) => p.sessions >= BIG_SESSIONS);
+  // Tháng đang chạy dở (lịch sử dừng trước 3 ngày cuối tháng) không dùng để xếp cỡ kênh: lập T12 từ ngày 6/11 thì T11 mới 15 ca ⇒ trước
+  // 07/11 CROCS bị coi là "kênh ít lịch sử" (dải rộng hơn) chỉ vì tháng hiện tại chưa hết.
+  const complete = usable.filter((p) => isCompleteMonth(p.month, last));
+  const big = complete.length >= BIG_MONTHS && complete.slice(-BIG_MONTHS).every((p) => p.sessions >= BIG_SESSIONS);
+  // Khoảng bình thường của ca: mỗi tháng quy kỳ vọng ca về đúng tổng tháng (gỡ phần "mức tháng"), còn lại là dao động của chính ca.
+  const ratios: number[] = [];
+  for (const m of recentMonths) {
+    const xs = hist.filter((s) => s.date.startsWith(m));
+    const w = glmWeights(xs, model, fixedBucket);
+    const Y = xs.reduce((a, s) => a + s.actualGmv, 0), Wm = w.reduce((a, v) => a + v, 0);
+    if (!(Y > 0) || !(Wm > 0) || xs.length < MIN_LEVEL_SESSIONS) continue;
+    xs.forEach((s, i) => { if (w[i] > 0) ratios.push(s.actualGmv / ((w[i] / Wm) * Y)); });
+  }
+  ratios.sort((a, b) => a - b);
+  const slotBand = ratios.length >= SLOT_BAND_MIN ? { lo: quantile(ratios, 0.1), hi: quantile(ratios, 0.9), n: ratios.length } : null;
   const mostlyManual = hist.filter((s) => dataSourceTier(s) === "manual").length > hist.length / 2;
-  return { hist, model, level, levelMonths, levelRecent, dayHoursP90, big, mostlyManual };
+  return { hist, model, level, levelMonths, levelRecent, dayHoursP90, big, mostlyManual, slotBand };
+}
+
+/** Tháng đã hết theo lịch sử: ngày có số cuối cùng không sớm hơn 3 ngày cuối tháng. */
+function isCompleteMonth(month: string, lastHist: string): boolean {
+  const [y, m] = month.split("-").map(Number);
+  return lastHist >= addDaysIso(new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10), -2);
 }
 
 /** Hệ số "giờ vượt vùng" cho từng ca: ngày nào tổng giờ vượt p90 cùng loại ngày thì phần vượt chỉ tính `factor`. */
@@ -143,11 +186,9 @@ export function buildMonthForecaster(history: LiveSession[], month: string, para
   // Lệch của các tháng trước: dự báo lúc lập (dữ liệu tới ngày 20 tháng trước nữa — đúng nhịp ops lập kế hoạch) ÷ thực tế.
   const pastErrors: { month: string; error: number }[] = [];
   const lastHist = core.hist.reduce((a, s) => (s.date > a ? s.date : a), "");
-  for (const p of core.levelMonths.slice(-3)) {
-    if (p.sessions < MIN_LEVEL_SESSIONS) continue;
-    // Tháng đang chạy dở (lịch sử dừng trước 3 ngày cuối tháng) chưa chấm được — GMV cả tháng chưa có.
-    const [py, pm] = p.month.split("-").map(Number);
-    if (lastHist < addDaysIso(new Date(Date.UTC(py, pm, 0)).toISOString().slice(0, 10), -2)) continue;
+  // 3 tháng ĐÃ HẾT gần nhất — tháng đang chạy dở chưa chấm được (GMV cả tháng chưa có), và trước 07/11 nó chiếm một trong 3 chỗ nên lập
+  // tháng sau giữa tháng chỉ còn 2 tháng để chấm.
+  for (const p of core.levelMonths.filter((x) => x.sessions >= MIN_LEVEL_SESSIONS && isCompleteMonth(x.month, lastHist)).slice(-3)) {
     const [y, m] = p.month.split("-").map(Number);
     const cut = new Date(Date.UTC(y, m - 2, 20)).toISOString().slice(0, 10);
     const prior = coreFit(history.filter((s) => s.date < cut), p.month, params);
@@ -164,13 +205,18 @@ export function buildMonthForecaster(history: LiveSession[], month: string, para
   const sameSign = recentErr.length >= 2 && (recentErr.every((e) => e.error > 0) || recentErr.every((e) => e.error < 0));
   // Bù NỬA phần lệch: lệch đo trên 2–3 tháng còn nhiễu, bù hết dễ quá tay khi xu hướng đảo chiều.
   const biasFactor = params.fcBiasCorrect && bias !== null && sameSign && Math.abs(bias) > 0.05 ? 1 / (1 + bias / 2) : 1;
+  const bandBase = core.big ? params.fcBandBig : params.fcBandSmall;
+  const own = bandFromPastErrors(pastErrors);
   return {
     month,
     model: core.model,
     level: core.level * biasFactor,
     levelMonths: core.levelMonths,
     levelRecent: core.levelRecent,
-    band: core.big ? params.fcBandBig : params.fcBandSmall,
+    band: own !== null && own > bandBase ? own : bandBase,
+    bandBase,
+    bandFromErrors: own !== null && own > bandBase,
+    slotBand: core.slotBand,
     big: core.big,
     dayHoursP90: core.dayHoursP90,
     pastErrors,
@@ -179,6 +225,23 @@ export function buildMonthForecaster(history: LiveSession[], month: string, para
     mostlyManual: core.mostlyManual,
     params
   };
+}
+
+/**
+ * Nửa dải theo sai số thật của chính kênh (07/11): p80 của |lệch lúc lập| ≥ 3 tháng gần nhất, trần 80%. Chỉ dùng để NỚI dải khi kênh sai
+ * nhiều hơn mức chung — đo 06/11: kênh lớn 9/12 tháng trong ±22% (đúng), kênh nhỏ chỉ 3/8 trong ±30% (p80 thật 45–49%), VERA TikTok
+ * T8–T10 lệch 6/23/57% ⇒ dải ±43%. Không thu hẹp dưới mức theo cỡ kênh: 3 tháng là quá ít để tin một kênh "đúng hơn" mức chung.
+ */
+export function bandFromPastErrors(pastErrors: readonly { error: number }[]): number | null {
+  const xs = pastErrors.slice(-3).map((e) => Math.abs(e.error)).sort((a, b) => a - b);
+  if (xs.length < 3) return null;
+  return Math.min(0.8, quantile(xs, 0.8));
+}
+
+/** Khoảng bình thường (tiền) của một ca có target `target` — null khi kênh chưa đủ ca để đo. */
+export function slotNormalRange(f: Pick<MonthForecaster, "slotBand"> | null | undefined, target: number): { lo: number; hi: number } | null {
+  if (!f?.slotBand || !(target > 0)) return null;
+  return { lo: target * f.slotBand.lo, hi: target * f.slotBand.hi };
 }
 
 /** Trọng số đã gồm hệ số giờ vượt vùng — tổng tỷ lệ với GMV kỳ vọng. */
@@ -214,6 +277,18 @@ export function planOutlook(f: MonthForecaster, slots: SlotLike[], bucketOf: Buc
   const sigma = half / Z80;
   const pHit = target > 0 && p50 > 0 ? (sigma > 0 ? 1 - normalCdf((target - p50) / sigma) : p50 >= target ? 1 : 0) : null;
   return { p50, lo: Math.max(0, p50 - half), hi: p50 + half, pHit, perSlot, excessHours, band: f.band };
+}
+
+/**
+ * Dự báo lúc lập nhân thêm Kịch bản brand (0201): P50, dải và từng ca × `factor`, khả năng đạt tính lại với CÙNG độ rộng tương đối.
+ * factor = 1 ⇒ trả nguyên `o`.
+ */
+export function scaleOutlook(o: PlanOutlook, factor: number, target: number): PlanOutlook {
+  if (!(factor > 0) || factor === 1) return o;
+  const p50 = o.p50 * factor;
+  const sigma = (o.band * p50) / Z80;
+  const pHit = target > 0 && p50 > 0 ? (sigma > 0 ? 1 - normalCdf((target - p50) / sigma) : p50 >= target ? 1 : 0) : null;
+  return { ...o, p50, lo: o.lo * factor, hi: o.hi * factor, perSlot: o.perSlot.map((v) => v * factor), pHit };
 }
 
 /**

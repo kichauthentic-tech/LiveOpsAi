@@ -38,6 +38,12 @@ interface Props {
   maxSlotsPerDay: number;
   blackoutDates: string[];
   outcomeOf: (d: PlanDraftSlot) => SlotOutcome | undefined;
+  /**
+   * Khoảng bình thường của ca (07/11): thực tế ÷ target trong [lo, hi] = dao động bình thường (p10–p90 lịch sử kênh). Ca đã có số chỉ tô
+   * đỏ khi DƯỚI khoảng, xanh khi TRÊN khoảng — trong khoảng để màu chữ thường; đạt/hụt thật đọc ở % ngày / tuần / đợt. null = kênh chưa
+   * đủ ca để đo ⇒ tô theo target như trước.
+   */
+  slotBand?: { lo: number; hi: number } | null;
   clashOf: (key: string) => string | undefined;
   labelOf: (day: string) => string | undefined;
   isStaffed: (d: PlanDraftSlot) => boolean;
@@ -59,6 +65,12 @@ const BUCKET_LABEL: Record<string, string> = { daily: "Daily", dday: "D-Day", mi
 const fmtH = (n: number) => n.toLocaleString("vi-VN", { maximumFractionDigits: 1 });
 /** "20:00" → "20", "20:30" → "20:30" — ca đa số tròn giờ, bỏ ":00" cho dòng ca vừa ô ngày. */
 const hm = (t: string) => (t.slice(3, 5) === "00" ? String(Number(t.slice(0, 2))) : t.slice(0, 5));
+type Verdict = "below" | "normal" | "above" | "hit" | "miss";
+/** Có khoảng bình thường: dưới / trong / trên khoảng. Chưa có (kênh ít ca): như cũ, đạt / dưới target. */
+const verdictOf = (actual: number, target: number, band: Props["slotBand"]): Verdict =>
+  band && target > 0 ? (actual < target * band.lo ? "below" : actual > target * band.hi ? "above" : "normal") : actual >= target ? "hit" : "miss";
+const VERDICT_TEXT: Record<Verdict, string> = { below: "text-rose-400", normal: "text-[var(--text)]", above: "text-emerald-400", hit: "text-emerald-400", miss: "text-rose-400" };
+const VERDICT_BORDER: Record<Verdict, string> = { below: "border-rose-800", normal: "border-[var(--border)]", above: "border-emerald-800", hit: "border-emerald-800", miss: "border-rose-800" };
 const pctTone = (p: number) => (p >= 1 ? "text-emerald-400" : p >= 0.85 ? "text-amber-400" : "text-rose-400");
 
 export function PlanMonthGrid(p: Props) {
@@ -170,10 +182,11 @@ function SlotChip({ d, p, active, onEdit }: { d: PlanDraftSlot; p: Props; active
   let border = "border-[var(--border)]";
   let title = `${d.startTime}–${d.endTime} · target ${fmtVndShort(d.targetGmv)}`;
   if (o?.state === "done") {
-    const ok = o.actual >= d.targetGmv;
-    right = <b className={ok ? "text-emerald-400" : "text-rose-400"}>{fmtVndShort(o.actual)}</b>;
-    border = ok ? "border-emerald-800" : "border-rose-800";
+    const v = verdictOf(o.actual, d.targetGmv, p.slotBand);
+    right = <b className={VERDICT_TEXT[v]}>{fmtVndShort(o.actual)}</b>;
+    border = VERDICT_BORDER[v];
     title += ` → thực đạt ${fmtVndShort(o.actual)}${d.targetGmv > 0 ? ` (${Math.round((o.actual / d.targetGmv) * 100)}%)` : ""}`;
+    if (p.slotBand && d.targetGmv > 0) title += ` · khoảng bình thường ${fmtVndShort(d.targetGmv * p.slotBand.lo)}–${fmtVndShort(d.targetGmv * p.slotBand.hi)}${v === "below" ? " — DƯỚI khoảng, đáng xem lại" : v === "above" ? " — trên khoảng" : ""}`;
   } else if (o?.state === "cancelled") {
     right = <span className="text-[var(--text-faint)]">huỷ</span>;
     title += " · ca đã huỷ — vẫn giữ target trong run-rate";
@@ -338,7 +351,12 @@ const SlotEditor = ({ d, x, y, p, onClose, ref }: { d: PlanDraftSlot; x: number;
           {d.expectedGmv !== undefined ? ` · dự báo ${fmtVndShort(d.expectedGmv)}` : ""}
         </span>
       </label>
-      {o?.state === "done" && <p className="text-[var(--text-muted)]">Thực đạt <b className={o.actual >= d.targetGmv ? "text-emerald-400" : "text-rose-400"}>{fmtVndShort(o.actual)}</b>{d.targetGmv > 0 ? ` · ${Math.round((o.actual / d.targetGmv) * 100)}% target` : ""}</p>}
+      {o?.state === "done" && <p className="text-[var(--text-muted)]">Thực đạt <b className={VERDICT_TEXT[verdictOf(o.actual, d.targetGmv, p.slotBand)]}>{fmtVndShort(o.actual)}</b>{d.targetGmv > 0 ? ` · ${Math.round((o.actual / d.targetGmv) * 100)}% target` : ""}</p>}
+      {p.slotBand && d.targetGmv > 0 && (
+        <p className="text-2xs text-[var(--text-faint)] tabular-nums">
+          Khoảng bình thường {fmtVndShort(d.targetGmv * p.slotBand.lo)}–{fmtVndShort(d.targetGmv * p.slotBand.hi)} (8/10 ca của kênh rơi trong khoảng này) — ca lẻ trong khoảng là may rủi; đạt/hụt xem theo ngày, tuần, đợt.
+        </p>
+      )}
       {targetReason && <p className="text-2xs text-[var(--text-faint)]">{targetReason}</p>}
       {moveStaffed && <p className="text-2xs text-[var(--text-faint)]">Ca đã chốt người: đổi giờ sẽ dời cả ca thật, host/trợ giữ nguyên.</p>}
       {tLocked && <p className="text-2xs text-[var(--text-faint)]">{p.isStaffed(d) ? "Đã chốt người: huỷ ca ở Cửa sổ Ca Live." : "Ca ngày đã qua giữ nguyên giờ như lúc chốt."}</p>}

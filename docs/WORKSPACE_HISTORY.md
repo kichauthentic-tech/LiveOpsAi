@@ -6660,3 +6660,32 @@ Chưa commit, không migration. Số thuần ở `src/lib/report/reportVisuals.t
 - UI: `report/NextMonthPanels.tsx` (`LiveRequirementCell`, `BookingSummaryPanel` có trạng thái "chưa có kế hoạch Booking", `RefundTrackPanel`); `ActionPlan.tsx` thêm cột Deadline + PIC chính; `MonthlyReportTabs.tsx` nối dây (bảng Target Live + Booking ra ngoài `SectionDetail`; `nmvChoice` dùng tỷ lệ chốt ops nhập qua `applyFinalRate`).
 - Verify: tsc sạch, vitest 1111 pass; app thật CROCS T9 (tháng sau T10 có kế hoạch) và T10 (tháng sau T11 trống → trạng thái rỗng), không tràn ngang ở 1360/1024/375.
 - Chưa làm/chưa kiểm: ghi thử Deadline/PIC và Refund rate chốt vào DB thật (bị chặn, chỉ test hàm mã hoá); file xuất HTML chưa tải thử; cột "Mẫu file" hiện "chưa rõ" ở snapshot hiện tại (shopDays chưa mang template → cần bấm "Cập nhật số liệu"); ô sửa việc/Deadline chỉ lưu khi bấm "Lưu action plan".
+
+## Nghiên cứu độ chính xác dự báo tháng + ca (2026-11-06, đề xuất — CHƯA làm code)
+
+User: "nghiên cứu + đề xuất phương án xây dựng module kế hoạch tháng, dự báo target từng ca + tháng chính xác nhất có thể". Trang đề xuất:
+https://claude.ai/artifact/PBSannSs6WyaW5wyudi7a9. Script đo ở `scratchpad/fc/` (untracked; `dump.ts` kéo DB → `data.json`, `b_level.ts`,
+`c_agg.ts`, `d_ledger.ts`; chạy `npx tsx --env-file=.env scratchpad/fc/<file>.ts`).
+
+**Số đo (walk-forward, T7–T10, 6 kênh, 20–21 tháng-kênh, lịch = ca đã live thật):**
+- Tổng tháng lúc lập (cắt ngày 20 tháng trước): v3 22,6% (bias +10%, quá cao 4 tháng liền vì mức các kênh giảm T8→T10); bộ xếp ca
+  (sau sửa 06/11) 21,1%; TB 2 mô hình 22,4%; 3 tháng 22,5%; 28 ngày 23,3%; tháng trước 24,3%; 14 ngày 25,1%; xu hướng tắt dần 30,5%.
+  Cắt cuối tháng: v3 22,6%, xếp ca 20,3%, 14 ngày 20,0% ⇒ không cách nào hơn rõ. Bộ xếp ca thắng v3 11–12/18 nhưng vừa chỉnh trên T8–T10.
+- Thực tế ÷ mức đoán: 0,59–1,96, chỉ 6/20 trong ±10%. Toàn shop CROCS (shop_analytics, phần ngoài live) lên xuống cùng nhịp ⇒ nhu cầu brand.
+- Chỉ số toàn shop (GMV ngoài live 28 ngày ÷ 3 tháng) và Ads CROCS (brand_ads_daily: T8 chi 165M GMV/h cao nhất; T9–T10 337–342M GMV/h
+  thấp) không báo trước mức. Tính ca bán 0 có view vào lịch sử: 22,6 → 22,1%.
+- Trong tháng (backtest v3): kênh lớn lúc lập 19% → ngày 8 11% → ngày 15 5,5% → ngày 20 3,8%; kênh nhỏ 29/28/13/9%. Sổ dự báo thật T10
+  khớp (CROCS +10% 10/10 → +2% 14/10 → +4% cuối tháng).
+- Cấp gộp (WAPE, T8–T10): lúc lập ca 33% · ngày 27% · tuần 21% · tháng 18%; nếu biết đúng tổng tháng ca 29% · ngày 22% · tuần 12%.
+  Sàn nhiễu đơn hàng một ca ~16% (trung vị 20 đơn/ca, giả định CV giá trị đơn 0,8).
+- Dải 80%: kênh lớn 9/12 trong ±22% (q80 thật 23%) — ổn; kênh nhỏ 3/8 trong ±30% (q80 thật 45–49%) — hẹp.
+- Target brand T10 / thực tế: CROCS 95%, VERA Shopee 82%, JOCKEY 79%, Franklin TikTok 61%, VERA TikTok 53% (5/5 hụt).
+- Lỗ dữ liệu: JOCKEY T10 cuối tháng vẫn +19% vì 6 ca Completed nhập tay 0 view/0 đơn (từ 20/10) bị coi là "chưa về"; Franklin Shopee 17/35
+  ca bán 0 (có view) bị `validHistory` bỏ khỏi lịch sử.
+- Hệ số D-Day so Daily dao động theo tháng: CROCS 1,10–1,49, VERA Shopee 3,7–6,0.
+
+**Đề xuất (chờ user chốt 4 điểm):** mục tiêu chính xác theo mốc (lúc lập ±20% kênh lớn, sau ngày 15 ±6%); dải theo sai số thật của sổ
+dự báo, kênh nhỏ ±45%; "Kịch bản brand" = dòng điều chỉnh có lý do khi họp (Ads, voucher, SP mới, campaign sàn, mùa vụ Q4 — Metric: Q4/2025
++19% so Q3), chấm FVA sau tháng; target ca kèm dải p10–p90, đạt/hụt chấm theo ngày/tuần/đợt; ghi cả v3 + bộ xếp ca vào sổ, đổi mô hình khi
+hơn ≥ 2 điểm ngoài mẫu (T11–T12); ca xong > 2 ngày chưa số vào "Cần xử lý" (bán 0 / chưa nhập). Nguồn: Fildes et al. 2009 (IJF 25(1)):
+điều chỉnh tay lớn + có lý do giúp, điều chỉnh tăng hay sai chiều.

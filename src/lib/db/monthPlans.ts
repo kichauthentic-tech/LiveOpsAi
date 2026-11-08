@@ -6,9 +6,10 @@ import { LockedPlanRow, LockedPlanTargets, lockedPlanTargetsFromRows } from "../
 import { RetargetAuditRow, RetargetBatch, summarizeRetargetBatches } from "../scheduling/retarget";
 import type { RebaseItem } from "../scheduling/rebase";
 import type { BoostFillItem } from "../scheduling/boost";
-import { BoostSlot, BrandMonthPlan, BrandMonthPlanSlot, CalendarEventRow, PlanCampRanges, PlanGroupTargets } from "../../types";
+import { BoostSlot, BrandMonthPlan, BrandMonthPlanSlot, CalendarEventRow, PlanCampRanges, PlanGroupTargets, ScenarioLine } from "../../types";
 import { platformOf, brandPlatformKey, type ReportPlatform } from "../reportPlatform";
 import { cleanReserve } from "../scheduling/reservePlan";
+import { cleanScenario } from "../scheduling/brandScenario";
 
 // Kế Hoạch Tháng (0090). Bảng nhỏ (1 dòng plan + ≤ ~100 ca/brand/tháng) — đọc theo brand+tháng,
 // ghi ca kế hoạch bằng cách thay cả lô (xoá dòng không còn, upsert dòng còn) để UI lưới không phải
@@ -33,6 +34,8 @@ interface DbPlan {
   group_targets?: PlanGroupTargets | null;
   /** 0194 — DB chưa chạy 0194 thì không có cột. */
   reserve_slots?: unknown;
+  /** 0201 — DB chưa chạy 0201 thì không có cột ⇒ brandScenario undefined (ô Kịch bản brand báo chưa chạy migration). */
+  brand_scenario?: unknown;
   shop_target_gmv: number | null;
   ads_budget: number | null;
   locked_at: string | null;
@@ -85,6 +88,7 @@ const planFromDb = (r: DbPlan): BrandMonthPlan => ({
   campRanges: r.camp_ranges ?? {},
   groupTargets: cleanGroupTargets(r.group_targets),
   reserveSlots: cleanReserve(r.reserve_slots),
+  brandScenario: "brand_scenario" in r ? cleanScenario(r.brand_scenario) : undefined,
   shopTargetGmv: Number(r.shop_target_gmv ?? 0),
   adsBudget: Number(r.ads_budget ?? 0),
   lockedAt: r.locked_at ?? undefined,
@@ -515,4 +519,16 @@ export async function fetchPlanCoverage(month: string): Promise<PlanCoverage> {
     }
   }
   return { slotsByPlan, boostByPlan };
+}
+
+/** Ghi Kịch bản brand của một kế hoạch (0201) — ghi thẳng cột, RLS ceo/operations/trainer/admin như mọi cột kế hoạch. Không đổi gì khác
+ *  của kế hoạch (không rớt xác nhận của brand: trigger 0110 không theo dõi cột này). */
+export async function saveBrandScenario(planId: string, lines: ScenarioLine[]): Promise<ScenarioLine[]> {
+  const clean = cleanScenario(lines);
+  const { error } = await supabase.from("brand_month_plans").update({ brand_scenario: clean }).eq("id", planId);
+  if (error) {
+    if (error.code === "42703" || error.code === "PGRST204") throw new Error("DB chưa chạy migration 0201 (Kịch bản brand).");
+    throw error;
+  }
+  return clean;
 }

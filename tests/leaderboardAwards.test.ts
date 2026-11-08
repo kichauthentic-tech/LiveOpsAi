@@ -77,6 +77,27 @@ describe("campaignTargetBoard", () => {
     expect(mid.withTarget).toBe(1);
   });
 
+  test("chấm cả đợt (07/11): Σ GMV ÷ Σ target ≥ 100% ⇒ mọi ca có target của đợt Mức 1, kể cả ca tự hụt", () => {
+    const xs = [ses({ date: "2026-11-10", actualGmv: 8e6 }), ses({ date: "2026-11-11", actualGmv: 13e6 })];
+    const ev = A.campaignTargetBoard(xs, ACC, MONTH, undefined, "event");
+    const dday = ev.events.find((e) => e.type === "dday")!;
+    expect(dday.ratio).toBeCloseTo(1.05);
+    expect(dday.final).toBe(true);
+    expect(dday.tier).toBe(1);
+    // h1 đứng cả 2 ca, mỗi ca 1 suất (Mức 1) ⇒ 2; chấm từng ca thì chỉ ca 13M (Mức 2) ⇒ 2 suất từ 1 ca.
+    expect(ev.payouts.find((p) => p.talentId === "h1" && p.role === "host")!.tier1).toBe(2);
+    const sh = A.campaignTargetBoard(xs, ACC, MONTH, undefined, "shift");
+    expect(sh.payouts.find((p) => p.talentId === "h1" && p.role === "host")!.tier2).toBe(1);
+  });
+
+  test("chấm cả đợt: đợt còn ca sắp live ⇒ chưa chốt mức, chưa có suất", () => {
+    const xs = [ses({ date: "2026-11-10", actualGmv: 15e6 }), ses({ date: "2026-11-11", status: "Upcoming" })];
+    const b = A.campaignTargetBoard(xs, ACC, MONTH, undefined, "event");
+    expect(b.events[0].final).toBe(false);
+    expect(b.events[0].tier).toBeNull();
+    expect(b.payouts).toHaveLength(0);
+  });
+
   test("ca account khác không lẫn vào", () => {
     const board = A.campaignTargetBoard([ses({ platform: "Shopee", actualGmv: 20e6 })], ACC, MONTH);
     expect(board.events).toHaveLength(0);

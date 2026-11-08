@@ -582,6 +582,17 @@ export async function setSessionActuals(sessionId: string, v: { gmv: number; liv
   return fetchSessionById(sessionId);
 }
 
+/** Ops xác nhận ca đã qua giờ "có live, bán 0" (0201): giờ live = giờ kế hoạch, GMV/đơn = 0 ⇒ ca có bằng chứng diễn ra, vào run-rate và
+ *  lịch sử dự báo như kết quả thật. DB chỉ nhận ca Completed chưa có số nào (không file, không giờ live, không lượt xem). */
+export async function confirmZeroSales(sessionId: string): Promise<LiveSession> {
+  const { error } = await supabase.rpc("confirm_zero_sales", { p_session_id: sessionId });
+  if (error) {
+    if (error.code === "PGRST202" || error.code === "42883") throw new Error("DB chưa chạy migration 0201 (xác nhận ca bán 0).");
+    throw error;
+  }
+  return fetchSessionById(sessionId);
+}
+
 // Dùng sau khi gọi RPC submit_session_handover (src/lib/db/handovers.ts) — RPC đó chỉ
 // trả về row live_sessions thô, cần assemble lại đầy đủ (kèm .report) trước khi cập nhật state.
 export async function fetchSessionById(id: string): Promise<LiveSession> {

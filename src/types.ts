@@ -752,10 +752,23 @@ export interface BrandMonthPlan {
   adsBudget: number;
   /** Ca dự phòng (0194) — nhóm ca "sẵn sàng" ngoài lưới chính, mở dần ở các mốc kiểm nếu dự báo hụt target. Không cộng vào target tháng. */
   reserveSlots?: ReserveSlot[];
+  /** Kịch bản brand (0201) — dòng điều chỉnh CEO ghi sau họp monthly; dự báo cuối = engine × Π(1 + pct). Thiếu = DB chưa chạy 0201. */
+  brandScenario?: ScenarioLine[];
   lockedAt?: string;
   /** Brand đã bấm "xác nhận đã xem lịch" (migration 0110). Tự rớt về undefined nếu ops sửa tham số
    *  kế hoạch hoặc ca kế hoạch SAU khi brand đã xác nhận — xem trigger ở migration, đừng set tay. */
   brandConfirmedAt?: string;
+}
+
+/** Một dòng Kịch bản brand (0201) — logic ở lib/scheduling/brandScenario.ts. */
+export interface ScenarioLine {
+  id: string;
+  label: string;
+  /** Tỷ lệ: +0.06 = +6%, giới hạn ±50%. */
+  pct: number;
+  reason: string;
+  /** ISO lúc ghi. */
+  at: string;
 }
 
 /** Một ca dự phòng của Kế Hoạch Tháng (0194). `expectedGmv` = dự báo engine lúc lập, chỉ để xếp ưu tiên khi chọn ca mở. */

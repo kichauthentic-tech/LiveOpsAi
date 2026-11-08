@@ -21,6 +21,7 @@ import {
   type CampaignEvent,
   type ShiftPerson,
   type TargetPayout,
+  type TargetScoring,
   type TargetShift
 } from "../lib/leaderboard/awards";
 
@@ -224,6 +225,12 @@ function mergeEvents(list: CampaignEvent[][]): CampaignEvent[] {
       o.tier2 += e.tier2;
       o.noTarget += e.noTarget;
       o.upcoming += e.upcoming;
+      o.actual += e.actual;
+      o.targetDone += e.targetDone;
+      o.final = o.final && e.final;
+      // Gộp nhiều account: % đợt là tổng chung, MỨC xét riêng từng account (suất đã tính ở từng account) ⇒ không hiện mức chung.
+      o.ratio = o.targetDone > 0 ? o.actual / o.targetDone : null;
+      o.tier = null;
     }
   const order = (x: TargetShift) => (x.live ? 0 : x.upcoming ? 2 : 1);
   return [...by.values()]
@@ -246,7 +253,7 @@ function mergePayouts(list: TargetPayout[][]): TargetPayout[] {
   return [...by.values()].sort((a, b) => b.units - a.units || a.name.localeCompare(b.name, "vi"));
 }
 
-const CampaignView: React.FC<{ events: CampaignEvent[]; payouts: TargetPayout[]; showAccount: boolean; today: string }> = ({ events, payouts, showAccount, today }) => {
+const CampaignView: React.FC<{ events: CampaignEvent[]; payouts: TargetPayout[]; showAccount: boolean; today: string; scoring: TargetScoring; onScoring: (s: TargetScoring) => void }> = ({ events, payouts, showAccount, today, scoring, onScoring }) => {
   const defaultPick = useMemo(() => {
     const now = events.find((e) => eventState(e, today) === "now") ?? events.find((e) => eventState(e, today) === "soon") ?? events[events.length - 1];
     return now?.type ?? null;
@@ -261,6 +268,24 @@ const CampaignView: React.FC<{ events: CampaignEvent[]; payouts: TargetPayout[];
 
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <span className="text-[var(--text-faint)]">Chấm giải:</span>
+        <div className="flex gap-1 rounded-xl border border-[var(--border)] p-1" role="group" aria-label="Cách chấm giải Ca đạt target">
+          {(
+            [
+              ["event", "Cả đợt"],
+              ["shift", "Từng ca"]
+            ] as const
+          ).map(([k, l]) => (
+            <button key={k} type="button" aria-pressed={scoring === k} onClick={() => onScoring(k)} className={`${seg(scoring === k)} px-3 min-h-[28px]`}>
+              {l}
+            </button>
+          ))}
+        </div>
+        <span className="text-2xs text-[var(--text-faint)]">
+          {scoring === "event" ? "Cả đợt đạt ≥ 100% target ⇒ mọi ca có target của đợt Mức 1, ≥ 120% ⇒ Mức 2. Một ca chỉ ~20 đơn nên ca lẻ đạt/hụt phần lớn là may rủi." : "Từng ca tự đạt ≥ 100% / ≥ 120% target ca."}
+        </span>
+      </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {events.map((e) => {
           const st = eventState(e, today);
@@ -286,12 +311,23 @@ const CampaignView: React.FC<{ events: CampaignEvent[]; payouts: TargetPayout[];
                 {fmtDateVn(e.from, false)}
                 {e.to !== e.from ? ` – ${fmtDateVn(e.to, false)}` : ""}
               </p>
-              <p className="mt-2 text-2xl font-black tabular-nums text-[var(--text)] leading-none">
-                {e.hit}
-                <span className="text-sm font-bold text-[var(--text-faint)]"> / {e.withTarget} ca đạt</span>
-              </p>
+              {scoring === "event" ? (
+                <p className="mt-2 text-2xl font-black tabular-nums leading-none">
+                  <span className={e.ratio === null ? "text-[var(--text-faint)]" : e.ratio >= 1.2 ? "text-[var(--accent)]" : e.ratio >= 1 ? "text-emerald-400" : "text-[var(--text)]"}>{e.ratio === null ? "—" : `${Math.round(e.ratio * 100)}%`}</span>
+                  <span className="text-sm font-bold text-[var(--text-faint)]"> target cả đợt</span>
+                </p>
+              ) : (
+                <p className="mt-2 text-2xl font-black tabular-nums text-[var(--text)] leading-none">
+                  {e.hit}
+                  <span className="text-sm font-bold text-[var(--text-faint)]"> / {e.withTarget} ca đạt</span>
+                </p>
+              )}
               <p className="text-2xs text-[var(--text-muted)] mt-1">
-                Mức 2: <b className="text-[var(--accent)]">{e.tier2}</b>
+                {scoring === "event" ? (
+                  <>{e.tier ? <b className="text-[var(--accent)]">Mức {e.tier}</b> : e.final ? "chưa đạt" : "chưa xong đợt"} · {e.hit}/{e.withTarget} ca tự đạt</>
+                ) : (
+                  <>Mức 2: <b className="text-[var(--accent)]">{e.tier2}</b></>
+                )}
                 {e.upcoming > 0 && <> · {e.upcoming} ca sắp live</>}
                 {e.noTarget > 0 && <> · {e.noTarget} ca không có target</>}
               </p>
@@ -310,9 +346,9 @@ const CampaignView: React.FC<{ events: CampaignEvent[]; payouts: TargetPayout[];
 
       <section className={`${CARD} p-4 sm:p-5`}>
         <h3 className="text-xs font-bold text-[var(--text)]">Suất thưởng Ca đạt target trong tháng</h3>
-        <p className="text-2xs text-[var(--text-faint)] mt-0.5">Mức 1 = 1 suất, Mức 2 = 2 suất, nhân phần phút người đó có mặt trong ca. Chỉ tính ca đã xong.</p>
+        <p className="text-2xs text-[var(--text-faint)] mt-0.5">Mức 1 = 1 suất, Mức 2 = 2 suất, nhân phần phút người đó có mặt trong ca. {scoring === "event" ? "Chỉ tính đợt đã xong hết ca." : "Chỉ tính ca đã xong."}</p>
         {payouts.length === 0 ? (
-          <p className="text-xs text-[var(--text-muted)] mt-3">Chưa có ca Campaign nào đạt target.</p>
+          <p className="text-xs text-[var(--text-muted)] mt-3">{scoring === "event" ? "Chưa có đợt Campaign nào xong mà đạt target." : "Chưa có ca Campaign nào đạt target."}</p>
         ) : (
           <div className="mt-3 overflow-x-auto">
             <table className="w-full text-xs">
@@ -483,6 +519,7 @@ export const Leaderboard: React.FC<{ sessions: LiveSession[] }> = ({ sessions })
   const thisMonth = getTodayMonth();
   const [month, setMonth] = useState(thisMonth);
   const [view, setView] = useState<View>("campaign");
+  const [scoring, setScoring] = useState<TargetScoring>("event");
   const [plans, setPlans] = useState<Map<string, BrandMonthPlan>>(new Map());
   useEffect(() => {
     let alive = true;
@@ -508,9 +545,9 @@ export const Leaderboard: React.FC<{ sessions: LiveSession[] }> = ({ sessions })
 
   const campaign = useMemo(() => {
     const list = account ? [account] : accounts;
-    const boards = list.map((a) => campaignTargetBoard(sessions, a, month, effectiveCamp(plans.get(brandPlatformKey(a.brandId, a.platform))?.campRanges)));
+    const boards = list.map((a) => campaignTargetBoard(sessions, a, month, effectiveCamp(plans.get(brandPlatformKey(a.brandId, a.platform))?.campRanges), scoring));
     return { events: mergeEvents(boards.map((b) => b.events)), payouts: mergePayouts(boards.map((b) => b.payouts)) };
-  }, [sessions, month, plans, account, accounts]);
+  }, [sessions, month, plans, account, accounts, scoring]);
 
   const monthly = useMemo(() => {
     if (!monthAccount) return null;
@@ -580,7 +617,7 @@ export const Leaderboard: React.FC<{ sessions: LiveSession[] }> = ({ sessions })
       {accounts.length === 0 ? (
         <p className={`${CARD} p-5 text-xs text-[var(--text-muted)]`}>Tháng {fmtMonth(month)} chưa có ca nào.</p>
       ) : view === "campaign" ? (
-        <CampaignView key={`${month}${pick}`} events={campaign.events} payouts={campaign.payouts} showAccount={!account} today={today} />
+        <CampaignView key={`${month}${pick}`} events={campaign.events} payouts={campaign.payouts} showAccount={!account} today={today} scoring={scoring} onScoring={setScoring} />
       ) : (
         monthly && (
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">

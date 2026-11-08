@@ -6,6 +6,8 @@ import { Brand, LiveSession, ShiftRegistration, ShiftSlot, Studio, Talent, UserR
 import { getTodayDate } from "../lib/dateUtils";
 import { fmtVndShort } from "../lib/format";
 import { isUnconfirmedPast } from "../lib/sessionStatus";
+import { confirmZeroSales } from "../lib/db/sessions";
+import { useConfirm } from "../hooks/useConfirm";
 import { BrandLogo } from "./ui/BrandLogo";
 import { PlatformChip } from "./common/PlatformChip";
 import { sumGmvByPlatform } from "../lib/platforms/perf";
@@ -154,7 +156,9 @@ const SessionRow: React.FC<{
   open: boolean;
   onOpen: (id: string) => void;
   onToggle?: () => void;
-}> = ({ s, brand, today, clashWith, unackNames, expected, showExpected, open, onOpen, onToggle }) => {
+  /** Ops xác nhận ca chưa có số là "có live, bán 0" (0201). Thiếu = không hiện nút. */
+  onZeroSales?: (s: LiveSession) => void;
+}> = ({ s, brand, today, clashWith, unackNames, expected, showExpected, open, onOpen, onToggle, onZeroSales }) => {
   const upcoming = isUpcoming(s, today);
   const noNumbers = isUnconfirmedPast(s);
   const noRoom = !s.studioId && s.status !== "Cancelled" && s.date >= today;
@@ -174,6 +178,17 @@ const SessionRow: React.FC<{
       <span className="order-5 md:order-none ml-auto md:ml-0 flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-2xs font-bold">
         {clashWith && <span className="px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-300" title="Người này có ca khác cùng giờ">trùng người: {clashWith.join(", ")}</span>}
         {noNumbers && <span className="px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-300">chưa có số liệu</span>}
+        {noNumbers && onZeroSales && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onZeroSales(s); }}
+            onKeyDown={(e) => e.stopPropagation()}
+            className="px-2 py-0.5 rounded border border-[var(--border)] text-[var(--text)] hover:border-[var(--accent)] min-h-[24px]"
+            title="Ca có live nhưng không bán được đơn nào: ghi GMV 0, giờ live = giờ kế hoạch. Có file số liệu thì mở ca → Giao ca thay vì bấm nút này."
+          >
+            Bán 0
+          </button>
+        )}
         {noRoom && <span className="text-amber-300">chưa có phòng</span>}
         {unackNames && <span className="text-amber-300" title={unackNames}>chưa nhận lịch: {unackNames}</span>}
       </span>
@@ -328,6 +343,20 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
 }) => {
   const today = getTodayDate();
   const isOps = OPS_ROLES.includes(currentRole);
+  const confirm = useConfirm();
+  const [zeroMsg, setZeroMsg] = useState<string | null>(null);
+  // "Bán 0" (07/11, đề xuất dự báo): ca qua giờ không có số mà ops biết là có live, không đơn nào. Trước đó ca nằm mãi ở "chưa có số" và
+  // dự báo vẫn chiếu doanh số cho nó (JOCKEY T10: 6 ca ⇒ dự báo cuối tháng cao hơn thực tế 19%).
+  const zeroSales = async (s: LiveSession) => {
+    if (!(await confirm(`Xác nhận ca ${s.brandName} ${s.startTime}–${s.endTime} ngày ${s.date.slice(8)}/${s.date.slice(5, 7)} CÓ live nhưng bán 0 đồng?\n\nGMV ghi 0, giờ live = giờ kế hoạch. Ca có file số liệu thì bấm Huỷ rồi mở ca → Giao ca. Ca không diễn ra thì huỷ ca.`))) return;
+    try {
+      const fresh = await confirmZeroSales(s.id);
+      onSessionsUpdated(sessions.map((x) => (x.id === s.id ? fresh : x)));
+      setZeroMsg(`Đã ghi ca ${s.startTime}–${s.endTime} ${s.date.slice(8)}/${s.date.slice(5, 7)} bán 0.`);
+    } catch (e) {
+      setZeroMsg(`Không ghi được: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
   const [rangeState, setRange] = useState<Range>("today");
   const [filter, setFilter] = useState<Filter | null>(null);
   // Hết nháp khi đang ở bộ lọc Ca nháp ⇒ về hôm nay (nút lọc biến mất cùng lúc).
@@ -600,6 +629,12 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
               )}
               {/* Tóm tắt một hàng ô không khung (thay 4 ô "Ca trong ngày / Chưa có người / Chưa giao ca / GMV" — 3 ô kia nay nằm ở khối Cần xử lý
                   và nhãn trên dòng ca). Không có ca thì không bày ô 0. */}
+              {zeroMsg && (
+                <p role="status" className="px-2 sm:px-3 text-xs text-[var(--text-muted)] flex items-center gap-2">
+                  {zeroMsg}
+                  <button type="button" onClick={() => setZeroMsg(null)} aria-label="Đóng thông báo" className="p-1 text-[var(--text-faint)] hover:text-[var(--text)]"><X className="w-4 h-4" /></button>
+                </p>
+              )}
               {summary.total > 0 && range !== "drafts" && (
                 <div className="flex flex-wrap gap-x-8 gap-y-2 px-2 sm:px-3 pt-1">
                   <StatTile frame="plain" size="sm" label={range === "backlog" ? "Ca chưa có số liệu" : range === "today" ? "Ca hôm nay" : "Ca"} value={String(summary.total)} />
@@ -631,6 +666,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
                             open={open}
                             onOpen={setOpenId}
                             onToggle={toggle(id)}
+                            onZeroSales={isOps || currentRole === "trainer" ? zeroSales : undefined}
                           />
                         ) : (
                           <SlotRow r={r} brand={r.slot.brandId ? brandById.get(r.slot.brandId) : undefined} expected={expectedOf?.(id)} showExpected={showExpected} open={open} onOpen={setOpenSlotId} onToggle={toggle(id)} />

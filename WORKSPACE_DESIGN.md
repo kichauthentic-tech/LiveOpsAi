@@ -13,6 +13,30 @@
 
 ## 1. Giai đoạn hiện tại (cập nhật 2026-10-31; mục KH Tháng bản gọn 27/10)
 
+- **08/11: APP TALENT — LỊCH THÁNG, HỒ SƠ, CÀI ĐẶT, CA ĐANG MỞ (UI-only, KHÔNG migration)** — user: "Ca của tôi" thêm chế độ **Cả tháng** (`talent/TalentMonthCalendar.tsx`: lưới T2–CN, chip theo màu brand, giờ gọn "20h" ở điện thoại). Tab **Tôi** (`MyTalentProfile.tsx`) dựng lại: 4 ô tổng quan (thu nhập, giờ, ca, so nhóm) → Bảng công dạng bảng có dòng tổng → hiệu suất / từ trước tới nay; mọi form sửa (lịch điện thoại, SĐT/ngày sinh/ảnh, email, đổi mật khẩu) tách sang tab ẩn **`talent_settings`** (`TalentSettings.tsx`, route `cai-dat`, trong `TABS_WITHOUT_NAV_ITEM`, vào bằng nút "Cài đặt" ở tab Tôi). Tab "Lịch agency" (`talent_calendar`) **đã gỡ** khỏi menu/thanh tab talent + xoá `TalentAgency.tsx` (id + nhãn giữ để "Lượt Mở Tab" đọc lượt cũ). **Ca đang mở / đã đăng ký** (`TalentShiftSignup.tsx`): giữ danh sách, mỗi ngày là một khối có khung + thanh tiêu đề một dòng, "Bạn đã có" xuống chân khối, lưới cùng hàng cao bằng nhau; lọc brand = nút logo + màu brand (chỉ brand có ca mở trong tháng). Đã đề xuất (demo artifact 832GZqSK3Hw9XSv98Cq1TG) lịch tháng + panel ngày cho Ca đang mở — user chọn GIỮ danh sách. Quy ước: tiền hiển thị không đơn vị (test `uiReadability`); form tài khoản talent nằm ở `TalentSettings`, không quay lại tab Tôi. Verify: tsc, vitest (3 test đỏ có sẵn ngoài phạm vi: PlanMonthGrid chữ <11px, PnlStatementView, bundleSplit recharts), trình duyệt dev 375px.
+- **07/11: REVIEW FUJIWA TUẦN ĐẦU + KẾ HOẠCH 8–14/11 (phân tích, KHÔNG code, không ghi DB)** — trang https://claude.ai/artifact/V5zFTVhqnyFCYgL2nc6qyz. 12 ca 1–6/11: 18,6M, 0,60M/giờ (brand tự live T10 0,30M), 25% target cùng kỳ; nghẽn ERR 3,5% (tự live 7,7%) + CTOR 4,5% (7,2%); impressions ca tối tụt 33K → 6K từ 2/11 (nghi Ads, app chưa có số Ads FUJIWA); cam kết 450M = 7× tháng live tốt nhất shop; kế hoạch T11 chưa khai báo khung Campaign. Script `scratchpad/fj/`.
+- **07/11: DỰ BÁO THÁNG + CA — 5 THAY ĐỔI (code xong, CHƯA commit; migration `0201` CHƯA chạy trên production)** — từ nghiên cứu 06/11
+  (https://claude.ai/artifact/PBSannSs6WyaW5wyudi7a9, số đo ở lịch sử "Nghiên cứu độ chính xác dự báo tháng + ca"): lúc lập không công thức
+  nào dưới ~20% ⇒ đổi CÁCH DÙNG con số, không đổi công thức. User "làm cả 5" (mặc định theo đề xuất: chấm giải theo đợt, CEO nhập kịch bản,
+  chờ T11–T12 mới đổi mô hình). (1) **Khoảng bình thường của ca**: `MonthForecaster.slotBand` = p10–p90 của GMV ca ÷ kỳ vọng khi biết đúng tổng
+  tháng (3 tháng gần nhất, ≥ 30 ca; CROCS 0,57–1,39); `slotNormalRange`; lưới Kế Hoạch Tháng tô ca đỏ chỉ khi DƯỚI khoảng, xanh khi TRÊN,
+  trong khoảng chữ thường (`PlanMonthGrid` `slotBand`, `verdictOf`) + dòng "Theo đợt tới nay" (run-rate từng loại ngày). CROCS 1–5/11: cách cũ
+  12/14 ca đỏ, cách mới 4 ca. Leader Board "Ca đạt target" thêm `TargetScoring` "event" (MẶC ĐỊNH, chấm cả đợt Σ GMV ÷ Σ target ≥ 100/120%,
+  chỉ khi đợt xong hết ca) / "shift" (cách 06/11) — nút "Chấm giải: Cả đợt | Từng ca". (2) **Kịch bản brand**: `brand_month_plans.brand_scenario`
+  (0201), `lib/scheduling/brandScenario.ts` (`scenarioFactor`, `scenarioLineError` — lý do bắt buộc, ±50%/dòng; `scoreScenario` chấm từng dòng),
+  `monthplan/BrandScenarioPanel.tsx` (ceo/admin sửa; tháng đã hết thì chấm "giúp/hại N điểm"); Kế Hoạch Tháng `engineOutlook` (v3) →
+  `gridOutlook = scaleOutlook(engine, factor)` nên ô Dự báo, Nhận target, cảnh báo thiếu target đều dùng số đã nhân kịch bản. (3) **Dải**:
+  `fcBandSmall` 0,30 → 0,45; `bandFromPastErrors` nới dải theo p80 |lệch| 3 tháng của kênh (chỉ nới, không thu; VERA TikTok ±43%); sửa lỗi
+  tháng đang chạy dở làm kênh lớn thành "ít lịch sử" và chiếm 1 trong 3 tháng chấm lệch (`isCompleteMonth`). Ca bán 0 có bằng chứng (view /
+  giờ live / số từ file) vào lịch sử mức. (4) **"Bán 0"**: RPC `confirm_zero_sales` (0201: ca Completed chưa có số nào ⇒ nguồn
+  `handover_typed`, giờ live = giờ kế hoạch, GMV 0 — file về sau vẫn ghi đè) + nút trên dòng ca "chưa có số liệu" ở Bảng Vận Hành
+  (ceo/admin/ops/trainer). (5) **Sổ dự báo nhiều mô hình**: khoá duy nhất thêm `model` ('v3'|'sched'|'v3_kb'), RPC ghi viết lại (giữ trainer);
+  Chốt kế hoạch ghi cả 3 (DB chưa 0201 ⇒ chỉ v3, tránh đè); `lib/performance/modelScoreboard.ts` (`modelScoreboard`, `switchAdvice`: chỉ tháng
+  có SỔ của cả hai, bộ xếp ca hơn ≥ 2 điểm 2 tháng liền ⇒ báo "đủ điều kiện đổi", app không tự đổi) + bảng ở AI Training → thẻ Dự báo.
+  **Verify:** replay 0001→0201 sạch, chạy lại 0201 lần 2 không lỗi, `supabase/tests/0201_*.sql` 15/15 OK, 0200 vẫn 16/16; vitest 1440 pass (3 đỏ
+  có từ trước: bundleSplit, platformProfiles, uiReadability 10px ở PlanMonthGrid:221); test mới `brandScenario`, `modelScoreboard`, thêm vào
+  `monthForecast`, `leaderboardAwards`; script số thật `scratchpad/fc/verify.ts`. **Chưa:** xem UI trên trình duyệt (cần user đăng nhập ở
+  Browser pane), chạy 0201 trên production.
 - **06/11 (cuối): ĐIỀU PHỐI — LƯỚI THEO THÁNG (đã commit + push 06/11, KHÔNG migration)** — user: tuần vắt hai tháng (30/11–6/12) trộn ca tháng 11 vào lịch tháng 12 dễ nhầm. Header đổi từ "‹ tuần ›" sang "‹ Tháng 12/2026 ›" (state `viewMonth` riêng trong `RosterBoard`, không còn suy từ thứ Năm của tuần); trên lưới có dãy tuần trong tháng (1–6 · 7–13 · … · 28–31); `WeekGrid({month})` chỉ vẽ ngày thuộc tháng. Luật lịch/kiểm lỗi và **Công bố vẫn theo tuần ISO** (RPC `publish_roster_week`) — hộp xác nhận báo nếu có ca nháp ngoài tháng (ngày đang ẩn) sẽ công bố kèm. Sang tháng hiện tại thì nhảy tới tuần có hôm nay; `goWeekOf(date)` (việc cần làm, Thêm ca) đổi cả tháng. Verify: tsc/eslint, trình duyệt dev T11/T12.
 - **06/11 (đêm): VERA TIKTOK 15–18 NGÀY PAY DAY — HIỆU CHỈNH + KHUÔN CAMPAIGN + THÓI QUEN GIỜ (đã commit + push 06/11, KHÔNG migration)** — sau sửa
   Daily, Pay Day vẫn 15–18 + 18–21 + 21–00. Gốc 1: **hiệu chỉnh kế hoạch-vs-thực tế mang cả lệch chung** — VERA TikTok thực tế thấp hơn kế
@@ -787,6 +811,7 @@ target khung camp ở Nhập Ads bỏ 06/10 — tháng không có kế hoạch c
 
 | Mục trong file lịch sử | Tóm tắt |
 |---|---|
+| `## Nghiên cứu độ chính xác dự báo tháng + ca (2026-11-06, đề xuất — CHƯA làm code)` | 8 cách đoán mức đều ~20–23%; trong tháng ngày 15 ~6%; ca sàn nhiễu ~16%; dải kênh nhỏ hẹp; target brand T10 5/5 hụt; 2 lỗ dữ liệu; đề xuất Kịch bản brand + dải từ sổ dự báo |
 | `## Report Tháng giai đoạn 1: mỗi trang một màn (2026-10-28)` | thanh trang + hash `#mr-id`, hàng ≤4 ô chỉ số + huy hiệu %, tiêu đề kết luận (`pageHeadlines.ts`), `showAll` cho file xuất |
 | `## Report Tháng giai đoạn 2: biểu đồ/bảng theo demo T10` | Cầu Target/traffic×CVR×AOV, GMV/giờ kế hoạch, bảng dọc loại ngày, scatter SKU + ảnh SKU (section_notes), scatter cặp host |
 | **Report Tháng dựng lại 1:1 theo demo chốt (28/10, đã commit 9bb4c33…970a693, đẩy main)** | `report/demo.css` (CSS demo, mọi selector tiền tố `.rt`) + `report/demoCharts.ts` (hàm SVG/bảng của demo, trả chuỗi HTML — không tự chỉnh, đổi giao diện thì đổi demo trước); trang dựng bằng `DemoBlocks/DemoShopWhy/DemoSummaryPages/ProductsPage/HostPage`, `PageHead`/`PageInsight` trong `ui.tsx` xuất markup demo. Action plan: `ActionItem` có Deadline/Status/PIC/Note/`autoKey` (jsonb `action_plan`, không migration); bảng "Đánh giá lại" (`ActionResultsPanel`) và "Việc tháng sau" (`ActionPlanPanel`) dùng chung `ActionEditor`, cột Kết quả tự điền từ Ads theo ngày / Affiliate / Shop Analytics / dự báo LIVE. Mục 1–2 trang Kế hoạch tháng sau đọc Kế Hoạch Tháng + tab Affiliate (ô nhập tay chỉ để tính thử). T9 CROCS đã có 8 việc. Còn lại: file xuất HTML (`exportStandaloneHtml.ts`, `BrandMonthlyReport.tsx`) chưa commit; thanh trang vẫn là hàng tab ngang (demo là cột trái) |

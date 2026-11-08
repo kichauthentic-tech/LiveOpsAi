@@ -44,8 +44,11 @@ import { PlanGroupTargetsBlock } from "./PlanGroupTargets";
 import { PlanMonthGrid, type GridExtra } from "./monthplan/PlanMonthGrid";
 import type { SlotOutcome } from "../lib/scheduling/planWeeks";
 import { HistorySummary, RELIABLE_BLOCK_MIN_CA, STRATEGY_LABEL, SuggestResult, SuggestStrategy, buildBorrowedHistory, buildHistory, estimateSlots, suggestMonthPlan } from "../lib/scheduling/suggestEngine";
-import { RELIABILITY_LABEL, buildMonthForecaster, forecastReliability, planOutlook, slotForecasts, targetForChance } from "../lib/performance/monthForecast";
-import { recordForecastSnapshots } from "../lib/db/forecastSnapshots";
+import { RELIABILITY_LABEL, buildMonthForecaster, forecastReliability, planOutlook, scaleOutlook, slotForecasts, targetForChance } from "../lib/performance/monthForecast";
+import { scenarioFactor } from "../lib/scheduling/brandScenario";
+import { channelMonthActual } from "../lib/performance/modelScoreboard";
+import { BrandScenarioPanel } from "./monthplan/BrandScenarioPanel";
+import { recordForecastSnapshots, type ForecastSnapshotInput } from "../lib/db/forecastSnapshots";
 import { EngineParams } from "../lib/scheduling/engineParams";
 import { findBrandStudioId } from "../lib/db/brandStudios";
 import { useConfirm } from "../hooks/useConfirm";
@@ -676,11 +679,16 @@ export default function MonthPlan({
     const theirs = sumOf(estimateSlots(engineHistory, sample, estimateCtx));
     return mine > 0 && theirs > 0 ? target * (theirs / mine) : target;
   };
-  // Dự báo cả lưới (P50 + dải ~80% + khả năng đạt target) — cùng phân phối với Dashboard.
-  const gridOutlook = useMemo(
+  // Dự báo cả lưới (P50 + dải ~80% + khả năng đạt target) — cùng phân phối với Dashboard. `engineOutlook` = riêng engine v3;
+  // `gridOutlook` = engine × Kịch bản brand (0201, 07/11) — MỌI số dự báo của màn (ô Dự báo, Nhận target, cảnh báo thiếu target) đi
+  // qua con số này; sổ dự báo ghi cả hai để cuối tháng chấm kịch bản có giúp hay không.
+  const scenario = plan?.brandScenario ?? [];
+  const kbFactor = scenarioFactor(scenario);
+  const engineOutlook = useMemo(
     () => (forecaster && drafts.length > 0 ? planOutlook(forecaster, drafts, (d) => resolveCampBucketType(d, campRanges), targetTotal) : null),
     [forecaster, drafts, campRanges, targetTotal]
   );
+  const gridOutlook = useMemo(() => (engineOutlook ? scaleOutlook(engineOutlook, kbFactor, targetTotal) : null), [engineOutlook, kbFactor, targetTotal]);
   const baseConstraints = useMemo(() => ({
     month,
     today,
@@ -793,7 +801,7 @@ export default function MonthPlan({
     const act = activeDrafts(rebaseSet);
     if (total <= 0 || act.length === 0) return null;
     const bucket = (d: string) => resolveCampBucketType(d, campRanges);
-    const outlook = forecaster ? planOutlook(forecaster, act, bucket, total) : null;
+    const outlook = forecaster ? scaleOutlook(planOutlook(forecaster, act, bucket, total), kbFactor, total) : null;
     const forecast = outlook ? outlook.p50 : sumOf(estimateSlots(engineHistory, act, estimateCtx));
     const hours = act.reduce((a, d) => a + slotHours(d), 0);
     const r = targetIntake(total, forecast, hours);
@@ -809,7 +817,7 @@ export default function MonthPlan({
       extras = pickExtraSlots(ranked, r.hoursNeeded, r.hoursCap, today).sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime));
     }
     return { ...r, total, forecast, hours, slots: act.length, outlook, extras };
-  }, [retargetOpen, rebaseSet, retargetTotal, retargetGroups, campRanges, forecaster, engineHistory, estimateCtx, baseConstraints, strategy, today]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [retargetOpen, rebaseSet, retargetTotal, retargetGroups, campRanges, forecaster, engineHistory, estimateCtx, baseConstraints, strategy, today, kbFactor]); // eslint-disable-line react-hooks/exhaustive-deps
   const extraKey = (sl: { date: string; startTime: string; endTime: string }) => `${sl.date}|${sl.startTime}|${sl.endTime}`;
   const pickedExtras = intake ? intake.extras.filter((sl) => !extraOff.has(extraKey(sl))) : [];
   const openExtras = async () => {
@@ -973,9 +981,17 @@ export default function MonthPlan({
     try {
       const r = await lockMonthPlan(p.id);
       // Sổ độ chính xác (0163): dự báo LÚC CHỐT của lưới vừa chốt — để cuối tháng so với GMV thật. Lỗi ghi không chặn việc chốt.
-      if (gridOutlook) {
-        recordForecastSnapshots([{ brandId, platform, month, asOf: today, kind: "plan", p50: gridOutlook.p50, lo: gridOutlook.lo, hi: gridOutlook.hi, target: Math.round(totals.target) }])
-          .catch((e) => console.warn("Ghi sổ dự báo lúc chốt không được:", e));
+      if (engineOutlook && gridOutlook) {
+        // 0201 (07/11): ghi CẢ engine v3, bộ xếp ca và v3 × kịch bản brand — cuối tháng chấm mô hình nào đúng hơn. DB chưa có 0201 (cột
+        // brand_scenario chưa có ⇒ plan.brandScenario undefined) thì chỉ ghi v3: khoá cũ không có `model`, dòng sau sẽ đè dòng v3.
+        const tgt = Math.round(totals.target);
+        const rows: ForecastSnapshotInput[] = [{ brandId, platform, month, asOf: today, kind: "plan", model: "v3", p50: engineOutlook.p50, lo: engineOutlook.lo, hi: engineOutlook.hi, target: tgt }];
+        if (plan?.brandScenario !== undefined) {
+          const sched = sumOf(estimateSlots(engineHistory, drafts, estimateCtx));
+          if (sched > 0) rows.push({ brandId, platform, month, asOf: today, kind: "plan", model: "sched", p50: sched, target: tgt });
+          if (kbFactor !== 1) rows.push({ brandId, platform, month, asOf: today, kind: "plan", model: "v3_kb", p50: gridOutlook.p50, lo: gridOutlook.lo, hi: gridOutlook.hi, target: tgt });
+        }
+        recordForecastSnapshots(rows).catch((e) => console.warn("Ghi sổ dự báo lúc chốt không được:", e));
       }
       await onPlanLocked();
       const fresh = await fetchMonthPlan(brandId, month, platform);
@@ -1140,6 +1156,11 @@ export default function MonthPlan({
       ? ` Chi phí host + trợ ~${fmtVndShort(hours * hourCost.perHour)} (≈ ${fmtVndShort(hourCost.perHour)}/giờ theo người live kênh 60 ngày qua)${gain && gain > 0 ? ` · mỗi 1 đồng lương ≈ ${fmtFixed(gain / (hours * hourCost.perHour), 0)} đồng GMV dự báo` : ""}.`
       : "";
   const reliability = forecaster ? forecastReliability(forecaster.pastErrors) : null;
+  // GMV thật cả tháng của kênh (ca có số, kể cả ngoài kế hoạch) — để chấm Kịch bản brand khi tháng đã hết.
+  const monthActualDone = useMemo(
+    () => channelMonthActual(platformSessions.filter((s) => s.brandId === brandId), month),
+    [platformSessions, brandId, month]
+  );
   const reliabilityText = reliability && reliability.level !== "unknown"
     ? `Độ tin dự báo kênh: ${RELIABILITY_LABEL[reliability.level]} · lệch TB ${Math.round(reliability.meanAbs! * 100)}% (${reliability.months} tháng)${reliability.bias !== null ? ` · thường ${reliability.bias > 0 ? "cao" : "thấp"} hơn thực tế ~${Math.round(Math.abs(reliability.bias) * 100)}%` : ""}`
     : reliability ? "Độ tin dự báo kênh: chưa đủ tháng để chấm" : null;
@@ -1254,12 +1275,13 @@ export default function MonthPlan({
           </div>
         ) : (
           <div className={TILE} data-testid="grid-forecast">
-            <span className={TILE_LABEL}>Dự báo lưới <Info text={`Engine target v3: giờ × loại ngày × khung giờ × vị trí ngày, mức = trung bình nhân 28 ngày gần nhất và 3 tháng gần nhất. Backtest 06/11 (14 tháng-kênh T8–T10, lúc lập): lệch TB ~28%, dải chứa thực tế 10/14 tháng.${isAdmin ? pastErrorsText : ""}${calibration ? ` Đã hiệu chỉnh từ ${calibration.observations} ca kế hoạch có thực tế ở các tháng khác.` : ""}`} /></span>
+            <span className={TILE_LABEL}>Dự báo lưới <Info text={`Engine target v3: giờ × loại ngày × khung giờ × vị trí ngày, mức = trung bình nhân 28 ngày gần nhất và 3 tháng gần nhất. Lúc lập kế hoạch mọi cách tính đều lệch ~20–23% (thử 8 cách, 07/11) vì GMV/giờ của kênh tự trôi theo nhu cầu brand — thông tin brand đưa vào bằng Kịch bản brand. Dải: kênh lớn ±22%, kênh nhỏ ±45%, kênh sai nhiều hơn thì nới theo sai số thật của kênh.${isAdmin ? pastErrorsText : ""}${calibration ? ` Đã hiệu chỉnh từ ${calibration.observations} ca kế hoạch có thực tế ở các tháng khác.` : ""}`} /></span>
             <b className="text-xl font-black tabular-nums text-[var(--text)]">{gridOutlook ? fmtVndShort(gridOutlook.p50) : "—"}</b>
             <span className="text-2xs text-[var(--text-faint)] tabular-nums">
               {gridOutlook ? <>dải {fmtVndShort(gridOutlook.lo)} – {fmtVndShort(gridOutlook.hi)}</> : forecaster ? "lưới trống" : "kênh chưa đủ lịch sử"}
               {gridOutlook?.pHit != null && <> · đạt target <b className={gridOutlook.pHit >= 0.8 ? "text-emerald-400" : gridOutlook.pHit >= 0.5 ? "text-sky-400" : gridOutlook.pHit >= 0.2 ? "text-amber-400" : "text-rose-400"}>{Math.round(gridOutlook.pHit * 100)}%</b></>}
             </span>
+            {engineOutlook && kbFactor !== 1 && <span className="text-2xs text-[var(--text-faint)] tabular-nums">engine {fmtVndShort(engineOutlook.p50)} · kịch bản brand {kbFactor >= 1 ? "+" : "−"}{fmtFixed(Math.abs(kbFactor - 1) * 100, 1)}%</span>}
             {gridOutlook && canRetarget && <span className="text-2xs text-[var(--text-faint)] tabular-nums">target khả thi: 80% ≈ {fmtVndShort(targetForChance(gridOutlook, 0.8))} · 50% ≈ {fmtVndShort(gridOutlook.p50)}</span>}
             {isAdmin && reliabilityText && <span className={`text-2xs tabular-nums ${reliabilityTone}`}>{reliabilityText}</span>}
           </div>
@@ -1291,6 +1313,17 @@ export default function MonthPlan({
           <span className="text-2xs text-[var(--text-faint)] tabular-nums">{settings.shopTargetGmv > 0 ? `= ${fmtVndShort(settings.shopTargetGmv)}${monthTarget > 0 ? ` · target live ${Math.round((monthTarget / settings.shopTargetGmv) * 100)}%` : ""}` : "không bắt buộc"}</span>
         </div>
       </div>
+
+      {plan && (engineOutlook || scenario.length > 0) && (
+        <BrandScenarioPanel
+          planId={plan.id}
+          lines={plan.brandScenario}
+          engineP50={engineOutlook?.p50 ?? null}
+          canEdit={canRetarget}
+          actual={month < curMonth ? monthActualDone : null}
+          onSaved={(lines) => setPlan((p) => (p ? { ...p, brandScenario: lines } : p))}
+        />
+      )}
 
       {(committedGmv > 0 && monthTarget > 0 && monthTarget < committedGmv) || (!locked && committedGmv > 0 && targetTotal <= 0) || (gridOutlook && gridOutlook.excessHours > 0.05) || forecaster?.mostlyManual ? (
         <div className="space-y-1 text-2xs px-1">
@@ -1715,8 +1748,16 @@ export default function MonthPlan({
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-2xs text-[var(--text-faint)]">
         {locked ? (
           <>
-            <span><span className="text-emerald-400">■</span> đạt target ca</span>
-            <span><span className="text-rose-400">■</span> dưới target</span>
+            {forecaster?.slotBand ? (
+              <span title="Một ca chỉ ~20 đơn nên riêng may rủi đã lệch ±16%. Khoảng = p10–p90 thực tế ÷ kỳ vọng ca của kênh 3 tháng gần nhất.">
+                ca: <span className="text-rose-400">■</span> dưới khoảng bình thường ({Math.round(forecaster.slotBand.lo * 100)}% target) · chữ thường = trong khoảng · <span className="text-emerald-400">■</span> trên khoảng ({Math.round(forecaster.slotBand.hi * 100)}%) — đạt/hụt xem % ngày, tuần, đợt
+              </span>
+            ) : (
+              <>
+                <span><span className="text-emerald-400">■</span> đạt target ca</span>
+                <span><span className="text-rose-400">■</span> dưới target</span>
+              </>
+            )}
             <span><span className="text-amber-400">chưa số liệu</span> = qua giờ chưa có số liệu</span>
             <span><span className="text-sky-300">┅</span> tăng cường / ngoài kế hoạch — không tính vào target tháng</span>
           </>
@@ -1726,6 +1767,24 @@ export default function MonthPlan({
         <span><span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 align-middle" /> đã chốt người</span>
         {boostInfo && boostInfo.pending > 0 && <span className="text-amber-300">{boostInfo.pending} ca tăng cường đang chờ target (engine chưa có dự báo cho ca này)</span>}
       </div>
+
+      {locked && monthRR && monthRR.buckets.some((b) => b.targetToDate > 0) && (
+        // Đạt/hụt theo CỤM (07/11): ca lẻ dao động ±16% vì may rủi, cả đợt mới là tín hiệu thật — vd CROCS 1–5/11: 12/14 ca "hụt"
+        // nhưng chỉ 4 ca dưới khoảng bình thường, còn cả đợt Daily đạt 77%.
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-xs tabular-nums" data-testid="bucket-strip">
+          <span className="text-[var(--text-faint)]">Theo đợt tới nay:</span>
+          {monthRR.buckets.filter((b) => b.status !== "none").map((b) => (
+            <span key={b.bucket} className="text-[var(--text-muted)]">
+              {BUCKET_LABEL[b.bucket]}{" "}
+              {b.runRate !== null ? (
+                <><b className={b.runRate >= 1 ? "text-emerald-400" : b.runRate >= 0.85 ? "text-amber-400" : "text-rose-400"}>{Math.round(b.runRate * 100)}%</b> <span className="text-[var(--text-faint)]">{fmtVndShort(b.actual)}/{fmtVndShort(b.targetToDate)}</span></>
+              ) : (
+                <span className="text-[var(--text-faint)]">chưa tới</span>
+              )}
+            </span>
+          ))}
+        </div>
+      )}
 
       <PlanMonthGrid
         cells={cells}
@@ -1738,6 +1797,7 @@ export default function MonthPlan({
         maxSlotsPerDay={settings.maxSlotsPerDay}
         blackoutDates={settings.blackoutDates}
         outcomeOf={outcomeOf}
+        slotBand={locked ? forecaster?.slotBand ?? null : null}
         clashOf={(key) => crossBrand.clashes.find((c) => c.key === key)?.roomTakenBy}
         labelOf={(day) => {
           const ev = eventByDate.get(day);

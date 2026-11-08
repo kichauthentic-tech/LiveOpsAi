@@ -99,7 +99,24 @@ export interface CampaignEvent {
   tier2: number;
   noTarget: number;
   upcoming: number;
+  /** Σ GMV ÷ Σ target của các ca ĐÃ XONG có target trong đợt (ca đang live không tính). null khi chưa có ca nào xong. */
+  ratio: number | null;
+  actual: number;
+  targetDone: number;
+  /** Đợt đã xong hết (không còn ca sắp live / đang live) — chỉ khi đó mới chốt mức của đợt. */
+  final: boolean;
+  /** Mức của CẢ ĐỢT (chấm theo đợt) — null khi chưa đạt hoặc chưa xong. */
+  tier: TargetTier | null;
 }
+
+/**
+ * Cách chấm giải "Ca đạt target" (07/11, user chốt "làm cả 5" theo đề xuất dự báo):
+ *   "event" (mặc định) — chấm CẢ ĐỢT: Σ GMV ÷ Σ target các ca đã xong của đợt ≥ 100% ⇒ mọi ca có target của đợt được Mức 1, ≥ 120% ⇒ Mức 2.
+ *            Lý do: một ca chỉ ~20 đơn nên riêng may rủi đã lệch ±16% — ca kỳ vọng 90% target vẫn có ~30% khả năng "đạt" (CROCS 1–5/11:
+ *            12/14 ca "hụt" nhưng chỉ 4 ca dưới khoảng bình thường). Gộp cả đợt thì may rủi triệt tiêu, cả đội cùng hướng về một con số.
+ *   "shift" — như 06/11: từng ca tự đạt/hụt.
+ */
+export type TargetScoring = "event" | "shift";
 
 export interface TargetPayout {
   talentId: string;
@@ -122,14 +139,14 @@ export const tierOf = (ratio: number): TargetTier | null => (ratio >= TARGET_TIE
  * Ca Campaign của một account trong tháng. `camp` = khung camp hiệu lực (effectiveCamp của Kế Hoạch Tháng); không có thì lịch cố định.
  * Target = `planTargetOf` (target ca của kế hoạch đã chốt — ca tăng cường không có target kế hoạch nên không xét).
  */
-export function campaignTargetBoard(sessions: readonly LiveSession[], account: AwardAccount, month: string, camp?: CampOverrides): TargetBoard {
+export function campaignTargetBoard(sessions: readonly LiveSession[], account: AwardAccount, month: string, camp?: CampOverrides, scoring: TargetScoring = "shift"): TargetBoard {
   const events = new Map<CampaignDayType, CampaignEvent>();
   for (const s of sessions) {
     if (!s.date.startsWith(month) || accountKey(s) !== account.key) continue;
     if (s.status === "Cancelled") continue;
     const bucket = resolveCampBucketType(s.date, camp);
     if (bucket === "daily") continue;
-    const ev = events.get(bucket) ?? { type: bucket, from: s.date, to: s.date, shifts: [], withTarget: 0, hit: 0, tier2: 0, noTarget: 0, upcoming: 0 };
+    const ev: CampaignEvent = events.get(bucket) ?? { type: bucket, from: s.date, to: s.date, shifts: [], withTarget: 0, hit: 0, tier2: 0, noTarget: 0, upcoming: 0, ratio: null, actual: 0, targetDone: 0, final: false, tier: null };
     if (s.date < ev.from) ev.from = s.date;
     if (s.date > ev.to) ev.to = s.date;
     const target = planTargetOf(s);
@@ -145,10 +162,19 @@ export function campaignTargetBoard(sessions: readonly LiveSession[], account: A
       ev.withTarget += 1;
       if (tier && !live) ev.hit += 1;
       if (tier === 2 && !live) ev.tier2 += 1;
+      if (!live) {
+        ev.actual += s.actualGmv || 0;
+        ev.targetDone += target;
+      }
     } else ev.noTarget += 1;
     events.set(bucket, ev);
   }
   const list = [...events.values()].sort((a, b) => a.from.localeCompare(b.from));
+  for (const ev of list) {
+    ev.ratio = ev.targetDone > 0 ? ev.actual / ev.targetDone : null;
+    ev.final = ev.upcoming === 0 && !ev.shifts.some((x) => x.live) && ev.targetDone > 0;
+    ev.tier = ev.final && ev.ratio !== null ? tierOf(ev.ratio) : null;
+  }
   // Đang live trước, rồi ca đã xong theo % giảm dần, ca sắp live theo giờ.
   const order = (x: TargetShift) => (x.live ? 0 : x.upcoming ? 2 : 1);
   for (const ev of list)
@@ -156,13 +182,15 @@ export function campaignTargetBoard(sessions: readonly LiveSession[], account: A
   const pay = new Map<string, TargetPayout>();
   for (const ev of list) {
     for (const sh of ev.shifts) {
-      if (!sh.tier || sh.live || sh.upcoming) continue;
+      // Chấm theo đợt: mọi ca đã xong có target của đợt nhận mức của CẢ ĐỢT; chấm theo ca: mức của chính ca.
+      const t = scoring === "event" ? (sh.target > 0 ? ev.tier : null) : sh.tier;
+      if (!t || sh.live || sh.upcoming) continue;
       for (const p of sh.people) {
         const k = `${p.role}|${p.talentId}`;
         const o = pay.get(k) ?? { talentId: p.talentId, name: p.name, role: p.role, tier1: 0, tier2: 0, units: 0 };
-        if (sh.tier === 2) o.tier2 += 1;
+        if (t === 2) o.tier2 += 1;
         else o.tier1 += 1;
-        o.units += sh.tier * p.share;
+        o.units += t * p.share;
         pay.set(k, o);
       }
     }

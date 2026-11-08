@@ -9,6 +9,7 @@ import { REPORT_PLATFORMS, platformOf, type ReportPlatform } from "../lib/report
 import { fetchForecastSnapshots, type ForecastSnapshot } from "../lib/db/forecastSnapshots";
 import { fetchChannelAdsBudgets } from "../lib/db/monthPlans";
 import { fmtFixed, fmtVndShort } from "../lib/format";
+import { modelScoreboard, switchAdvice, SWITCH_MIN_GAIN, SWITCH_MONTHS } from "../lib/performance/modelScoreboard";
 import { Explain } from "./common/Explain";
 import { StatTile } from "./common/StatTile";
 
@@ -68,13 +69,21 @@ export const ForecastTrainingCard: React.FC<Props> = ({ brandId, sessions, param
     return [...by.entries()].sort(([a], [b]) => b.localeCompare(a)).map(([month, rows]) => {
       const done = month < today.slice(0, 7);
       const actual = done ? actualByMonth.get(month) ?? null : null;
-      const plan = rows.find((r) => r.kind === "plan") ?? null;
+      // 0201: một ngày có thể có nhiều dòng "plan" (v3 / bộ xếp ca / v3 × kịch bản) — cột "Lúc chốt" là engine chính.
+      const plan = rows.find((r) => r.kind === "plan" && (r.model ?? "v3") === "v3") ?? null;
       const daily = rows.filter((r) => r.kind === "daily");
       const at = (d: number) => [...daily].reverse().find((r) => Number(r.asOf.slice(8)) <= d) ?? null;
       const err = (r: ForecastSnapshot | null) => (r && actual ? r.p50 / actual - 1 : null);
       return { month, done, actual, plan, planErr: err(plan), days: daily.length, at: Object.fromEntries(BACKTEST_DAYS.map((d) => [d, err(at(d))])) as Record<number, number | null>, last: daily[daily.length - 1] ?? null };
     });
   }, [ledger, key, today, actualByMonth]);
+
+  // Thay đổi 5 (07/11): chấm v3 vs bộ xếp ca theo tháng — sổ (ngoài mẫu) thắng backtest; chỉ báo đổi khi sổ đủ 2 tháng.
+  const scores = useMemo(
+    () => (channel.length ? modelScoreboard(channel, params, today, ledger && ledger.key === key ? ledger.rows : []) : []),
+    [channel, params, today, ledger, key]
+  );
+  const advice = useMemo(() => switchAdvice(scores), [scores]);
 
   const leading = useMemo(() => {
     const adsMap = ads && ads.key === key ? ads.map : new Map<string, number>();
@@ -130,7 +139,7 @@ export const ForecastTrainingCard: React.FC<Props> = ({ brandId, sessions, param
                   {fc.levelRecent != null && <span className="text-[var(--text-muted)]">{params.fcRecentDays} ngày gần nhất: <b className="text-[var(--text)]">{fmtVndShort(fc.levelRecent)}</b></span>}
                   <span className="text-[var(--text-muted)]">Dùng: <b className="text-[var(--accent-text)]">{fmtVndShort(fc.level)}</b>/giờ quy chuẩn</span>
                 </div>
-                <p className="text-2xs text-[var(--text-muted)]">Dải ~80% lúc lập: <b className="text-[var(--text)]">±{Math.round(fc.band * 100)}%</b> ({fc.big ? "kênh đủ lịch sử" : "kênh ít lịch sử"}) · giờ/ngày p90 đã thấy: {(["daily", "dday", "midmonth", "payday"] as const).map((b) => `${BUCKET_LABEL[b]} ${Number.isFinite(fc.dayHoursP90[b]) ? `${fmtFixed(fc.dayHoursP90[b], 1)}h` : "—"}`).join(" · ")}</p>
+                <p className="text-2xs text-[var(--text-muted)]">Dải ~80% lúc lập: <b className="text-[var(--text)]">±{Math.round(fc.band * 100)}%</b> ({fc.big ? "kênh đủ lịch sử" : "kênh ít lịch sử"}{fc.bandFromErrors ? `, nới từ ±${Math.round(fc.bandBase * 100)}% theo sai số thật 3 tháng của kênh` : ""}){fc.slotBand ? ` · khoảng bình thường một ca ${Math.round(fc.slotBand.lo * 100)}–${Math.round(fc.slotBand.hi * 100)}% kỳ vọng (${fc.slotBand.n} ca)` : ""} · giờ/ngày p90 đã thấy: {(["daily", "dday", "midmonth", "payday"] as const).map((b) => `${BUCKET_LABEL[b]} ${Number.isFinite(fc.dayHoursP90[b]) ? `${fmtFixed(fc.dayHoursP90[b], 1)}h` : "—"}`).join(" · ")}</p>
                 {fc.pastErrors.length > 0 && (
                   <p className="text-2xs text-[var(--text-muted)]">Lệch lúc lập các tháng trước: {fc.pastErrors.map((e) => <b key={e.month} className={`${tone(e.error, 0.05)} mr-1.5`}>T{Number(e.month.slice(5))} {pct(e.error, true)}</b>)}{fc.biasFactor !== 1 ? `— đang tự hiệu chỉnh ×${fmtFixed(fc.biasFactor, 2)}` : params.fcBiasCorrect ? "— chưa đủ điều kiện tự hiệu chỉnh" : "— tự hiệu chỉnh đang tắt"}</p>
                 )}
@@ -207,6 +216,49 @@ export const ForecastTrainingCard: React.FC<Props> = ({ brandId, sessions, param
                   </tbody>
                 </table>
                 <p className="mt-1 text-2xs text-[var(--text-faint)] leading-snug">Tháng đang chạy chỉ hiện dự báo đã ghi; hết tháng mới chấm lệch so với {platformText("GMV", platform)} cuối tháng (lấy từ ca, nên đối soát lại vẫn đúng).</p>
+              </div>
+            )}
+          </div>
+
+          <div className="text-xs" data-testid="model-scoreboard">
+            <p className="font-bold text-[var(--text-muted)] mb-1">Chấm mô hình lúc lập: v3 (đang dùng) và bộ xếp ca</p>
+            {scores.length === 0 ? (
+              <p className="text-[var(--text-muted)]">Chưa có tháng nào đã hết để chấm.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-2xs">
+                  <thead>
+                    <tr className="text-[var(--text-faint)] text-right">
+                      <th className="text-left font-normal py-1">Tháng</th>
+                      <th className="font-normal px-1.5">{platformText("GMV", platform)}</th>
+                      <th className="font-normal px-1.5">v3</th>
+                      <th className="font-normal px-1.5">Bộ xếp ca</th>
+                      <th className="font-normal px-1.5" title="v3 × Kịch bản brand — chỉ có khi đã ghi kịch bản trước lúc chốt (0201)">v3 × kịch bản</th>
+                      <th className="font-normal px-1.5">Nguồn</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {scores.map((r) => {
+                      const a = r.v3 ? Math.abs(r.v3.error) : null, b = r.sched ? Math.abs(r.sched.error) : null;
+                      const win = a !== null && b !== null ? (a <= b ? "v3" : "sched") : null;
+                      return (
+                        <tr key={r.month} className="border-t border-[var(--border)] text-right">
+                          <td className="text-left py-1 text-[var(--text)]">T{Number(r.month.slice(5))}/{r.month.slice(2, 4)}</td>
+                          <td className="px-1.5 text-[var(--text)]">{fmtVndShort(r.actual)}</td>
+                          <td className={`px-1.5 ${win === "v3" ? "font-bold text-emerald-400" : "text-[var(--text-muted)]"}`}>{pct(r.v3?.error, true)}</td>
+                          <td className={`px-1.5 ${win === "sched" ? "font-bold text-emerald-400" : "text-[var(--text-muted)]"}`}>{pct(r.sched?.error, true)}</td>
+                          <td className="px-1.5 text-[var(--text-muted)]">{pct(r.v3Kb, true)}</td>
+                          <td className="px-1.5 text-[var(--text-faint)]">{r.v3?.source === "ledger" || r.sched?.source === "ledger" ? "sổ" : "backtest"}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                <p className={`mt-1 text-2xs leading-snug ${advice.switchToSched ? "text-amber-300 font-bold" : "text-[var(--text-faint)]"}`}>
+                  {advice.switchToSched
+                    ? `Bộ xếp ca đúng hơn ≥ ${Math.round(SWITCH_MIN_GAIN * 100)} điểm ở ${SWITCH_MONTHS} tháng sổ gần nhất (TB ${fmtFixed(advice.avgGainPts ?? 0, 1)} điểm) — đủ điều kiện đổi mô hình chính (cần sửa code, app không tự đổi).`
+                    : `Luật đổi: bộ xếp ca đúng hơn ≥ ${Math.round(SWITCH_MIN_GAIN * 100)} điểm ở ${SWITCH_MONTHS} tháng có SỔ của cả hai mô hình (backtest không tính — bộ xếp ca đã chỉnh 06/11 trên chính các tháng đó). Hiện có ${advice.ledgerMonths} tháng sổ; sổ ghi cả hai từ lần Chốt kế hoạch sau khi chạy 0201.`}
+                </p>
               </div>
             )}
           </div>

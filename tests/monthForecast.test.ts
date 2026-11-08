@@ -2,6 +2,8 @@
 // Chạy: npx vitest run tests/monthForecast.test.ts
 import { describe, expect, test } from "vitest";
 import {
+  bandFromPastErrors,
+  slotNormalRange,
   activeCheckpoint,
   backtestMonthForecast,
   buildMonthForecaster,
@@ -129,7 +131,7 @@ describe("planOutlook — khả năng đạt", () => {
     const test = world({ "2026-09": 1 });
     const p50 = planOutlook(f, test, fixed, 0).p50;
     expect(planOutlook(f, test, fixed, p50).pHit).toBeCloseTo(0.5, 5);
-    expect(planOutlook(f, test, fixed, p50 * 0.5).pHit!).toBeGreaterThan(0.98); // dải ±30% ⇒ σ ≈ 23%: nửa P50 cách 2,1σ
+    expect(planOutlook(f, test, fixed, p50 * 0.5).pHit!).toBeGreaterThan(0.9); // kênh nhỏ dải ±45% (07/11) ⇒ σ ≈ 35%: nửa P50 cách 1,4σ
     expect(planOutlook(f, test, fixed, 0).pHit).toBeNull();
   });
 });
@@ -251,5 +253,25 @@ describe("06/11 — độ tin dự báo kênh + target theo khả năng đạt (
     const t80 = targetForChance(o, 0.8);
     // σ = 0,22 × 4850 / 1,2816 ≈ 832,6 ⇒ T80 ≈ 4850 − 0,8416σ ≈ 4149
     expect(Math.round(t80)).toBe(4149);
+  });
+});
+
+describe("dải theo sai số thật + khoảng bình thường của ca (07/11)", () => {
+  test("bandFromPastErrors: cần ≥ 3 tháng, p80 của |lệch|, trần 80%", () => {
+    expect(bandFromPastErrors([{ error: 0.1 }, { error: -0.2 }])).toBeNull();
+    expect(bandFromPastErrors([{ error: 0.06 }, { error: 0.23 }, { error: 0.57 }])).toBeCloseTo(0.23 + 0.6 * 0.34, 5);
+    expect(bandFromPastErrors([{ error: 2 }, { error: 1.5 }, { error: -1 }])).toBe(0.8);
+  });
+  test("slotNormalRange = target × p10…p90; thiếu khoảng ⇒ null", () => {
+    expect(slotNormalRange({ slotBand: { lo: 0.6, hi: 1.4, n: 100 } }, 50)).toEqual({ lo: 30, hi: 70 });
+    expect(slotNormalRange({ slotBand: null }, 50)).toBeNull();
+    expect(slotNormalRange({ slotBand: { lo: 0.6, hi: 1.4, n: 100 } }, 0)).toBeNull();
+  });
+  test("buildMonthForecaster có slotBand khi đủ 30 ca, p10 < 1 < p90", () => {
+    const f = buildMonthForecaster(world({ "2026-06": 1, "2026-07": 1, "2026-08": 1 }), "2026-09", P)!;
+    expect(f.slotBand).not.toBeNull();
+    expect(f.slotBand!.lo).toBeLessThanOrEqual(1);
+    expect(f.slotBand!.hi).toBeGreaterThanOrEqual(1);
+    expect(f.bandBase).toBe(P.fcBandSmall);
   });
 });

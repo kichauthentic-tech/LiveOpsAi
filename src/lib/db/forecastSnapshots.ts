@@ -5,6 +5,8 @@ import type { ReportPlatform } from "../reportPlatform";
 // (ceo/operations/admin), đọc thẳng bảng (RLS cùng nhóm role). Chưa chạy 0163 ⇒ ghi bị bỏ qua lặng lẽ, đọc trả `missing`.
 
 export type ForecastSnapshotKind = "plan" | "daily";
+/** 0201: 'v3' engine chính · 'sched' bộ xếp ca · 'v3_kb' v3 × Kịch bản brand. Trước 0201 mọi dòng là 'v3'. */
+export type ForecastModel = "v3" | "sched" | "v3_kb";
 
 export interface ForecastSnapshotInput {
   brandId: string;
@@ -14,6 +16,8 @@ export interface ForecastSnapshotInput {
   /** "YYYY-MM-DD" (giờ VN). */
   asOf: string;
   kind: ForecastSnapshotKind;
+  /** Thiếu = 'v3'. */
+  model?: ForecastModel;
   p50: number;
   lo?: number | null;
   hi?: number | null;
@@ -41,6 +45,7 @@ export async function recordForecastSnapshots(rows: ForecastSnapshotInput[]): Pr
     month: `${r.month}-01`,
     as_of: r.asOf,
     kind: r.kind,
+    model: r.model ?? "v3",
     p50: Math.max(0, Math.round(r.p50)),
     lo: finite(r.lo) === null ? null : Math.max(0, Math.round(r.lo!)),
     hi: finite(r.hi) === null ? null : Math.max(0, Math.round(r.hi!)),
@@ -64,7 +69,7 @@ export async function recordForecastSnapshots(rows: ForecastSnapshotInput[]): Pr
 export async function fetchForecastSnapshots(brandId: string, platform: ReportPlatform): Promise<{ rows: ForecastSnapshot[]; missing: boolean }> {
   const { data, error } = await supabase
     .from("forecast_snapshots")
-    .select("brand_id,platform,month,as_of,kind,p50,lo,hi,actual,target,seen_share,ratio,recorded_at")
+    .select("brand_id,platform,month,as_of,kind,model,p50,lo,hi,actual,target,seen_share,ratio,recorded_at")
     .eq("brand_id", brandId)
     .eq("platform", platform)
     .order("as_of", { ascending: true })
@@ -82,6 +87,7 @@ export async function fetchForecastSnapshots(brandId: string, platform: ReportPl
       month: String(r.month).slice(0, 7),
       asOf: String(r.as_of),
       kind: r.kind as ForecastSnapshotKind,
+      model: ((r.model as string) || "v3") as ForecastModel,
       p50: Number(r.p50),
       lo: num(r.lo),
       hi: num(r.hi),
