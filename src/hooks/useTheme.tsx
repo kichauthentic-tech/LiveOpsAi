@@ -3,12 +3,12 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 export type Theme = "yfb" | "midnight" | "sand" | "paper" | "sage" | "daylight";
 
 export const THEME_OPTIONS: Array<{ id: Theme; label: string; dark: boolean; hint: string }> = [
-  { id: "yfb", label: "YFB", dark: true, hint: "Đen vàng, mặc định" },
+  { id: "yfb", label: "YFB", dark: true, hint: "Đen vàng" },
   { id: "midnight", label: "Midnight", dark: true, hint: "Xanh navy" },
   { id: "sand", label: "Sand", dark: false, hint: "Sáng, tông kem" },
   { id: "paper", label: "Paper", dark: false, hint: "Trắng giấy, họp với brand" },
   { id: "sage", label: "Sage", dark: false, hint: "Sáng dịu, bo tròn" },
-  { id: "daylight", label: "Daylight", dark: false, hint: "Tương phản cao, chữ to" }
+  { id: "daylight", label: "Daylight", dark: false, hint: "Tương phản cao, chữ to, mặc định" }
 ];
 
 // Font riêng của theme (05/11) — chỉ tải khi có người chọn theme đó, theme cũ giữ font hệ thống nên không tốn gì thêm.
@@ -39,13 +39,13 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 const STORAGE_KEY = "liveops-theme";
 const DENSITY_KEY = "liveops-density";
 
-// YFB là theme chính (mặc định). Giá trị cũ được map sang preset tương ứng: "light" → sand,
-// "ocean" (đã bỏ) và chưa chọn gì → yfb.
+// Daylight là theme chính (mặc định, từ 08/11). Giá trị cũ được map sang preset tương ứng: "light" → sand,
+// "ocean" (đã bỏ) và chưa chọn gì → daylight. Người đã tự chọn theme khác vẫn giữ lựa chọn của mình.
 const getInitialTheme = (): Theme => {
   const stored = localStorage.getItem(STORAGE_KEY);
   if (THEME_OPTIONS.some((t) => t.id === stored)) return stored as Theme;
   if (stored === "light") return "sand";
-  return "yfb";
+  return "daylight";
 };
 
 const getInitialDensity = (): Density => {
