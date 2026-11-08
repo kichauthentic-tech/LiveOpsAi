@@ -8,16 +8,18 @@ import type { SnapshotRoomRow } from "./extractRooms";
 
 export type BreakReason = "network" | "manual_restart" | "device_change" | "platform_cut" | "test_room" | "other";
 
-export const BREAK_REASONS: { key: BreakReason; label: string; hint: string }[] = [
-  { key: "network", label: "Mất kết nối / ứng dụng lỗi", hint: "Thiết bị treo, mất wifi — TikTok kết thúc phiên, mở lại ra Room ID mới" },
-  { key: "manual_restart", label: "Tắt bật lại có chủ ý", hint: "Nghỉ giữa giờ, đổi cảnh, sửa tiêu đề/thumbnail" },
-  { key: "device_change", label: "Đổi thiết bị / tài khoản", hint: "Đổi máy live hoặc người đăng nhập" },
-  { key: "platform_cut", label: "TikTok cắt live", hint: "Cảnh báo vi phạm, lỗi kỹ thuật phía TikTok" },
-  { key: "test_room", label: "Live thử trước giờ", hint: "Room test vài phút trước khi vào ca" },
-  { key: "other", label: "Lý do khác", hint: "Ghi chú thêm bên dưới" }
+// `short` (08/11, cửa sổ ca gọn): nhãn ô chạm + nhãn trên dòng thời gian — trợ chạm chọn thay vì đọc cả câu.
+export const BREAK_REASONS: { key: BreakReason; label: string; short: string; hint: string }[] = [
+  { key: "network", label: "Mất kết nối / ứng dụng lỗi", short: "Mất kết nối", hint: "Thiết bị treo, mất wifi — TikTok kết thúc phiên, mở lại ra Room ID mới" },
+  { key: "manual_restart", label: "Tắt bật lại có chủ ý", short: "Tắt bật lại", hint: "Nghỉ giữa giờ, đổi cảnh, sửa tiêu đề/thumbnail" },
+  { key: "device_change", label: "Đổi thiết bị / tài khoản", short: "Đổi máy", hint: "Đổi máy live hoặc người đăng nhập" },
+  { key: "platform_cut", label: "TikTok cắt live", short: "Sàn cắt live", hint: "Cảnh báo vi phạm, lỗi kỹ thuật phía TikTok" },
+  { key: "test_room", label: "Live thử trước giờ", short: "Live thử", hint: "Room test vài phút trước khi vào ca" },
+  { key: "other", label: "Lý do khác", short: "Khác", hint: "Ghi chú thêm bên dưới" }
 ];
 
 export const breakReasonLabel = (r: string): string => BREAK_REASONS.find((x) => x.key === r)?.label ?? r;
+export const breakReasonShort = (r: string): string => BREAK_REASONS.find((x) => x.key === r)?.short ?? r;
 
 export interface RoomSpan {
   roomId: string;

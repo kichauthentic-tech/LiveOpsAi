@@ -14,7 +14,7 @@ import { durationDeviationInfo } from "../lib/sessionStatus";
 
 // Giao ca, MỘT luồng cho cả hai sàn (TikTok user chốt 06/10 tối; Shopee chuyển sang file 08/10, migration 0154): (1) up file số liệu
 // tải từ sàn ngay khi hết ca — TikTok Creator-Live-Performance, Shopee Live List — file giữ đúng ranh giới ca nối (số cộng dồn của
-// phòng/phiên, app trừ lần up trước, 0078); (2) các lượt live + ca nối (11/10: nằm ngay trong giao ca — restart thì mỗi lượt up file riêng,
+// phòng/phiên, app trừ lần up trước, 0078); (2) dòng thời gian các lượt live + ca nối (08/11: một hình, chỉ hỏi khi room chạy qua giờ giao) (11/10: nằm ngay trong giao ca — restart thì mỗi lượt up file riêng,
 // room chạy qua giờ giao thì đề xuất sẵn ca sau để trợ xác nhận); (3) chạm chọn sự cố/OT rồi bấm Giao ca (DB từ chối khi chưa có file).
 
 interface Props {
@@ -81,10 +81,10 @@ export function FileHandover({ session: s, isOps = false, allSessions, onSaved, 
         <Step no={1} state={stepState(fileDone, !fileDone)} title={`Tải lên file ${prof.reconciliationFile}`}>
           <SessionLiveSnapshotUpload session={s} onApplied={(u) => onSaved([u])} />
         </Step>
-        <Step no={2} state={stepState(false, fileDone)} title="Lượt live & ca nối" hint="chỉ khi có restart / chạy sang ca sau">
+        <Step no={2} state={stepState(false, fileDone)} title="Xem dòng thời gian">
           <SessionRoomCase key={s.id} session={s} canEdit isOps={isOps} allSessions={allSessions} onSessionsUpdated={onSaved} embedded restartFlagged={shown.on.includes("restart")} />
         </Step>
-        <Step no={3} state={stepState(false, fileDone)} title="Ca này có gì?" last>
+        <Step no={3} state={stepState(false, fileDone)} title="Ca có gì khác?" hint="bỏ qua nếu không" last>
           <HandoverIncidents value={shown} onChange={changeIncidents} />
         </Step>
       </ol>

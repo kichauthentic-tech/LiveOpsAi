@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { AlertTriangle, Link2, Link2Off, Plus, Scissors, Trash2 } from "lucide-react";
+import { AlertTriangle, Link2 } from "lucide-react";
 import { LiveSession } from "../types";
 import {
   RoomLinkCandidate,
@@ -10,7 +10,6 @@ import {
   estimateHandoverSplit,
   fetchRoomLinkCandidates,
   fetchRoomLinks,
-  fetchRoomLinksAmong,
   fetchSnapshotParts,
   isRoomLinksBackendMissing,
   linkSessionRoom,
@@ -18,9 +17,11 @@ import {
 } from "../lib/db/sessionRoomLinks";
 import { SessionSnapshot, fetchSessionSnapshot } from "../lib/db/sessionLiveSnapshots";
 import { parseSnapshotFile, type ParsedSnapshotFile } from "../lib/liveSnapshot/extractRooms";
-import { BREAK_REASONS, BreakReason, adjacentShiftChain, breakReasonLabel, buildTurns, chainBoundaries, nextLinkStatus, roomGapMinutes, roomsFromPrev, runOverRoom } from "../lib/liveSnapshot/roomCases";
+import { BREAK_REASONS, BreakReason, adjacentShiftChain, breakReasonLabel, breakReasonShort, nextLinkStatus, roomsFromPrev, runOverRoom } from "../lib/liveSnapshot/roomCases";
+import { CROSS_TOL_MS, timelineLayout } from "../lib/liveSnapshot/timeline";
+import { SessionTimeline } from "./SessionTimeline";
+import { MoreMenu, type MoreMenuItem } from "./ui/MoreMenu";
 import { sessionWindow, shortRoomId } from "../lib/liveSnapshot/roomSelection";
-import { hasSnapshot } from "../lib/sessionLedger";
 import { preloadSpreadsheetReader } from "../lib/dataraw/parseDataRawExcel";
 import { SnapshotRoomPicker } from "./SnapshotRoomPicker";
 import { errorMessage } from "../lib/errorMessage";
@@ -58,11 +59,7 @@ function writeDismissed(id: string) {
 }
 
 const fmtDay = (d: string) => (d ? `${d.slice(8, 10)}/${d.slice(5, 7)}` : "");
-const vnTime = (iso?: string) => (iso ? new Date(iso).toLocaleTimeString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit" }) : "…");
-const linkedLabel = (x: { date: string; startTime: string; endTime: string; hostName: string }) =>
-  `${fmtDay(x.date)} ${x.startTime}–${x.endTime}${x.hostName ? ` · ${x.hostName}` : ""}`;
 
-const chipBase = "text-2xs font-bold px-2 py-0.5 rounded-full border";
 const btnGhost = "inline-flex items-center gap-1.5 text-2xs font-bold px-2.5 py-1.5 rounded-lg bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-[var(--text)] disabled:opacity-40 transition-colors";
 
 export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSessionsUpdated, embedded = false, restartFlagged = false }: Props) {
@@ -79,7 +76,6 @@ export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSes
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [chainLinks, setChainLinks] = useState<{ prevId: string; nextId: string }[]>([]);
   const [dismissed, setDismissed] = useState(() => readDismissed(s.id));
   const [chooser, setChooser] = useState<RoomLinkCandidate[] | null>(null);
   const [pickedNext, setPickedNext] = useState("");
@@ -93,6 +89,7 @@ export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSes
   // Nạp lại khi số liệu của chính ca đổi (trợ vừa up file / ca khác tính lại) hoặc sau mỗi thao tác của component này.
   // Đổi sang ca khác: SessionWindow đặt key={s.id} nên component dựng lại từ đầu.
   const [tick, setTick] = useState(0);
+  const [openedAt] = useState(() => Date.now());
   const stamp = `${s.id}|${s.dataSource ?? ""}|${s.actualGmv}|${(s.liveRoomIds ?? []).join(",")}`;
   useEffect(() => {
     let alive = true;
@@ -114,16 +111,8 @@ export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSes
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chạy theo dấu vết số liệu `stamp`, không theo từng field của ca
   }, [stamp, tick]);
 
-  // Dải chuỗi ca liền kề trong ngày (cùng brand + sàn, cách nhau ≤ 30 phút).
+  // Ca liền kề trong ngày (cùng brand + sàn, cách nhau ≤ 30 phút) — để vẽ ca trước/ca sau trên dòng thời gian.
   const chain = allSessions ? adjacentShiftChain(s, allSessions) : [s];
-  const chainIds = chain.map((x) => x.id).join(",");
-  useEffect(() => {
-    if (chain.length < 2) return;
-    let alive = true;
-    fetchRoomLinksAmong(chainIds.split(",")).then((l) => { if (alive) setChainLinks(l); }).catch(() => undefined);
-    return () => { alive = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- chạy theo danh sách ca trong chuỗi + sau mỗi thao tác, không theo từng field
-  }, [chainIds, tick, stamp]);
 
   // Room chạy qua giờ giao (chưa kết thúc / kết thúc sau giờ hết ca) mà chưa nối ⇒ tự mở danh sách ca sau để trợ chỉ xác nhận.
   const win = sessionWindow(s);
@@ -175,7 +164,7 @@ export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSes
   const confirmLink = async () => {
     const cand = chooser?.find((c) => c.sessionId === pickedNext);
     if (!cand) return;
-    if (!(await confirm(`Xác nhận: ${unit} của ca này chạy tiếp sang ca ${linkedLabel(cand)}? Số của ca sau = ${unit} cộng dồn trừ file ca này tải lên lúc giao ca.`))) return;
+    // Chạm "Đúng, nối" đã là xác nhận (08/11) — không hỏi lại bằng hộp thoại một câu dài.
     if (await run(() => linkSessionRoom(s.id, cand.sessionId))) setChooser(null);
   };
 
@@ -216,35 +205,37 @@ export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSes
   };
 
   if (unavailable) return null;
-  // Bố cục 19/10: trong form Giao ca (bước "2 · Lượt live & ca nối") khối này không vẽ khung + tiêu đề riêng — trước đó tiêu đề
-  // lặp hai lần và thêm một tầng hộp trong hộp Giao ca.
-  const shell = (body: React.ReactNode) =>
+  // Cửa sổ ca gọn (08/11, user duyệt demo): khối này là MỘT dòng thời gian (room, khoảng nghỉ, giờ giao ca, ca kề bên) thay cho các
+  // viên + hộp chữ "nối sang ca", "Các lượt live", "Chuỗi ca liền kề" + chú giải. Chữ chỉ còn khi có việc phải làm (ca bị khoá số,
+  // room chưa nối); câu hỏi trả lời bằng ô chạm; thao tác ít dùng vào menu ⋯. Trong form Giao ca không vẽ khung/tiêu đề riêng.
+  const shell = (body: React.ReactNode, menu?: React.ReactNode) =>
     embedded ? (
-      <div className="space-y-2">{body}</div>
+      <div className="space-y-2">{body}{menu && <div className="flex justify-end">{menu}</div>}</div>
     ) : (
-      <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface-base)]/60 p-3 space-y-2">
-        <h4 className="text-xs font-bold text-[var(--text-muted)]">Lượt live & ca nối</h4>
+      <section className="space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <h4 className="text-xs font-bold text-[var(--text-muted)]">Dòng thời gian</h4>
+          {menu}
+        </div>
         {body}
       </section>
     );
-  if (loading) return shell(<p className="text-2xs text-[var(--text-faint)]">Đang tải thông tin {unit}...</p>);
+  // Đang tải: ca đã có room thì giữ chỗ bằng một thanh mờ cùng cỡ để cửa sổ không giật khi dòng thời gian hiện ra.
+  if (loading) {
+    if (embedded) return shell(<p className="text-2xs text-[var(--text-faint)]">Đang tải thông tin {unit}...</p>);
+    return (s.liveRoomIds?.length ?? 0) > 0 ? shell(<div className="h-10 rounded-md bg-[var(--surface-elevated)] animate-pulse" aria-label={`Đang tải ${unit}`} />) : null;
+  }
 
   const rooms = snapshot?.rooms ?? [];
-  const gap = roomGapMinutes(rooms);
-  const multiRoom = rooms.length > 1 || parts.length > 0;
-  const turns = buildTurns(rooms, parts);
-  const nextTurnNo = (turns[turns.length - 1]?.no ?? 1) + 1;
   const fromPrevRooms = snapshot ? roomsFromPrev(rooms, win) : [];
   const myIdx = chain.findIndex((x) => x.id === s.id);
   const prevShift = myIdx > 0 ? chain[myIdx - 1] : undefined;
-  const boundaries = chainBoundaries(chain, chainLinks, (id) => {
-    const x = chain.find((c) => c.id === id);
-    return !!x && hasSnapshot(x);
-  });
+  const nextShift = myIdx >= 0 && myIdx < chain.length - 1 ? chain[myIdx + 1] : undefined;
   const prev = links.prev;
   const next = links.next;
   const waiting = nextLinkStatus(!!prev, !!prev?.hasSnapshot) === "waiting";
   const knownRoomIds = new Set(rooms.map((r) => r.roomId));
+  const nextTurnNo = Math.max(1, rooms.length, ...parts.map((p) => p.partNo)) + 1;
 
   if (pendingFile && partForm) {
     const fresh = pendingFile.parsed.rows.filter((r) => !knownRoomIds.has(r.roomId));
@@ -254,122 +245,120 @@ export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSes
           session={s}
           rows={fresh}
           fileName={pendingFile.fileName}
-          heading={`Lượt ${nextTurnNo} (${breakReasonLabel(partForm.reason)}) — chọn ${prof.liveFileRowNoun} của lượt này`}
+          heading={`Lượt ${nextTurnNo} (${breakReasonShort(partForm.reason)}) — chọn ${prof.liveFileRowNoun} của lượt này`}
           prevBaseline={prev?.boundaryAt ? { boundaryMs: Date.parse(prev.boundaryAt), roomIds: prev.roomIds, label: `${prev.startTime}–${prev.endTime}` } : undefined}
           confirmLabel={`Thêm lượt ${nextTurnNo} vào ca`}
           busy={busy}
           onConfirm={(r) => void savePart(r, pendingFile.fileName, pendingFile.parsed.periodLabel)}
           onCancel={() => { setPendingFile(null); setError(null); }}
         />
-        {fresh.length < pendingFile.parsed.rows.length && (
-          <p className="text-2xs text-[var(--text-faint)]">Đã ẩn {pendingFile.parsed.rows.length - fresh.length} {prof.liveFileRowNoun} đã có ở lượt trước của ca này.</p>
-        )}
         {error && <ErrorLine text={error} />}
       </div>
     );
   }
 
-  return shell(
+  // Ca kề bên trên trục: ca đã nối luôn vẽ; ca liền kề chưa nối chỉ vẽ khi có room chạy sang phía đó (để thấy room đang lấn ca nào).
+  const shiftOf = (x: { date: string; startTime: string; endTime: string; hostName?: string }, linked: boolean) => {
+    const w = sessionWindow(x);
+    return { startMs: w.startMs, endMs: w.endMs, label: `${x.startTime.slice(0, 5)}–${x.endTime.slice(0, 5)}${x.hostName ? ` ${x.hostName}` : ""}`, linked };
+  };
+  const timed = rooms.filter((r) => r.startedAt);
+  const crossesStart = timed.some((r) => Date.parse(r.startedAt!) < win.startMs - CROSS_TOL_MS);
+  const crossesEnd = timed.some((r) => !r.endedAt || Date.parse(r.endedAt) > win.endMs + CROSS_TOL_MS);
+  const layout =
+    snapshot && !snapshot.isEstimated && timed.length > 0
+      ? timelineLayout({
+          win,
+          rooms,
+          parts,
+          prev: prev ? shiftOf(prev, true) : prevShift && crossesStart ? shiftOf(prevShift, false) : undefined,
+          next: next ? shiftOf(next, true) : nextShift && crossesEnd ? shiftOf(nextShift, false) : undefined,
+          nowMs: openedAt
+        })
+      : null;
+
+  // Trong Giao ca mà chưa tải file: chưa có gì để nối / thêm lượt ⇒ không chào nút ⋯ trơ trọi.
+  const menuItems: MoreMenuItem[] = canEdit && !chooser && !partForm && (snapshot || !embedded)
+    ? [
+        ...(!next ? [{ label: `Nối sang ca sau (${unit} chạy tiếp)`, onClick: () => void openChooser(), disabled: busy }] : []),
+        ...(next ? [{ label: "Gỡ nối với ca sau", onClick: () => void doUnlink(), disabled: busy, danger: true }] : []),
+        ...(snapshot ? [{ label: "Thêm lượt restart (tải file riêng)", onClick: () => setPartForm({ reason: "network", note: "" }), disabled: busy }] : []),
+        ...parts.map((p) => ({ label: `Xoá lượt ${p.partNo} (${breakReasonShort(p.reason)})`, onClick: () => void removePart(p), disabled: busy, danger: true }))
+      ]
+    : [];
+  const menu = menuItems.length > 0 ? <MoreMenu items={menuItems} label="Thao tác ca nối / restart" /> : undefined;
+
+  const warn = (children: React.ReactNode, action?: React.ReactNode) => (
+    <div className="rounded-xl border border-amber-800 bg-amber-950/40 p-2.5 text-xs space-y-1.5">
+      <p className="text-amber-300 flex items-start gap-1.5"><AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" /><span>{children}</span></p>
+      {action}
+    </div>
+  );
+
+  const body = (
     <div className="space-y-3">
-      {/* Trạng thái hiện tại — trong Giao ca (23/10) ca bình thường không vẽ viên "Bình thường — 1 room riêng": tiêu đề bước đã nói
-          "chỉ khi có restart / chạy sang ca sau", viên đó chỉ là thêm một dòng. */}
-      {(prev || next || multiRoom || !embedded || (s.liveRoomIds?.length ?? 0) > 1) && <div className="flex flex-wrap items-center gap-1.5">
-        {!prev && !next && !multiRoom && (s.liveRoomIds?.length ?? 0) > 1 && (
-          <span className={`${chipBase} bg-amber-950 text-amber-300 border-amber-800`}>{s.liveRoomIds!.length} {unit} theo số đã nạp — chưa có file giao ca để ghi lý do từng lượt</span>
+      {layout && <SessionTimeline layout={layout} unit={unit} />}
+      {embedded && !snapshot && <p className="text-2xs text-[var(--text-faint)]">Hiện ra sau khi tải file ở bước 1.</p>}
+      {snapshot?.isEstimated && <p className="text-2xs text-amber-300">Số ca này đang chia ước lượng theo thời gian — tự cập nhật khi có file thật.</p>}
+      {!snapshot && !embedded && (s.liveRoomIds?.length ?? 0) > 1 && (
+        <p className="text-2xs text-[var(--text-muted)]">{s.liveRoomIds!.length} {unit} theo số đã nạp.</p>
+      )}
+
+      {/* Chỉ còn chữ khi có việc phải làm. */}
+      {prev && waiting &&
+        warn(
+          <>Ca trước ({prev.startTime}–{prev.endTime}) chưa tải file ⇒ số ca này đang khoá. Nhờ trợ ca trước tải file.</>,
+          isOps && (
+            <button onClick={() => void doEstimate(prev.id, s.id, `${prev.startTime}–${prev.endTime}`)} disabled={busy || !snapshot} className={btnGhost}>
+              {snapshot ? "Chia ước lượng theo thời gian" : "Tải file ca này trước rồi mới chia ước lượng được"}
+            </button>
+          )
         )}
-        {!embedded && !prev && !next && !multiRoom && (s.liveRoomIds?.length ?? 0) <= 1 && <span className={`${chipBase} bg-[var(--surface-elevated)] text-[var(--text-muted)] border-[var(--border)]`}>Bình thường — 1 {unit} riêng</span>}
-        {prev && <span className={`${chipBase} bg-sky-950 text-sky-300 border-sky-800`}>Nối từ ca {prev.startTime}–{prev.endTime}</span>}
-        {next && <span className={`${chipBase} bg-sky-950 text-sky-300 border-sky-800`}>Nối sang ca {next.startTime}–{next.endTime}</span>}
-        {multiRoom && <span className={`${chipBase} bg-amber-950 text-amber-300 border-amber-800`}>{rooms.length} {unit}{parts.length > 0 ? ` · bị ngắt ×${Math.max(parts.length, rooms.length - 1)}` : ""}</span>}
-      </div>}
+      {prev && !waiting && prev.isEstimated && <p className="text-2xs text-amber-300">Mốc ca trước là ước lượng — tự cập nhật khi ca trước tải file.</p>}
+      {next && !snapshot &&
+        warn(
+          <>Chưa tải file ⇒ ca sau ({next.startTime}–{next.endTime}) đang khoá số.</>,
+          isOps && next.hasSnapshot && (
+            <button onClick={() => void doEstimate(s.id, next.id, `${s.startTime}–${s.endTime}`)} disabled={busy} className={btnGhost}>
+              Quên tải file — chia ước lượng theo thời gian
+            </button>
+          )
+        )}
+      {!prev && fromPrevRooms.length > 0 &&
+        warn(
+          <>{Unit} {fromPrevRooms.map((r) => shortRoomId(r.roomId)).join(", ")} bắt đầu trước giờ vào ca nhưng chưa nối từ ca trước ⇒ đang tính cả {unit} cho ca này.</>,
+          isOps && prevShift && (
+            <button onClick={() => void run(() => linkSessionRoom(prevShift.id, s.id))} disabled={busy} className={btnGhost}>
+              <Link2 className="w-3.5 h-3.5" /> Nối từ ca {prevShift.startTime.slice(0, 5)}–{prevShift.endTime.slice(0, 5)}
+            </button>
+          )
+        )}
 
-      {/* Ca này nối TỪ ca trước */}
-      {prev && (
-        <div className={`rounded-xl border p-2.5 text-xs space-y-1.5 ${waiting ? "border-amber-800 bg-amber-950/40" : "border-sky-900 bg-sky-950/30"}`}>
-          <p className="text-[var(--text)]">
-            <Link2 className="w-3.5 h-3.5 inline mr-1 -mt-0.5" />
-            Ca này nối từ ca <b>{linkedLabel(prev)}</b>: số = {unit} cộng dồn <b>trừ</b> mốc ca đó đã tải lên lúc giao ca.
-          </p>
-          {waiting ? (
-            <>
-              <p className="text-amber-300 flex items-start gap-1.5">
-                <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
-                Ca trước chưa tải lên file lúc giao ca ⇒ số của ca này đang KHOÁ (chưa ghi). Nhờ trợ ca trước tải lên file.
-              </p>
-              {isOps && (
-                <button onClick={() => void doEstimate(prev.id, s.id, `${prev.startTime}–${prev.endTime}`)} disabled={busy || !snapshot} className={btnGhost}>
-                  Ca trước chưa tải file lên — chia ước lượng theo thời gian
-                </button>
-              )}
-              {isOps && !snapshot && <p className="text-2xs text-[var(--text-faint)]">Cần tải lên file của ca này trước thì mới chia ước lượng được.</p>}
-            </>
-          ) : prev.isEstimated ? (
-            <p className="text-amber-300 flex items-start gap-1.5">
-              <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
-              Mốc của ca trước là ƯỚC LƯỢNG (chia theo thời gian). Khi trợ ca trước tải lên file thật, số của ca này tự cập nhật.
-            </p>
-          ) : (
-            <p className="text-sky-200/80">Ca trước đã có mốc — số của ca này đã trừ chính xác.</p>
-          )}
-        </div>
-      )}
-
-      {/* Ca này nối SANG ca sau */}
-      {next && (
-        <div className="rounded-xl border border-sky-900 bg-sky-950/30 p-2.5 text-xs space-y-1.5">
-          <p className="text-[var(--text)]">
-            <Link2 className="w-3.5 h-3.5 inline mr-1 -mt-0.5" />
-            {Unit} chạy tiếp sang ca <b>{linkedLabel(next)}</b>.
-          </p>
-          {!snapshot ? (
-            <p className="text-amber-300 flex items-start gap-1.5">
-              <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
-              Chưa tải lên file lúc giao ca — ca sau sẽ bị khoá số cho tới khi ca này tải lên file (đây chính là mốc để tách số hai ca).
-            </p>
-          ) : (
-            <p className="text-sky-200/80">Đã có mốc giao ca — ca sau trừ đúng file này.</p>
-          )}
-          <div className="flex flex-wrap gap-2">
-            {canEdit && (
-              <button onClick={() => void doUnlink()} disabled={busy} className={btnGhost}>
-                <Link2Off className="w-3.5 h-3.5" /> Gỡ liên kết
-              </button>
-            )}
-            {isOps && !snapshot && next.hasSnapshot && (
-              <button onClick={() => void doEstimate(s.id, next.id, `${s.startTime}–${s.endTime}`)} disabled={busy} className={btnGhost}>
-                Quên tải lên file — chia ước lượng theo thời gian
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Chọn ca sau */}
+      {/* Câu hỏi nối ca: chạm chọn ca sau rồi Đúng / Không. */}
       {chooser && (
-        <div className="rounded-xl border border-[var(--accent)]/40 bg-[var(--surface-base)] p-3 space-y-2">
-          <p className="text-xs font-bold text-[var(--text)]">
-            {overRoom ? <>{Unit} <span className="font-mono">{shortRoomId(overRoom.roomId)}</span> đang chạy qua giờ giao ca — chạy tiếp sang ca nào?</> : <>{Unit} này chạy tiếp sang ca nào?</>}
+        <div className="rounded-xl border-[1.5px] border-[var(--accent)]/45 p-3 space-y-2">
+          <p className="text-sm font-bold text-[var(--text)]">
+            {overRoom ? `${Unit} còn live lúc ${s.endTime.slice(0, 5)}. Nối sang ca sau?` : `${Unit} chạy tiếp sang ca nào?`}
           </p>
-          <p className="text-2xs text-[var(--text-muted)]">Chỉ liệt kê ca {s.platform} cùng brand đã có trên lịch, bắt đầu sau ca này và trong vòng 2 giờ sau khi ca này hết.</p>
           {chooser.length === 0 ? (
-            <p className="text-xs text-amber-300">Chưa có ca nào trên lịch phù hợp. Nhờ OPS thêm ca sau vào lịch trước, rồi quay lại đây.</p>
+            <p className="text-xs text-amber-300">Chưa có ca sau trên lịch — nhờ OPS thêm ca rồi quay lại.</p>
           ) : (
-            <ul className="space-y-1.5">
+            <div className="flex flex-wrap gap-1.5">
               {chooser.map((c) => (
-                <li key={c.sessionId}>
-                  <label className={`flex items-start gap-2.5 rounded-lg border px-2.5 py-2 text-xs ${c.takenBy ? "opacity-45 border-[var(--border)]" : pickedNext === c.sessionId ? "border-emerald-700 bg-emerald-950/30 cursor-pointer" : "border-[var(--border)] cursor-pointer"}`}>
-                    <input type="radio" name="next-session" className="mt-0.5 w-4 h-4 shrink-0" disabled={!!c.takenBy} checked={pickedNext === c.sessionId} onChange={() => setPickedNext(c.sessionId)} />
-                    <span className="min-w-0">
-                      <span className="block font-bold text-[var(--text)]">{fmtDay(c.date)} · {c.startTime}–{c.endTime}</span>
-                      <span className="block text-2xs text-[var(--text-muted)]">
-                        Host {c.hostName || "chưa gán"}{c.coHostName ? ` · Trợ ${c.coHostName}` : ""}{c.studioName ? ` · ${c.studioName}` : ""}
-                      </span>
-                      {c.takenBy && <span className="block text-2xs text-[var(--text-faint)]">Đã được nối từ một ca khác.</span>}
-                    </span>
-                  </label>
-                </li>
+                <button
+                  key={c.sessionId}
+                  type="button"
+                  disabled={!!c.takenBy}
+                  aria-pressed={pickedNext === c.sessionId}
+                  title={c.takenBy ? "Đã được nối từ một ca khác" : undefined}
+                  onClick={() => setPickedNext(c.sessionId)}
+                  className={`min-h-10 px-3 rounded-xl border text-xs font-bold text-left disabled:opacity-40 ${pickedNext === c.sessionId ? "seg-on" : "border-[var(--border)] text-[var(--text)]"}`}
+                >
+                  {c.date !== s.date ? `${fmtDay(c.date)} · ` : ""}{c.startTime.slice(0, 5)}–{c.endTime.slice(0, 5)}
+                  <span className="block text-2xs font-normal text-[var(--text-muted)]">{c.hostName || "chưa gán host"}</span>
+                </button>
               ))}
-            </ul>
+            </div>
           )}
           <div className="flex gap-2">
             <button
@@ -377,171 +366,71 @@ export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSes
               disabled={busy}
               className="min-h-10 px-4 rounded-xl bg-[var(--surface-elevated)] text-[var(--text-muted)] font-bold text-xs"
             >
-              {overRoom ? `Không, ${unit} kết thúc ở ca này` : "Thôi"}
+              Không
             </button>
-            <button onClick={() => void confirmLink()} disabled={busy || !pickedNext} className="flex-1 min-h-10 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black text-xs">
-              {busy ? "Đang lưu..." : "Xác nhận ca nối này"}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Các lượt live của ca: mỗi room = một lượt; lượt restart có lý do + file riêng */}
-      {snapshot && !snapshot.isEstimated && (
-        <div className="rounded-xl border border-amber-900 bg-amber-950/20 p-2.5 text-xs space-y-1.5">
-          <p className="font-bold text-amber-200">
-            <Scissors className="w-3.5 h-3.5 inline mr-1 -mt-0.5" />
-            Các lượt live của ca{turns.length > 1 ? ` — restart ×${turns.length - 1}, số ca là tổng mọi ${unit}` : ""}
-          </p>
-          <ul className="space-y-1 text-[var(--text)]">
-            {turns.map((t) => {
-              const spans = t.rooms.map((r) => `${vnTime(r.startedAt)}→${r.endedAt ? vnTime(r.endedAt) : "đang live"} (${shortRoomId(r.roomId)})`).join(", ");
-              const part = parts.find((p) => p.id === t.partId);
-              return (
-                <li key={t.partId ?? "first"} className="flex items-start justify-between gap-2">
-                  <span>
-                    <b>Lượt {t.no}</b>
-                    {t.no > 1 ? ` · ${breakReasonLabel(t.reason ?? "other")}` : " · lượt đầu"}
-                    {spans ? ` · ${spans}` : t.no > 1 ? ` · chỉ ghi nhận (${unit} đã nằm trong file lượt trước)` : ""}
-                    {t.note ? <span className="text-[var(--text-muted)]"> — {t.note}</span> : null}
-                  </span>
-                  {canEdit && part && (
-                    <button onClick={() => void removePart(part)} disabled={busy} title="Xoá lượt này" className="p-1.5 -m-1.5 shrink-0 text-[var(--text-faint)] hover:text-rose-400 disabled:opacity-40">
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-          {multiRoom && (
-            <p className="text-2xs text-[var(--text-muted)]">
-              Gián đoạn giữa các {unit}: <b>{gap} phút</b> · giờ live = cộng thời lượng từng {unit} (khoảng nghỉ không tính).
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* Room bắt đầu trước giờ vào ca mà ca này chưa được xác nhận nối từ ca trước ⇒ đang nhận CẢ room */}
-      {!prev && fromPrevRooms.length > 0 && (
-        <div className="rounded-xl border border-amber-800 bg-amber-950/40 p-2.5 text-xs space-y-1.5">
-          <p className="text-amber-300 flex items-start gap-1.5">
-            <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
-            <span>
-              {Unit} {fromPrevRooms.map((r) => shortRoomId(r.roomId)).join(", ")} bắt đầu TRƯỚC giờ vào ca nhưng ca này chưa được xác nhận nối từ ca trước ⇒ đang tính CẢ {unit} cho ca này.
-              {prevShift ? ` Ca liền trước: ${linkedLabel(prevShift)}.` : " Chưa thấy ca liền trước trên lịch."}
-            </span>
-          </p>
-          {isOps && prevShift && (
-            <button
-              onClick={async () => {
-                if (!(await confirm(`Xác nhận: ${unit} của ca ${linkedLabel(prevShift)} chạy tiếp sang ca này? Số ca này = ${unit} cộng dồn trừ file ca đó tải lên lúc giao ca.`))) return;
-                await run(() => linkSessionRoom(prevShift.id, s.id));
-              }}
-              disabled={busy}
-              className={btnGhost}
-            >
-              <Link2 className="w-3.5 h-3.5" /> Xác nhận nối từ ca {prevShift.startTime.slice(0, 5)}–{prevShift.endTime.slice(0, 5)}
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Dải chuỗi ca liền kề trong ngày */}
-      {chain.length > 1 && (
-        <div className="rounded-xl border border-[var(--border)] p-2.5 space-y-1.5">
-          <p className="text-xs font-bold text-[var(--text-muted)]">Chuỗi ca liền kề trong ngày</p>
-          <div className="flex flex-wrap items-center gap-1 text-2xs">
-            {chain.map((c, i) => {
-              const bd = i > 0 ? boundaries[i - 1] : undefined;
-              const here = c.id === s.id;
-              return (
-                <React.Fragment key={c.id}>
-                  {bd && (
-                    <span
-                      title={bd.kind === "linked" ? `${Unit} chạy tiếp: ca sau trừ mốc ca trước${bd.locked ? " — ca trước CHƯA tải lên file ⇒ ca sau đang khoá số" : ""}` : `Chưa xác nhận nối — ${unit} mới ở ca sau`}
-                      className={`font-bold px-1 ${bd.kind === "linked" ? (bd.locked ? "text-amber-300" : "text-sky-300") : "text-[var(--text-faint)]"}`}
-                    >
-                      {bd.kind === "linked" ? (bd.locked ? "⛓🔒" : "⛓") : "○"}
-                    </span>
-                  )}
-                  <span className={`px-2 py-0.5 rounded-lg border ${here ? "border-emerald-700 bg-emerald-950/40 text-emerald-200 font-bold" : "border-[var(--border)] text-[var(--text-muted)]"}`}>
-                    {c.startTime.slice(0, 5)}–{c.endTime.slice(0, 5)} {hasSnapshot(c) ? "✔" : "·"}
-                  </span>
-                </React.Fragment>
-              );
-            })}
-          </div>
-          <p className="text-2xs text-[var(--text-faint)]">⛓ {unit} chạy tiếp (ca sau trừ mốc ca trước) · ○ chưa xác nhận nối ({unit} mới) · 🔒 chờ file ca trước · ✔ đã có file</p>
-        </div>
-      )}
-
-      {/* Thêm mảnh */}
-      {partForm && !pendingFile && (
-        <div className="rounded-xl border border-[var(--accent)]/40 bg-[var(--surface-base)] p-3 space-y-2">
-          <p className="text-xs font-bold text-[var(--text)]">Lượt {nextTurnNo}: vì sao {unit} bị ngắt?</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-            {BREAK_REASONS.map((r) => (
-              <label key={r.key} className={`flex items-start gap-2 rounded-lg border px-2.5 py-1.5 text-xs cursor-pointer ${partForm.reason === r.key ? "border-emerald-700 bg-emerald-950/30" : "border-[var(--border)]"}`}>
-                <input type="radio" name="break-reason" className="mt-0.5" checked={partForm.reason === r.key} onChange={() => setPartForm({ ...partForm, reason: r.key })} />
-                <span><span className="block font-bold text-[var(--text)]">{r.label}</span><span className="block text-2xs text-[var(--text-faint)]">{r.hint}</span></span>
-              </label>
-            ))}
-          </div>
-          <input
-            value={partForm.note}
-            onChange={(e) => setPartForm({ ...partForm, note: e.target.value })}
-            placeholder="Ghi chú thêm (không bắt buộc)"
-            className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] text-xs"
-          />
-          <div className="flex flex-wrap gap-2">
-            <button onClick={() => { setPartForm(null); setError(null); }} disabled={busy} className="min-h-10 px-4 rounded-xl bg-[var(--surface-elevated)] text-[var(--text-muted)] font-bold text-xs">Thôi</button>
-            <button onClick={() => fileRef.current?.click()} disabled={busy} className="min-h-10 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black text-xs">
-              {busy ? "Đang xử lý..." : `Tải lên file riêng của lượt ${nextTurnNo}`}
-            </button>
-            {rooms.length > 1 && (
-              <button onClick={() => void savePart([], null)} disabled={busy} className="min-h-10 px-4 rounded-xl bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-[var(--text)] font-bold text-xs" title={`Các ${unit} đã nằm sẵn trong file đã tải lên — chỉ ghi lý do`}>
-                Chỉ ghi nhận lý do ({unit} đã có trong file)
+            {chooser.length > 0 && (
+              <button onClick={() => void confirmLink()} disabled={busy || !pickedNext} className="flex-1 min-h-10 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black text-xs">
+                {busy ? "Đang lưu..." : "Đúng, nối"}
               </button>
             )}
           </div>
         </div>
       )}
 
-      {/* Nút hành động */}
-      {canEdit && !chooser && !partForm && (
-        <div className="flex flex-wrap gap-2">
-          {!next && (
-            <button onClick={() => void openChooser()} disabled={busy} className={btnGhost}>
-              <Link2 className="w-3.5 h-3.5" /> Ca nối: {unit} chạy tiếp sang ca sau
+      {/* Thêm lượt restart (từ menu ⋯): chạm lý do → tải file riêng của lượt. */}
+      {partForm && !pendingFile && (
+        <div className="rounded-xl border-[1.5px] border-[var(--accent)]/45 p-3 space-y-2">
+          <p className="text-sm font-bold text-[var(--text)]">Lượt {nextTurnNo} vì sao?</p>
+          <div className="flex flex-wrap gap-1.5">
+            {BREAK_REASONS.map((r) => (
+              <button
+                key={r.key}
+                type="button"
+                title={r.hint}
+                aria-pressed={partForm.reason === r.key}
+                onClick={() => setPartForm({ ...partForm, reason: r.key })}
+                className={`min-h-9 px-3 rounded-xl border text-xs font-bold ${partForm.reason === r.key ? "seg-on" : "border-[var(--border)] text-[var(--text)]"}`}
+              >
+                {r.short}
+              </button>
+            ))}
+          </div>
+          <input
+            value={partForm.note}
+            onChange={(e) => setPartForm({ ...partForm, note: e.target.value })}
+            placeholder="Ghi chú (không bắt buộc)"
+            className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] text-xs"
+          />
+          <div className="flex flex-wrap gap-2">
+            <button onClick={() => { setPartForm(null); setError(null); }} disabled={busy} className="min-h-10 px-4 rounded-xl bg-[var(--surface-elevated)] text-[var(--text-muted)] font-bold text-xs">Thôi</button>
+            <button onClick={() => fileRef.current?.click()} disabled={busy} className="min-h-10 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black text-xs">
+              {busy ? "Đang xử lý..." : `Tải file lượt ${nextTurnNo}`}
             </button>
-          )}
-          {/* Trong Giao ca: chưa up file thì chưa có lượt đầu ⇒ ẩn hẳn nút restart thay vì một nút xám + một dòng giải thích. */}
-          {(snapshot || !embedded || restartFlagged) && (
-            <button
-              onClick={() => setPartForm({ reason: "network", note: "" })}
-              disabled={busy || !snapshot}
-              title={snapshot ? "Mỗi lượt restart có một lần tải lên file riêng" : "Tải lên file của lượt đầu trước, rồi mới thêm lượt restart"}
-              className={btnGhost}
-            >
-              <Plus className="w-3.5 h-3.5" /> Thêm lượt restart (tải lên file riêng)
-            </button>
-          )}
+            {rooms.length > 1 && (
+              <button onClick={() => void savePart([], null)} disabled={busy} className="min-h-10 px-4 rounded-xl bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-[var(--text)] font-bold text-xs" title={`Các ${unit} đã nằm sẵn trong file đã tải lên — chỉ ghi lý do`}>
+                Chỉ ghi lý do
+              </button>
+            )}
+          </div>
         </div>
       )}
-      {canEdit && embedded && restartFlagged && !chooser && !partForm && (
+
+      {/* Trong Giao ca: trợ báo có restart mà file chưa có lượt sau ⇒ chỉ đường một dòng. */}
+      {canEdit && embedded && restartFlagged && !chooser && !partForm && rooms.length < 2 && (
         <p className="text-2xs text-amber-300/90">
-          {snapshot
-            ? `Lượt restart chưa có trong file vừa tải lên thì bấm "Thêm lượt restart" — mỗi lượt một file riêng.`
-            : `Có restart: file ở bước 1 thường có đủ các lượt — chọn hết ${prof.liveFileRowNoun} của ca ở đó, app hỏi lý do từng lượt. Lượt nào không có trong file thì tải lên file riêng bằng "Thêm lượt restart" sau khi xong bước 1.`}
+          {snapshot ? `Có restart mà file chỉ có 1 ${unit}: bấm ⋯ → "Thêm lượt restart".` : `Có restart: chọn hết ${prof.liveFileRowNoun} của ca khi tải file ở bước 1.`}
         </p>
       )}
-      {canEdit && !embedded && !snapshot && !chooser && !partForm && <p className="text-2xs text-[var(--text-faint)]">Restart giữa ca: tải lên file lượt đầu trước, rồi bấm "Thêm lượt restart" — mỗi lượt có một lần tải lên file riêng.</p>}
 
       {error && <ErrorLine text={error} />}
       <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleFile(f); }} />
     </div>
   );
+
+  // Ngoài Giao ca: ca chưa có file, không nối, không cảnh báo ⇒ không vẽ gì (ô trống chỉ thêm một tiêu đề).
+  const hasContent = !!layout || !!chooser || !!partForm || !!error || waiting || (!!next && !snapshot) || fromPrevRooms.length > 0 || !!snapshot?.isEstimated || (s.liveRoomIds?.length ?? 0) > 1;
+  if (!embedded && !hasContent) return null;
+  return shell(body, menu);
 }
 
 function ErrorLine({ text }: { text: string }) {

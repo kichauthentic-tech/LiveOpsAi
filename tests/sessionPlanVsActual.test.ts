@@ -1,4 +1,4 @@
-// "Kế hoạch vs thực tế" của Cửa sổ Ca Live: hai cột Kế hoạch | Thực tế, vẽ SSR để bắt NaN/undefined và rò target cho brand.
+// Kết quả ca ở đầu Cửa sổ Ca Live (08/11: GMV to + % target + 2 ô giờ live / GMV/giờ), vẽ SSR để bắt NaN/undefined và rò target cho brand.
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test, vi } from "vitest";
@@ -21,21 +21,24 @@ const render = (s: LiveSession, o: Partial<{ liveHours: number; hideMetrics: boo
 const noBadText = (html: string) => expect(html).not.toMatch(/NaN|undefined|Infinity|\[object/);
 
 describe("SessionPlanVsActual", () => {
-  test("ca chưa có số: hai cột, thực tế trống, không có target", () => {
+  test("ca chưa có số: GMV trống, giờ ca kế hoạch, không có target", () => {
     const html = render(base);
-    expect(html).toContain("Kế hoạch");
-    expect(html).toContain("Thực tế");
-    expect(html).toContain("19:00–22:00 (3h)");
+    expect(html).toContain("Giờ live");
+    expect(html).toContain("19:00–22:00");
+    expect(html).toContain("/ 3h");
     expect(html).toContain("chưa có target");
+    expect(html).not.toContain("progressbar");
     noBadText(html);
   });
 
-  test("ca có target + số: kế hoạch GMV/giờ = target/giờ ca, % target ở cột thực tế", () => {
+  test("ca có target + số: % target + thanh, GMV/giờ thực tế / kế hoạch (target ÷ giờ ca)", () => {
     const s = { ...base, targetGmv: 30_000_000, actualGmv: 15_000_000, actualStartAt: "2026-10-08T12:05:00Z", actualEndAt: "2026-10-08T15:00:00Z" } as LiveSession;
     const html = render(s, { liveHours: 2.9 });
-    expect(html).toContain("50% target");
-    expect(html).toContain("(2,9h)");
-    expect(html).toContain("10M"); // 30M / 3h
+    expect(html).toContain("50%");
+    expect(html).toContain("target 30M");
+    expect(html).toContain("progressbar");
+    expect(html).toContain("2,9h");
+    expect(html).toContain("/ 10M"); // 30M / 3h
     noBadText(html);
   });
 
@@ -57,7 +60,7 @@ describe("SessionPlanVsActual", () => {
   test("brand, tháng chưa phát hành: không lộ số", () => {
     const s = { ...base, targetGmv: 30_000_000, actualGmv: 15_000_000 } as LiveSession;
     const html = render(s, { isBrandView: true, hideMetrics: true });
-    expect(html).toContain("chưa phát hành");
+    expect(html).toContain("sau khi Report Tháng được phát hành");
     expect(html).not.toContain("15M");
   });
 });

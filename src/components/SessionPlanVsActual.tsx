@@ -11,8 +11,8 @@ import { errorMessage } from "../lib/errorMessage";
 import { metricHint } from "../lib/metricGlossary";
 import { platformOf } from "../lib/reportPlatform";
 
-// "Kế hoạch vs thực tế" của Cửa sổ Ca Live: hai cột — Kế hoạch (giờ ca, target từ Kế Hoạch Tháng) và Thực tế (giờ live thật,
-// GMV). Thực tế có hai đường vào: up file (Creator-Live-Performance / Live List / giao ca) tự ghi đè, hoặc ops gõ tay khi
+// Kết quả ca ở đầu Cửa sổ Ca Live (trước 08/11 là bảng "Kế hoạch vs thực tế"): GMV thực tế so với target từ Kế Hoạch Tháng, giờ live
+// và GMV/giờ thực tế / kế hoạch. Thực tế có hai đường vào: up file (Creator-Live-Performance / Live List / giao ca) tự ghi đè, hoặc ops gõ tay khi
 // ca chưa có file (RPC set_session_actuals, 0152). Ca đã có số từ file thì ô nhập tay ẩn — file là bằng chứng.
 
 interface Props {
@@ -30,7 +30,7 @@ interface Props {
 const fmtTime = (iso?: string) => (iso ? new Date(iso).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : "");
 const clock = (iso?: string) => (iso ? new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "");
 const fmtHours = (h: number) => (h > 0 ? `${h.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h` : "—");
-const fmtPct = (n: number) => `${n.toLocaleString("vi-VN", { maximumFractionDigits: 2 })}%`;
+const fmtPct = (n: number) => `${n.toLocaleString("vi-VN", { maximumFractionDigits: n < 10 ? 1 : 0 })}%`;
 
 const inputCls = "w-full bg-[var(--surface)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] text-xs";
 
@@ -83,59 +83,70 @@ export function SessionPlanVsActual({ session: s, planHours, liveHours, hideMetr
     }
   };
 
-  const muted = "text-[var(--text-faint)] font-normal italic";
-  const cell = "px-2.5 py-2 text-xs font-bold text-[var(--text)]";
-  const label = "px-2.5 py-2 text-2xs text-[var(--text-faint)]";
-  const row = "grid grid-cols-[84px_1fr_1fr] items-baseline border-t border-[var(--border)] first:border-t-0";
-
-  const none = (text: string) => <span className={muted}>{text}</span>;
+  // Bố cục 08/11 (cửa sổ ca gọn, user duyệt demo): bảng 3 dòng Kế hoạch | Thực tế thành MỘT số GMV to + thanh % target, giờ live và
+  // GMV/giờ là hai ô nhỏ "thực tế / kế hoạch". Bỏ câu chú thích nguồn số dưới bảng (nguồn số nằm ở "Chi tiết" của cửa sổ ca).
+  const gmvLabel = platformText("GMV", platformOf(s));
+  const showTarget = !isBrandView && s.targetGmv > 0;
+  const pct = showTarget && actualGmv > 0 ? (actualGmv / s.targetGmv) * 100 : null;
+  const tone = pct == null ? "" : pct >= 100 ? "var(--success)" : pct >= 50 ? "var(--warning)" : "var(--danger)";
+  const sub = "text-2xs font-normal text-[var(--text-faint)]";
 
   return (
-    <section>
-      <div className="flex items-center justify-between gap-2 mb-2">
-        <h4 className="text-xs font-bold text-[var(--text-muted)]">Kế hoạch vs thực tế</h4>
-        {canEnter && !editing && !hideMetrics && (
-          <button type="button" onClick={open} className="text-2xs font-bold text-[var(--accent-text)] px-2 py-1 rounded-lg border border-[var(--accent)]/40 flex items-center gap-1">
-            <Pencil className="w-3 h-3" /> Nhập tay thực tế
-          </button>
-        )}
-      </div>
-
-      <div className="bg-[var(--surface-base)] border border-[var(--border)] rounded-lg overflow-hidden">
-        <div className="grid grid-cols-[84px_1fr_1fr] bg-[var(--surface-elevated)] text-2xs font-semibold text-[var(--text-muted)]">
-          <span className="px-2.5 py-1.5" />
-          <span className="px-2.5 py-1.5">Kế hoạch</span>
-          <span className="px-2.5 py-1.5">Thực tế</span>
-        </div>
-
-        <div className={row}>
-          <span className={label}>Giờ live</span>
-          <span className={cell}>{s.startTime}–{s.endTime} ({fmtHours(planHours)})</span>
-          <span className={cell}>
-            {hideMetrics ? none("chưa phát hành") : hasActualTime ? `${fmtTime(s.actualStartAt)}–${fmtTime(s.actualEndAt)} (${fmtHours(liveHours)})` : none("chưa có")}
-          </span>
-        </div>
-
-        {/* Brand không thấy target — ô Kế hoạch của hai dòng dưới để trống, không ẩn cả dòng để cột Thực tế vẫn thẳng hàng. */}
-        <div className={row}>
-          <span className={label} title={metricHint(`${platformText("GMV", platformOf(s))}`)}>{platformText("GMV", platformOf(s))}</span>
-          <span className={cell}>
-            {isBrandView ? none("—") : s.targetGmv > 0 ? <>{fmtVndShort(s.targetGmv)}<span className="ml-1 text-2xs font-normal text-[var(--text-muted)]" title={s.boostTarget ? "Ca tăng cường: target đề xuất, không thuộc target tháng" : undefined}>{s.boostTarget ? "target đề xuất" : "target"}</span></> : none("chưa có target")}
-          </span>
-          <span className={`${cell} ${!hideMetrics && actualGmv > 0 ? "!text-[var(--success)]" : ""}`}>
-            {hideMetrics ? none("chưa phát hành") : actualGmv > 0 ? `${splitEstimate ? "≈ " : ""}${fmtVndShort(actualGmv)}` : none("—")}
-            {!hideMetrics && !isBrandView && s.targetGmv > 0 && actualGmv > 0 && (
-              <span className="ml-1.5 text-2xs font-bold text-[var(--text-muted)]">· {fmtPct((actualGmv / s.targetGmv) * 100)} target</span>
+    <section className="space-y-2">
+      {hideMetrics ? (
+        <p className="text-xs text-[var(--text-faint)] italic">Số liệu tháng {s.date.slice(0, 7)} sẽ hiện tại đây sau khi Report Tháng được phát hành.</p>
+      ) : (
+        <>
+          <div className="flex items-end justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-2xs text-[var(--text-muted)]" title={metricHint(gmvLabel)}>{gmvLabel}</p>
+              <p className="flex flex-wrap items-baseline gap-x-2 tabular-nums">
+                <span className={`text-3xl font-black leading-tight ${actualGmv > 0 ? "text-[var(--text)]" : "text-[var(--text-faint)]"}`}>
+                  {actualGmv > 0 ? `${splitEstimate ? "≈ " : ""}${fmtVndShort(actualGmv)}` : "—"}
+                </span>
+                {pct != null && <span className="text-sm font-black" style={{ color: tone }}>{fmtPct(pct)}</span>}
+                {showTarget ? (
+                  <span className="text-xs text-[var(--text-muted)]" title={s.boostTarget ? "Ca tăng cường: target đề xuất, không thuộc target tháng" : undefined}>
+                    {s.boostTarget ? "target đề xuất" : "target"} {fmtVndShort(s.targetGmv)}
+                  </span>
+                ) : (
+                  !isBrandView && <span className="text-xs text-[var(--text-faint)]">chưa có target</span>
+                )}
+              </p>
+            </div>
+            {canEnter && !editing && (
+              <button type="button" onClick={open} className="shrink-0 text-2xs font-bold text-[var(--accent-text)] px-2 py-1 rounded-lg border border-[var(--accent)]/40 flex items-center gap-1">
+                <Pencil className="w-3 h-3" /> Nhập tay thực tế
+              </button>
             )}
-          </span>
-        </div>
-
-        <div className={row}>
-          <span className={label} title={metricHint(`${platformText("GMV/giờ", platformOf(s))}`)}>{platformText("GMV/giờ", platformOf(s))}</span>
-          <span className={cell}>{isBrandView || planGmvPerHour <= 0 ? none("—") : fmtVndShort(planGmvPerHour)}</span>
-          <span className={cell}>{hideMetrics ? none("chưa phát hành") : gmvPerHour > 0 ? fmtVndShort(gmvPerHour) : none("—")}</span>
-        </div>
-      </div>
+          </div>
+          {pct != null && (
+            <div className="h-2 rounded-full bg-[var(--surface-hover)] overflow-hidden" role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100} aria-label="% target">
+              <div className="h-full rounded-full" style={{ width: `${Math.min(100, Math.max(2, pct))}%`, background: tone }} />
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-2 tabular-nums">
+            <div className="rounded-lg bg-[var(--surface-elevated)] px-2.5 py-1.5 min-w-0">
+              <p className="text-2xs text-[var(--text-muted)]">Giờ live</p>
+              <p className="text-sm font-black text-[var(--text)]">
+                {hasActualTime ? fmtHours(liveHours) : "—"} <span className={sub}>/ {fmtHours(planHours)}</span>
+              </p>
+              <p className={`${sub} truncate`}>{hasActualTime ? `${fmtTime(s.actualStartAt)}–${fmtTime(s.actualEndAt)}` : `${s.startTime}–${s.endTime}`}</p>
+            </div>
+            <div className="rounded-lg bg-[var(--surface-elevated)] px-2.5 py-1.5 min-w-0">
+              <p className="text-2xs text-[var(--text-muted)]" title={metricHint(platformText("GMV/giờ", platformOf(s)))}>{platformText("GMV/giờ", platformOf(s))}</p>
+              <p className="text-sm font-black text-[var(--text)]">
+                {gmvPerHour > 0 ? fmtVndShort(gmvPerHour) : "—"}
+                {!isBrandView && planGmvPerHour > 0 && <span className={sub}> / {fmtVndShort(planGmvPerHour)}</span>}
+              </p>
+              <p className={sub}>{!isBrandView && planGmvPerHour > 0 ? "thực tế / kế hoạch" : "\u00a0"}</p>
+            </div>
+          </div>
+          {splitEstimate && !isBrandView && (
+            <p className="text-2xs text-amber-300">≈ File tải trễ khi room còn live: số chia tạm theo giờ tới giờ hết ca — gõ số đúng ở bước tải file hoặc chờ đối soát.</p>
+          )}
+        </>
+      )}
 
       {editing && (
         <form onSubmit={submit} className="mt-2 space-y-2 text-xs bg-[var(--surface-base)] p-3 rounded-xl border border-[var(--border)]">
@@ -172,19 +183,6 @@ export function SessionPlanVsActual({ session: s, planHours, liveHours, hideMetr
         </form>
       )}
 
-      {hideMetrics ? (
-        <p className="mt-2 text-2xs text-[var(--text-faint)] italic">Số liệu tháng {s.date.slice(0, 7)} sẽ hiện tại đây sau khi Report Tháng được phát hành.</p>
-      ) : (
-        !isBrandView && !editing && (
-          <p className="mt-2 text-2xs text-[var(--text-faint)]">
-            {canEnter
-              ? "Cột Thực tế tự cập nhật khi tải lên file số liệu; chưa có file thì nhập tay."
-              : splitEstimate
-                ? "≈ File tải sau giờ giao ca khi room còn live: giờ cắt về giờ hết ca, số chia tạm theo giờ — gõ số đúng ở \"Số liệu ca\" hoặc chờ đối soát."
-                : "Cột Thực tế lấy từ file số liệu / giao ca / đối soát."}
-          </p>
-        )
-      )}
     </section>
   );
 }

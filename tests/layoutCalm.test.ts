@@ -232,13 +232,13 @@ test("Lịch Vận Hành brand: đầu trang PageHeader, danh sách ca dưới l
   expect(grid).toMatch(/bg-\[var\(--surface-base\)\]\/60 border-transparent/);
 });
 
-test("Cửa sổ ca: chỉ số trong MỘT khung (không hộp từng ô); Lượt live & ca nối không lặp tiêu đề trong Giao ca", () => {
+test("Cửa sổ ca: chỉ số trong MỘT khung (không hộp từng ô); dòng thời gian không lặp tiêu đề trong Giao ca", () => {
   const sw = read("components/SessionWindow.tsx");
   const kv = sw.slice(sw.indexOf("const KV: React.FC"));
   expect(kv.slice(0, 300)).not.toMatch(/border|rounded/);
   expect((sw.match(/className=\{KV_GRID\}/g) ?? []).length).toBe(3);
   expect(read("components/FileHandover.tsx")).toMatch(/<SessionRoomCase [^>]*\bembedded\b/);
-  expect(read("components/SessionRoomCase.tsx")).toMatch(/embedded \? \(\s*<div className="space-y-2">\{body\}<\/div>/);
+  expect(read("components/SessionRoomCase.tsx")).toMatch(/embedded \? \(\s*<div className="space-y-2">\{body\}/);
 });
 
 test("Điều Phối Lịch Live: thẻ ca chỉ còn vạch màu bên trái, nút + ca không viền", () => {

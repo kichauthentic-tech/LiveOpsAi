@@ -3,12 +3,12 @@ import SearchSelect from "./ui/SearchSelect";
 import React, { useContext, useEffect, useMemo, useState } from "react";
 import { SESSION_STATUS_CLS, SESSION_STATUS_LABEL_VI } from "../lib/sessionStatusUi";
 import { hasSessionData, isUnconfirmedPast } from "../lib/sessionStatus";
-import { AlertTriangle, Ban, CheckCircle2, Circle, EyeOff, Hand, Link2, Pencil, RotateCcw, Trash2, X } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Circle, EyeOff, Hand, Link2, Pencil, X } from "lucide-react";
 import { AuditLogEntry, Brand, LiveSession, ShiftSlot, Studio, Talent, UserRole } from "../types";
 import { findPersonClashes, personClash, studioClash, studioClashLabel } from "../lib/scheduling/conflicts";
 import { PlatformChip } from "./common/PlatformChip";
 import { fmtVndShort } from "../lib/format";
-import { profileOf } from "../lib/platforms/profiles";
+import { profileOf, type PlatformProfile } from "../lib/platforms/profiles";
 import { platformOf } from "../lib/reportPlatform";
 import { sessionHours } from "../lib/performance/hostPerformance";
 import {
@@ -23,6 +23,7 @@ import {
   sessionRatios
 } from "../lib/sessionLedger";
 import { DataSourceBadge } from "./common/DataSourceBadge";
+import { MoreMenu, type MoreMenuItem } from "./ui/MoreMenu";
 import { BrandLogo } from "./ui/BrandLogo";
 import { SessionPlanVsActual } from "./SessionPlanVsActual";
 import { FileHandover } from "./FileHandover";
@@ -36,7 +37,7 @@ import { CLOSED_MONTH_NOTICE } from "../lib/closedMonth";
 import { describeStaff, hasStaffSegments } from "../lib/staffSegments";
 import { HostChangeReports } from "./HostChangeReports";
 import { StaffSegmentsEditor } from "./StaffSegmentsEditor";
-import { metricHint } from "../lib/metricGlossary";
+import { METRIC, metricHint } from "../lib/metricGlossary";
 import { dataSourceTier } from "../lib/dataSource";
 
 // Cửa sổ Ca Live — MỘT cửa sổ chi tiết cho một ca, dùng chung cho mọi nơi click vào ca (Sổ Ca,
@@ -100,6 +101,7 @@ function fmtDate(d: string): string {
 const fmtTime = (iso?: string) => (iso ? new Date(iso).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : "—");
 const fmtInt = (n: number | undefined) => (n ?? 0).toLocaleString("vi-VN");
 const fmtPct = (n: number) => `${n.toLocaleString("vi-VN", { maximumFractionDigits: 2 })}%`;
+const fmtAt = (iso: string) => new Date(iso).toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 
 const inputCls = "w-full bg-[var(--surface)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] text-xs";
 
@@ -146,6 +148,9 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
   const hideMetrics = metricsHiddenFor(s, viewer.role);
 
   const [editingHandover, setEditingHandover] = useState(false);
+  const [showAllMetrics, setShowAllMetrics] = useState(false);
+  // Mốc "bây giờ" lấy một lần lúc mở cửa sổ (render phải thuần) — đủ cho "chưa tới giờ / đang live / đã hết ca".
+  const [openedAt] = useState(() => Date.now());
   // Bố cục 23/10: ca chưa tới giờ bắt đầu thì Giao ca chỉ là một dòng (file số liệu chỉ có sau khi live) — mở form sớm khi cần.
   const [earlyHandover, setEarlyHandover] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -318,60 +323,87 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
 
   const snapshotDone = hasSnapshot(s);
   const handoverDone = hasHandover(s);
-  const notStarted = Date.now() < sessionWindow(s).startMs;
+  const notStarted = openedAt < sessionWindow(s).startMs;
   const handoverCollapsed = notStarted && !handoverDone && !earlyHandover;
+
+  // Dải trạng thái: Live xong khi đã có file / đã qua giờ hết ca; đang live khi trong giờ ca.
+  const nowMs = openedAt;
+  const win = sessionWindow(s);
+  const liveStep: StepState = snapshotDone || handoverDone || nowMs >= win.endMs ? "done" : nowMs >= win.startMs ? "now" : "todo";
+  // Restart của ca nhiều room đã vẽ trên dòng thời gian ⇒ không lặp viên "Restart ×N".
+  const shownIncidents = incidents.filter((i) => !(i.key === "restart" && (s.liveRoomIds?.length ?? 0) > 1));
+  const funnelSteps = buildFunnel(prof, metricTotals);
+
+  const moreItems: MoreMenuItem[] = [];
+  if (canCancel) moreItems.push({ label: "Huỷ ca này", onClick: () => setCancelOpen(true) });
+  if (canExclude && !s.excludedFromReports) moreItems.push({ label: "Loại ca khỏi báo cáo", onClick: () => setExcludeOpen(true) });
+  if (canExclude && s.excludedFromReports) moreItems.push({ label: excluding ? "Đang đưa lại..." : "Đưa ca trở lại báo cáo", onClick: () => void doExclude(false), disabled: excluding });
+  if (isOps && !monthClosed && onDeleteSession && !hasData) moreItems.push({ label: deleting ? "Đang xoá..." : "Xoá hẳn ca này", onClick: () => void handleDelete(), danger: true, disabled: deleting });
+
+  // Lịch sử — mốc có trong dữ liệu ca (U6), nằm trong "Chi tiết".
+  // `reconciled_at` là "lần cuối ghi số vào ca", KHÔNG phải "đã đối soát": RPC snapshot (0078/0079 `recompute_session_from_snapshot`)
+  // cũng set cột này ⇒ chỉ ghi "Đối soát" khi nguồn số thật sự là đối soát.
+  const historyEvents: { at: string; label: string }[] = [];
+  if (!isBrandView) {
+    if (s.report?.submittedAt) historyEvents.push({ at: s.report.submittedAt, label: `Giao ca / report${s.report.submittedByRole ? ` (${s.report.submittedByRole === "talent" ? "trợ live" : s.report.submittedByRole})` : ""}` });
+    if (s.actualStartAt && (s.liveRoomIds?.length ?? 0) > 0) historyEvents.push({ at: s.actualStartAt, label: `File số liệu · live thật ${fmtTime(s.actualStartAt)}–${fmtTime(s.actualEndAt)}` });
+    if (s.reconciledAt && dataSourceTier(s) === "reconciled") historyEvents.push({ at: s.reconciledAt, label: `Đối soát ${prof.label} ghi đè số liệu` });
+    if (s.cancelledAt) historyEvents.push({ at: s.cancelledAt, label: `Huỷ ca${s.cancelReason ? ` — ${s.cancelReason}` : ""}` });
+    historyEvents.sort((a, b) => a.at.localeCompare(b.at));
+  }
 
   return (
     <>
       <div className="fixed inset-0 bg-black/50 backdrop-blur-[2px] z-40" onClick={onClose} />
       <aside className="fixed inset-y-0 right-0 z-50 w-full sm:w-[600px] bg-[var(--surface)] border-l border-[var(--border)] shadow-2xl overflow-y-auto" role="dialog" aria-label="Cửa sổ ca live">
-        {/* Đầu: brand · ngày · giờ · người · trạng thái */}
+        {/* Đầu: brand · sàn / ngày · giờ / người. Bố cục 08/11 (cửa sổ ca gọn): bỏ viên trạng thái + viên nguồn số ở đầu — trạng thái là dải
+            Live → Giao ca → Đối soát ngay dưới, nguồn số nằm trong "Chi tiết". Brand vẫn có viên trạng thái + nhãn tin cậy. */}
         <div className="sticky top-0 bg-[var(--surface)] border-b border-[var(--border)] p-4 flex items-start justify-between gap-3 z-10">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <BrandLogo brand={brand ?? { name: s.brandName, logo: "" }} size="sm" />
-              <div className="min-w-0">
-                <p className="text-sm font-black text-[var(--text)] truncate">
-                  {s.brandName} · {fmtDate(s.date)} · {s.startTime}–{s.endTime}
+          <div className="min-w-0 flex items-start gap-2.5">
+            <BrandLogo brand={brand ?? { name: s.brandName, logo: "" }} size="sm" />
+            <div className="min-w-0">
+              <p className="text-sm font-black text-[var(--text)] flex items-center gap-2 min-w-0">
+                <span className="truncate">{s.brandName}</span>
+                <PlatformChip platform={s.platform} />
+              </p>
+              {/* Năm bỏ (cửa sổ luôn mở từ lịch/sổ đang xem tháng đó); studio trùng tên brand thì không lặp; tên host/trợ được xuống dòng
+                  thay vì cắt "Tr…" trên điện thoại. */}
+              <p className="text-xs text-[var(--text-muted)] tabular-nums">
+                {fmtDate(s.date).slice(0, -5)} · {s.startTime}–{s.endTime}
+                {!isBrandView && s.studioName && s.studioName.trim().toLowerCase() !== s.brandName.trim().toLowerCase() ? ` · ${s.studioName}` : ""}
+              </p>
+              <p className="text-2xs text-[var(--text-muted)]">
+                Host {s.hostName || (isBrandView ? "—" : "chưa gán")}
+                {!isBrandView && s.coHostName ? ` · Trợ ${s.coHostName}` : ""}
+              </p>
+              {!isBrandView && hasStaffSegments(s) && (
+                <p className="text-2xs text-amber-300 truncate" title={describeStaff(s).join(" · ")}>
+                  Đổi người giữa ca — {describeStaff(s).join(" · ")}
                 </p>
-                <p className="text-2xs text-[var(--text-muted)] truncate">
-                  Host {s.hostName || (isBrandView ? "—" : "chưa gán")}
-                  {!isBrandView && s.coHostName ? ` · Trợ ${s.coHostName}` : ""}
-                  {!isBrandView && s.studioName ? ` · ${s.studioName}` : ""}
-                </p>
-                {!isBrandView && hasStaffSegments(s) && (
-                  <p className="text-2xs text-amber-300 truncate" title={describeStaff(s).join(" · ")}>
-                    Đổi người giữa ca — {describeStaff(s).join(" · ")}
-                  </p>
-                )}
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-1.5 mt-2">
-              <PlatformChip platform={s.platform} />
-              <span className={`text-2xs font-bold px-2 py-0.5 rounded-full border ${STATUS_CLS[s.status]}`}>{STATUS_LABEL[s.status]}</span>
-              {/* Nhãn tin cậy nói "số này chốt tới đâu" — vô nghĩa khi chưa được thấy số nào. */}
-              {isBrandView ? (
-                hideMetrics ? (
-                  <span className="text-2xs font-bold px-2 py-0.5 rounded-full border bg-[var(--surface-elevated)] text-[var(--text-faint)] border-[var(--border)]">
-                    chưa phát hành
-                  </span>
-                ) : (
-                  <TrustBadge session={s} />
-                )
-              ) : (
-                <DataSourceBadge dataSource={s.dataSource} platform={s.platform} />
               )}
-              {!isBrandView && s.isBackfill && (
-                <span className="text-2xs font-bold px-2 py-0.5 rounded-full border bg-[var(--surface-elevated)] text-[var(--text-faint)] border-[var(--border)]">nạp bù từ file</span>
+              {(isBrandView || isMine || s.isBackfill) && (
+                <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                  {isBrandView && <span className={`text-2xs font-bold px-2 py-0.5 rounded-full border ${STATUS_CLS[s.status]}`}>{STATUS_LABEL[s.status]}</span>}
+                  {/* Nhãn tin cậy nói "số này chốt tới đâu" — vô nghĩa khi chưa được thấy số nào. */}
+                  {isBrandView &&
+                    (hideMetrics ? (
+                      <span className="text-2xs font-bold px-2 py-0.5 rounded-full border bg-[var(--surface-elevated)] text-[var(--text-faint)] border-[var(--border)]">
+                        chưa phát hành
+                      </span>
+                    ) : (
+                      <TrustBadge session={s} />
+                    ))}
+                  {!isBrandView && s.isBackfill && (
+                    <span className="text-2xs font-bold px-2 py-0.5 rounded-full border bg-[var(--surface-elevated)] text-[var(--text-faint)] border-[var(--border)]">nạp bù từ file</span>
+                  )}
+                  {isMine && <span className="text-2xs font-bold px-2 py-0.5 rounded-full border bg-sky-950 text-sky-300 border-sky-800">ca của tôi</span>}
+                </div>
               )}
-              {/* RPC snapshot (0078) cũng ghi reconciled_at — chỉ gọi là "đối soát" khi nguồn số thật sự là tiktok_reconciled. */}
-              {s.reconciledAt && dataSourceTier(s) === "reconciled" && <span className="text-2xs text-[var(--text-faint)]">đối soát {new Date(s.reconciledAt).toLocaleDateString("vi-VN")}</span>}
-              {isMine && <span className="text-2xs font-bold px-2 py-0.5 rounded-full border bg-sky-950 text-sky-300 border-sky-800">ca của tôi</span>}
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
             {canEdit && !editing && (
-              <button onClick={startEdit} className="text-2xs font-bold text-[var(--accent-text)] px-2.5 py-1.5 rounded-lg border border-[var(--accent)]/40 flex items-center gap-1"><Pencil className="w-3 h-3" /> Sửa ca · thay người</button>
+              <button onClick={startEdit} title="Sửa ca · thay người" className="text-2xs font-bold text-[var(--accent-text)] px-2.5 py-1.5 rounded-lg border border-[var(--accent)]/40 flex items-center gap-1"><Pencil className="w-3 h-3" /> Sửa ca</button>
             )}
             <button onClick={onClose} className="text-[var(--text-faint)] hover:text-[var(--text)] p-1" aria-label="Đóng"><X className="w-5 h-5" /></button>
           </div>
@@ -399,17 +431,18 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
               </span>
             </div>
           )}
-          {missing.length > 0 && s.status !== "Cancelled" && !s.excludedFromReports && (
+          {/* Trạng thái ca = dải Live → Giao ca → Đối soát (ngay trên kết quả). Khung chữ "Còn thiếu để chốt" chỉ còn ở nơi không có dải
+              (cửa sổ chỉ đọc), và cảnh báo ca qua giờ chưa có bằng chứng — việc OPS phải xử lý. */}
+          {!showHandover && missing.length > 0 && s.status !== "Cancelled" && !s.excludedFromReports && (
             <div className="rounded-xl border border-amber-800 bg-amber-950/50 p-3 text-xs text-amber-200 flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>
-                Còn thiếu để chốt: {missing.map((m) => missingLabel(m, prof.reconciliationFile)).join(" · ")}
-                {isOps && isUnconfirmedPast(s) && (
-                  <span className="block mt-1 text-amber-300/90">
-                    Ca đã qua giờ mà chưa có bằng chứng diễn ra — chưa tính vào giờ cam kết và lương. Có chạy: giao ca (mục Giao ca bên dưới). Không diễn ra: huỷ ca ở cuối cửa sổ này.
-                  </span>
-                )}
-              </span>
+              <span>Còn thiếu để chốt: {missing.map((m) => missingLabel(m, prof.reconciliationFile)).join(" · ")}</span>
+            </div>
+          )}
+          {isOps && isUnconfirmedPast(s) && s.status !== "Cancelled" && !s.excludedFromReports && (
+            <div className="rounded-xl border border-amber-800 bg-amber-950/50 p-3 text-xs text-amber-200 flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>Ca đã qua giờ mà chưa có file — chưa tính vào giờ cam kết và lương. Có live: giao ca bên dưới. Không live: ⋯ → Huỷ ca.</span>
             </div>
           )}
 
@@ -500,7 +533,13 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
             />
           )}
 
-          {/* Kế hoạch vs thực tế — hai cột; Thực tế tự cập nhật khi up file, hoặc ops gõ tay khi chưa có file (0152). */}
+          {/* Dải trạng thái Live → Giao ca → Đối soát (08/11) thay viên "Đã xong" + viên nguồn số + khung "Còn thiếu để chốt" + nhãn
+              "đã giao" — bốn chỗ cùng nói một chuyện. Đối soát là việc OPS ⇒ xám, không báo vàng cho trợ. */}
+          {showHandover && !s.excludedFromReports && (
+            <SessionSteps live={liveStep} handoverDone={handoverDone} handoverAt={s.report?.handoverAt} reconciled={dataSourceTier(s) === "reconciled"} />
+          )}
+
+          {/* Kết quả: GMV to + % target, giờ live và GMV/giờ thực tế / kế hoạch; ops gõ tay khi chưa có file (0152). */}
           <SessionPlanVsActual
             session={s}
             planHours={planHours}
@@ -517,114 +556,92 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
           )}
 
           {/* Giao ca: trợ live của ca — ca không trợ thì OPS. Cả hai sàn một luồng: up file số liệu của sàn (TikTok Creator-Live-Performance,
-              Shopee Live List — 0154) + chọn sự cố (0145). Thay form report cũ. */}
-          {showHandover && (
+              Shopee Live List — 0154) + chọn sự cố (0145). Ca chưa tới giờ: một dòng. Đã giao: không còn khung — nút "Sửa giao ca" ở hàng
+              thao tác cuối cửa sổ, giờ giao nằm trên dải trạng thái. */}
+          {showHandover && handoverCollapsed && (
+            <p className="text-xs text-[var(--text-muted)] flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span>Hết ca {s.endTime.slice(0, 5)} thì tải file {prof.reconciliationFile} và giao ca ở đây.</span>
+              {canHandover && (
+                <button onClick={() => setEarlyHandover(true)} className="text-2xs font-bold text-[var(--accent-text)] hover:underline">
+                  Mở giao ca ngay
+                </button>
+              )}
+            </p>
+          )}
+          {showHandover && !handoverCollapsed && (!handoverDone || editingHandover) && (
             <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface-base)]/60 p-3 space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <h4 className="text-xs font-bold text-[var(--text-muted)]">Giao ca</h4>
-                <span className={`text-2xs font-bold px-2 py-0.5 rounded-full border ${handoverDone ? "bg-emerald-950 text-emerald-300 border-emerald-800" : notStarted ? "bg-[var(--surface-elevated)] text-[var(--text-muted)] border-[var(--border)]" : "bg-amber-950 text-amber-300 border-amber-800"}`}>
-                  {handoverDone ? `đã giao ${new Date(s.report!.handoverAt!).toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" })}` : notStarted ? "chưa tới giờ" : "chưa giao ca"}
-                </span>
-              </div>
-              {handoverCollapsed && (
-                <p className="text-xs text-[var(--text-muted)] flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <span>Hết ca lúc {s.endTime.slice(0, 5)} thì tải lên file {prof.reconciliationFile} và giao ca ở đây.</span>
-                  {canHandover && (
-                    <button onClick={() => setEarlyHandover(true)} className="text-2xs font-bold text-[var(--accent-text)] hover:underline">
-                      Mở giao ca ngay
-                    </button>
-                  )}
-                </p>
+              <h4 className="text-xs font-bold text-[var(--text-muted)]">{editingHandover ? "Sửa giao ca" : "Giao ca"}</h4>
+              {canHandover ? (
+                <FileHandover
+                  session={s}
+                  isOps={isOps}
+                  allSessions={allSessions}
+                  onSaved={(updated) => {
+                    onSessionsUpdated!(updated);
+                    if (updated.some((u) => u.report?.handoverAt && u.id === s.id && u.report.handoverAt !== s.report?.handoverAt)) setEditingHandover(false);
+                  }}
+                  onCancel={editingHandover ? () => setEditingHandover(false) : undefined}
+                />
+              ) : (
+                <p className="text-xs text-[var(--text-muted)]">{handoverOwnerLabel(s)}.</p>
               )}
-              {handoverDone && !editingHandover && (
-                <div className="space-y-1.5 text-xs">
-                  <p className="text-[var(--text-muted)]">{snapshotDone ? `Đã tải lên file ${prof.reconciliationFile} — số của ca ở "Số liệu ca" bên dưới.` : "Chưa có file số liệu."}</p>
-                  {canHandover && (
-                    <button onClick={() => setEditingHandover(true)} className="text-2xs font-bold px-2.5 py-1 rounded-lg bg-emerald-950 text-emerald-300 border border-emerald-800 hover:bg-emerald-900 transition-colors">
-                      Sửa giao ca / tải lại file
-                    </button>
-                  )}
-                </div>
-              )}
-              {!handoverCollapsed && (!handoverDone || editingHandover) &&
-                (canHandover ? (
-                  <FileHandover
-                    session={s}
-                    isOps={isOps}
-                    allSessions={allSessions}
-                    onSaved={(updated) => {
-                      onSessionsUpdated!(updated);
-                      if (updated.some((u) => u.report?.handoverAt && u.id === s.id && u.report.handoverAt !== s.report?.handoverAt)) setEditingHandover(false);
-                    }}
-                    onCancel={editingHandover ? () => setEditingHandover(false) : undefined}
-                  />
-                ) : (
-                  <p className="text-xs text-[var(--text-muted)]">{handoverOwnerLabel(s)}.</p>
-                ))}
             </section>
           )}
 
-          {/* Room của ca (0153, Shopee 0154): ca NỐI (1 room/phiên → nhiều ca) và ca BỊ NGẮT (1 ca → nhiều room/phiên), trợ/OPS xác nhận. */}
-          {/* Khi form Giao ca đang mở thì khối này nằm TRONG form (bước 2), không vẽ hai lần. */}
+          {/* Dòng thời gian (0153, Shopee 0154): room/phiên của ca, khoảng nghỉ restart, ca nối. Khi form Giao ca đang mở thì nằm TRONG form. */}
           {showHandover && (isOps || isMine) && !(canHandover && (!handoverDone || editingHandover)) && (
             <SessionRoomCase key={s.id} session={s} canEdit={canHandover} isOps={isOps} allSessions={allSessions} onSessionsUpdated={(u) => onSessionsUpdated!(u)} />
           )}
 
-          {/* Report đã nộp (mọi vai đọc được) */}
-          {!editingHandover && (s.report || incidents.length > 0) && (
-            <section>
-              <h4 className="text-xs font-bold text-[var(--text-muted)] mb-2">Report ca</h4>
-              {s.report ? (
-                <div className="space-y-2">
-                  <div className="flex flex-wrap gap-1">
-                    {incidents.length === 0 && <span className="text-xs text-emerald-300">Không có sự cố</span>}
-                    {incidents.map((i) => (
-                      <span key={i.key} className="text-2xs font-bold px-1.5 py-0.5 rounded border bg-rose-950/60 text-rose-300 border-rose-800">{i.label}</span>
-                    ))}
-                  </div>
-                  {s.report.statusNote && <p className="text-xs text-[var(--text)] whitespace-pre-wrap">{s.report.statusNote}</p>}
-                  {!s.report.handoverAt && (s.report.dashboardLink1 || s.report.dashboardLink2) && (
-                    <div className="flex flex-wrap gap-2 text-2xs">
-                      {s.report.dashboardLink1 && <a href={s.report.dashboardLink1} target="_blank" rel="noreferrer" className="text-[var(--accent-text)] underline">Dashboard 1</a>}
-                      {s.report.dashboardLink2 && <a href={s.report.dashboardLink2} target="_blank" rel="noreferrer" className="text-[var(--accent-text)] underline">Dashboard 2</a>}
-                    </div>
-                  )}
-                  {s.report.submittedAt && (
-                    <p className="text-2xs text-[var(--text-faint)]">Nhập lúc {new Date(s.report.submittedAt).toLocaleString("vi-VN")}{s.report.submittedByRole ? ` · ${s.report.submittedByRole === "talent" ? "trợ live" : "OPS"}` : ""}</p>
-                  )}
+          {/* Sự cố của ca: chỉ viên ngắn. Restart khi ca có nhiều room đã thấy trên dòng thời gian ⇒ không lặp. Giờ nhập ở "Chi tiết". */}
+          {!editingHandover && (shownIncidents.length > 0 || !!s.report?.statusNote) && (
+            <div className="space-y-1.5">
+              {shownIncidents.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {shownIncidents.map((i) => (
+                    <span key={i.key} className="text-2xs font-bold px-1.5 py-0.5 rounded border bg-rose-950/60 text-rose-300 border-rose-800">{i.label}</span>
+                  ))}
                 </div>
-              ) : (
-                <p className="text-xs text-[var(--text-faint)] italic">Chưa có report.</p>
               )}
-            </section>
+              {s.report?.statusNote && <p className="text-xs text-[var(--text)] whitespace-pre-wrap">{s.report.statusNote}</p>}
+            </div>
           )}
 
-          {/* Số liệu ca — ca chưa có số thì bỏ hẳn mục (23/10): cột Thực tế ở "Kế hoạch vs thực tế" đã nói "chưa có". */}
-          {(counters || s.actualGmv || s.totalOrders || s.totalViews) ? <section>
-            <h4 className="text-xs font-bold text-[var(--text-muted)] mb-2">Số liệu ca</h4>
+          {/* Số liệu ca (08/11): phễu 4 số (TikTok LIVE impressions → Views → Product clicks → Orders, Shopee Viewers → ATC → Orders) kèm
+              tỷ lệ từng bước; đủ bộ chỉ số + "Số khác" gập sau một nút. Ca chưa có số thì bỏ hẳn mục (23/10). */}
+          {(counters || s.actualGmv || s.totalOrders || s.totalViews) ? <section className="space-y-2">
+            <h4 className="text-xs font-bold text-[var(--text-muted)]">Phễu</h4>
             {counters ? (
               <>
-                {/* Key Metrics đủ 18 chỉ số + AOV, cùng hàm/thứ tự với mọi report (lib/report/keyMetrics.ts). */}
-                <div className={KV_GRID}>
-                  {prof.metrics.defs.map((d) => <KV key={d.key} label={d.label} value={prof.metrics.fmt(d, prof.metrics.value(metricTotals, d.key))} />)}
-                </div>
-                <p className="text-xs font-bold text-[var(--text-muted)] mt-3 mb-2">Số khác</p>
-                <div className={KV_GRID}>
-                  {/* Shopee chỉ có Comments ở mức ca (file Live List); SKU orders/followers/shares/likes/PCU/Show GPM là số TikTok. */}
-                  {prof.showsTikTokCounters && <KV label="SKU orders" value={fmtInt(counters.skuOrders)} />}
-                  {prof.showsTikTokCounters && <KV label="New followers" value={fmtInt(counters.newFollowers)} />}
-                  <KV label="Comments" value={fmtInt(counters.comments)} />
-                  {prof.showsTikTokCounters && <KV label="Shares" value={fmtInt(counters.shares)} />}
-                  {prof.showsTikTokCounters && <KV label="Likes" value={fmtInt(counters.likes)} />}
-                  {prof.showsTikTokCounters && <KV label="PCU" value={fmtInt(s.peakViewers)} />}
-                  {prof.showsTikTokCounters && ratios && (
-                    <>
-                      <KV label="SKU order rate" value={fmtPct(ratios.skuOrderRate)} />
-                      <KV label="Show GPM" value={fmtVndShort(ratios.showGpm)} />
-                    </>
-                  )}
-                </div>
-                <p className="text-2xs text-[var(--text-faint)] mt-2">Tỷ lệ tính lại từ số đã tách theo ca, không lấy cột tỷ lệ cộng dồn của file.</p>
+                <SessionFunnel steps={funnelSteps} />
+                {showAllMetrics && (
+                  <>
+                    {/* Key Metrics đủ 18 chỉ số + AOV, cùng hàm/thứ tự với mọi report (lib/report/keyMetrics.ts). */}
+                    <div className={KV_GRID}>
+                      {prof.metrics.defs.map((d) => <KV key={d.key} label={d.label} value={prof.metrics.fmt(d, prof.metrics.value(metricTotals, d.key))} />)}
+                    </div>
+                    <p className="text-xs font-bold text-[var(--text-muted)] mt-3">Số khác</p>
+                    <div className={KV_GRID}>
+                      {/* Shopee chỉ có Comments ở mức ca (file Live List); SKU orders/followers/shares/likes/PCU/Show GPM là số TikTok. */}
+                      {prof.showsTikTokCounters && <KV label="SKU orders" value={fmtInt(counters.skuOrders)} />}
+                      {prof.showsTikTokCounters && <KV label="New followers" value={fmtInt(counters.newFollowers)} />}
+                      <KV label="Comments" value={fmtInt(counters.comments)} />
+                      {prof.showsTikTokCounters && <KV label="Shares" value={fmtInt(counters.shares)} />}
+                      {prof.showsTikTokCounters && <KV label="Likes" value={fmtInt(counters.likes)} />}
+                      {prof.showsTikTokCounters && <KV label="PCU" value={fmtInt(s.peakViewers)} />}
+                      {prof.showsTikTokCounters && ratios && (
+                        <>
+                          <KV label="SKU order rate" value={fmtPct(ratios.skuOrderRate)} />
+                          <KV label="Show GPM" value={fmtVndShort(ratios.showGpm)} />
+                        </>
+                      )}
+                    </div>
+                    <p className="text-2xs text-[var(--text-faint)]">Tỷ lệ tính lại từ số đã tách theo ca, không lấy cột tỷ lệ cộng dồn của file.</p>
+                  </>
+                )}
+                <button type="button" onClick={() => setShowAllMetrics((v) => !v)} className="text-xs font-bold text-[var(--accent-text)] hover:underline">
+                  {showAllMetrics ? "Thu gọn" : `Xem đủ ${prof.metrics.defs.length} chỉ số`}
+                </button>
               </>
             ) : s.actualGmv || s.totalOrders || s.totalViews ? (
               <>
@@ -633,52 +650,21 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                   <KV label={prof.viewsLabel} value={fmtInt(s.totalViews)} />
                   {prof.showsTikTokCounters && <KV label="PCU" value={fmtInt(s.peakViewers)} />}
                 </div>
-                <p className="text-2xs text-amber-300 mt-2">Số tự khai tay — chưa có file nên không tính được tỷ lệ.</p>
+                <p className="text-2xs text-amber-300">Số tự khai tay — chưa có file nên chưa có phễu.</p>
               </>
             ) : null}
           </section> : null}
 
-          {/* Lịch sử — mốc có trong dữ liệu ca (U6). Audit log chi tiết xem ở Nhật ký hệ thống. */}
-          {!isBrandView && (() => {
-            const fmtAt = (iso: string) => new Date(iso).toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
-            const events: { at: string; label: string }[] = [];
-            if (s.report?.submittedAt) events.push({ at: s.report.submittedAt, label: `Report nộp${s.report.submittedByRole ? ` (${s.report.submittedByRole})` : ""}` });
-            if (s.actualStartAt && (s.liveRoomIds?.length ?? 0) > 0) events.push({ at: s.actualStartAt, label: `File số liệu · live thật ${fmtTime(s.actualStartAt)}–${fmtTime(s.actualEndAt)}` });
-            // `reconciled_at` là "lần cuối ghi số vào ca", KHÔNG phải "đã đối soát": RPC snapshot
-            // (0078/0079 `recompute_session_from_snapshot`) cũng set cột này. Không guard theo
-            // dataSource thì ca vừa up file đã hiện "Đối soát TikTok ghi đè số liệu" ngay dưới dòng
-            // "Còn thiếu để chốt: Chưa đối soát" — cùng một cửa sổ nói hai điều ngược nhau. Đây là
-            // đúng guard đã dùng ở badge nguồn số phía trên.
-            if (s.reconciledAt && dataSourceTier(s) === "reconciled") {
-              events.push({ at: s.reconciledAt, label: `Đối soát ${prof.label} ghi đè số liệu` });
-            }
-            if (s.cancelledAt) events.push({ at: s.cancelledAt, label: `Huỷ ca${s.cancelReason ? ` — ${s.cancelReason}` : ""}` });
-            if (events.length === 0) return null;
-            events.sort((a, b) => a.at.localeCompare(b.at));
-            return (
-              <section>
-                <h4 className="text-xs font-bold text-[var(--text-muted)] mb-2">Lịch sử</h4>
-                <ul className="space-y-1">
-                  {events.map((e, i) => (
-                    <li key={i} className="text-xs flex items-start gap-2">
-                      <span className="font-mono text-[var(--text-faint)] shrink-0">{fmtAt(e.at)}</span>
-                      <span className="text-[var(--text-muted)]">{e.label}</span>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            );
-          })()}
-
-          {/* Phiên TikTok / ca nối */}
-          {!isBrandView && ((s.liveRoomIds?.length ?? 0) > 0 || linkedLabel.length > 0) && (
-            <section>
-              <h4 className="text-xs font-bold text-[var(--text-muted)] mb-2">Phiên {prof.label}</h4>
-              {(s.liveRoomIds?.length ?? 0) > 0 && <p className="text-xs text-[var(--text-muted)] font-mono break-all">Room: {s.liveRoomIds!.join(", ")}</p>}
-              {linkedLabel.length > 0 && (
-                <p className="text-xs text-sky-300 mt-1 flex items-start gap-1"><Link2 className="w-3.5 h-3.5 shrink-0 mt-0.5" /><span>Ca nối, chung room với: {linkedLabel.join("; ")}</span></p>
+          {/* Hàng thao tác: việc chính là một nút; việc ít dùng (huỷ / loại khỏi báo cáo / xoá) vào ⋯. */}
+          {((canHandover && handoverDone && !editingHandover) || moreItems.length > 0) && (
+            <div className="flex gap-2">
+              {canHandover && handoverDone && !editingHandover && (
+                <button onClick={() => setEditingHandover(true)} className="flex-1 min-h-11 rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-[var(--text)] font-bold text-sm">
+                  Sửa giao ca
+                </button>
               )}
-            </section>
+              <MoreMenu items={moreItems} className={canHandover && handoverDone && !editingHandover ? "" : "ml-auto"} />
+            </div>
           )}
 
           {canDropout && (
@@ -710,13 +696,8 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
             </div>
           )}
 
-          {isScheduler && (canCancel || canExclude || (isOps && !monthClosed && onDeleteSession && !hasData)) && (
-            <div className="pt-3 border-t border-[var(--border)] space-y-2">
-              {canCancel && !cancelOpen && (
-                <button onClick={() => setCancelOpen(true)} className="inline-flex items-center gap-1.5 text-2xs font-bold text-amber-300 hover:text-amber-200 transition-colors">
-                  <Ban className="w-3.5 h-3.5" /> Huỷ ca này
-                </button>
-              )}
+          {((canCancel && cancelOpen) || (canExclude && !s.excludedFromReports && excludeOpen)) && (
+            <div className="space-y-2">
               {canCancel && cancelOpen && (
                 <div className="rounded-xl border border-amber-800 bg-amber-950/40 p-3 space-y-2">
                   <p className="text-xs text-amber-200">Huỷ ca {fmtDate(s.date)} {s.startTime}–{s.endTime}: ca về "Đã huỷ", host/trợ được báo nếu ca chưa diễn ra. Chọn tiếp ca chờ đăng ký đi đâu:</p>
@@ -739,11 +720,6 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
               {/* Đ10 (0114): ca đã có số KHÔNG huỷ/xoá được — chủ ý, số đã ghi là bằng chứng. Nhưng
                   trước 0114 hệ quả là ca nhập nhầm brand / ca test kẹt vĩnh viễn trong mọi tổng hợp,
                   gỡ được bằng đúng một cách: SQL tay. Đây là đường thứ ba: giữ dòng, bỏ khỏi sổ. */}
-              {canExclude && !s.excludedFromReports && !excludeOpen && (
-                <button onClick={() => setExcludeOpen(true)} className="inline-flex items-center gap-1.5 text-2xs font-bold text-violet-300 hover:text-violet-200 transition-colors">
-                  <EyeOff className="w-3.5 h-3.5" /> Loại ca này khỏi báo cáo
-                </button>
-              )}
               {canExclude && !s.excludedFromReports && excludeOpen && (
                 <div className="rounded-xl border border-violet-800 bg-violet-950/40 p-3 space-y-2">
                   <p className="text-xs text-violet-200">
@@ -759,22 +735,41 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                   </div>
                 </div>
               )}
-              {canExclude && s.excludedFromReports && (
-                <button onClick={() => doExclude(false)} disabled={excluding} className="inline-flex items-center gap-1.5 text-2xs font-bold text-emerald-300 hover:text-emerald-200 disabled:opacity-50 transition-colors">
-                  <RotateCcw className="w-3.5 h-3.5" /> {excluding ? "Đang đưa lại..." : "Đưa ca trở lại báo cáo"}
-                </button>
-              )}
-              {isOps && !monthClosed && onDeleteSession && !hasData && (
-                <button
-                  onClick={handleDelete}
-                  disabled={deleting}
-                  title={'Ca mở đang gắn sẽ về "mở" để chốt người khác; ca đã có số liệu không xoá được.'}
-                  className="block text-2xs text-[var(--text-faint)] hover:text-rose-400 disabled:opacity-40 transition-colors"
-                >
-                  <span className="inline-flex items-center gap-1.5"><Trash2 className="w-3.5 h-3.5" /> {deleting ? "Đang xoá..." : "Xoá hẳn ca này"}</span>
-                </button>
-              )}
             </div>
+          )}
+
+          {/* Chi tiết (08/11): room/phiên, nguồn số, giờ nhập, lịch sử — để tra, không phải đọc mỗi lần mở ca. Audit log đầy đủ ở Nhật ký hệ thống. */}
+          {!isBrandView && (
+            <details className="text-xs text-[var(--text-muted)] border-t border-[var(--border)] pt-3">
+              <summary className="cursor-pointer font-bold select-none">Chi tiết</summary>
+              <div className="mt-2 space-y-2">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <DataSourceBadge dataSource={s.dataSource} platform={s.platform} />
+                  {/* RPC snapshot (0078) cũng ghi reconciled_at — chỉ gọi là "đối soát" khi nguồn số thật sự là tiktok_reconciled. */}
+                  {s.reconciledAt && dataSourceTier(s) === "reconciled" && <span className="text-2xs text-[var(--text-faint)]">đối soát {new Date(s.reconciledAt).toLocaleDateString("vi-VN")}</span>}
+                </div>
+                {(s.liveRoomIds?.length ?? 0) > 0 && <p className="font-mono break-all">{prof.liveRefNoun[0].toUpperCase() + prof.liveRefNoun.slice(1)}: {s.liveRoomIds!.join(", ")}</p>}
+                {linkedLabel.length > 0 && (
+                  <p className="flex items-start gap-1"><Link2 className="w-3.5 h-3.5 shrink-0 mt-0.5" /><span>Ca nối, chung room với: {linkedLabel.join("; ")}</span></p>
+                )}
+                {s.report && !s.report.handoverAt && (s.report.dashboardLink1 || s.report.dashboardLink2) && (
+                  <div className="flex flex-wrap gap-2 text-2xs">
+                    {s.report.dashboardLink1 && <a href={s.report.dashboardLink1} target="_blank" rel="noreferrer" className="text-[var(--accent-text)] underline">Dashboard 1</a>}
+                    {s.report.dashboardLink2 && <a href={s.report.dashboardLink2} target="_blank" rel="noreferrer" className="text-[var(--accent-text)] underline">Dashboard 2</a>}
+                  </div>
+                )}
+                {historyEvents.length > 0 && (
+                  <ul className="space-y-1">
+                    {historyEvents.map((e, i) => (
+                      <li key={i} className="flex items-start gap-2">
+                        <span className="font-mono text-[var(--text-faint)] shrink-0">{fmtAt(e.at)}</span>
+                        <span>{e.label}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </details>
           )}
         </div>
       </aside>
@@ -802,4 +797,83 @@ const KV: React.FC<{ label: string; value: string; muted?: boolean; accent?: boo
     <p className={`text-xs font-bold ${accent ? "text-[var(--success)]" : muted ? "text-[var(--text-faint)] font-normal italic" : "text-[var(--text)]"}`}>{value}</p>
   </div>
 );
+
+// ---------------- Cửa sổ ca gọn (08/11, user duyệt demo) ----------------
+
+type StepState = "done" | "now" | "todo";
+
+/** Dải trạng thái ca: Live → Giao ca → Đối soát. Đối soát là việc OPS ⇒ chưa xong thì xám, không báo vàng cho trợ. */
+const SessionSteps: React.FC<{ live: StepState; handoverDone: boolean; handoverAt?: string; reconciled: boolean }> = ({ live, handoverDone, handoverAt, reconciled }) => {
+  const hand: StepState = handoverDone ? "done" : live === "done" ? "now" : "todo";
+  const rec: StepState = reconciled ? "done" : "todo";
+  const at = handoverAt ? new Date(handoverAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : "";
+  const steps: { state: StepState; label: string; sub?: string }[] = [
+    { state: live, label: live === "now" ? "Đang live" : "Live" },
+    { state: hand, label: "Giao ca", sub: handoverDone ? at : hand === "now" ? "đến lượt" : undefined },
+    { state: rec, label: "Đối soát", sub: reconciled ? undefined : "OPS" }
+  ];
+  return (
+    <ol className="flex items-center text-2xs font-bold" aria-label="Trạng thái ca">
+      {steps.map((st, i) => (
+        <React.Fragment key={st.label}>
+          {i > 0 && <li aria-hidden className={`flex-1 h-0.5 mx-1.5 min-w-3 ${steps[i - 1].state === "done" ? "bg-[var(--success)]" : "bg-[var(--border)]"}`} />}
+          <li className={`flex items-center gap-1.5 whitespace-nowrap ${st.state === "todo" ? "text-[var(--text-faint)]" : "text-[var(--text)]"}`}>
+            <span
+              className={`w-5 h-5 rounded-full border-2 flex items-center justify-center text-2xs font-black ${
+                st.state === "done" ? "bg-[var(--success)] border-[var(--success)] text-white" : st.state === "now" ? "seg-on" : "border-[var(--border)]"
+              }`}
+            >
+              {st.state === "done" ? "✓" : i + 1}
+            </span>
+            <span>{st.label}</span>
+            {st.sub && <span className="font-normal text-[var(--text-muted)] tabular-nums">{st.sub}</span>}
+          </li>
+        </React.Fragment>
+      ))}
+    </ol>
+  );
+};
+
+interface FunnelStep { label: string; value: number; rateLabel?: string; rate?: number }
+
+// Phễu LIVE của ca theo sàn — cùng các bước với phễu kênh ở Dashboard (profiles.liveFunnel). Tỷ lệ = bước này ÷ bước trước:
+// TikTok Views ÷ LIVE impressions = ERR, Product clicks ÷ Views = LIVE CTR, Orders ÷ Product clicks = CTOR.
+const FUNNEL_KEYS: Record<string, { key: string; rate?: string }[]> = {
+  TikTok: [{ key: "impressions" }, { key: "views", rate: METRIC.err }, { key: "productClicks", rate: METRIC.liveCtr }, { key: "orders", rate: METRIC.ctor }],
+  Shopee: [{ key: "viewers" }, { key: "atc" }, { key: "orders" }]
+};
+
+function buildFunnel(prof: PlatformProfile, totals: Parameters<PlatformProfile["metrics"]["value"]>[0]): FunnelStep[] {
+  const out: FunnelStep[] = [];
+  for (const f of FUNNEL_KEYS[prof.id] ?? []) {
+    const def = prof.metrics.defs.find((d) => d.key === f.key);
+    const v = prof.metrics.value(totals, f.key);
+    if (!def || v == null || !Number.isFinite(v)) continue;
+    const prev = out[out.length - 1];
+    out.push({ label: def.label, value: v, rateLabel: prev ? f.rate : undefined, rate: prev && prev.value > 0 ? (v / prev.value) * 100 : undefined });
+  }
+  return out.length >= 2 ? out : [];
+}
+
+const SessionFunnel: React.FC<{ steps: FunnelStep[] }> = ({ steps }) => {
+  if (steps.length === 0) return null;
+  // Bước đầu lớn gấp nghìn lần bước cuối ⇒ độ dài thanh theo thang log để bước cuối vẫn thấy.
+  const top = Math.log10(steps[0].value + 1) || 1;
+  return (
+    <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-1.5 tabular-nums">
+      {steps.map((st) => (
+        <React.Fragment key={st.label}>
+          <span className="text-sm font-black text-[var(--text)] text-right">{fmtInt(st.value)}</span>
+          <span className="min-w-0">
+            <span className="block text-2xs text-[var(--text-muted)] truncate" title={metricHint(st.label)}>{st.label}</span>
+            <span className="block h-1.5 rounded-full bg-[var(--accent)]/60" style={{ width: `${Math.max(6, (Math.log10(st.value + 1) / top) * 100)}%` }} />
+          </span>
+          <span className="text-2xs text-[var(--text-muted)] text-right" title={st.rateLabel ? metricHint(st.rateLabel) : undefined}>
+            {st.rate != null ? <>{st.rateLabel ? `${st.rateLabel} ` : ""}<b className="text-[var(--text)]">{fmtPct(st.rate)}</b></> : ""}
+          </span>
+        </React.Fragment>
+      ))}
+    </div>
+  );
+};
 

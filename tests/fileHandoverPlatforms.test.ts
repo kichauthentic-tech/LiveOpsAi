@@ -28,8 +28,8 @@ describe("FileHandover — một luồng, tên file theo sàn", () => {
     // Dải bước dọc (23/10): số bước nằm trong chấm tròn, chữ "1 · " chỉ còn cho trình đọc màn hình.
     expect(html).toMatch(new RegExp(`1 · </span>Tải lên file ${file}`));
     expect(html).toContain("Tải lên file ở bước 1 trước để giao ca");
-    expect(html).toContain("2 · </span>Lượt live &amp; ca nối");
-    expect(html).toContain("3 · </span>Ca này có gì?");
+    expect(html).toContain("2 · </span>Xem dòng thời gian");
+    expect(html).toContain("3 · </span>Ca có gì khác?");
     expect(html).not.toMatch(/Link dashboard|link dashboard|gõ số/);
     noBad(html);
   });

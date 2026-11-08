@@ -134,23 +134,32 @@ export function SnapshotRoomPicker({ session: s, rows, fileName, untilMin, previ
         </p>
       )}
 
+      {/* Lý do restart: ô chạm (08/11, cửa sổ ca gọn) thay ô chọn thả xuống. */}
       {askRestartReasons && turns.length > 1 && (
-        <div className="rounded-lg border border-amber-800 bg-amber-950/30 px-2.5 py-2 text-xs space-y-1.5">
-          <p className="font-bold text-amber-200">Ca có {turns.length} {noun} = {turns.length} lượt live (restart ×{turns.length - 1}). Mỗi lượt sau lượt đầu cần một lý do:</p>
-          <ul className="space-y-1">
-            {turns.slice(1).map((r, i) => (
-              <li key={r.roomId} className="flex flex-wrap items-center gap-2">
-                <span className="text-[var(--text)]">Lượt {i + 2} · {vnTime(r.startedAt)} · {noun} {shortRoomId(r.roomId)}</span>
-                <select
-                  value={reasons[r.roomId] ?? "network"}
-                  onChange={(e) => setReasons((cur) => ({ ...cur, [r.roomId]: e.target.value as BreakReason }))}
-                  className="bg-[var(--surface)] border border-[var(--border)] rounded-lg px-2 py-1 text-[var(--text)] text-xs"
-                >
-                  {BREAK_REASONS.map((b) => <option key={b.key} value={b.key}>{b.label}</option>)}
-                </select>
-              </li>
-            ))}
-          </ul>
+        <div className="rounded-lg border border-amber-800 bg-amber-950/30 px-2.5 py-2 text-xs space-y-2">
+          <p className="font-bold text-amber-200">{turns.length} {noun} = restart ×{turns.length - 1}. Lượt sau vì sao?</p>
+          {turns.slice(1).map((r, i) => (
+            <div key={r.roomId} className="space-y-1">
+              <p className="text-[var(--text)] tabular-nums">Lượt {i + 2} · {vnTime(r.startedAt)}</p>
+              <div className="flex flex-wrap gap-1.5" role="group" aria-label={`Lý do lượt ${i + 2}`}>
+                {BREAK_REASONS.map((b) => {
+                  const on = (reasons[r.roomId] ?? "network") === b.key;
+                  return (
+                    <button
+                      key={b.key}
+                      type="button"
+                      title={b.hint}
+                      aria-pressed={on}
+                      onClick={() => setReasons((cur) => ({ ...cur, [r.roomId]: b.key }))}
+                      className={`min-h-9 px-3 rounded-xl border text-xs font-bold ${on ? "seg-on" : "border-[var(--border)] text-[var(--text)]"}`}
+                    >
+                      {b.short}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
