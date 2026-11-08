@@ -1,5 +1,5 @@
 import React from "react";
-import { BookOpen, BrainCircuit, Calculator, ClipboardList, Briefcase, Building2, CalendarCheck, CalendarCheck2, CalendarDays, Clapperboard, CalendarClock, Calendar as CalendarIcon, CalendarRange, Database, DollarSign, FileSignature, FileText, LayoutDashboard, LayoutGrid, Link2, Megaphone, Package, ShieldCheck, ShoppingBasket, TrendingUp, Trophy, User, Users } from "lucide-react";
+import { BookOpen, BrainCircuit, Calculator, ClipboardList, Briefcase, Building2, CalendarCheck, CalendarCheck2, Clapperboard, CalendarClock, Calendar as CalendarIcon, CalendarRange, Database, DollarSign, FileSignature, FileText, LayoutDashboard, LayoutGrid, Link2, Megaphone, Package, ShieldCheck, ShoppingBasket, TrendingUp, Trophy, User, Users } from "lucide-react";
 import { PermissionKey, UserRole } from "../types";
 
 // Cấu hình sidebar + vài hằng số điều hướng, tách khỏi App.tsx 2026-10-01 (App.tsx 2.867 dòng).
@@ -48,7 +48,7 @@ export interface NavGroup {
 // Các tab mà nội dung chính là lưới lịch — bỏ giới hạn max-w-7xl để lấy hết chiều ngang
 // (lưới 7 cột / ma trận 5 khung giờ cần ~150px mỗi ô). Không còn tự thu
 // gọn sidebar theo tab — xem `autoCollapse`.
-export const CALENDAR_TABS = new Set(["calendar", "studio_calendar", "brand_calendar", "talent_calendar", "roster"]);
+export const CALENDAR_TABS = new Set(["calendar", "studio_calendar", "brand_calendar", "roster"]);
 
 // Tab không đọc ca / talent / report tháng — không phải chờ đợt nạp đầu (coreDataReady). Mọi tab khác
 // hiện khung chờ tới khi nạp xong, thay vì vẽ "0 ca" / "Chưa có…" giả (audit UX 2026-09-29).
@@ -64,7 +64,7 @@ export const TABS_NEEDING_SHELL_ONLY = new Set(["brand_dataraw", "brand_ads_repo
 
 // Tab render được nhưng cố ý KHÔNG nằm trong sidebar (vào từ menu user ở Header). Phải khai
 // báo ở đây vì isTabAllowed coi "không có nav item" là không được phép.
-export const TABS_WITHOUT_NAV_ITEM = new Set(["account_settings"]);
+export const TABS_WITHOUT_NAV_ITEM = new Set(["account_settings", "talent_settings"]);
 
 // Tab mặc định khi đăng nhập/đổi user, theo role — module Dashboard đã bị xoá (chờ chốt
 // cấu trúc data raw để build lại), nên không còn tab "dashboard"/"brand_dashboard" nào để về.
@@ -106,7 +106,6 @@ export function agencyNavGroups(currentRole: UserRole): NavGroup[] {
               { id: "my_shifts", label: "Ca của tôi", icon: CalendarCheck, perm: undefined },
               { id: "shift_scheduling", label: "Ca đang mở", icon: CalendarClock, perm: undefined },
               { id: "shift_registered", label: "Ca đã đăng ký", icon: CalendarCheck2, perm: undefined },
-              { id: "talent_calendar", label: "Lịch agency", icon: CalendarDays, perm: undefined },
               { id: "my_talent_profile", label: "Tôi", icon: User, perm: undefined }
             ]
           }

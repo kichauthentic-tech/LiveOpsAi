@@ -167,7 +167,7 @@ test("chữ viết hoa bằng CSS toàn app: chỉ còn chỗ nhận diện cố
     "FinanceHr", "TabUsagePanel", "MonthPlan", "brand-workspace/BrandNextMonthPlan", "scheduling/TalentLoadTimeline",
     "scheduling/SlotDetailModal", "ui/PosterCalendarGrid", "StudioEquipment", "brand-workspace/SchemeWeekStrip",
     "brand-workspace/SchemeDayPanel", "roster/ShiftPanel", "AccountSettings", "MyTalentProfile", "Header", "ResetPasswordScreen",
-    "talent/TalentAgency", "talent/TalentToday"
+    "talent/TalentToday"
   ];
   expect(CLEANED.filter((f) => /tracking-wider|tracking-widest/.test(read(`components/${f}.tsx`)))).toEqual([]);
 });

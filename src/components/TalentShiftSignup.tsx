@@ -6,6 +6,7 @@ import { fetchRosterMonths, fetchRosterWeeks, signupDeadlineOf, type RosterMonth
 import { fmtDateVn, fmtNum } from "../lib/format";
 import { DAY_PART_LABEL, dayPartOf, openSlotsFrom, slotHours, type DayPart } from "../lib/talent/myShifts";
 import { BrandLogo } from "./ui/BrandLogo";
+import { getBrandTheme } from "../lib/brandTheme";
 import { PlatformLogo } from "./ui/PlatformLogo";
 
 // Đăng Ký Ca của talent — màn riêng, tách khỏi Agency từ 08/10. OP vẫn là người chốt (user chốt 11/10 phương án B: chỉ đăng ký
@@ -279,17 +280,29 @@ export default function TalentShiftSignup({ mode, onOpenTab, brands, shiftSlots,
                 ))}
               </div>
               {brandNames.length > 1 && (
-                <select
-                  value={brandFilter}
-                  onChange={(e) => setBrandFilter(e.target.value)}
-                  aria-label="Lọc brand"
-                  className="min-h-9 rounded-full border border-[var(--border)] bg-[var(--surface-elevated)] px-3 text-sm font-bold text-[var(--text)]"
-                >
-                  <option value="all">Mọi brand</option>
-                  {brandNames.map((b) => (
-                    <option key={b} value={b}>{b}</option>
-                  ))}
-                </select>
+                <div className="flex flex-wrap gap-1.5" role="group" aria-label="Lọc brand">
+                  <button type="button" aria-pressed={brandFilter === "all"} onClick={() => setBrandFilter("all")} className={pill(brandFilter === "all")}>
+                    Mọi brand
+                  </button>
+                  {brandNames.map((name) => {
+                    const on = brandFilter === name;
+                    const th = getBrandTheme(name);
+                    const b = brands.find((x) => x.name === name);
+                    return (
+                      <button
+                        key={name}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() => setBrandFilter(on ? "all" : name)}
+                        style={on ? { background: th.primary, borderColor: th.primary, color: th.onPrimary } : { borderColor: th.primary }}
+                        className={`shrink-0 min-h-9 pl-1.5 pr-3 rounded-full text-sm font-bold border-2 flex items-center gap-1.5 transition-colors ${on ? "" : "bg-[var(--surface)] text-[var(--text)] hover:bg-[var(--surface-elevated)]"}`}
+                      >
+                        <BrandLogo brand={b ?? { name, logo: "" }} size="sm" />
+                        {name}
+                      </button>
+                    );
+                  })}
+                </div>
               )}
               {filtered && (
                 <button
@@ -323,23 +336,30 @@ export default function TalentShiftSignup({ mode, onOpenTab, brands, shiftSlots,
             </div>
           ) : (
             // Mỗi ngày có ca một cột; cột không hẹp hơn 220px — màn rộng nhiều cột, điện thoại một cột.
-            <div className="grid gap-4 items-start [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]">
+            <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]">
               {dates.map((date) => {
                 const xs = shown.filter((s) => s.date === date);
                 const have = booked.filter((s) => s.date === date).sort((a, b) => a.startTime.localeCompare(b.startTime));
                 return (
-                  <section key={date} aria-label={`${weekday(date)} ${fmtDateVn(date, false)}`} className="space-y-2 min-w-0">
-                    <div className="px-1">
+                  <section
+                    key={date}
+                    aria-label={`${weekday(date)} ${fmtDateVn(date, false)}`}
+                    className={`min-w-0 flex flex-col overflow-hidden rounded-2xl border-2 bg-[var(--surface-elevated)] ${date === today ? "border-[var(--accent)]" : "border-[var(--text-faint)]/35"}`}
+                  >
+                    {/* Mỗi ngày là MỘT KHỐI có khung + thanh tiêu đề riêng (08/11, user: ca của hai ngày liền nhau khó phân biệt). */}
+                    <div className={`px-3 py-2.5 border-b-2 ${date === today ? "bg-[var(--accent)]/20 border-[var(--accent)]/50" : "bg-[var(--text-faint)]/15 border-[var(--text-faint)]/35"}`}>
                       <h3 className="flex items-baseline gap-2">
                         <span className={`text-base font-black ${date === today ? "text-[var(--accent-text)]" : "text-[var(--text)]"}`}>{date === today ? "Hôm nay" : weekday(date)}</span>
-                        <span className="text-sm text-[var(--text-muted)]">{fmtDateVn(date, false)}</span>
-                        <span className="ml-auto text-xs text-[var(--text-faint)]">{xs.length} ca</span>
+                        <span className="text-sm font-bold text-[var(--text-muted)]">{fmtDateVn(date, false)}</span>
+                        <span className="ml-auto text-xs font-bold text-[var(--text-faint)]">{xs.length} ca</span>
                       </h3>
-                      {have.length > 0 && (
-                        <p className="text-xs text-[var(--text-faint)]">Bạn đã có: {have.map((s) => `${s.startTime}–${s.endTime} ${s.brandName}`).join(", ")}</p>
-                      )}
                     </div>
-                    {xs.map(slotTile)}
+                    <div className="p-2 space-y-2 flex-1">{xs.map(slotTile)}</div>
+                    {have.length > 0 && (
+                      <p className="border-t border-[var(--text-faint)]/25 px-3 py-2 text-xs text-[var(--text-faint)]">
+                        <b className="font-bold text-[var(--text-muted)]">Bạn đã có:</b> {have.map((s) => `${s.startTime.slice(0, 5)}–${s.endTime.slice(0, 5)} ${s.brandName}`).join(" · ")}
+                      </p>
+                    )}
                   </section>
                 );
               })}

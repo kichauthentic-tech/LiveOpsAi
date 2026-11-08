@@ -28,8 +28,9 @@ export const AGENCY_TAB_LABELS: Record<string, string> = {
   account_settings: "Tài Khoản Của Tôi",
   my_shifts: "Ca của tôi", // 11–16/10 là "Hôm Nay" (app talent T1); bản 2 16/10 về lại "Ca Của Tôi"
   shift_registered: "Ca đã đăng ký",
-  talent_calendar: "Lịch agency",
-  my_talent_profile: "Tôi"
+  talent_calendar: "Lịch & Studio", // đã bỏ khỏi app talent 08/11 — giữ tên để "Lượt Mở Tab" đọc được lượt cũ,
+  my_talent_profile: "Tôi",
+  talent_settings: "Cài đặt"
 };
 
 // Cùng id nhưng talent thấy tên khác (menu talent).

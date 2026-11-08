@@ -94,6 +94,7 @@ const BrandAffiliateTable = lazyNamed(() => import("./components/brand-workspace
 const BrandNextMonthPlan = lazyNamed(() => import("./components/brand-workspace/BrandNextMonthPlan"), "BrandNextMonthPlan");
 const BrandDataRaw = lazyNamed(() => import("./components/brand-workspace/BrandDataRaw"), "BrandDataRaw");
 const AccountSettings = lazyNamed(() => import("./components/AccountSettings"), "AccountSettings");
+const TalentSettings = lazyNamed(() => import("./components/TalentSettings"), "TalentSettings");
 const MyTalentProfile = lazyNamed(() => import("./components/MyTalentProfile"), "MyTalentProfile");
 const SessionLedger = lazyNamed(() => import("./components/SessionLedger"), "SessionLedger");
 const LiveCalendar = lazyNamed(() => import("./components/LiveCalendar"), "LiveCalendar");
@@ -114,7 +115,6 @@ const Leaderboard = lazyNamed(() => import("./components/Leaderboard"), "Leaderb
 const BrandsOverview = lazyNamed(() => import("./components/BrandsOverview"), "BrandsOverview");
 const TalentShiftSignup = lazyNamed(() => import("./components/TalentShiftSignup"), "default");
 const TalentToday = lazyNamed(() => import("./components/talent/TalentToday"), "TalentToday");
-const TalentAgency = lazyNamed(() => import("./components/talent/TalentAgency"), "TalentAgency");
 const OpsPlanningTodo = lazyNamed(() => import("./components/OpsPlanningTodo"), "default");
 const MonthPlan = lazyNamed(() => import("./components/MonthPlan"), "default");
 const OpsSupport = lazyNamed(() => import("./components/OpsSupport"), "default");
@@ -136,7 +136,6 @@ const TAB_CHUNKS: Record<string, { preload: () => void }[]> = {
   sessions: [SessionLedger],
   roster: [RosterBoard],
   my_shifts: [TalentToday],
-  talent_calendar: [TalentAgency, LiveCalendar],
   shift_scheduling: [TalentShiftSignup],
   shift_registered: [TalentShiftSignup],
   month_plan: [MonthPlan],
@@ -157,6 +156,7 @@ const TAB_CHUNKS: Record<string, { preload: () => void }[]> = {
   brand_dataraw: [BrandDataRaw],
   talents: [TalentMatcher],
   my_talent_profile: [MyTalentProfile],
+  talent_settings: [TalentSettings],
   studios: [StudioEquipment],
   crm: [CrmProjects],
   tiktok_api: [TikTokApiAutomation],
@@ -2150,38 +2150,6 @@ export default function App() {
                   />
                 )}
 
-                {activeTab === "talent_calendar" && currentRole === "talent" && (
-                  <TalentAgency
-                    sessions={activeSessions}
-                    shiftSlots={shiftSlots}
-                    brands={brands}
-                    talents={activeTalents}
-                    currentRole={currentRole}
-                    myTalentId={activeUser.assignedTalentId}
-                    onSessionsUpdated={handleSessionsUpdated}
-                    onRequestDropout={handleRequestDropout}
-                    fullCalendar={() => (
-                      <LiveCalendar
-                        channels={channels}
-                        sessions={activeSessions}
-                        shiftSlots={shiftSlots}
-                        shiftRegistrations={shiftRegistrations}
-                        studios={activeStudios}
-                        talents={activeTalents}
-                        brands={brands}
-                        onRegisterSlot={handleRegisterSlot}
-                        onUnregisterSlot={handleUnregisterSlot}
-                        myTalentId={activeUser.assignedTalentId}
-                        currentUserId={activeUser.id}
-                        currentRole={currentRole}
-                        schemes={promoSchemes}
-                        onSessionsUpdated={handleSessionsUpdated}
-                        onRequestDropout={handleRequestDropout}
-                      />
-                    )}
-                  />
-                )}
-
                 {(activeTab === "shift_scheduling" || activeTab === "shift_registered") && currentRole === "talent" && (
                   <TalentShiftSignup
                     mode={activeTab === "shift_registered" ? "registered" : "open"}
@@ -2458,8 +2426,17 @@ export default function App() {
                     payrollSessions={sessions}
                     financeRecords={financeRecords}
                     talentRateHistory={talentRateHistory}
+                    onOpenSettings={() => setActiveTab("talent_settings")}
+                  />
+                )}
+
+                {activeTab === "talent_settings" && currentRole === "talent" && (
+                  <TalentSettings
+                    activeUser={activeUser}
+                    myTalent={talents.find((t) => t.id === activeUser.assignedTalentId)}
                     onSaveMyProfile={handleSaveMyTalentProfile}
                     onOpenAccount={() => setActiveTab("account_settings")}
+                    onBack={() => setActiveTab("my_talent_profile")}
                   />
                 )}
 

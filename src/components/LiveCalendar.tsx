@@ -566,7 +566,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
     <div className="space-y-4 sm:space-y-6">
       <PageHeader
         icon={CalendarIcon}
-        title={talentView ? "Lịch" : "Lịch & Studio"}
+        title="Lịch & Studio"
         description={
           talentView
             ? "Lịch ca đã chốt của bạn và của toàn agency, theo tháng, tuần, phòng. Bấm một ca để xem chi tiết; ca của bạn có chip \"Bạn\"."

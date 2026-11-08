@@ -15,6 +15,7 @@ import { BrandLogo } from "../ui/BrandLogo";
 import { SessionWindow } from "../SessionWindow";
 import { TalentSessionCard } from "./TalentSessionCard";
 import { CalendarFeedCard } from "./CalendarFeedCard";
+import { TalentMonthCalendar } from "./TalentMonthCalendar";
 
 // Tab "Ca của tôi" của app talent (bản 2, 16/10; id cũ `my_shifts` — thông báo + localStorage trỏ vào). Trả lời MỘT câu: ca tới
 // lúc mấy giờ, phòng nào, đi với ai. Đo bản 1 trên app thật (375×812, host Huỳnh Tấn Khanh): màn dài 3.451px, ca kế tiếp bắt
@@ -123,12 +124,14 @@ export const TalentToday: React.FC<Props> = ({
   const hoursOf = (k: AgendaRangeKey) => daysOf[k].reduce((a, d) => a + d.hours, 0);
   // Mở sẵn khoảng đầu tiên có ca (tối CN tuần này đã hết ca thì mở thẳng tuần sau).
   const [rangePick, setRangePick] = useState<AgendaRangeKey | null>(null);
+  const [monthMode, setMonthMode] = useState(false);
   const range: AgendaRangeKey = rangePick ?? ranges.find((r) => countOf(r.key) > 0)?.key ?? "this";
   const days = daysOf[range];
 
   const jumpTo = (s: LiveSession) => {
     const r = ranges.find((x) => s.date >= x.from && s.date <= x.to);
     if (r) setRangePick(r.key);
+    setMonthMode(false);
     // Chờ React vẽ xong tuần vừa chọn rồi mới cuộn tới ca.
     setTimeout(() => document.getElementById(`my-shift-${s.id}`)?.scrollIntoView({ block: "center", behavior: "smooth" }), 50);
   };
@@ -211,16 +214,29 @@ export const TalentToday: React.FC<Props> = ({
               <button
                 key={r.key}
                 type="button"
-                aria-pressed={range === r.key}
-                onClick={() => setRangePick(r.key)}
-                className={`flex-1 min-h-8 rounded-lg text-xs font-bold ${range === r.key ? "bg-[var(--surface-elevated)] text-[var(--text)]" : "text-[var(--text-faint)]"}`}
+                aria-pressed={!monthMode && range === r.key}
+                onClick={() => {
+                  setMonthMode(false);
+                  setRangePick(r.key);
+                }}
+                className={`flex-1 min-h-8 px-1 rounded-lg text-xs font-bold whitespace-nowrap ${!monthMode && range === r.key ? "bg-[var(--surface-elevated)] text-[var(--text)]" : "text-[var(--text-faint)]"}`}
               >
                 {r.label} · {countOf(r.key)}
               </button>
             ))}
+            <button
+              type="button"
+              aria-pressed={monthMode}
+              onClick={() => setMonthMode(true)}
+              className={`flex-1 min-h-8 px-1 rounded-lg text-xs font-bold whitespace-nowrap ${monthMode ? "bg-[var(--surface-elevated)] text-[var(--text)]" : "text-[var(--text-faint)]"}`}
+            >
+              Cả tháng
+            </button>
           </div>
 
-          {weekGrid && range !== "later" ? (
+          {monthMode ? (
+            <TalentMonthCalendar mine={mine} talentId={myTalentId} today={today} clashIds={clashIds} onOpen={setOpenId} />
+          ) : weekGrid && range !== "later" ? (
             // Lưới tuần T2–CN (cả ngày đã qua của tuần này, mờ đi) — như Lịch Tuần của agency, chỉ ca của mình.
             <div className="grid grid-cols-7 gap-2">
               {weekDates(ranges.find((r) => r.key === range)!.from).map((date) => {

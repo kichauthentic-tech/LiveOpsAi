@@ -434,11 +434,15 @@ test("Hồ Sơ Của Tôi (tab Tôi): số đứng trước form, và ô trống
   const src = readFileSync(join(SRC, "components/MyTalentProfile.tsx"), "utf8");
   // Thứ tự khối (bản 2, 16/10): giờ + thu nhập tháng → bảng công → hiệu suất → thông tin tự sửa → đổi email. Trước 30/09 hai form
   // ghi chiếm trọn màn đầu 812px ở 375px, đẩy hiệu suất và lương ra ngoài màn.
-  const order = ["Tháng này", "Thu nhập tháng", "Bảng công", "Hiệu suất", "Thông tin tự sửa", "Đổi email đăng nhập"].map((c) => src.indexOf(`{/* ${c}`));
+  // Từ 08/11 hai form (và lịch điện thoại, mật khẩu) tách sang màn Cài đặt (TalentSettings.tsx): tab "Tôi" chỉ còn số liệu.
+  const order = ["Tháng này", "Bảng công", "Hiệu suất"].map((c) => src.indexOf(`{/* ${c}`));
   expect(order.every((i) => i >= 0), `thiếu comment mốc khối: ${order}`).toBe(true);
   expect(order, `thứ tự khối sai: ${order}`).toEqual([...order].sort((a, b) => a - b));
-  // Form ghi gập sẵn (<details>) — không chiếm màn đầu.
-  expect(src.slice(src.indexOf("{/* Thông tin tự sửa")).trimStart()).toMatch(/^\{\/\* Thông tin tự sửa \*\/\}\s*<details/);
+  // Form ghi nằm ở màn Cài đặt riêng, gập sẵn (<details>), không còn ở tab "Tôi".
+  expect(src).not.toMatch(/<form/);
+  const settings = readFileSync(join(SRC, "components/TalentSettings.tsx"), "utf8");
+  expect(settings).toMatch(/\{\/\* Thông tin tự sửa \*\/\}\s*<details/);
+  expect(settings).toMatch(/\{\/\* Đổi email đăng nhập \*\/\}\s*<details/);
   // Rate chưa nhập phải nói "ops chưa nhập", không in "0/live". Không có ô hoa hồng theo GMV (user chốt 06/10: talent
   // chỉ ăn rate giờ/phiên) — hiện lại "Hoa hồng ops chưa nhập" là hứa một khoản không tồn tại.
   expect(src).toContain("ops chưa nhập");
@@ -458,7 +462,7 @@ test("App talent: có lịch sử ca đã chạy, và không nói 'không còn c
   // thật sự có (229/229 ca nạp bù 30/09) ⇒ Hồ sơ liệt kê ca đã chạy của tháng; Hôm nay nói "chưa có ca nào" với người chưa có ca.
   const profile = readFileSync(join(SRC, "components/MyTalentProfile.tsx"), "utf8");
   expect(profile).toMatch(/const monthDone = useMemo\(/);
-  expect(profile).toMatch(/\{monthDone\.length > 0 && \(/);
+  expect(profile).toMatch(/monthDone\.length === 0 \?/);
   const today = readFileSync(join(SRC, "components/talent/TalentToday.tsx"), "utf8");
   expect(today).toContain('mine.length === 0 ? "Bạn chưa có ca nào trên lịch."');
   // Bản 2 (16/10): giao ca không còn ở app talent (admin giao trên máy phòng live), không có khối liệt kê ca chờ nhận riêng.
