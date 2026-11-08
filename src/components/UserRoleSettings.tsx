@@ -134,6 +134,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
   const [emailError, setEmailError] = useState<string | null>(null);
   const [savingEmail, setSavingEmail] = useState(false);
   const [issued, setIssued] = useState<IssuedCredential | null>(null);
+  const [formEmailError, setFormEmailError] = useState<string | null>(null);
   const saveEmail = async () => {
     if (!emailFor) return;
     const email = newEmail.trim().toLowerCase();
@@ -324,6 +325,19 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
     setIsSavingUser(true);
     try {
       if (editingUser) {
+        const newLoginEmail = formData.email.trim().toLowerCase();
+        if (canManage(editingUser) && newLoginEmail !== editingUser.email.toLowerCase()) {
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newLoginEmail) || isAliasEmail(newLoginEmail)) {
+            setFormEmailError("Email chưa đúng dạng (vd: ten@gmail.com).");
+            return;
+          }
+          try {
+            await onSetUserEmail(editingUser.id, newLoginEmail);
+          } catch (err) {
+            setFormEmailError(err instanceof Error ? err.message : "Không đổi được email.");
+            return;
+          }
+        }
         const updated: SystemUser = {
           ...editingUser,
           name: formData.name,
@@ -380,6 +394,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
 
   const openEditModal = (user: SystemUser) => {
     setEditingUser(user);
+    setFormEmailError(null);
     setFormData({
       name: user.name,
       email: user.email,
@@ -936,17 +951,23 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                 <input
                   type="email"
                   required
-                  disabled={!!editingUser}
+                  disabled={!!editingUser && !canManage(editingUser)}
                   placeholder="email@congty.com"
                   value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  onChange={(e) => {
+                    setFormEmailError(null);
+                    setFormData({ ...formData, email: e.target.value });
+                  }}
                   className="w-full px-3 py-2 bg-[var(--surface-base)] rounded-xl border border-[var(--border)] text-[var(--text)] focus:outline-none focus:border-[var(--accent)] disabled:opacity-50 disabled:cursor-not-allowed"
                 />
                 {editingUser && (
                   <p className="text-2xs text-[var(--text-faint)]">
-                    Không thể đổi email đăng nhập tại đây — email là tên đăng nhập của tài khoản.
+                    {canManage(editingUser)
+                      ? "Đổi email là đổi tên đăng nhập: từ lúc lưu họ phải đăng nhập bằng email mới, mật khẩu giữ nguyên."
+                      : "Không đổi được email của tài khoản này tại đây."}
                   </p>
                 )}
+                {formEmailError && <p className="text-2xs font-bold text-red-500">{formEmailError}</p>}
                 {!editingUser && (
                   <p className="text-2xs text-[var(--text-faint)]">
                     Hệ thống sẽ gửi email mời tạo mật khẩu đến địa chỉ này.
