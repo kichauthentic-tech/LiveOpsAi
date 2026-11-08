@@ -62,6 +62,8 @@ interface LiveCalendarProps {
   onSetSessionExcluded?: (id: string, excluded: boolean, reason: string) => Promise<boolean>;
   onRequestDropout?: (sessionId: string, reason: string) => Promise<boolean>; // Đ7 (0116) — talent báo bận, chỉ gửi thông báo cho ops
   onLogAudit?: (entry: { action: string; details: string; category: AuditLogEntry["category"] }) => Promise<void>;
+  /** Tiêu đề trang — app talent nhúng cùng lịch này vào tab "Ca của tôi" (08/11) nên đặt tên khác "Lịch & Studio". */
+  title?: string;
 }
 
 // Lịch Ngày (trục phòng): tối thiểu 64px mỗi giờ, mỗi làn cao LANE_H — đủ cho thẻ "gọn" 3 dòng (Host + Trợ live
@@ -107,7 +109,8 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   onCancelSession,
   onSetSessionExcluded,
   onRequestDropout,
-  onLogAudit
+  onLogAudit,
+  title = "Lịch & Studio"
 }) => {
   // Sync sessions with propSessions so clean test mode is respected
   const [sessions, setSessions] = useState<LiveSession[]>(propSessions);
@@ -562,11 +565,61 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
     )
   ).sort((a, b) => a.localeCompare(b, "vi"));
 
+  // Danh sách ca của ngày đang chọn, đặt ngay dưới lưới Tháng/Tuần (user 08/11). Dưới xl lưới 7 cột phải cuộn
+  // ngang (thẻ ca giữ cỡ to như desktop) nên bấm ô ngày ⇒ đọc trọn ca của ngày đó ở đây, không phải cuộn tìm.
+  const renderDayList = () => {
+    const picked = {
+      sessions: filteredSessions.filter((s) => s.date === selectedDate && s.status !== "Cancelled"),
+      slots: openSlots.filter((sl) => sl.date === selectedDate)
+    };
+    const pickedCount = picked.sessions.length + picked.slots.length;
+    return (
+      <div className="xl:hidden space-y-3 border-t border-[var(--border)] pt-3">
+        <div className="space-y-2">
+          <p className="text-xs font-black text-[var(--text)]">
+            {getDayOfWeekName(selectedDate)}, {fmtDateVn(selectedDate)}
+            <span className="font-bold text-[var(--text-muted)]"> · {pickedCount > 0 ? `${pickedCount} ca` : "không có ca"}</span>
+          </p>
+          {picked.slots.map((sl) => (
+            <SessionEventCard
+              key={sl.id}
+              theme={getBrandTheme(sl.brandName)}
+              brand={brandById.get(sl.brandId ?? "")}
+              brandName={sl.brandName} platform={sl.platform}
+              startTime={sl.startTime}
+              endTime={sl.endTime}
+              meta={buildSlotMeta(sl)}
+              tone="pending"
+              pending
+              onClick={() => setSelectedSlotDetail(sl)}
+            />
+          ))}
+          {picked.sessions.map((ds) => (
+            <SessionEventCard
+              key={ds.id}
+              theme={getBrandTheme(ds.brandName)}
+              brand={brandById.get(ds.brandId)}
+              brandName={ds.brandName} platform={ds.platform}
+              startTime={ds.startTime}
+              endTime={ds.endTime}
+              title={ds.title}
+              meta={buildSessionMeta(ds, talentLookup, undefined, talentView ? myTalentId : undefined)} durationBadge={buildDurationBadge(ds, "agency")} pctBadge={buildPctBadge(ds, "agency")} className={clashRing(ds.id)}
+              targetGmv={ds.targetGmv}
+              tone={SESSION_TONE[ds.status]}
+              tooltip={clashTip(ds.id, `${ds.studioName} · Host ${ds.hostName}`)}
+              onClick={() => setSelectedSessionDetail(ds)}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-4 sm:space-y-6">
       <PageHeader
         icon={CalendarIcon}
-        title="Lịch & Studio"
+        title={title}
         description={
           talentView
             ? "Lịch ca đã chốt của bạn và của toàn agency, theo tháng, tuần, phòng. Bấm một ca để xem chi tiết; ca của bạn có chip \"Bạn\"."
@@ -595,7 +648,8 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
               >
                 <CalendarIcon className="w-3.5 h-3.5" /> Lịch Tuần
               </button>
-              <button
+              {/* Talent không cần "Phòng theo giờ" (user 08/11) — xem phòng là việc của điều phối. */}
+              {!talentView && <button
                 onClick={() => setViewMode("day")}
                 className={`px-3 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
                   viewMode === "day"
@@ -604,7 +658,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                 }`}
               >
                 <Building2 className="w-3.5 h-3.5" /> Phòng theo giờ
-              </button>
+              </button>}
               {canManageSlots && <button
                 onClick={() => setViewMode("talent_workload")}
                 className={`px-3 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
@@ -873,7 +927,8 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   onDrop={(e) => handleDropOnMonthDay(e, cell.dateStr)}
                   onClick={() => {
                     setSelectedDate(cell.dateStr);
-                    setViewMode("day");
+                    // Talent không có "Phòng theo giờ" ⇒ bấm ngày chỉ chọn ngày, ca của ngày hiện ở danh sách dưới lưới.
+                    if (!talentView) setViewMode("day");
                   }}
                   title={campaignDay?.label}
                   className={`min-h-[110px] sm:min-h-[215px] p-1 sm:p-2.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between relative overflow-visible ${
@@ -1001,15 +1056,16 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
             })}
           </div>
           </div>
+          {renderDayList()}
         </div>
       )}
 
       {/* VIEW 2: WEEK VIEW (Lịch Tuần - 7 Ngày Từ T2 Đến CN) */}
       {viewMode === "week" && (
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-6 shadow-xl space-y-4">
-          <div className="border-b border-[var(--border)] pb-3 flex justify-between items-center">
+          <div className="border-b border-[var(--border)] pb-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
             <div>
-              <h3 className="font-black text-[var(--text)] text-base flex items-center gap-2">
+              <h3 className="font-black text-[var(--text)] text-base flex items-center gap-2 whitespace-nowrap">
                 <CalendarIcon className="w-5 h-5 text-[var(--accent-text)]" /> Lịch Vận Hành Tuần
               </h3>
               {canEdit && <p className="text-xs text-[var(--text-muted)]">Kéo thả để đổi lịch</p>}
@@ -1017,7 +1073,9 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
             <SessionCardLegend showTiming />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
+          {/* Luôn 7 cột như Lịch Tháng (user 08/11) — dưới xl cuộn ngang thay vì xếp 7 ngày thành một cột dọc dài. */}
+          <div className="overflow-x-auto -mx-1 px-1 pb-1">
+          <div className="grid grid-cols-7 gap-3 min-w-[1080px] xl:min-w-0">
             {currentWeekDates.map((wDay, wIdx) => {
               const daySessions = filteredSessions.filter((s) => s.date === wDay.dateStr && s.status !== "Cancelled");
               const daySlots = openSlots.filter((sl) => sl.date === wDay.dateStr);
@@ -1035,6 +1093,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   onDragOver={(e) => handleDragOver(e, weekCellKey)}
                   onDragLeave={(e) => handleDragLeave(e, weekCellKey)}
                   onDrop={(e) => handleDropOnWeekDay(e, wDay.dateStr)}
+                  onClick={() => setSelectedDate(wDay.dateStr)}
                   title={campaignDay?.label}
                   className={`bg-[var(--surface)] rounded-2xl p-3 border space-y-3 transition-all overflow-visible ${
                     isWeekHovered
@@ -1049,7 +1108,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   {/* Desktop (md:grid-cols-7, hàng ngang thật): dải banner nối liền qua 3 ngày của
                       đợt Campaign, đồng bộ kỹ thuật với Poster Calendar/lịch tháng. Mobile xếp dọc
                       1 cột nên "nối ngang" vô nghĩa — vẫn dùng badge rời như cũ. */}
-                  <div className="hidden md:block">
+                  <div>
                     <CampaignDayRibbon
                       info={campaignDay}
                       columnIndex={wIdx}
@@ -1058,7 +1117,6 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                       variant="liveWeek"
                     />
                   </div>
-                  {campaignDay && <CampaignDayBanner info={campaignDay} className="-mt-0.5 md:hidden" />}
                   <div
                     onClick={() => setSelectedDate(wDay.dateStr)}
                     className="flex justify-between items-center border-b border-[var(--border-muted)] pb-2 cursor-pointer"
@@ -1154,6 +1212,8 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
               );
             })}
           </div>
+          </div>
+          {renderDayList()}
         </div>
       )}
 

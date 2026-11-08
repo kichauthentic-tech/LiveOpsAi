@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, Clock, X } from "lucide-react";
 import type { Brand, LiveSession, ShiftSlot, Talent, UserRole } from "../../types";
-import { getTodayDate, addDays } from "../../lib/dateUtils";
+import { getTodayDate } from "../../lib/dateUtils";
 import { fmtDateVn, fmtFixed, fmtVndShort } from "../../lib/format";
 import { getBrandTheme } from "../../lib/brandTheme";
-import { BACK_TO_BACK_MIN, dayTimeline, heroShift, myClashes, myRole, mySessions } from "../../lib/talent/myShifts";
-import { TALENT_WEEK_GRID_QUERY, TALENT_WIDE_QUERY, agendaDays, agendaRanges, weekDates, type AgendaRangeKey } from "../../lib/talent/agenda";
+import { heroShift, myClashes, myRole, mySessions } from "../../lib/talent/myShifts";
+import { TALENT_WIDE_QUERY, agendaDays, weekRange } from "../../lib/talent/agenda";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { myPendingAcks, type PendingAck } from "../../lib/talent/acks";
 import { shiftPrep } from "../../lib/talent/prep";
@@ -13,9 +13,7 @@ import type { ShiftAck } from "../../lib/db/shiftAcks";
 import { PlatformChip } from "../common/PlatformChip";
 import { BrandLogo } from "../ui/BrandLogo";
 import { SessionWindow } from "../SessionWindow";
-import { TalentSessionCard } from "./TalentSessionCard";
 import { CalendarFeedCard } from "./CalendarFeedCard";
-import { TalentMonthCalendar } from "./TalentMonthCalendar";
 
 // Tab "Ca của tôi" của app talent (bản 2, 16/10; id cũ `my_shifts` — thông báo + localStorage trỏ vào). Trả lời MỘT câu: ca tới
 // lúc mấy giờ, phòng nào, đi với ai. Đo bản 1 trên app thật (375×812, host Huỳnh Tấn Khanh): màn dài 3.451px, ca kế tiếp bắt
@@ -44,6 +42,8 @@ interface Props {
   /** Dòng "Đã nhận lịch" của người này (0169). null/vắng = DB chưa chạy 0169 hoặc chưa nạp ⇒ ẩn thanh xác nhận. */
   acks?: ShiftAck[] | null;
   onAck?: (sessionIds: string[]) => Promise<boolean>;
+  /** Lịch & Studio (LiveCalendar) cách nhìn talent — App dựng sẵn. */
+  calendar?: React.ReactNode;
 }
 
 const WEEKDAY = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
@@ -79,11 +79,11 @@ export const TalentToday: React.FC<Props> = ({
   requestOpenSessionId = null,
   onOpenRequestHandled,
   acks = null,
-  onAck
+  onAck,
+  calendar
 }) => {
   const today = getTodayDate();
   const wide = useMediaQuery(TALENT_WIDE_QUERY);
-  const weekGrid = useMediaQuery(TALENT_WEEK_GRID_QUERY);
   // Đồng hồ riêng của màn (đếm ngược tới giờ vào ca) — trạng thái ca đã được App tự đổi theo giờ (withEffectiveStatus).
   const [nowMs, setNowMs] = useState(() => Date.now());
   useEffect(() => {
@@ -111,39 +111,15 @@ export const TalentToday: React.FC<Props> = ({
   const mine = useMemo(() => mySessions(sessions, myTalentId), [sessions, myTalentId]);
   const hero = useMemo(() => heroShift(mine, nowMs), [mine, nowMs]);
   const clashes = useMemo(() => myClashes(sessions, myTalentId, today), [sessions, myTalentId, today]);
-  const clashIds = useMemo(() => new Set(clashes.flatMap((c) => [c.session.id, c.other?.id].filter((x): x is string => !!x))), [clashes]);
   const pendingAcks = useMemo(() => (acks ? myPendingAcks(sessions, myTalentId, acks, nowMs) : []), [acks, sessions, myTalentId, nowMs]);
-  const pendingById = useMemo(() => new Map(pendingAcks.map((p) => [p.session.id, p])), [pendingAcks]);
 
-  const ranges = useMemo(() => agendaRanges(today), [today]);
-  const daysOf = useMemo(
-    () => Object.fromEntries(ranges.map((r) => [r.key, myTalentId ? agendaDays(mine, myTalentId, r.from, r.to) : []])) as Record<AgendaRangeKey, ReturnType<typeof agendaDays>>,
-    [ranges, mine, myTalentId]
-  );
-  const countOf = (k: AgendaRangeKey) => daysOf[k].reduce((a, d) => a + d.items.length, 0);
-  const hoursOf = (k: AgendaRangeKey) => daysOf[k].reduce((a, d) => a + d.hours, 0);
-  // Mở sẵn khoảng đầu tiên có ca (tối CN tuần này đã hết ca thì mở thẳng tuần sau).
-  const [rangePick, setRangePick] = useState<AgendaRangeKey | null>(null);
-  const [monthMode, setMonthMode] = useState(false);
-  const range: AgendaRangeKey = rangePick ?? ranges.find((r) => countOf(r.key) > 0)?.key ?? "this";
-  const days = daysOf[range];
+  const thisWeek = weekRange(today, 0);
+  const thisWeekDays = useMemo(() => (myTalentId ? agendaDays(mine, myTalentId, thisWeek.from, thisWeek.to) : []), [mine, myTalentId, thisWeek.from, thisWeek.to]);
+  const thisWeekCount = thisWeekDays.reduce((a, d) => a + d.items.length, 0);
+  const thisWeekHours = thisWeekDays.reduce((a, d) => a + d.hours, 0);
 
-  const jumpTo = (s: LiveSession) => {
-    const r = ranges.find((x) => s.date >= x.from && s.date <= x.to);
-    if (r) setRangePick(r.key);
-    setMonthMode(false);
-    // Chờ React vẽ xong tuần vừa chọn rồi mới cuộn tới ca.
-    setTimeout(() => document.getElementById(`my-shift-${s.id}`)?.scrollIntoView({ block: "center", behavior: "smooth" }), 50);
-  };
-
-  const shiftBlock = (s: LiveSession) => (
-    <div id={`my-shift-${s.id}`} className="space-y-1 scroll-mt-24">
-      <AckLabel p={pendingById.get(s.id)} />
-      <TalentSessionCard session={s} brand={brandById.get(s.brandId)} talents={talents} meId={myTalentId} clash={clashIds.has(s.id)} onOpen={setOpenId} />
-      {clashIds.has(s.id) && <p className="text-2xs font-bold text-rose-300 px-1">Trùng giờ với một ca khác của bạn</p>}
-    </div>
-  );
-  const dayTitle = (date: string) => (date === today ? "Hôm nay" : date === addDays(today, 1) ? "Ngày mai" : dayLabel(date));
+  // Bấm cảnh báo trùng giờ ⇒ mở Cửa sổ Ca của ca đó (lịch bên dưới là Lịch & Studio, có viền đỏ cho ca trùng).
+  const jumpTo = (s: LiveSession) => setOpenId(s.id);
 
   const openSession = openId ? sessions.find((s) => s.id === openId) ?? null : null;
   const roleText = (s: LiveSession) => (myTalentId && myRole(s, myTalentId) === "host" ? "Host" : "Trợ live");
@@ -155,7 +131,7 @@ export const TalentToday: React.FC<Props> = ({
         <h2 className="text-lg font-black text-[var(--text)]">Ca của tôi</h2>
         <p className="text-xs text-[var(--text-muted)]">
           {dayLabel(today)}
-          {myTalentId && countOf("this") > 0 && ` · tuần này còn ${countOf("this")} ca · ${hrs(hoursOf("this"))}`}
+          {myTalentId && thisWeekCount > 0 && ` · tuần này còn ${thisWeekCount} ca · ${hrs(thisWeekHours)}`}
         </p>
       </div>
 
@@ -207,85 +183,9 @@ export const TalentToday: React.FC<Props> = ({
         </div>
       </div>
 
-      {myTalentId && mine.length > 0 && (
-        <>
-          <div className={`flex rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1 ${wide ? "max-w-md" : ""}`} role="group" aria-label="Chọn tuần">
-            {ranges.map((r) => (
-              <button
-                key={r.key}
-                type="button"
-                aria-pressed={!monthMode && range === r.key}
-                onClick={() => {
-                  setMonthMode(false);
-                  setRangePick(r.key);
-                }}
-                className={`flex-1 min-h-8 px-1 rounded-lg text-xs font-bold whitespace-nowrap ${!monthMode && range === r.key ? "bg-[var(--surface-elevated)] text-[var(--text)]" : "text-[var(--text-faint)]"}`}
-              >
-                {r.label} · {countOf(r.key)}
-              </button>
-            ))}
-            <button
-              type="button"
-              aria-pressed={monthMode}
-              onClick={() => setMonthMode(true)}
-              className={`flex-1 min-h-8 px-1 rounded-lg text-xs font-bold whitespace-nowrap ${monthMode ? "bg-[var(--surface-elevated)] text-[var(--text)]" : "text-[var(--text-faint)]"}`}
-            >
-              Cả tháng
-            </button>
-          </div>
-
-          {monthMode ? (
-            <TalentMonthCalendar mine={mine} talentId={myTalentId} today={today} clashIds={clashIds} onOpen={setOpenId} />
-          ) : weekGrid && range !== "later" ? (
-            // Lưới tuần T2–CN (cả ngày đã qua của tuần này, mờ đi) — như Lịch Tuần của agency, chỉ ca của mình.
-            <div className="grid grid-cols-7 gap-2">
-              {weekDates(ranges.find((r) => r.key === range)!.from).map((date) => {
-                const items = dayTimeline(mine, date);
-                return (
-                  <section key={date} aria-label={dayLabel(date)} className={`min-w-0 rounded-2xl border p-2 space-y-1.5 ${date === today ? "border-[var(--accent)]/70 bg-[var(--accent)]/5" : "border-[var(--border)] bg-[var(--surface)]"} ${date < today ? "opacity-60" : ""}`}>
-                    <h3 className={`text-2xs font-black px-1 ${date === today ? "text-[var(--accent-text)]" : "text-[var(--text-muted)]"}`}>
-                      {date === today ? "Hôm nay" : dayLabel(date)}
-                      {items.length > 0 && <span className="font-normal text-[var(--text-faint)]"> · {items.length} ca</span>}
-                    </h3>
-                    {items.length === 0 ? (
-                      <p className="text-2xs text-[var(--text-faint)] px-1">Nghỉ</p>
-                    ) : (
-                      items.map(({ session: s, gapMin }) => (
-                        <React.Fragment key={s.id}>
-                          {gapMin != null && gapMin <= BACK_TO_BACK_MIN && <GapLine gapMin={gapMin} />}
-                          {shiftBlock(s)}
-                        </React.Fragment>
-                      ))
-                    )}
-                  </section>
-                );
-              })}
-            </div>
-          ) : days.length === 0 ? (
-            <p className="text-xs text-[var(--text-faint)] px-1">Không có ca nào {ranges.find((r) => r.key === range)!.label.toLowerCase()}.</p>
-          ) : (
-            <div className={wide ? "grid grid-cols-3 gap-3 items-start" : "space-y-3"}>
-              {days.map((d) => (
-                <section key={d.date} className="space-y-1.5 min-w-0" aria-label={dayLabel(d.date)}>
-                  <div className="flex items-baseline justify-between gap-2 px-1 pt-1">
-                    <h3 className={`text-xs font-black ${d.date === today ? "text-[var(--accent-text)]" : "text-[var(--text)]"}`}>
-                      {dayTitle(d.date)}
-                      {d.date === today || d.date === addDays(today, 1) ? <span className="font-normal text-[var(--text-faint)]"> · {dayLabel(d.date)}</span> : null}
-                    </h3>
-                    <span className="text-2xs text-[var(--text-faint)]">{d.items.length} ca · {hrs(d.hours)}</span>
-                  </div>
-                  {d.items.map(({ session: s, gapMin }) => (
-                    <React.Fragment key={s.id}>
-                      {gapMin != null && <GapLine gapMin={gapMin} />}
-                      {shiftBlock(s)}
-                    </React.Fragment>
-                  ))}
-                </section>
-              ))}
-            </div>
-          )}
-        </>
-      )}
+      {/* Lịch = ĐÚNG module Lịch & Studio (LiveCalendar, cách nhìn talent: chỉ đọc, "Của tôi" / "Toàn agency") — user 08/11: "làm
+          y chang Lịch & Studio cho talent". App truyền vào để dùng chung dữ liệu phòng/kênh/lịch mở ca. */}
+      {calendar}
 
       {openSession && (
         <SessionWindow
@@ -304,22 +204,7 @@ export const TalentToday: React.FC<Props> = ({
   );
 };
 
-const AckLabel: React.FC<{ p?: PendingAck }> = ({ p }) => {
-  if (!p) return null;
-  const st = p.state;
-  return (
-    <p className="text-2xs font-bold text-[var(--accent-text)] px-1 flex items-center gap-1.5">
-      <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] shrink-0" />
-      {st.kind === "changed" ? `Đổi giờ · trước: ${st.before.date === p.session.date ? "" : `${dayLabel(st.before.date)} `}${st.before.startTime}–${st.before.endTime}` : "Ca mới"}
-    </p>
-  );
-};
 
-const GapLine: React.FC<{ gapMin: number }> = ({ gapMin }) => {
-  if (gapMin < 0) return <p className="text-2xs font-bold text-rose-300 pl-3 border-l-2 border-rose-700 ml-3">Chồng {duration(-gapMin)} với ca trước — báo OP</p>;
-  if (gapMin <= BACK_TO_BACK_MIN) return <p className="text-2xs font-bold text-amber-300 pl-3 border-l-2 border-amber-700 ml-3">Nối ca · nghỉ {gapMin} phút</p>;
-  return <p className="text-2xs text-[var(--text-faint)] pl-3 border-l-2 border-dotted border-[var(--border)] ml-3">Nghỉ {duration(gapMin)}</p>;
-};
 
 const HeroCard: React.FC<{
   hero: NonNullable<ReturnType<typeof heroShift>>;

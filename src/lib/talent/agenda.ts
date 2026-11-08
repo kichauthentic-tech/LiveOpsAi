@@ -32,8 +32,14 @@ export function agendaRanges(today: string): AgendaRange[] {
   return [
     { key: "this", label: "Tuần này", from: today, to: addDays(monday, 6) },
     { key: "next", label: "Tuần sau", from: addDays(monday, 7), to: addDays(monday, 13) },
-    { key: "later", label: "Sau nữa", from: addDays(monday, 14), to: "9999-12-31" }
+    { key: "later", label: "Sau đó", from: addDays(monday, 14), to: "9999-12-31" }
   ];
+}
+
+/** Một tuần T2 → CN cách tuần chứa `today` đúng `offset` tuần. Tuần này (offset 0) bắt đầu từ hôm nay (ngày đã qua không còn trong danh sách). */
+export function weekRange(today: string, offset: number): { from: string; to: string; monday: string } {
+  const monday = addDays(isoWeekStart(today), offset * 7);
+  return { from: offset === 0 ? today : monday, to: addDays(monday, 6), monday };
 }
 
 export interface AgendaDay {

@@ -2147,6 +2147,25 @@ export default function App() {
                     onOpenRequestHandled={() => setNotifOpenSessionId(null)}
                     acks={talentAcks}
                     onAck={handleAckShifts}
+                    calendar={
+                      <LiveCalendar
+                        title="Lịch ca"
+                        channels={channels}
+                        sessions={activeSessions}
+                        shiftSlots={shiftSlots}
+                        shiftRegistrations={shiftRegistrations}
+                        studios={activeStudios}
+                        talents={activeTalents}
+                        brands={brands}
+                        brandStudios={brandStudios}
+                        myTalentId={activeUser.assignedTalentId}
+                        currentUserId={activeUser.id}
+                        currentRole={currentRole}
+                        schemes={promoSchemes}
+                        onSessionsUpdated={handleSessionsUpdated}
+                        onRequestDropout={handleRequestDropout}
+                      />
+                    }
                   />
                 )}
 
