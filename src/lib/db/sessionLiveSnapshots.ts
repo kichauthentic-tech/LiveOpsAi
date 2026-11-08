@@ -14,6 +14,8 @@ export interface SessionSnapshotRoom {
   views: number;
   /** Mảnh (≥ 2) mà phòng này thuộc về khi ca bị ngắt room; vắng = mảnh đầu (lần up đầu). 0153. */
   partId?: string;
+  /** 0174/0203: GMV gốc của file khi dòng đã bị quy về giờ hết ca (gõ GMV hoặc chia tạm theo giờ). Vắng = dòng đang là số file. */
+  fileGmv?: number;
 }
 
 export interface SessionSnapshot {
@@ -29,6 +31,8 @@ export interface SessionSnapshot {
   boundaryAt: string;
   /** 0174: GMV đúng của ca do trợ/OPS gõ (file tải trễ lẫn phần ca sau). Vắng = dùng số file. */
   typedGmv?: number;
+  /** 0203: room còn live sang ca nối khi tải file ⇒ số đã chia tạm theo giờ tới giờ hết ca (chưa ai gõ số đúng). */
+  autoSplit: boolean;
   rooms: SessionSnapshotRoom[];
 }
 
@@ -42,6 +46,7 @@ interface DbSnapshot {
   is_estimated: boolean | null;
   boundary_at: string;
   typed_gmv?: number | null;
+  auto_split?: boolean | null;
 }
 
 interface DbSnapshotRow {
@@ -54,6 +59,7 @@ interface DbSnapshotRow {
   orders: number;
   views: number;
   part_id: string | null;
+  orig_gmv?: string | null;
 }
 
 export async function fetchSessionSnapshot(sessionId: string): Promise<SessionSnapshot | null> {
@@ -68,7 +74,7 @@ export async function fetchSessionSnapshot(sessionId: string): Promise<SessionSn
 
   const { data: rowData, error: rowError } = await supabase
     .from("session_live_snapshot_rows")
-    .select("room_id, room_title, started_at, ended_at, duration_minutes, gmv, orders, views, part_id")
+    .select("room_id, room_title, started_at, ended_at, duration_minutes, gmv, orders, views, part_id, orig_gmv:raw->orig->>gmv")
     .eq("snapshot_id", snap.id)
     .order("started_at", { ascending: true });
   if (rowError) throw rowError;
@@ -83,6 +89,7 @@ export async function fetchSessionSnapshot(sessionId: string): Promise<SessionSn
     isEstimated: snap.is_estimated === true,
     boundaryAt: snap.boundary_at,
     typedGmv: snap.typed_gmv == null ? undefined : Number(snap.typed_gmv),
+    autoSplit: snap.auto_split === true,
     rooms: ((rowData ?? []) as DbSnapshotRow[]).map((r) => ({
       roomId: r.room_id,
       roomTitle: r.room_title ?? undefined,
@@ -92,7 +99,8 @@ export async function fetchSessionSnapshot(sessionId: string): Promise<SessionSn
       gmv: Number(r.gmv) || 0,
       orders: Number(r.orders) || 0,
       views: Number(r.views) || 0,
-      partId: r.part_id ?? undefined
+      partId: r.part_id ?? undefined,
+      fileGmv: r.orig_gmv == null ? undefined : Number(r.orig_gmv)
     }))
   };
 }
@@ -115,6 +123,16 @@ export async function deleteSessionLiveSnapshot(sessionId: string): Promise<Live
   const { error } = await supabase.rpc("delete_session_live_snapshot", { p_session_id: sessionId });
   if (error) throw error;
   return fetchSessionById(sessionId);
+}
+
+/**
+ * 0203: số của ca đang là số CHIA TẠM theo giờ (file tải trễ, room còn live sang ca nối) — để cột Thực tế ghi "≈".
+ * Lỗi đọc (vd chưa chạy 0203) ⇒ false: không có dấu ≈ thì vẫn là số đúng như trước.
+ */
+export async function fetchSnapshotAutoSplit(sessionId: string): Promise<boolean> {
+  const { data, error } = await supabase.from("session_live_snapshots").select("auto_split").eq("session_id", sessionId).maybeSingle();
+  if (error || !data) return false;
+  return (data as { auto_split?: boolean | null }).auto_split === true;
 }
 
 /**

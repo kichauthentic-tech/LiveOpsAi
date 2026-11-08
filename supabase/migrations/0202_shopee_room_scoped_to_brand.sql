@@ -80,6 +80,8 @@ where (c.gmv - coalesce(p.gmv, 0) > 0
     or ((c.ended_at is null or c.ended_at >= sn.session_start)
         and (c.started_at is null or c.started_at <= sn.boundary_at)))
   and (sn.prev_session_id is null or exists (select 1 from session_live_snapshots x where x.session_id = sn.prev_session_id));
+-- View chỉ để đọc (khuôn 0198): create or replace giữ quyền cũ nhưng chốt lại cho chắc.
+revoke insert, update, delete, truncate, references, trigger on public.session_room_deltas from public, anon, authenticated;
 
 do $$
 declare

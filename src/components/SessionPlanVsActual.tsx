@@ -1,10 +1,12 @@
 import { platformText } from "../lib/metricGlossary";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { Pencil } from "lucide-react";
 import { LiveSession } from "../types";
 import { fmtVndShort } from "../lib/format";
 import { fmtCount, parseCount } from "../lib/handover";
 import { setSessionActuals } from "../lib/db/sessions";
+import { fetchSnapshotAutoSplit } from "../lib/db/sessionLiveSnapshots";
+import { isHandoverFile } from "../lib/dataSource";
 import { errorMessage } from "../lib/errorMessage";
 import { metricHint } from "../lib/metricGlossary";
 import { platformOf } from "../lib/reportPlatform";
@@ -39,6 +41,18 @@ export function SessionPlanVsActual({ session: s, planHours, liveHours, hideMetr
   const [gmv, setGmv] = useState("");
   const [liveStart, setLiveStart] = useState("");
   const [liveEnd, setLiveEnd] = useState("");
+
+  // 0203: file giao ca tải trễ khi room còn live sang ca nối ⇒ số đang chia tạm theo giờ — cột Thực tế ghi "≈".
+  const [splitFor, setSplitFor] = useState<string | null>(null);
+  const splitEligible = isHandoverFile(s) && !hideMetrics;
+  useEffect(() => {
+    if (!splitEligible) return;
+    let alive = true;
+    const key = `${s.id}:${s.actualGmv ?? 0}`;
+    fetchSnapshotAutoSplit(s.id).then((v) => { if (alive) setSplitFor(v ? key : null); }).catch(() => undefined);
+    return () => { alive = false; };
+  }, [s.id, s.actualGmv, splitEligible]);
+  const splitEstimate = splitEligible && splitFor === `${s.id}:${s.actualGmv ?? 0}`;
 
   const hasActualTime = !!s.actualStartAt && !!s.actualEndAt;
   const actualGmv = s.actualGmv ?? 0;
@@ -109,7 +123,7 @@ export function SessionPlanVsActual({ session: s, planHours, liveHours, hideMetr
             {isBrandView ? none("—") : s.targetGmv > 0 ? <>{fmtVndShort(s.targetGmv)}<span className="ml-1 text-2xs font-normal text-[var(--text-muted)]" title={s.boostTarget ? "Ca tăng cường: target đề xuất, không thuộc target tháng" : undefined}>{s.boostTarget ? "target đề xuất" : "target"}</span></> : none("chưa có target")}
           </span>
           <span className={`${cell} ${!hideMetrics && actualGmv > 0 ? "!text-[var(--success)]" : ""}`}>
-            {hideMetrics ? none("chưa phát hành") : actualGmv > 0 ? fmtVndShort(actualGmv) : none("—")}
+            {hideMetrics ? none("chưa phát hành") : actualGmv > 0 ? `${splitEstimate ? "≈ " : ""}${fmtVndShort(actualGmv)}` : none("—")}
             {!hideMetrics && !isBrandView && s.targetGmv > 0 && actualGmv > 0 && (
               <span className="ml-1.5 text-2xs font-bold text-[var(--text-muted)]">· {fmtPct((actualGmv / s.targetGmv) * 100)} target</span>
             )}
@@ -163,7 +177,11 @@ export function SessionPlanVsActual({ session: s, planHours, liveHours, hideMetr
       ) : (
         !isBrandView && !editing && (
           <p className="mt-2 text-2xs text-[var(--text-faint)]">
-            {canEnter ? "Cột Thực tế tự cập nhật khi tải lên file số liệu; chưa có file thì nhập tay." : "Cột Thực tế lấy từ file số liệu / giao ca / đối soát."}
+            {canEnter
+              ? "Cột Thực tế tự cập nhật khi tải lên file số liệu; chưa có file thì nhập tay."
+              : splitEstimate
+                ? "≈ File tải sau giờ giao ca khi room còn live: giờ cắt về giờ hết ca, số chia tạm theo giờ — gõ số đúng ở \"Số liệu ca\" hoặc chờ đối soát."
+                : "Cột Thực tế lấy từ file số liệu / giao ca / đối soát."}
           </p>
         )
       )}

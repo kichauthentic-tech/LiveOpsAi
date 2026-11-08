@@ -37,6 +37,17 @@ function runsPastBoundary(snap: SessionSnapshot): boolean {
   return snap.rooms.some((r) => !r.endedAt || Date.parse(r.endedAt) > limit);
 }
 
+// 0203: giờ chụp muộn nhất của các room chạy quá giờ hết ca + tổng GMV gốc trong file (trước khi chia tạm).
+function lateFileInfo(snap: SessionSnapshot): { fileAt?: string; fileGmv: number } {
+  const limit = Date.parse(snap.boundaryAt) + 5 * 60_000;
+  const late = snap.rooms.filter((r) => !r.endedAt || Date.parse(r.endedAt) > limit);
+  const ends = late.map((r) => r.endedAt).filter((x): x is string => !!x).sort();
+  return {
+    fileAt: ends.length > 0 ? ends[ends.length - 1] : snap.capturedAt,
+    fileGmv: snap.rooms.reduce((sum, r) => sum + (r.fileGmv ?? r.gmv), 0)
+  };
+}
+
 function fmtTime(iso?: string): string {
   return iso ? new Date(iso).toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" }) : "—";
 }
@@ -215,9 +226,11 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
           {editingGmv ? (
             <div className="space-y-1">
               <p className="text-2xs text-[var(--text-muted)]">
-                {runsPastBoundary(snapshot)
-                  ? `Room vẫn live sau giờ hết ca ${fmtClock(snapshot.boundaryAt)} khi tải file — số trên có thể lẫn phần của ca sau. Gõ ${platformText("GMV", prof.id)} đúng của ca (số trên dashboard lúc giao ca):`
-                  : `Gõ ${platformText("GMV", prof.id)} đúng của ca:`}
+                {snapshot.autoSplit
+                  ? `Room vẫn live sau giờ hết ca ${fmtClock(snapshot.boundaryAt)} khi tải file — số trên đang chia tạm theo giờ. Có số trên dashboard lúc giao ca thì gõ vào:`
+                  : runsPastBoundary(snapshot)
+                    ? `Room vẫn live sau giờ hết ca ${fmtClock(snapshot.boundaryAt)} khi tải file — số trên có thể lẫn phần của ca sau. Gõ ${platformText("GMV", prof.id)} đúng của ca (số trên dashboard lúc giao ca):`
+                    : `Gõ ${platformText("GMV", prof.id)} đúng của ca:`}
               </p>
               <GmvEditor initial={snapshot.typedGmv ?? session.actualGmv} busy={busy} onSave={(v) => void saveGmv(v)} onCancel={() => setEditingGmv(false)} />
               <p className="text-2xs text-[var(--text-faint)]">Đơn, lượt xem… tự chia theo % {platformText("GMV", prof.id)}; phần dư tự sang ca sau.</p>
@@ -227,8 +240,28 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
               <Pencil className="w-3.5 h-3.5 shrink-0" />
               {platformText("GMV", prof.id)} gõ tay {fmtVndFull(snapshot.typedGmv)} — đơn, lượt xem theo % {platformText("GMV", prof.id)}, phần dư đã sang ca sau.
               <button onClick={() => setEditingGmv(true)} disabled={busy} className="underline hover:text-violet-200 disabled:opacity-40">Sửa</button>
-              <button onClick={() => void saveGmv(null)} disabled={busy} className="underline text-[var(--text-faint)] hover:text-[var(--text)] disabled:opacity-40">Bỏ, dùng số file</button>
+              <button onClick={() => void saveGmv(null)} disabled={busy} className="underline text-[var(--text-faint)] hover:text-[var(--text)] disabled:opacity-40">Bỏ số gõ</button>
             </p>
+          ) : snapshot.autoSplit ? (
+            <div className="space-y-1">
+              <p className="text-2xs text-amber-300 flex items-start gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
+                <span>
+                  File tải lúc {fmtClock(lateFileInfo(snapshot).fileAt ?? snapshot.capturedAt)} khi room vẫn live sang ca nối — app cắt ca về {fmtClock(snapshot.boundaryAt)} và
+                  chia tạm theo giờ: ca này ≈ {fmtVndFull(session.actualGmv ?? 0)} (file ghi {fmtVndFull(lateFileInfo(snapshot).fileGmv)} cộng dồn). Phần còn lại tự sang ca sau.
+                </span>
+              </p>
+              <div className="flex items-center gap-3 flex-wrap">
+                <button
+                  onClick={() => setEditingGmv(true)}
+                  disabled={busy}
+                  className="inline-flex items-center gap-1 text-2xs font-bold text-violet-300 hover:text-violet-200 disabled:opacity-40"
+                >
+                  <Pencil className="w-3 h-3" /> Gõ {platformText("GMV", prof.id)} đúng lúc giao ca
+                </button>
+                <span className="text-2xs text-[var(--text-faint)]">Không có số thì để nguyên — đối soát bằng file sàn sẽ chia lại.</span>
+              </div>
+            </div>
           ) : (
             <div className="flex items-start gap-2 flex-wrap">
               {runsPastBoundary(snapshot) && (
