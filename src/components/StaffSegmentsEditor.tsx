@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import SearchSelect from "./ui/SearchSelect";
 import { Plus, Trash2, Users } from "lucide-react";
 import type { LiveSession, StaffSegment, Talent } from "../types";
 import { clockAtOffset, effectiveSegments, hasStaffSegments, offsetOfClock, segmentRange, sessionMinutes, validateSegments } from "../lib/staffSegments";
@@ -133,12 +134,8 @@ export const StaffSegmentsEditor: React.FC<Props> = ({ session: s, talents, allS
                 <option value="host">Host</option>
                 <option value="co_host">Trợ live</option>
               </select>
-              <select value={r.talentId} onChange={(e) => update(i, { talentId: e.target.value })} className={inputCls} aria-label="Người">
-                <option value="">-- Chọn người --</option>
-                {talents.map((t) => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
-                ))}
-              </select>
+              <SearchSelect value={r.talentId} onChange={(v) => update(i, { talentId: v })} className={inputCls} ariaLabel="Người" emptyLabel="-- Chọn người --"
+                options={talents.map((t) => ({ value: t.id, label: t.name }))} />
               <input type="time" value={r.from} onChange={(e) => update(i, { from: e.target.value })} className={`${inputCls} font-mono`} aria-label="Từ giờ" />
               <input type="time" value={r.to} onChange={(e) => update(i, { to: e.target.value })} className={`${inputCls} font-mono`} aria-label="Đến giờ" />
               <button

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import SearchSelect from "./ui/SearchSelect";
 import { LiveSession, ShiftSlot, ShiftRegistration, Studio, Talent, Brand, PromoScheme, UserRole, BrandStudio, AuditLogEntry, BrandChannel } from "../types";
 import { planTargetOf } from "../lib/performance/targetAllocation";
 import { schemesForDate } from "../lib/schemeUtils";
@@ -706,7 +707,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
               placeholder="Tìm theo tên phiên, Host, Brand..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl pl-9 pr-3 py-2 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
+              className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl pl-9 pr-3 py-2 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] text-xs font-bold"
             />
           </div>
           {(() => {
@@ -731,7 +732,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
           <select
             value={selectedStudioFilter}
             onChange={(e) => setSelectedStudioFilter(e.target.value)}
-            className="bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-2 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
+            className="bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-2 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] text-xs font-bold"
           >
             <option value="ALL">Tất cả phòng Studio ({studios.length})</option>
             {studios.map((s) => (
@@ -739,21 +740,19 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
             ))}
           </select>
 
-          <select
-            value={selectedHostFilter}
-            onChange={(e) => setSelectedHostFilter(e.target.value)}
-            className="bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-2 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
-          >
-            <option value="ALL">Tất cả talent ({talents.length})</option>
-            {talents.map((t) => (
-              <option key={t.id} value={t.id}>{t.name} ({talentRoleLabel(t.role)})</option>
-            ))}
-          </select>
+          <SearchSelect
+            value={selectedHostFilter === "ALL" ? "" : selectedHostFilter}
+            onChange={(v) => setSelectedHostFilter(v || "ALL")}
+            className="bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-2 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] text-xs font-bold"
+            emptyLabel={`Tất cả talent (${talents.length})`}
+            ariaLabel="Talent"
+            options={talents.map((t) => ({ value: t.id, label: `${t.name} (${talentRoleLabel(t.role)})` }))}
+          />
 
           <select
             value={selectedBrandFilter}
             onChange={(e) => setSelectedBrandFilter(e.target.value)}
-            className="bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-2 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
+            className="bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-2 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] text-xs font-bold"
           >
             <option value="ALL">Tất cả Brand Khách Hàng ({brands.length})</option>
             {brands.map((b) => (

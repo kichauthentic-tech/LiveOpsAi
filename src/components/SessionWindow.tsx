@@ -1,4 +1,5 @@
 import { platformText } from "../lib/metricGlossary";
+import SearchSelect from "./ui/SearchSelect";
 import React, { useContext, useEffect, useMemo, useState } from "react";
 import { SESSION_STATUS_CLS, SESSION_STATUS_LABEL_VI } from "../lib/sessionStatusUi";
 import { hasSessionData, isUnconfirmedPast } from "../lib/sessionStatus";
@@ -460,16 +461,12 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
               </label>
               <div className="grid grid-cols-2 gap-2">
                 <label className="block"><span className="font-bold text-[var(--text-muted)] block mb-1">Host</span>
-                  <select value={edit.hostId} disabled={hasStaffSegments(s, "host")} onChange={(e) => setEdit({ ...edit, hostId: e.target.value })} className={`${inputCls} disabled:opacity-60`}>
-                    <option value="">-- Chưa gán --</option>
-                    {talents!.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                  </select>
+                  <SearchSelect value={edit.hostId} disabled={hasStaffSegments(s, "host")} onChange={(v) => setEdit({ ...edit, hostId: v })} className={`${inputCls} disabled:opacity-60`} emptyLabel="-- Chưa gán --" ariaLabel="Host"
+                    options={talents!.map((t) => ({ value: t.id, label: t.name }))} />
                 </label>
                 <label className="block"><span className="font-bold text-[var(--text-muted)] block mb-1">Trợ live</span>
-                  <select value={edit.coHostId} disabled={hasStaffSegments(s, "co_host")} onChange={(e) => setEdit({ ...edit, coHostId: e.target.value })} className={`${inputCls} disabled:opacity-60`}>
-                    <option value="">-- Không có --</option>
-                    {talents!.filter((t) => t.id !== edit.hostId).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                  </select>
+                  <SearchSelect value={edit.coHostId} disabled={hasStaffSegments(s, "co_host")} onChange={(v) => setEdit({ ...edit, coHostId: v })} className={`${inputCls} disabled:opacity-60`} emptyLabel="-- Không có --" ariaLabel="Trợ live"
+                    options={talents!.filter((t) => t.id !== edit.hostId).map((t) => ({ value: t.id, label: t.name }))} />
                 </label>
               </div>
               {(hasStaffSegments(s, "host") || hasStaffSegments(s, "co_host")) && (

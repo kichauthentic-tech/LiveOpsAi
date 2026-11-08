@@ -1,4 +1,5 @@
 import { platformText } from "../../lib/metricGlossary";
+import SearchSelect from "../ui/SearchSelect";
 import React, { useEffect, useMemo, useState } from "react";
 import { LiveSession, Talent } from "../../types";
 import { Layers, Scissors, Users, Wand2, CalendarDays, Save, ChevronDown, ChevronUp, Home, Trash2 } from "lucide-react";
@@ -528,14 +529,10 @@ export const BackfillFromRooms: React.FC<Props> = ({ platform, brandId, brandNam
                               )}
                             </div>
                             <div className="space-y-1">
-                              <select value={a.hostId} onChange={(e) => setCell(s.id, { hostId: e.target.value })} className={`${selectCls} ${!a.hostId ? "border-rose-300 dark:border-rose-800" : ""}`}>
-                                <option value="">— Host —</option>
-                                {hostOptions.map((t) => <option key={t.id} value={t.id}>{talentOptionLabel(t)}</option>)}
-                              </select>
-                              <select value={a.coHostId} onChange={(e) => setCell(s.id, { coHostId: e.target.value })} className={selectCls}>
-                                <option value="">— Trợ live —</option>
-                                {hostOptions.filter((t) => t.id !== a.hostId).map((t) => <option key={t.id} value={t.id}>{talentOptionLabel(t)}</option>)}
-                              </select>
+                              <SearchSelect value={a.hostId} onChange={(v) => setCell(s.id, { hostId: v })} className={`${selectCls} ${!a.hostId ? "border-rose-300 dark:border-rose-800" : ""}`} emptyLabel="— Host —" ariaLabel="Host"
+                                options={hostOptions.map((t) => ({ value: t.id, label: talentOptionLabel(t) }))} />
+                              <SearchSelect value={a.coHostId} onChange={(v) => setCell(s.id, { coHostId: v })} className={selectCls} emptyLabel="— Trợ live —" ariaLabel="Trợ live"
+                                options={hostOptions.filter((t) => t.id !== a.hostId).map((t) => ({ value: t.id, label: talentOptionLabel(t) }))} />
                             </div>
                           </td>
                         );

@@ -1,4 +1,5 @@
 import { platformText } from "../lib/metricGlossary";
+import SearchSelect from "./ui/SearchSelect";
 import React, { useEffect, useMemo, useState } from "react";
 import { inChannelScope, platformOf, REPORT_PLATFORMS, type ChannelScope } from "../lib/reportPlatform";
 import { SESSION_STATUS_CLS, SESSION_STATUS_LABEL_VI } from "../lib/sessionStatusUi";
@@ -295,14 +296,8 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
                 ))}
               </select>
             )}
-            <select value={filter.hostKey ?? ""} onChange={(e) => patch({ hostKey: e.target.value })} className={inputCls}>
-              <option value="">Mọi host</option>
-              {hosts.map((h) => (
-                <option key={h.key} value={h.key}>
-                  {h.name}
-                </option>
-              ))}
-            </select>
+            <SearchSelect value={filter.hostKey ?? ""} onChange={(v) => patch({ hostKey: v })} className={inputCls} emptyLabel="Mọi host" ariaLabel="Host"
+              options={hosts.map((h) => ({ value: h.key, label: h.name }))} />
             <select
               value={filter.status ?? ""}
               onChange={(e) => patch({ status: e.target.value as LedgerFilter["status"] })}
