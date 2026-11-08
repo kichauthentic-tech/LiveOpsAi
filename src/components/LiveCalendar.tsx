@@ -652,12 +652,17 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
               </button>
             </div>
 
-            {/* Quick Date Picker */}
-            <div className="flex items-center gap-2 bg-[var(--surface-base)] px-3 py-1.5 rounded-xl border border-[var(--border)]">
-              <CalendarIcon className="w-3.5 h-3.5 text-[var(--accent-text)] shrink-0" />
+            {/* Quick Date Picker — chỉ còn nút lịch (ô ngày đầy đủ làm hàng tiêu đề tràn, 08/11); nhãn ngày đã có ở bộ điều hướng */}
+            <label
+              title="Chọn ngày"
+              className="relative flex items-center justify-center w-9 h-9 bg-[var(--surface-base)] rounded-xl border border-[var(--border)] cursor-pointer hover:bg-[var(--surface-elevated)]"
+            >
+              <CalendarIcon className="w-3.5 h-3.5 text-[var(--accent-text)] pointer-events-none" />
               <input
                 type="date"
+                aria-label="Chọn ngày"
                 value={selectedDate}
+                onClick={(e) => (e.currentTarget as HTMLInputElement & { showPicker?: () => void }).showPicker?.()}
                 onChange={(e) => {
                   const val = e.target.value;
                   if (val) {
@@ -667,9 +672,9 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                     setCurrentMonth(parsed.month);
                   }
                 }}
-                className="bg-transparent text-[var(--text)] focus:outline-none cursor-pointer font-mono text-xs"
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               />
-            </div>
+            </label>
           </div>
           {talentView ? (
             <div role="group" aria-label="Phạm vi lịch" className="flex items-center bg-[var(--surface-base)] p-1 rounded-xl border border-[var(--border)] text-xs font-bold">
