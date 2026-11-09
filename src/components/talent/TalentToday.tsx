@@ -4,7 +4,7 @@ import type { Brand, LiveSession, ShiftSlot, Talent, UserRole } from "../../type
 import { getTodayDate } from "../../lib/dateUtils";
 import { fmtDateVn, fmtFixed, fmtVndShort } from "../../lib/format";
 import { getBrandTheme } from "../../lib/brandTheme";
-import { heroShift, myClashes, myRole, mySessions } from "../../lib/talent/myShifts";
+import { heroShift, myClashes, myRole, mySessions, myWindow } from "../../lib/talent/myShifts";
 import { TALENT_WIDE_QUERY, agendaDays, weekRange } from "../../lib/talent/agenda";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { myPendingAcks, type PendingAck } from "../../lib/talent/acks";
@@ -109,7 +109,7 @@ export const TalentToday: React.FC<Props> = ({
 
   const brandById = useMemo(() => new Map(brands.map((b) => [b.id, b])), [brands]);
   const mine = useMemo(() => mySessions(sessions, myTalentId), [sessions, myTalentId]);
-  const hero = useMemo(() => heroShift(mine, nowMs), [mine, nowMs]);
+  const hero = useMemo(() => heroShift(mine, nowMs, 7, myTalentId), [mine, nowMs, myTalentId]);
   const clashes = useMemo(() => myClashes(sessions, myTalentId, today), [sessions, myTalentId, today]);
   const pendingAcks = useMemo(() => (acks ? myPendingAcks(sessions, myTalentId, acks, nowMs) : []), [acks, sessions, myTalentId, nowMs]);
 
@@ -145,7 +145,7 @@ export const TalentToday: React.FC<Props> = ({
       {/* Màn rộng: ca kế tiếp bên trái, việc cần làm (trùng giờ / lịch mới / thêm lịch) bên phải — cùng một màn đầu. */}
       <div className={wide ? "grid grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] gap-3 items-start" : "space-y-3"}>
         {hero ? (
-          <HeroCard hero={hero} mine={mine} sessions={sessions} brand={brandById.get(hero.session.brandId)} roleText={roleText(hero.session)} today={today} onOpen={setOpenId} />
+          <HeroCard hero={hero} mine={mine} sessions={sessions} brand={brandById.get(hero.session.brandId)} roleText={roleText(hero.session)} today={today} myTalentId={myTalentId} onOpen={setOpenId} />
         ) : (
           myTalentId && (
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 text-sm text-[var(--text-muted)]">
@@ -213,15 +213,18 @@ const HeroCard: React.FC<{
   brand?: Brand;
   roleText: string;
   today: string;
+  myTalentId?: string;
   onOpen: (id: string) => void;
-}> = ({ hero, mine, sessions, brand, roleText, today, onOpen }) => {
+}> = ({ hero, mine, sessions, brand, roleText, today, myTalentId, onOpen }) => {
   const s = hero.session;
   const prep = hero.live ? null : shiftPrep(s, sessions);
   const prev = prep?.prevSameChannel;
   const theme = getBrandTheme(s.brandName);
   const partner = roleText === "Host" ? s.coHostName || "không có trợ live" : s.hostName || "chưa có host";
   // Ca kế tiếp CÙNG NGÀY sau ca này — để biết nghỉ bao lâu giữa hai ca.
-  const after = mine.find((o) => o.id !== s.id && o.date === s.date && o.status !== "Cancelled" && o.startTime > s.startTime);
+  const after = mine
+    .filter((o) => o.id !== s.id && o.date === s.date && o.status !== "Cancelled" && myWindow(o, myTalentId).startMs > hero.window.startMs)
+    .sort((a, b) => myWindow(a, myTalentId).startMs - myWindow(b, myTalentId).startMs)[0];
   return (
     <section
       aria-label={hero.live ? "Ca đang live" : "Ca kế tiếp"}
@@ -239,7 +242,8 @@ const HeroCard: React.FC<{
       <div className="flex items-center gap-3">
         <BrandLogo brand={brand ?? { name: s.brandName, logo: "" }} size="md" className="rounded-lg bg-white" />
         <div className="min-w-0">
-          <p className="font-mono text-2xl sm:text-3xl font-black text-[var(--text)] leading-none">{s.startTime}–{s.endTime}</p>
+          <p className="font-mono text-2xl sm:text-3xl font-black text-[var(--text)] leading-none">{hero.window.startTime}–{hero.window.endTime}</p>
+          {hero.window.partial && <p className="text-2xs text-[var(--text-muted)] mt-1">Bạn đứng một đoạn · cả ca {s.startTime}–{s.endTime}</p>}
           <p className="text-sm font-bold text-[var(--text)] mt-1 flex flex-wrap items-center gap-1.5">{s.brandName} <PlatformChip platform={s.platform} /></p>
         </div>
       </div>
@@ -268,7 +272,7 @@ const HeroCard: React.FC<{
         <button type="button" onClick={() => onOpen(s.id)} className="px-3 py-2 min-h-8 rounded-lg bg-[var(--surface)] border border-[var(--border)] text-xs font-bold text-[var(--text)] hover:border-[var(--accent)]">
           Chi tiết ca
         </button>
-        {after && <span className="text-2xs text-[var(--text-muted)]">Sau đó: {after.startTime} {after.brandName}</span>}
+        {after && <span className="text-2xs text-[var(--text-muted)]">Sau đó: {myWindow(after, myTalentId).startTime} {after.brandName}</span>}
       </div>
     </section>
   );

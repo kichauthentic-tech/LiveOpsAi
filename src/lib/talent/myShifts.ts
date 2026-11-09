@@ -1,7 +1,7 @@
 import type { LiveSession, ShiftSlot } from "../../types";
 import { sessionWindowMs } from "../sessionStatus";
 import { findPersonClashes, type PersonClash } from "../scheduling/conflicts";
-import { personRoleMinutes, sessionMinutes, hasStaffSegments } from "../staffSegments";
+import { personRoleMinutes, sessionMinutes, hasStaffSegments, personWindows } from "../staffSegments";
 
 // Logic thuần của app talent (T1 11/10, bản 2 16/10): tab Ca của tôi, Đăng ký, Tôi. Giao ca không còn ở app talent (admin giao
 // trên máy phòng live, user chốt 16/10). Mọi phép "ca của tôi" đi qua đây để ba tab nói
@@ -27,6 +27,45 @@ export function myRole(s: LiveSession, talentId: string): MyRole | null {
 
 const byStart = (a: LiveSession, b: LiveSession) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime);
 
+// ---------- Giờ của RIÊNG tôi trong ca ----------
+// Ca là một room chạy liền (12:00–14:00) nhưng tôi có thể chỉ đứng một đoạn (12:00–12:30, rồi người khác vào — 0138).
+// "Đang live" / giờ hiển thị / khoảng nghỉ của talent phải theo đoạn của tôi, không theo cả room: bản cũ đọc cả ca nên
+// người đã giao ca lúc 12:30 vẫn thấy "Bạn đang trong ca" tới 14:00 và đè lên ca 13:00 của brand khác (user báo 09/11).
+
+export interface MyWindow {
+  /** HH:MM giờ vào / ra của riêng tôi (ca qua đêm: giờ ra nhỏ hơn giờ vào). */
+  startTime: string;
+  endTime: string;
+  startMs: number;
+  endMs: number;
+  /** Tôi chỉ đứng một phần của ca (đổi người giữa ca). */
+  partial: boolean;
+}
+
+/** Khoảng tôi đứng ca, gộp từ đoạn đầu tới đoạn cuối. Không phải của tôi (hoặc không có đoạn nào) ⇒ cả ca. */
+export function myWindow(s: LiveSession, talentId: string | undefined): MyWindow {
+  const full = sessionWindowMs(s);
+  const whole: MyWindow = { startTime: s.startTime, endTime: s.endTime, startMs: full[0], endMs: full[1], partial: false };
+  if (!talentId || !hasStaffSegments(s)) return whole;
+  const wins = personWindows(s, talentId).map((w) => ({ ...w, ms: sessionWindowMs(w) }));
+  if (wins.length === 0) return whole;
+  const first = wins.reduce((a, b) => (b.ms[0] < a.ms[0] ? b : a));
+  const last = wins.reduce((a, b) => (b.ms[1] > a.ms[1] ? b : a));
+  const partial = first.ms[0] > full[0] || last.ms[1] < full[1];
+  return { startTime: first.startTime, endTime: last.endTime, startMs: first.ms[0], endMs: last.ms[1], partial };
+}
+
+/** Trạng thái ca theo CÁCH NHÌN CỦA TÔI: ca đang live nhưng đoạn của tôi đã hết ⇒ "Completed", chưa tới ⇒ "Upcoming". */
+export function myStatus(s: LiveSession, talentId: string | undefined, nowMs: number): LiveSession["status"] {
+  if (s.status === "Cancelled") return s.status;
+  const w = myWindow(s, talentId);
+  if (!w.partial) return s.status;
+  if (s.status === "Completed") return "Completed";
+  if (nowMs >= w.endMs) return "Completed";
+  if (nowMs >= w.startMs) return s.status === "Live Now" ? "Live Now" : s.status;
+  return "Upcoming";
+}
+
 /** Ca của tôi (bỏ ca nạp bù — lịch sử đọc từ file, không phải lịch được xếp), theo giờ bắt đầu. */
 export function mySessions(sessions: LiveSession[], talentId: string | undefined): LiveSession[] {
   if (!talentId) return [];
@@ -40,12 +79,12 @@ export interface TimelineItem {
 }
 
 /** Ca chưa huỷ của tôi trong một ngày, kèm khoảng nghỉ với ca trước (để nhắc ca nối / chồng giờ). */
-export function dayTimeline(mine: LiveSession[], date: string): TimelineItem[] {
+export function dayTimeline(mine: LiveSession[], date: string, talentId?: string): TimelineItem[] {
   const day = mine.filter((s) => s.date === date && s.status !== "Cancelled");
   return day.map((s, i) => {
     if (i === 0) return { session: s, gapMin: null };
-    const prevEnd = sessionWindowMs(day[i - 1])[1];
-    return { session: s, gapMin: Math.round((sessionWindowMs(s)[0] - prevEnd) / 60000) };
+    const prevEnd = myWindow(day[i - 1], talentId).endMs;
+    return { session: s, gapMin: Math.round((myWindow(s, talentId).startMs - prevEnd) / 60000) };
   });
 }
 
@@ -54,24 +93,25 @@ export const BACK_TO_BACK_MIN = 30;
 
 export interface HeroShift {
   session: LiveSession;
+  /** Giờ của riêng tôi trong ca (cả ca nếu tôi đứng suốt). */
+  window: MyWindow;
   live: boolean;
   /** Phút tới giờ vào ca (sắp tới) hoặc tới giờ hết ca (đang live). */
   minutesLeft: number;
 }
 
-/** Ca đang live của tôi, không có thì ca sắp tới gần nhất (trong `withinDays` ngày). */
-export function heroShift(mine: LiveSession[], nowMs: number, withinDays = 7): HeroShift | null {
+/** Ca đang live của tôi (theo đoạn giờ của tôi), không có thì ca sắp tới gần nhất (trong `withinDays` ngày). */
+export function heroShift(mine: LiveSession[], nowMs: number, withinDays = 7, talentId?: string): HeroShift | null {
   const active = mine.filter((s) => s.status !== "Cancelled");
-  for (const s of active) {
-    const [start, end] = sessionWindowMs(s);
-    if (nowMs >= start && nowMs < end) return { session: s, live: true, minutesLeft: Math.ceil((end - nowMs) / 60000) };
+  const wins = active.map((s) => ({ s, w: myWindow(s, talentId) }));
+  for (const { s, w } of wins) {
+    if (nowMs >= w.startMs && nowMs < w.endMs) return { session: s, window: w, live: true, minutesLeft: Math.ceil((w.endMs - nowMs) / 60000) };
   }
   const limit = nowMs + withinDays * 86400000;
-  const next = active.find((s) => {
-    const start = sessionWindowMs(s)[0];
-    return start > nowMs && start <= limit;
-  });
-  return next ? { session: next, live: false, minutesLeft: Math.ceil((sessionWindowMs(next)[0] - nowMs) / 60000) } : null;
+  const next = wins
+    .filter(({ w }) => w.startMs > nowMs && w.startMs <= limit)
+    .sort((a, b) => a.w.startMs - b.w.startMs)[0];
+  return next ? { session: next.s, window: next.w, live: false, minutesLeft: Math.ceil((next.w.startMs - nowMs) / 60000) } : null;
 }
 
 /** Chỗ tôi bị xếp hai ca cùng lúc, từ hôm nay (cùng luật quét lịch của ops — findPersonClashes). */

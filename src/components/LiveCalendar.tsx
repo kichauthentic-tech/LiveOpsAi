@@ -11,7 +11,7 @@ import { BrandLogo } from "./ui/BrandLogo";
 import { getBrandTheme } from "../lib/brandTheme";
 
 import { CampaignDayRibbon, CampaignDayBanner } from "./ui/CampaignDayRibbon";
-import { isMine } from "../lib/talent/myShifts";
+import { isMine, myStatus, myWindow } from "../lib/talent/myShifts";
 import {
   SessionEventCard,
   SESSION_TONE,
@@ -124,6 +124,24 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   const talentView = currentRole === "talent";
   const [viewMode, setViewMode] = useState<"month" | "week" | "day" | "talent_workload">(talentView ? "week" : "day");
   const [onlyMine, setOnlyMine] = useState(true);
+  // Đồng hồ phút cho app talent: ca đang live nhưng đoạn của riêng họ đã hết (đổi người giữa ca) phải chuyển "Đã xong" đúng giờ,
+  // trong khi `sessions` giữ nguyên tham chiếu (withEffectiveStatus chỉ đổi khi cả ca đổi trạng thái).
+  const [clockMs, setClockMs] = useState(() => Date.now());
+  useEffect(() => {
+    if (!talentView) return;
+    const t = setInterval(() => setClockMs(Date.now()), 60_000);
+    return () => clearInterval(t);
+  }, [talentView]);
+  // Giờ + trạng thái hiện trên thẻ: talent thấy ĐOẠN của mình (12:00–12:30), không phải cả room (12:00–14:00). Ops/brand: cả ca.
+  const cardTime = (s: LiveSession) => {
+    if (!talentView || !myTalentId || !isMine(s, myTalentId)) return { startTime: s.startTime, endTime: s.endTime, tone: SESSION_TONE[s.status] };
+    const w = myWindow(s, myTalentId);
+    return {
+      startTime: w.startTime,
+      endTime: w.endTime,
+      tone: SESSION_TONE[myStatus(s, myTalentId, clockMs)]
+    };
+  };
   // Ca có người bị xếp trùng giờ (user chốt 06/10: một người chỉ đứng một ca tại một thời điểm) — viền đỏ trên thẻ ca.
   const clashList = useMemo(() => findPersonClashes(sessions), [sessions]);
   const clashMap = useMemo(() => clashedSessionIds(clashList), [clashList]);
@@ -599,12 +617,12 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
               theme={getBrandTheme(ds.brandName)}
               brand={brandById.get(ds.brandId)}
               brandName={ds.brandName} platform={ds.platform}
-              startTime={ds.startTime}
-              endTime={ds.endTime}
+              startTime={cardTime(ds).startTime}
+              endTime={cardTime(ds).endTime}
               title={ds.title}
               meta={buildSessionMeta(ds, talentLookup, undefined, talentView ? myTalentId : undefined)} durationBadge={buildDurationBadge(ds, "agency")} pctBadge={buildPctBadge(ds, "agency")} className={clashRing(ds.id)}
               targetGmv={ds.targetGmv}
-              tone={SESSION_TONE[ds.status]}
+              tone={cardTime(ds).tone}
               tooltip={clashTip(ds.id, `${ds.studioName} · Host ${ds.hostName}`)}
               onClick={() => setSelectedSessionDetail(ds)}
             />
@@ -998,11 +1016,11 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                         theme={getBrandTheme(ds.brandName)}
                         brand={brandById.get(ds.brandId)}
                         brandName={ds.brandName} platform={ds.platform}
-                        startTime={ds.startTime}
-                        endTime={ds.endTime}
+                        startTime={cardTime(ds).startTime}
+                        endTime={cardTime(ds).endTime}
                         meta={buildSessionMeta(ds, talentLookup, undefined, talentView ? myTalentId : undefined)} durationBadge={buildDurationBadge(ds, "agency")} pctBadge={buildPctBadge(ds, "agency")} className={clashRing(ds.id)}
                         targetGmv={ds.targetGmv}
-                        tone={SESSION_TONE[ds.status]}
+                        tone={cardTime(ds).tone}
                         dragging={draggedSessionId === ds.id}
                         draggable={canEdit}
                         tooltip={clashTip(ds.id, `${ds.title} · ${ds.studioName} · Host ${ds.hostName}${
@@ -1166,12 +1184,12 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                         theme={getBrandTheme(ds.brandName)}
                         brand={brandById.get(ds.brandId)}
                         brandName={ds.brandName} platform={ds.platform}
-                        startTime={ds.startTime}
-                        endTime={ds.endTime}
+                        startTime={cardTime(ds).startTime}
+                        endTime={cardTime(ds).endTime}
                         title={ds.title}
                         meta={buildSessionMeta(ds, talentLookup, undefined, talentView ? myTalentId : undefined)} durationBadge={buildDurationBadge(ds, "agency")} pctBadge={buildPctBadge(ds, "agency")} className={clashRing(ds.id)}
                         targetGmv={ds.targetGmv}
-                        tone={SESSION_TONE[ds.status]}
+                        tone={cardTime(ds).tone}
                         dragging={draggedSessionId === ds.id}
                         draggable={canEdit}
                         tooltip={clashTip(ds.id, canEdit ? "Kéo để đổi ngày" : `${ds.studioName} · Host ${ds.hostName}`)}
@@ -1277,15 +1295,15 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   brand={brandById.get(it.session!.brandId)}
                   brandName={it.session!.brandName}
                   platform={it.session!.platform}
-                  startTime={it.session!.startTime}
-                  endTime={it.session!.endTime}
+                  startTime={cardTime(it.session!).startTime}
+                  endTime={cardTime(it.session!).endTime}
                   title={it.session!.title}
                   meta={buildSessionMeta(it.session!, talentLookup, undefined, talentView ? myTalentId : undefined)}
                   durationBadge={buildDurationBadge(it.session!, "agency")}
                   pctBadge={buildPctBadge(it.session!, "agency")}
                   className={clashRing(it.session!.id)}
                   targetGmv={it.session!.targetGmv}
-                  tone={SESSION_TONE[it.session!.status]}
+                  tone={cardTime(it.session!).tone}
                   dragging={draggedSessionId === it.session!.id}
                   draggable={canEdit}
                   fill

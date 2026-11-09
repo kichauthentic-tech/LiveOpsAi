@@ -51,7 +51,7 @@ export interface AgendaDay {
 /** Ca chưa huỷ của tôi trong khoảng, nhóm theo ngày, kèm khoảng nghỉ giữa hai ca cùng ngày. */
 export function agendaDays(mine: LiveSession[], talentId: string, from: string, to: string): AgendaDay[] {
   const dates = [...new Set(mine.filter((s) => s.status !== "Cancelled" && s.date >= from && s.date <= to).map((s) => s.date))].sort();
-  return dates.map((date) => ({ date, items: dayTimeline(mine, date), hours: loadBetween(mine, talentId, date, date).hours }));
+  return dates.map((date) => ({ date, items: dayTimeline(mine, date, talentId), hours: loadBetween(mine, talentId, date, date).hours }));
 }
 
 /** Chấm đỏ của tab "Ca của tôi" = việc host làm được trên điện thoại: có lịch mới cần xem (1 dù bao nhiêu ca) + mỗi chỗ bị

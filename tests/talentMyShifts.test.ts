@@ -139,3 +139,45 @@ describe("myChannelStanding", () => {
     expect(got.every((r) => r.key === "hung")).toBe(true);
   });
 });
+
+// Lỗi user báo 09/11: trợ đứng 12:00–12:30 ở ca VERA 12:00–14:00 (rồi người khác vào), 13:00 trợ ca Fujiwa — app talent hiện
+// cả hai "đang live" và ca VERA ghi tới 14:00 vì đọc cả room thay vì đoạn của riêng người đó.
+describe("giờ của riêng tôi khi đổi người giữa ca", () => {
+  const NGAN = "ngan";
+  const vera = ca("vera", {
+    brandName: "VERA",
+    startTime: "12:00",
+    endTime: "14:00",
+    status: "Live Now",
+    hostId: "h1",
+    coHostId: "khac",
+    staffSegments: [
+      { talentId: NGAN, talentName: "Thanh Ngân", role: "co_host", fromMin: 0, toMin: 30 },
+      { talentId: "khac", talentName: "Khác", role: "co_host", fromMin: 30, toMin: 120 }
+    ]
+  } as Partial<LiveSession>);
+  const fuji = ca("fuji", { brandName: "Fujiwa", startTime: "13:00", endTime: "15:00", status: "Live Now", hostId: "h2", coHostId: NGAN });
+  const mine = [vera, fuji];
+
+  test("myWindow = đoạn của tôi; người đứng suốt ca = cả ca", () => {
+    expect(M.myWindow(vera, NGAN)).toMatchObject({ startTime: "12:00", endTime: "12:30", partial: true });
+    expect(M.myWindow(fuji, NGAN)).toMatchObject({ startTime: "13:00", endTime: "15:00", partial: false });
+    expect(M.myWindow(vera, undefined)).toMatchObject({ startTime: "12:00", endTime: "14:00", partial: false });
+  });
+
+  test("13:10: chỉ ca Fujiwa đang live, ca VERA đã xong với tôi", () => {
+    const now = at("2026-10-11", "13:10");
+    expect(M.heroShift(mine, now, 7, NGAN)).toMatchObject({ live: true, session: { id: "fuji" }, minutesLeft: 110 });
+    expect(M.myStatus(vera, NGAN, now)).toBe("Completed");
+    expect(M.myStatus(fuji, NGAN, now)).toBe("Live Now");
+  });
+
+  test("12:10: ca VERA live, hero hiện giờ 12:00–12:30; 12:40 chuyển sang ca Fujiwa sắp tới", () => {
+    expect(M.heroShift(mine, at("2026-10-11", "12:10"), 7, NGAN)).toMatchObject({ live: true, minutesLeft: 20, window: { endTime: "12:30" } });
+    expect(M.heroShift(mine, at("2026-10-11", "12:40"), 7, NGAN)).toMatchObject({ live: false, session: { id: "fuji" }, minutesLeft: 20 });
+  });
+
+  test("khoảng nghỉ giữa hai ca tính từ 12:30, không phải 14:00", () => {
+    expect(M.dayTimeline(mine, "2026-10-11", NGAN).map((t) => t.gapMin)).toEqual([null, 30]);
+  });
+});
