@@ -84,7 +84,7 @@ export const WeekGrid: React.FC<{
                           </span>
                           {s.kind === "open" && <span className="ml-1 text-2xs font-bold text-sky-300">{s.drafted ? "nháp" : "mở"}</span>}
                           <span className="block truncate text-[var(--text)]">{s.hostId ? nameOf(s.hostId) : <span className="text-red-300 font-bold">thiếu host</span>}</span>
-                          <span className="block truncate text-[var(--text-muted)]">{s.coHostId ? nameOf(s.coHostId) : <span className="text-amber-300">thiếu trợ</span>}</span>
+                          <span className="block truncate text-[var(--text-muted)]">{s.coHostId ? nameOf(s.coHostId) : s.noAssistant ? <span className="text-[var(--text-faint)]">No Asst</span> : <span className="text-amber-300">{s.kind === "open" && s.hostId ? "cần trợ · chưa công bố" : "thiếu trợ"}</span>}</span>
                           {s.kind === "open" && s.registrants.length > 0 && <span className="block text-2xs text-emerald-300">{s.registrants.length} báo rảnh</span>}
                         </button>
                       );
@@ -102,7 +102,7 @@ export const WeekGrid: React.FC<{
         </div>
       </div>
       <p className="flex flex-wrap gap-x-4 gap-y-1 text-2xs text-[var(--text-muted)]">
-        <span>Viền đỏ = lỗi chặn công bố hoặc ca thiếu host</span>
+        <span>Viền đỏ = lỗi chặn công bố hoặc ca thiếu host · "cần trợ" = chưa công bố tới khi có trợ hoặc No Asst</span>
         <span>Viền vàng = cảnh báo</span>
         <span>Viền đứt = ca mở (nháp / chưa xếp), talent chưa thấy người</span>
       </p>
@@ -116,6 +116,7 @@ const RULE_ORDER: [IssueCode, string][] = [
   ["week_over", "Quá giờ tối đa/tuần"],
   ["draft_no_host", "Nháp có trợ nhưng chưa có host"],
   ["no_host", "Ca chưa có host"],
+  ["co_pending", "Ca nháp có host, chưa có trợ / No Asst (chưa công bố)"],
   ["no_co", "Ca chưa có trợ live"],
   ["rest", "Nghỉ ít sau ca khuya"],
   ["room", "Nối ca sát giờ nhưng phải đổi phòng"],

@@ -61,7 +61,7 @@ function describe(c: MonthCard): { tone: keyof typeof PILL; label: string; text:
       return {
         tone: "warn",
         label: s.deadline ? "Đã đóng · đang xếp người" : "Đang xếp người",
-        text: `Còn ${s.noHost} ca chưa có host (${s.noHostWithSignup} ca có người báo rảnh)`,
+        text: [s.noHost > 0 ? `Còn ${s.noHost} ca chưa có host (${s.noHostWithSignup} ca có người báo rảnh)` : "", s.needCo > 0 ? `${s.needCo} ca có host, chờ trợ / No Asst` : ""].filter(Boolean).join(" · "),
         action: { kind: "staff", label: "Tới tuần còn trống" }
       };
     case "publish":
@@ -75,7 +75,7 @@ const ddmm = (d: string) => `${+d.slice(8, 10)}/${+d.slice(5, 7)}`;
 
 /** Một dòng mỗi đợt (0200): hạn đăng ký · ngày chốt lịch · việc còn lại của ca trong đợt. */
 const HalfLine: React.FC<{ month: string; h: HalfStatus; today: string }> = ({ month, h, today }) => {
-  const left = h.noHost > 0 ? `${h.noHost} ca chưa có host` : h.toPublish > 0 ? `${h.toPublish} ca chưa công bố` : "xong";
+  const left = h.noHost > 0 ? `${h.noHost} ca chưa có host` : h.needCo > 0 ? `${h.needCo} ca chờ trợ / No Asst` : h.toPublish > 0 ? `${h.toPublish} ca chưa công bố` : "xong";
   const late = !!h.publishBy && h.publishBy < today && left !== "xong";
   return (
     <li className="flex flex-wrap gap-x-1.5 tabular-nums">

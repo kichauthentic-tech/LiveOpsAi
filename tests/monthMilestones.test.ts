@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { defaultMilestones, draftFromSaved, halfOf, halfRange, milestoneError, slotDeadline } from "../src/lib/roster/milestones";
+import { defaultMilestones, draftFromSaved, extraSignupDeadline, halfOf, halfRange, milestoneError, slotDeadline } from "../src/lib/roster/milestones";
 import { pickExtraSlots, targetIntake } from "../src/lib/scheduling/targetIntake";
 import { signupDeadlineOf } from "../src/lib/db/roster";
 import { isoWeekStart } from "../src/lib/dateUtils";
@@ -79,4 +79,19 @@ test("chọn ca bổ sung: bỏ hôm nay/đã qua, dừng khi đủ giờ, khôn
   expect(pickExtraSlots(cands, 5, 20, "2026-11-06").map((x) => x.date)).toEqual(["2026-11-10", "2026-11-11"]);
   expect(pickExtraSlots(cands, 50, 7, "2026-11-06").map((x) => x.date)).toEqual(["2026-11-10", "2026-11-11"]);
   expect(pickExtraSlots(cands, 0, 7, "2026-11-06")).toEqual([]);
+});
+
+test("hạn đăng ký thêm cho ca còn thiếu người (0207): 17:00 trước ngày ca 1 ngày, tối đa 2 ngày nữa; ca sát giờ thì 2 giờ trước giờ bắt đầu; hết thời gian = null", () => {
+  const now = new Date("2026-11-09T10:00:00"); // giờ máy
+  const hm = (d: Date | null) => (d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}` : null);
+  // Ca xa: lấy hôm nay + 2 ngày 17:00 (sớm hơn ngày-trước-ca).
+  expect(hm(extraSignupDeadline("2026-11-20", "19:00", now))).toBe("2026-11-11 17:00");
+  // Ca gần hơn 3 ngày: lấy 17:00 ngày trước ca.
+  expect(hm(extraSignupDeadline("2026-11-11", "19:00", now))).toBe("2026-11-10 17:00");
+  // Ca ngày mai: 17:00 hôm nay còn trước giờ ca ⇒ hôm nay 17:00 > now.
+  expect(hm(extraSignupDeadline("2026-11-10", "19:00", now))).toBe("2026-11-09 17:00");
+  // Ca hôm nay 19:00 lúc 18:30: ngày-trước-ca đã qua ⇒ 2 giờ trước ca = 17:00 đã qua ⇒ null.
+  expect(extraSignupDeadline("2026-11-09", "19:00", new Date("2026-11-09T18:30:00"))).toBeNull();
+  // Ca hôm nay 22:00 lúc 10:00: 20:00 hôm nay.
+  expect(hm(extraSignupDeadline("2026-11-09", "22:00", now))).toBe("2026-11-09 20:00");
 });

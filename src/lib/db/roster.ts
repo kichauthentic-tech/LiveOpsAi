@@ -18,7 +18,13 @@ export interface RosterDraft {
   slotId: string;
   hostId?: string;
   coHostId?: string;
+  /** 0207 — thẻ "No Asst": ca này chủ ý không có trợ live. Không đi cùng coHostId. */
+  noAssistant?: boolean;
 }
+
+/** Cột/bảng của 0207 chưa có (Postgres 42703 undefined_column) — đọc/ghi lại theo bản cũ để màn không hỏng trước khi chạy migration. */
+let noAssistantColumn: boolean | null = null;
+const isMissingNoAssistantColumn = (e: unknown): boolean => (e as { code?: string } | null)?.code === "42703";
 
 export interface RosterChange {
   id: string;
@@ -52,13 +58,31 @@ export async function fetchRosterWeeks(fromWeek: string): Promise<RosterWeek[]> 
 
 export async function fetchRosterDrafts(): Promise<RosterDraft[]> {
   // Nháp chỉ tồn tại tới lúc công bố (RPC xoá) — vài trăm dòng mỗi tháng, không cần phân trang.
-  const { data, error } = await supabase.from("roster_drafts").select("slot_id, host_id, co_host_id").order("slot_id").limit(1000);
+  type Row = { slot_id: string; host_id: string | null; co_host_id: string | null; no_assistant?: boolean | null };
+  const first = await supabase.from("roster_drafts").select("slot_id, host_id, co_host_id, no_assistant").order("slot_id").limit(1000);
+  let data = first.data as Row[] | null;
+  let error = first.error;
+  if (error && isMissingNoAssistantColumn(error)) {
+    noAssistantColumn = false;
+    const old = await supabase.from("roster_drafts").select("slot_id, host_id, co_host_id").order("slot_id").limit(1000);
+    data = old.data as Row[] | null;
+    error = old.error;
+  } else if (!error) noAssistantColumn = true;
   if (error) throw error;
-  return (data as { slot_id: string; host_id: string | null; co_host_id: string | null }[]).map((r) => ({
+  return (data ?? []).map((r) => ({
     slotId: r.slot_id,
     hostId: r.host_id ?? undefined,
-    coHostId: r.co_host_id ?? undefined
+    coHostId: r.co_host_id ?? undefined,
+    noAssistant: r.no_assistant ? true : undefined
   }));
+}
+
+/** Dòng ghi bảng nháp. DB chưa chạy 0207 thì bỏ cột `no_assistant` để ghi nháp thường vẫn chạy như cũ. */
+function draftRow(d: RosterDraft, userId: string | undefined) {
+  const row: Record<string, unknown> = { slot_id: d.slotId, host_id: d.hostId ?? null, co_host_id: d.coHostId ?? null, updated_by: userId ?? null, updated_at: new Date().toISOString() };
+  // Có trợ thì thẻ luôn tắt (CHECK ở DB cấm vừa có trợ vừa No Asst) ⇒ luôn gửi giá trị rõ; bỏ cột hẳn khi DB chưa có (đọc nháp báo 42703).
+  if (noAssistantColumn !== false) row.no_assistant = !!d.noAssistant && !d.coHostId;
+  return row;
 }
 
 /** Ghi nháp người cho một ca mở. Cả hai vai trống ⇒ xoá dòng nháp. */
@@ -71,7 +95,7 @@ export async function saveRosterDraft(d: RosterDraft, userId: string | undefined
   const { data, error } = await supabase
     .from("roster_drafts")
     .upsert(
-      { slot_id: d.slotId, host_id: d.hostId ?? null, co_host_id: d.coHostId ?? null, updated_by: userId ?? null, updated_at: new Date().toISOString() },
+      draftRow(d, userId),
       { onConflict: "slot_id" }
     )
     .select("slot_id");
@@ -85,7 +109,7 @@ export async function saveRosterDrafts(rows: RosterDraft[], userId: string | und
     const { data, error } = await supabase
       .from("roster_drafts")
       .upsert(
-        keep.map((d) => ({ slot_id: d.slotId, host_id: d.hostId ?? null, co_host_id: d.coHostId ?? null, updated_by: userId ?? null, updated_at: new Date().toISOString() })),
+        keep.map((d) => draftRow(d, userId)),
         { onConflict: "slot_id" }
       )
       .select("slot_id");
@@ -229,6 +253,19 @@ export async function setRosterDeadline(weekStart: string, deadlineIso: string |
 }
 
 /** Công bố tuần: chốt mọi ca nháp trong MỘT transaction (lỗi một ca là không ca nào được chốt), gửi mỗi người một tin. */
+/** Bật/tắt thẻ "No Asst" cho ca ĐÃ công bố (0207). Ca nháp gắn thẻ qua `saveRosterDraft`. */
+export async function setSlotNoAssistant(slotId: string, value: boolean): Promise<void> {
+  const { error } = await supabase.rpc("set_slot_no_assistant", { p_slot_id: slotId, p_value: value });
+  if (error) throw error;
+}
+
+/** Đặt hạn đăng ký riêng cho ca còn thiếu người sau khi hạn tháng/đợt đã qua (0207). Trả số ca đã mở lại. */
+export async function openSlotsForSignup(slotIds: string[], deadline: Date): Promise<number> {
+  const { data, error } = await supabase.rpc("open_slots_for_signup", { p_slot_ids: slotIds, p_deadline: deadline.toISOString() });
+  if (error) throw error;
+  return Number(data ?? 0);
+}
+
 export async function publishRosterWeek(weekStart: string): Promise<{ published: number; notified: number }> {
   const { data, error } = await supabase.rpc("publish_roster_week", { p_week_start: weekStart });
   if (error) throw error;

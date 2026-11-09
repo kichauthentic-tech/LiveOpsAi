@@ -346,6 +346,7 @@ export function planMonth(input: PlanInput): MonthPlan {
     for (const role of ["host", "co_host"] as const) {
       const cur = assigned.get(shift.key)!;
       if (cur[role]) continue;
+      if (role === "co_host" && shift.noAssistant) continue; // thẻ No Asst: ca chủ ý không trợ
       // Ca nháp chỉ có trợ mà chưa có host làm cả tuần không công bố được (publish_roster_week từ chối) ⇒ chưa xếp trợ khi chưa có host.
       if (role === "co_host" && !cur.host) {
         unfilled.push({ shiftKey: shift.key, role, reason: "no_host", detail: "chưa có host nên chưa xếp trợ (ca nháp không có host thì không công bố được)" });
@@ -564,27 +565,28 @@ export function applyPlanRows(
   freed: readonly RosterShift[],
   auto: AutoFill,
   range?: { from: string; to: string }
-): { rows: { slotId: string; hostId?: string; coHostId?: string }[]; nextAuto: AutoFill } {
+): { rows: { slotId: string; hostId?: string; coHostId?: string; noAssistant?: boolean }[]; nextAuto: AutoFill } {
   const byKey = new Map(freed.map((s) => [s.key, s]));
-  const rows = new Map<string, { slotId: string; hostId?: string; coHostId?: string }>();
+  const rows = new Map<string, { slotId: string; hostId?: string; coHostId?: string; noAssistant?: boolean }>();
   const nextAuto: AutoFill = {};
   const inR = (d: string) => !range || (d >= range.from && d <= range.to);
   for (const [slotId, v] of Object.entries(auto)) {
     const s = byKey.get(`o:${slotId}`);
-    if (s && inR(s.date)) rows.set(slotId, { slotId, hostId: s.hostId, coHostId: s.coHostId });
+    if (s && inR(s.date)) rows.set(slotId, { slotId, hostId: s.hostId, coHostId: s.coHostId, noAssistant: s.noAssistant });
     else nextAuto[slotId] = v; // ngoài phạm vi lần này: giữ nguyên
   }
   for (const a of plan.assignments) {
     if (a.source !== "plan") continue;
     const s = byKey.get(a.shiftKey);
     if (!s) continue;
-    const r = rows.get(a.slotId) ?? { slotId: a.slotId, hostId: s.hostId, coHostId: s.coHostId };
+    const r = rows.get(a.slotId) ?? { slotId: a.slotId, hostId: s.hostId, coHostId: s.coHostId, noAssistant: s.noAssistant };
     const n = nextAuto[a.slotId] ?? {};
     if (a.role === "host") {
       r.hostId = a.talentId;
       n.hostId = a.talentId;
     } else {
       r.coHostId = a.talentId;
+      r.noAssistant = undefined;
       n.coHostId = a.talentId;
     }
     rows.set(a.slotId, r);

@@ -645,6 +645,16 @@ export interface ShiftSlot {
   planId?: string;
   /** Hạn đăng ký riêng của ca (0200 — ca bổ sung mở sau khi tháng đã đóng đăng ký). Có thì thay hạn tháng/tuần. */
   signupDeadline?: string;
+  /**
+   * 0207 — thẻ "No Asst": ca chủ ý không có trợ live (OPS giao ca). Công bố chép từ nháp sang ca; ca đã công bố đọc từ đây
+   * (live_sessions_secure là view, không thêm cột). Chưa chạy 0207 ⇒ luôn undefined.
+   */
+  noAssistant?: boolean;
+  /**
+   * 0207 — ca MỞ đã có người nháp nhưng còn thiếu đúng vai này. Talent không đọc được bảng nháp nên cột này lộ riêng vai thiếu
+   * (không lộ tên người) để hiện thẻ "Cần host / Cần trợ live". Trống = không có vai nào thiếu rõ ràng.
+   */
+  openNeed?: "host" | "co_host";
 }
 
 export interface ShiftRegistration {

@@ -116,3 +116,19 @@ export function milestonesChanged(d: MilestoneDraft, saved: MonthMilestones | un
   const same = (a: string | undefined, b: string) => !!a && new Date(a).getTime() === new Date(b).getTime();
   return !same(saved.signupDeadline, p.deadline1) || !same(saved.signupDeadline2, p.deadline2) || saved.publishBy1 !== p.publishBy1 || saved.publishBy2 !== p.publishBy2;
 }
+
+/**
+ * Hạn đăng ký riêng đề xuất cho ca còn thiếu người sau khi hạn tháng/đợt đã qua (0207): 17:00 của ngày sớm hơn trong {trước ngày ca 1 ngày,
+ * 2 ngày nữa}; nếu mốc đó đã qua (ca sát ngày) thì 2 giờ trước giờ bắt đầu ca. Hết cả hai ⇒ null (không còn thời gian để đăng ký).
+ * Giờ theo máy người đặt, như các mốc khác.
+ */
+export function extraSignupDeadline(date: string, startTime: string, now: Date): Date | null {
+  const at = (d: string, hhmm: string) => new Date(`${d}T${hhmm.slice(0, 5)}:00`);
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const dayBefore = at(addDays(date, -1), DEFAULT_SIGNUP_TIME);
+  const twoDays = at(addDays(today, 2), DEFAULT_SIGNUP_TIME);
+  const first = dayBefore < twoDays ? dayBefore : twoDays;
+  if (first > now) return first;
+  const beforeStart = new Date(at(date, startTime).getTime() - 2 * 3600000);
+  return beforeStart > now ? beforeStart : null;
+}

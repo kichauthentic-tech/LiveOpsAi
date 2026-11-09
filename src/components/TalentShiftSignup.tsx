@@ -150,6 +150,14 @@ export default function TalentShiftSignup({ mode, onOpenTab, brands, shiftSlots,
           {slot.startTime.slice(0, 5)} – {slot.endTime.slice(0, 5)}
           <span className="ml-2 font-sans text-xs font-medium text-[var(--text-faint)]">{hoursText(slotHours(slot))}</span>
         </p>
+        {/* 0207: ca đã có người nháp nhưng còn thiếu đúng vai này — không lộ tên người, chỉ vai cần. */}
+        {slot.openNeed && (
+          <p className="mt-1.5">
+            <span className="inline-flex text-2xs font-bold px-2 py-0.5 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-300">
+              {slot.openNeed === "co_host" ? "Cần trợ live" : "Cần host"}
+            </span>
+          </p>
+        )}
       </>
     );
     if (!myTalentId || locked)

@@ -50,6 +50,10 @@ export interface RosterShift {
   studioName: string;
   hostId?: string;
   coHostId?: string;
+  /** Thẻ "No Asst" (0207): ca CHỦ Ý không có trợ live — không tính là thiếu trợ. Ca mở: lấy từ nháp; ca đã công bố: lấy từ ca chờ đăng ký đã chốt. */
+  noAssistant?: boolean;
+  /** Ca đã công bố: id ca chờ đăng ký (shift_slots) đã sinh ra nó — để bật/tắt thẻ No Asst. Ca nối / nhập từ Sheet không có. */
+  finalSlotId?: string;
   /** Ca mở đã có người nháp (chưa công bố). */
   drafted: boolean;
   /** Ca đã chia đoạn người (0138) — đổi người ở Cửa sổ Ca Live, không ở Điều Phối Lịch Live. */
@@ -67,6 +71,7 @@ export interface DraftAssignment {
   slotId: string;
   hostId?: string;
   coHostId?: string;
+  noAssistant?: boolean;
 }
 
 /** Ca thật (chưa huỷ) + ca mở chưa chốt trong [from, to], gắn người nháp và người đã báo rảnh. */
@@ -88,6 +93,8 @@ export function buildRosterShifts(
   // Ca đã lên lịch vẫn là slot cũ (shift_slots.session_id) ⇒ giữ danh sách người từng đăng ký slot đó để đổi người chỉ gợi ý trong nhóm đã đăng ký.
   const regsBySession = new Map<string, string[]>();
   for (const sl of slots) if (sl.sessionId && regsBySlot.has(sl.id)) regsBySession.set(sl.sessionId, regsBySlot.get(sl.id)!);
+  const slotBySession = new Map<string, ShiftSlot>();
+  for (const sl of slots) if (sl.sessionId) slotBySession.set(sl.sessionId, sl);
   const out: RosterShift[] = [];
   for (const s of sessions) {
     if (s.status === "Cancelled" || s.date < from || s.date > to) continue;
@@ -107,6 +114,8 @@ export function buildRosterShifts(
       studioName: s.studioName ?? "",
       hostId: s.hostId || undefined,
       coHostId: s.coHostId || undefined,
+      noAssistant: slotBySession.get(s.id)?.noAssistant,
+      finalSlotId: slotBySession.get(s.id)?.id,
       drafted: false,
       segmented: hasStaffSegments(s),
       hasData: hasSessionData(s),
@@ -131,6 +140,7 @@ export function buildRosterShifts(
       studioName: sl.studioName,
       hostId: d?.hostId,
       coHostId: d?.coHostId,
+      noAssistant: d?.noAssistant && !d.coHostId ? true : undefined,
       drafted: !!d && !!(d.hostId || d.coHostId),
       segmented: false,
       hasData: false,
@@ -206,8 +216,8 @@ export function personEntries(shifts: readonly RosterShift[]): Map<string, Perso
   return out;
 }
 
-export type IssueCode = "clash" | "week_over" | "draft_no_host" | "no_host" | "no_co" | "week_warn" | "rest" | "room" | "day" | "streak" | "new_channel" | "brand_blocked" | "brand_exclusive";
-/** block = DB/công bố sẽ chặn; hole = ca thiếu host (còn trống, không chặn công bố); warn = cảnh báo. */
+export type IssueCode = "clash" | "week_over" | "draft_no_host" | "no_host" | "co_pending" | "no_co" | "week_warn" | "rest" | "room" | "day" | "streak" | "new_channel" | "brand_blocked" | "brand_exclusive";
+/** block = DB/công bố sẽ chặn; hole = ca còn trống vai (thiếu host, hoặc có host mà chưa trợ / No Asst — không công bố, giữ là ca mở); warn = cảnh báo. */
 export type IssueSeverity = "block" | "hole" | "warn";
 
 export const ISSUE_SEVERITY: Record<IssueCode, IssueSeverity> = {
@@ -215,6 +225,7 @@ export const ISSUE_SEVERITY: Record<IssueCode, IssueSeverity> = {
   week_over: "warn",
   draft_no_host: "block",
   no_host: "hole",
+  co_pending: "hole",
   no_co: "warn",
   week_warn: "warn",
   rest: "warn",
@@ -362,7 +373,11 @@ export function analyzeRoster(
       if (sh.kind === "open" && sh.drafted) add("draft_no_host", sh, "Nháp có trợ live nhưng chưa có host — công bố sẽ bị chặn");
       else add("no_host", sh, "Ca chưa có host");
     }
-    if (!sh.coHostId) add("no_co", sh, "Ca chưa có trợ live");
+    // 0207: ca CHỦ Ý không trợ (thẻ No Asst) không phải thiếu. Ca mở đã có host mà chưa trợ / No Asst thì công bố sẽ bỏ qua ca đó.
+    if (!sh.coHostId && !sh.noAssistant) {
+      if (sh.kind === "open" && sh.hostId) add("co_pending", sh, "Cần trợ live — chọn trợ hoặc gắn No Asst, nếu không ca này chưa được công bố");
+      else add("no_co", sh, "Ca chưa có trợ live");
+    }
     if (sh.hostId && familiar && familiar(sh.hostId, sh.channelKey) === 0) {
       add("new_channel", sh, `${nameOf(sh.hostId)} chưa đứng hay trợ kênh này trong 90 ngày — nên có người kèm`, sh.hostId);
     }

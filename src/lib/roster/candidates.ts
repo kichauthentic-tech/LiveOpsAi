@@ -253,6 +253,7 @@ export function autofillWeek(ctx: RankContext): { assignments: Assignment[]; mis
     for (const role of ["host", "co_host"] as const) {
       const cur = shifts.find((s) => s.key === t.key)!;
       if (role === "host" ? cur.hostId : cur.coHostId) continue;
+      if (role === "co_host" && cur.noAssistant) continue; // thẻ No Asst: ca chủ ý không trợ
       const an = analyzeRoster(shifts, ctx.rules, ctx.weekStart, ctx.nameOf, undefined, ctx.brandRules);
       const pick = rankCandidates(cur, role, { ...ctx, shifts }, an).find(
         (c) => !c.blocked && c.issues.length === 0 && c.famHost + c.famCo > 0 && (ctx.mode !== "cost" || c.qualified)

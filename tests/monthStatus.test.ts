@@ -47,13 +47,13 @@ test("có ca mở mà chưa đặt hạn → no_deadline; hạn còn ở tương
 test("qua hạn còn ca chưa host → đang xếp người; đủ host nháp → chờ công bố theo tuần; công bố hết → xong", () => {
   const slots = [slot("a", "2026-11-02"), slot("b", "2026-11-10")];
   const deadline = "2026-10-24T10:00:00.000Z";
-  const staff = monthStatus(base({ slots, milestones: { month: "2026-11", signupDeadline: deadline }, registrations: [reg("b", "t1")], drafts: [{ slotId: "a", hostId: "t3" }] }));
+  const staff = monthStatus(base({ slots, milestones: { month: "2026-11", signupDeadline: deadline }, registrations: [reg("b", "t1")], drafts: [{ slotId: "a", hostId: "t3", coHostId: "t4" }] }));
   expect(staff.phase).toBe("staff");
   expect(staff.noHost).toBe(1);
   expect(staff.noHostWithSignup).toBe(1);
   const drafts = [
-    { slotId: "a", hostId: "t3" },
-    { slotId: "b", hostId: "t1" }
+    { slotId: "a", hostId: "t3", coHostId: "t5" },
+    { slotId: "b", hostId: "t1", coHostId: "t6" }
   ];
   const pub = monthStatus(base({ slots, milestones: { month: "2026-11", signupDeadline: deadline }, drafts, weeks: [{ weekStart: "2026-11-02", publishedAt: "2026-10-25T00:00:00Z" }] as never }));
   expect(pub.phase).toBe("publish");
@@ -65,7 +65,7 @@ test("qua hạn còn ca chưa host → đang xếp người; đủ host nháp �
 });
 
 test("hạn đã đặt nhưng chưa có ca mở nào chưa người → không kẹt ở đăng ký", () => {
-  const st = monthStatus(base({ slots: [slot("a", "2026-11-02")], drafts: [{ slotId: "a", hostId: "t1" }], milestones: { month: "2026-11", signupDeadline: "2026-10-30T10:00:00.000Z" } }));
+  const st = monthStatus(base({ slots: [slot("a", "2026-11-02")], drafts: [{ slotId: "a", hostId: "t1", coHostId: "t2" }], milestones: { month: "2026-11", signupDeadline: "2026-10-30T10:00:00.000Z" } }));
   expect(st.phase).toBe("publish");
 });
 
@@ -82,7 +82,7 @@ test("một kết luận giờ mỗi kênh: thiếu / thêm là kịp target / d
 test("2 đợt (0200): ca 16–cuối theo hạn đợt 2; đợt 1 đã đóng mà đợt 2 còn hạn ⇒ vẫn đang nhận đăng ký; mỗi đợt đếm việc riêng", () => {
   const milestones = { month: "2026-11", signupDeadline: "2026-10-20T10:00:00.000Z", signupDeadline2: "2026-10-30T10:00:00.000Z", publishBy1: "2026-10-25", publishBy2: "2026-10-28" };
   const slots = [slot("a", "2026-11-03"), slot("b", "2026-11-04"), slot("c", "2026-11-20")];
-  const st = monthStatus(base({ slots, milestones, drafts: [{ slotId: "a", hostId: "t1" }] }));
+  const st = monthStatus(base({ slots, milestones, drafts: [{ slotId: "a", hostId: "t1", coHostId: "t2" }] }));
   expect(st.phase).toBe("signup");
   expect(st.deadline).toBe("2026-10-30T10:00:00.000Z");
   expect(st.halves.map((h) => ({ half: h.half, noHost: h.noHost, toPublish: h.toPublish, publishBy: h.publishBy, first: h.firstNoHostDate }))).toEqual([
@@ -95,4 +95,27 @@ test("2 đợt (0200): ca 16–cuối theo hạn đợt 2; đợt 1 đã đóng 
   const extra = monthStatus(base({ slots: [slot("z", "2026-11-20", { signupDeadline: "2026-10-27T10:00:00.000Z" })], milestones: { month: "2026-11", signupDeadline: "2026-10-20T10:00:00.000Z" } }));
   expect(extra.phase).toBe("signup");
   expect(extra.deadline).toBe("2026-10-27T10:00:00.000Z");
+});
+
+test("No Asst (0207): nháp có host mà chưa trợ / No Asst = chờ trợ, chưa tính là sẵn sàng công bố; gắn thẻ hoặc có trợ thì công bố được", () => {
+  const slots = [slot("a", "2026-11-02"), slot("b", "2026-11-03"), slot("c", "2026-11-04"), slot("d", "2026-11-18")];
+  const milestones = { month: "2026-11", signupDeadline: "2026-10-20T10:00:00.000Z" }; // hạn đã qua so với now
+  const drafts = [
+    { slotId: "a", hostId: "h1" }, // chờ trợ
+    { slotId: "b", hostId: "h2", noAssistant: true }, // chủ ý không trợ
+    { slotId: "c", hostId: "h3", coHostId: "t3" }, // đủ
+    { slotId: "d", hostId: "h4" } // đợt 2, chờ trợ
+  ];
+  const st = monthStatus(base({ slots, drafts, milestones }));
+  expect(st.drafted).toBe(4);
+  expect(st.needCo).toBe(2);
+  expect(st.phase).toBe("staff"); // còn ca chờ trợ ⇒ chưa sang "Công bố"
+  expect(st.halves[0].needCo).toBe(1);
+  expect(st.halves[0].toPublish).toBe(2); // b + c
+  expect(st.halves[1].needCo).toBe(1);
+  expect(st.halves[1].toPublish).toBe(0);
+  // Hết ca chờ trợ thì mới sang "publish".
+  const ready = monthStatus(base({ slots, drafts: drafts.map((d) => (d.coHostId || d.noAssistant ? d : { ...d, noAssistant: true })), milestones }));
+  expect(ready.needCo).toBe(0);
+  expect(ready.phase).toBe("publish");
 });

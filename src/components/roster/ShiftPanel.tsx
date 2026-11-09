@@ -8,6 +8,7 @@ import { talentShortName } from "../../lib/talentName";
 import { shiftHours, type RosterAnalysis, type RosterRole, type RosterShift } from "../../lib/roster/rules";
 import { plannedCost, rankCandidates, shiftCost, type Candidate, type RankContext, type RankMode } from "../../lib/roster/candidates";
 import { getTodayDate } from "../../lib/dateUtils";
+import { extraSignupDeadline } from "../../lib/roster/milestones";
 
 // Ngăn chi tiết một ca của Điều Phối Lịch Live: lỗi/cảnh báo, người đã báo rảnh, gợi ý người cho từng vai (kèm lý do + chi phí), dời giờ, bỏ ca.
 // Ca mở ⇒ ghi NHÁP (talent chưa thấy). Ca đã lên lịch ⇒ đổi người / dời giờ phải có lý do (RPC ghi nhật ký, DB báo người liên quan).
@@ -34,6 +35,10 @@ interface Props {
   onClose: () => void;
   /** `reason` có sẵn (vd "Báo nghỉ: …") ⇒ ca đã lên lịch đổi người không hỏi lý do nữa. */
   onAssign: (shift: RosterShift, role: RosterRole, talentId: string | undefined, reason?: string) => void;
+  /** Thẻ "No Asst" (0207): ca chủ ý không có trợ live. */
+  onNoAssistant?: (shift: RosterShift, value: boolean) => void;
+  /** Mở lại đăng ký cho ca còn thiếu người sau khi hạn tháng/đợt đã qua (0207). */
+  onReopenSignup?: (shift: RosterShift, deadline: Date) => void;
   onMove: (shift: RosterShift, v: { date: string; startTime: string; endTime: string }) => void;
   onRemove: (shift: RosterShift) => void;
   /** Đổi chế độ gợi ý (Cân bằng / Tiết kiệm chi phí / Tối ưu GMV) — cùng chế độ của thanh công cụ Điều Phối. */
@@ -46,7 +51,7 @@ const MODES: { key: RankMode; label: string; hint: string }[] = [
   { key: "gmv", label: "Tối ưu GMV", hint: "Host có GMV/giờ cao hơn kỳ vọng cùng kênh × khung giờ lên trước (chỉ số co về ×1,00 theo số ca; lặp lại yếu giữa các tháng, r = 0,23)." }
 ];
 
-export const ShiftPanel: React.FC<Props> = ({ shift, analysis, ctx, talents, history, showCost, readOnly, busy, onClose, onAssign, onMove, onRemove, onMode }) => {
+export const ShiftPanel: React.FC<Props> = ({ shift, analysis, ctx, talents, history, showCost, readOnly, busy, onClose, onAssign, onNoAssistant, onReopenSignup, onMove, onRemove, onMode }) => {
   const talentById = useMemo(() => new Map(talents.map((t) => [t.id, t])), [talents]);
   const nm = (id: string | undefined) => (id ? talentShortName(talentById.get(id)) || "?" : "");
   const issues = analysis.byShift.get(shift.key) ?? [];
@@ -100,6 +105,18 @@ export const ShiftPanel: React.FC<Props> = ({ shift, analysis, ctx, talents, his
             </span>
           )}
         </div>
+        {role === "co_host" && !cur && onNoAssistant && !readOnly && !past && !shift.segmented && (shift.kind === "open" ? !!shift.hostId : !!shift.finalSlotId) && (
+          <button
+            type="button"
+            disabled={busy}
+            aria-pressed={!!shift.noAssistant}
+            onClick={() => onNoAssistant(shift, !shift.noAssistant)}
+            title="Ca không có trợ live thì OPS giao ca. Gắn thẻ này để ca được công bố mà không bị tính là thiếu trợ."
+            className={`w-full text-left text-xs font-bold px-3 py-2 rounded-xl border ${shift.noAssistant ? "seg-on" : "border-[var(--border)] text-[var(--text)] hover:bg-[var(--surface-hover)]"}`}
+          >
+            No Asst — ca chủ ý không có trợ live{shift.noAssistant ? " (đang bật, bấm để gỡ)" : ""}
+          </button>
+        )}
         {absent === role && cur && <p className="text-2xs text-[var(--accent-text)]">Chọn người thay {nm(cur)} bên dưới — lý do "Báo nghỉ" ghi sẵn vào nhật ký, cả hai người nhận thông báo.</p>}
         {!lockedPeople && (
           <div className="overflow-x-auto">
@@ -211,7 +228,7 @@ export const ShiftPanel: React.FC<Props> = ({ shift, analysis, ctx, talents, his
             const id = r === "host" ? shift.hostId : shift.coHostId;
             return (
               <button key={r} type="button" aria-pressed={roleTab === r} onClick={() => setRoleTab(r)} className={`min-h-9 px-3 rounded-xl border text-xs font-bold ${roleTab === r ? "seg-on" : "border-[var(--border)] text-[var(--text)]"}`}>
-                {r === "host" ? "Host" : "Trợ"} · {id ? nm(id) : <span className="text-red-300">chưa có</span>}
+                {r === "host" ? "Host" : "Trợ"} · {id ? nm(id) : r === "co_host" && shift.noAssistant ? <span className="text-amber-300">No Asst</span> : <span className="text-red-300">chưa có</span>}
               </button>
             );
           })}
@@ -226,6 +243,20 @@ export const ShiftPanel: React.FC<Props> = ({ shift, analysis, ctx, talents, his
           </div>
         )}
         {roleBlock(roleTab)}
+
+        {onReopenSignup && !readOnly && !past && shift.kind === "open" && (!shift.hostId || (!shift.coHostId && !shift.noAssistant)) && (() => {
+          const dl = extraSignupDeadline(shift.date, shift.startTime, new Date());
+          return (
+            <div className="rounded-xl border border-[var(--border)] px-3 py-2.5 space-y-1.5">
+              <p className="text-xs text-[var(--text-muted)]">
+                Ca còn thiếu {!shift.hostId ? "host" : "trợ live"}. Hết hạn đăng ký của tháng/đợt thì talent không báo rảnh được nữa — đặt hạn riêng cho ca này để họ đăng ký thêm.
+              </p>
+              <button type="button" disabled={busy || !dl} onClick={() => dl && onReopenSignup(shift, dl)} className="text-xs font-bold px-3 py-1.5 rounded-lg border border-[var(--border)] text-[var(--text)] hover:bg-[var(--surface-hover)] disabled:opacity-50">
+                {dl ? `Mở đăng ký thêm tới ${dl.getHours()}:${String(dl.getMinutes()).padStart(2, "0")} ${dl.getDate()}/${dl.getMonth() + 1}` : "Ca sát giờ — không còn thời gian mở đăng ký"}
+              </button>
+            </div>
+          );
+        })()}
 
         {canMove && moving && (
           <section className="space-y-2 border-t border-[var(--border)] pt-4">

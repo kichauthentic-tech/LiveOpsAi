@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight, ClipboardList, Send, X } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, ClipboardList, FileSpreadsheet, Send, X } from "lucide-react";
 import type { Brand, BrandChannel, BrandStudio, LiveSession, ShiftRegistration, ShiftSlot, Studio, Talent, TalentRateHistoryEntry, UserRole } from "../types";
 import { PageHeader } from "./common/PageHeader";
 import { useToast } from "../hooks/useToast";
@@ -22,6 +22,8 @@ import {
   rosterMoveSession,
   rosterReassign,
   saveRosterDraft,
+  setSlotNoAssistant,
+  openSlotsForSignup,
   saveRosterDrafts,
   updateRosterRules,
   type RosterChange,
@@ -38,6 +40,7 @@ import { NextDesk, NowDesk, nextMonthOf, useRosterDesk, type NowChannel } from "
 import { MonthStrip, fmtWhen, type MonthAction, type MonthCard } from "./roster/MonthStrip";
 import { monthStatus } from "../lib/roster/monthStatus";
 import { OpenMonthWizard } from "./roster/OpenMonthWizard";
+import { BrandScheduleExportDialog } from "./roster/BrandScheduleExportDialog";
 import { MonthPlanPanel } from "./roster/MonthPlanPanel";
 import { WorkloadTable } from "./roster/WorkloadTable";
 import { DEFAULT_BOUNDS, GOALS, GOAL_HINT, GOAL_LABEL, applyPlanRows, buildHostPerformance, daysInMonth, planMonth, releaseAutoFilled, type AutoFill, type MonthBounds, type PlanGoal } from "../lib/roster/monthPlanner";
@@ -143,6 +146,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
   const [months, setMonths] = useState<RosterMonth[]>([]);
   // Đợt 2 (25/10): "Mở lịch tháng sau" 3 bước trong module (thay việc phải sang Kế Hoạch Tháng từng kênh).
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   // Xếp nháp theo mục tiêu (01/11): phạm vi theo mốc chốt (ngày 1–15 ~ ngày 20, cả tháng ~ ngày 25), mục tiêu, giờ tối thiểu/tối đa.
   const [goal, setGoal] = useState<PlanGoal>(() => {
     try {
@@ -298,8 +302,11 @@ export const RosterBoard: React.FC<Props> = (p) => {
   const warns = weekIssues.filter((i) => i.severity === "warn");
   const overWeek = warns.filter((i) => i.code === "week_over");
   const openShifts = wk.filter((s) => s.kind === "open");
-  const draftedCount = openShifts.filter((s) => s.drafted).length;
-  const outsideDrafts = openShifts.filter((s) => s.drafted && s.date.slice(0, 7) !== viewMonth).length;
+  // 0207: nháp có host mà chưa trợ / No Asst KHÔNG công bố (RPC bỏ qua, ca vẫn mở cho talent đăng ký trợ) ⇒ đếm riêng.
+  const holdCoShifts = openShifts.filter((s) => s.drafted && !!s.hostId && !s.coHostId && !s.noAssistant);
+  const publishableShifts = openShifts.filter((s) => s.drafted && (!s.hostId || !!s.coHostId || !!s.noAssistant));
+  const draftedCount = publishableShifts.length;
+  const outsideDrafts = publishableShifts.filter((s) => s.date.slice(0, 7) !== viewMonth).length;
   const weekCost = wk.reduce((s, x) => s + shiftCost(x, p.talents, p.talentRateHistory).amount, 0);
   const costMissing = wk.filter((x) => shiftCost(x, p.talents, p.talentRateHistory).missing).length;
   const selected = selectedKey ? shifts.find((s) => s.key === selectedKey) ?? null : null;
@@ -419,7 +426,9 @@ export const RosterBoard: React.FC<Props> = (p) => {
   const assign = (shift: RosterShift, role: RosterRole, talentId: string | undefined, presetReason?: string) =>
     run(async () => {
       if (shift.kind === "open") {
-        const next: RosterDraft = { slotId: shift.slotId!, hostId: role === "host" ? talentId : shift.hostId, coHostId: role === "co_host" ? talentId : shift.coHostId };
+        const coHostId = role === "co_host" ? talentId : shift.coHostId;
+        // Chọn trợ thì thẻ No Asst tự tắt (một ca không vừa có trợ vừa không trợ).
+        const next: RosterDraft = { slotId: shift.slotId!, hostId: role === "host" ? talentId : shift.hostId, coHostId, noAssistant: coHostId ? undefined : shift.noAssistant };
         await saveRosterDraft(next, p.currentUserId);
         setDrafts((prev) => [...prev.filter((d) => d.slotId !== next.slotId), ...(next.hostId || next.coHostId ? [next] : [])]);
         showToast(talentId ? `Nháp: ${nameOf(talentId)} vào ca ${shift.brandName} ${shift.startTime}` : "Đã bỏ người khỏi nháp");
@@ -437,6 +446,40 @@ export const RosterBoard: React.FC<Props> = (p) => {
       p.onSessionUpdated(saved);
       setChangesNonce((n) => n + 1);
       showToast(`Đã đổi người ca ${shift.brandName} ${shift.startTime} — đã báo người liên quan`);
+    });
+
+  /** Thẻ "No Asst" (0207): ca nháp lưu vào nháp (cần host trước); ca đã công bố đổi cột trên ca chờ đăng ký đã chốt. */
+  const setNoAssistant = (shift: RosterShift, value: boolean) =>
+    run(async () => {
+      if (shift.kind === "open") {
+        if (!shift.hostId) {
+          showToast("Chọn host trước rồi mới gắn No Asst.");
+          return;
+        }
+        const next: RosterDraft = { slotId: shift.slotId!, hostId: shift.hostId, coHostId: value ? undefined : shift.coHostId, noAssistant: value };
+        await saveRosterDraft(next, p.currentUserId);
+        setDrafts((prev) => [...prev.filter((d) => d.slotId !== next.slotId), next]);
+        showToast(value ? "Đã gắn No Asst — ca này chủ ý không có trợ live (OPS giao ca)" : "Đã gỡ No Asst — ca lại cần trợ live trước khi công bố");
+        return;
+      }
+      const slot = shift.finalSlotId ? p.shiftSlots.find((sl) => sl.id === shift.finalSlotId) : undefined;
+      if (!slot) {
+        showToast("Ca này nhập từ Sheet / ca nối, không có ca chờ đăng ký gốc nên không gắn được No Asst.");
+        return;
+      }
+      await setSlotNoAssistant(slot.id, value);
+      p.onSlotUpdated({ ...slot, noAssistant: value || undefined });
+      showToast(value ? "Đã gắn No Asst cho ca đã công bố" : "Đã gỡ No Asst");
+    });
+
+  /** Đặt hạn đăng ký riêng cho ca còn thiếu người (0207) — sau đó talent đăng ký thêm được dù hạn tháng/đợt đã qua. */
+  const reopenSignup = (shift: RosterShift, deadline: Date) =>
+    run(async () => {
+      const when = `${deadline.getHours()}:${String(deadline.getMinutes()).padStart(2, "0")} ${deadline.getDate()}/${deadline.getMonth() + 1}`;
+      if (!(await confirm(`Mở đăng ký thêm cho ca ${shift.brandName} ${dayLabel(shift.date)} ${shift.startTime} tới ${when}? Talent thấy ca trong tab Đăng ký ca với thẻ "Cần ${shift.hostId ? "trợ live" : "host"}".`, { confirmLabel: "Mở đăng ký" }))) return;
+      const n = await openSlotsForSignup([shift.slotId!], deadline);
+      await p.onScheduleChanged();
+      showToast(n > 0 ? `Đã mở đăng ký thêm tới ${when}` : "Ca không còn mở — không đặt được hạn");
     });
 
   const move = (shift: RosterShift, v: { date: string; startTime: string; endTime: string }) =>
@@ -501,7 +544,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
         return;
       }
       const bySlot = new Map<string, RosterDraft>();
-      for (const s of res.shifts) if (s.kind === "open" && s.slotId && res.assignments.some((a) => a.slotId === s.slotId)) bySlot.set(s.slotId, { slotId: s.slotId, hostId: s.hostId, coHostId: s.coHostId });
+      for (const s of res.shifts) if (s.kind === "open" && s.slotId && res.assignments.some((a) => a.slotId === s.slotId)) bySlot.set(s.slotId, { slotId: s.slotId, hostId: s.hostId, coHostId: s.coHostId, noAssistant: s.noAssistant });
       await saveRosterDrafts([...bySlot.values()], p.currentUserId);
       setDrafts((prev) => [...prev.filter((d) => !bySlot.has(d.slotId)), ...bySlot.values()]);
       showToast(`Đã xếp ${res.assignments.length} chỗ vào nháp${res.missed ? `, còn ${res.missed} chỗ không ai đủ điều kiện` : ""}`);
@@ -513,7 +556,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
       const rows = new Map<string, RosterDraft>();
       for (const m of costPlan.moves) {
         const s = costPlan.shifts.find((x) => x.key === m.shiftKey)!;
-        rows.set(s.slotId!, { slotId: s.slotId!, hostId: s.hostId, coHostId: s.coHostId });
+        rows.set(s.slotId!, { slotId: s.slotId!, hostId: s.hostId, coHostId: s.coHostId, noAssistant: s.noAssistant });
       }
       await saveRosterDrafts([...rows.values()], p.currentUserId);
       setDrafts((prev) => [...prev.filter((d) => !rows.has(d.slotId)), ...rows.values()]);
@@ -570,7 +613,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
     const byWeek = new Map<string, number>();
     for (const sl of p.shiftSlots) {
       if (sl.status !== "open" || sl.sessionId || sl.date < planRange.from || sl.date > planRange.to) continue;
-      if (!drafts.some((d) => d.slotId === sl.id && d.hostId)) continue;
+      if (!drafts.some((d) => d.slotId === sl.id && d.hostId && (d.coHostId || d.noAssistant))) continue;
       const w = isoWeekStart(sl.date);
       byWeek.set(w, (byWeek.get(w) ?? 0) + 1);
     }
@@ -653,6 +696,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
         `${draftedCount} ca nháp sẽ thành ca thật, mỗi host/trợ nhận MỘT tin liệt kê ca của mình.`,
         outsideDrafts > 0 ? `Công bố theo tuần nên gồm cả ${outsideDrafts} ca nháp ngoài tháng ${Number(viewMonth.slice(5))} (ngày đang ẩn trên lưới).` : "",
         holes > 0 ? `${holes} ca mở chưa có host sẽ vẫn mở (không công bố).` : "",
+        holdCoShifts.length > 0 ? `${holdCoShifts.length} ca đã có host nhưng chưa có trợ / No Asst sẽ chưa công bố, vẫn mở cho talent đăng ký trợ: ${holdCoShifts.slice(0, 4).map((s) => `${s.brandName} ${dayLabel(s.date)} ${s.startTime}`).join(", ")}${holdCoShifts.length > 4 ? "…" : ""}.` : "",
         // 0206: quá giờ tuần chỉ cảnh báo — nêu đích danh để người công bố nhìn thấy trước khi bấm.
         overWeek.length > 0 ? `⚠ Quá ${rules.maxWeekHours} giờ/tuần (không chặn): ${overWeek.map((i) => i.text.replace(/ có (.+) trong tuần.*/, " $1")).join("; ")}.` : "",
         warns.length - overWeek.length > 0 ? `Còn ${warns.length - overWeek.length} cảnh báo khác (không chặn).` : ""
@@ -662,7 +706,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
       if (!(await confirm(msg, { confirmLabel: "Công bố" }))) return;
       const r = await publishRosterWeek(weekStart);
       await Promise.all([p.onScheduleChanged(), reloadRoster()]);
-      showToast(`Đã công bố ${r.published} ca, gửi ${r.notified} tin cho host/trợ`);
+      showToast(`Đã công bố ${r.published} ca, gửi ${r.notified} tin cho host/trợ${holdCoShifts.length > 0 ? ` · còn ${holdCoShifts.length} ca chờ trợ` : ""}`);
     });
 
   const saveRules = (r: RosterRules) =>
@@ -746,7 +790,12 @@ export const RosterBoard: React.FC<Props> = (p) => {
         .filter((sl) => sl.date.slice(0, 7) === month && sl.date >= today && sl.status === "open" && !sl.sessionId && !drafts.find((d) => d.slotId === sl.id)?.hostId)
         .map((sl) => sl.date)
         .sort()[0];
-      if (first) goWeekOf(first);
+      // Không còn ca thiếu host thì tới ca đã có host mà chờ trợ / No Asst (0207).
+      const firstCo = p.shiftSlots
+        .filter((sl) => sl.date.slice(0, 7) === month && sl.date >= today && sl.status === "open" && !sl.sessionId && (() => { const d = drafts.find((x) => x.slotId === sl.id); return !!d?.hostId && !d.coHostId && !d.noAssistant; })())
+        .map((sl) => sl.date)
+        .sort()[0];
+      if (first ?? firstCo) goWeekOf((first ?? firstCo)!);
     } else if (kind === "publish") {
       const w = statusOf(month).weeksToPublish[0];
       if (w) goWeekOf(w);
@@ -769,13 +818,13 @@ export const RosterBoard: React.FC<Props> = (p) => {
     todos.push({ key: "next", tone: "warn", text: `${mNext[0].toUpperCase()}${mNext.slice(1)}: ${st1.weeksToPublish.length} tuần có ca nháp chưa công bố.`, action: { label: "Tới tuần chưa công bố", run: () => onMonthAction("publish", m1) } });
   // Mốc chốt lịch từng đợt (0200, user chốt 06/11: chốt ca 1–15 ngày 15, ca 16–cuối ngày 25 tháng trước). Nhắc từ 2 ngày trước mốc.
   for (const h of st1.halves) {
-    if (!h.publishBy || (h.noHost === 0 && h.toPublish === 0) || addDays(h.publishBy, -2) > today) continue;
+    if (!h.publishBy || (h.noHost === 0 && h.toPublish === 0 && h.needCo === 0) || addDays(h.publishBy, -2) > today) continue;
     const when = h.publishBy < today ? `đã quá hạn chốt ${dayLabel(h.publishBy)}` : h.publishBy === today ? "hôm nay phải chốt" : `chốt trước ${dayLabel(h.publishBy)}`;
     const firstWeek = h.weeksToPublish[0];
     todos.push({
       key: `half-${h.half}`,
       tone: h.publishBy <= today ? "bad" : "warn",
-      text: `Lịch đợt ${h.half} ${mNext} (ca ${halfRange(m1, h.half)}) ${when}: ${[h.noHost > 0 ? `${h.noHost} ca chưa có host` : "", h.toPublish > 0 ? `${h.toPublish} ca nháp chưa công bố` : ""].filter(Boolean).join(", ")}.`,
+      text: `Lịch đợt ${h.half} ${mNext} (ca ${halfRange(m1, h.half)}) ${when}: ${[h.noHost > 0 ? `${h.noHost} ca chưa có host` : "", h.needCo > 0 ? `${h.needCo} ca chờ trợ / No Asst` : "", h.toPublish > 0 ? `${h.toPublish} ca nháp chưa công bố` : ""].filter(Boolean).join(", ")}.`,
       action: h.noHost > 0 && h.firstNoHostDate ? { label: "Tới tuần còn trống", run: () => goWeekOf(h.firstNoHostDate!) } : firstWeek ? { label: "Tới tuần chưa công bố", run: () => goWeekOf(firstWeek) } : undefined
     });
   }
@@ -798,7 +847,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
     seenClash.add(k);
     todos.push({ key: `clash-${i.shiftKey}-${i.talentId}`, tone: "warn", text: `${s.brandName} ${s.platform} ${dayLabel(s.date)} ${s.startTime}: ${i.text.replace(" — ca đã lên lịch từ trước, không chặn công bố", "")}.`, sub: "Lịch nhập từ Sheet nên không chặn. Đổi một ca nếu không cố ý.", action: { label: "Xem ca", run: () => setSelectedKey(s.key) } });
   }
-  const noCoShifts = wk.filter((s) => s.kind === "session" && s.hostId && !s.coHostId && s.date >= today && !s.segmented);
+  const noCoShifts = wk.filter((s) => s.kind === "session" && s.hostId && !s.coHostId && !s.noAssistant && s.date >= today && !s.segmented);
   if (noCoShifts.length > 0)
     todos.push({ key: "noco", tone: "warn", text: `${noCoShifts.length} ca tuần này chưa có trợ live.`, sub: "Ca không có trợ thì OP giao ca. Bấm để xếp lần lượt.", action: { label: "Xếp ca đầu tiên", run: () => setSelectedKey(noCoShifts[0].key) } });
   const openNoHost = openShifts.filter((s) => !s.hostId).length;
@@ -806,6 +855,8 @@ export const RosterBoard: React.FC<Props> = (p) => {
     todos.push({ key: "open", tone: "warn", text: `${openNoHost} ca mở tuần này chưa có người.`, sub: "Tự xếp ưu tiên người đã báo rảnh, rồi người quen kênh, giờ tuần thấp.", action: readOnly ? undefined : { label: "Tự xếp người vào chỗ trống", run: doAutofill } });
   if (draftedCount > 0 && blocks.length === 0)
     todos.push({ key: "pub", tone: "warn", text: `${draftedCount} ca nháp tuần này chưa công bố.`, sub: "Công bố xong mỗi host/trợ nhận một tin.", action: readOnly ? undefined : { label: "Công bố", run: publish } });
+  if (holdCoShifts.length > 0)
+    todos.push({ key: "co-hold", tone: "warn", text: `${holdCoShifts.length} ca đã có host nhưng chưa có trợ / No Asst — chưa được công bố.`, sub: "Chọn trợ, hoặc gắn No Asst nếu ca chủ ý không trợ. Ca vẫn mở cho talent đăng ký trợ.", action: { label: "Xếp ca đầu tiên", run: () => setSelectedKey(holdCoShifts[0].key) } });
   // Ô tự fill có người đã rút đăng ký sau đó (talent bấm huỷ đăng ký): nháp còn giữ người không còn rảnh.
   const staleAuto = Object.entries(auto).filter(([slotId, a]) => {
     const d = drafts.find((x) => x.slotId === slotId);
@@ -850,6 +901,9 @@ export const RosterBoard: React.FC<Props> = (p) => {
             </div>
             <button type="button" disabled={readOnly || busy || blocks.length > 0 || draftedCount === 0} onClick={publish} title={blocks.length > 0 ? "Còn lỗi chặn — bấm ca viền đỏ để sửa" : draftedCount === 0 ? "Ca đã lên lịch không cần công bố; chỉ ca nháp mới cần" : undefined} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--accent)] text-[var(--accent-contrast)] text-xs font-black disabled:opacity-40">
               <Send className="w-4 h-4" /> {publishLabel}
+            </button>
+            <button type="button" onClick={() => setExportOpen(true)} title="Tải lịch cả tháng ra Excel để gửi brand xác nhận" className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[var(--border)] text-xs font-bold text-[var(--text)] hover:bg-[var(--surface-hover)]">
+              <FileSpreadsheet className="w-4 h-4" /> Xuất lịch gửi brand
             </button>
             <details ref={moreRef} className="relative">
               <summary className="list-none [&::-webkit-details-marker]:hidden cursor-pointer flex items-center gap-1 px-3 py-2 rounded-xl border border-[var(--border)] text-xs font-bold text-[var(--text)]">
@@ -1079,6 +1133,8 @@ export const RosterBoard: React.FC<Props> = (p) => {
         </div>
       )}
 
+      {exportOpen && <BrandScheduleExportDialog month={viewMonth} sessions={p.sessions} shiftSlots={p.shiftSlots} onClose={() => setExportOpen(false)} />}
+
       {wizardOpen && (
         <OpenMonthWizard
           month={m1}
@@ -1108,6 +1164,8 @@ export const RosterBoard: React.FC<Props> = (p) => {
           busy={busy}
           onClose={() => setSelectedKey(null)}
           onAssign={(s, r, t, reason) => void assign(s, r, t, reason)}
+          onNoAssistant={(s, v) => void setNoAssistant(s, v)}
+          onReopenSignup={(s, d) => void reopenSignup(s, d)}
           onMove={(s, v) => void move(s, v)}
           onRemove={(s) => void remove(s)}
           onMode={changeMode}

@@ -113,6 +113,34 @@ describe("analyzeRoster", () => {
     expect(an3.byShift.get("o:o3")?.map((i) => i.code)).toContain("new_channel");
   });
 
+  test("No Asst (0207): ca mở có host mà chưa trợ chưa gắn thẻ = 'co_pending' (hole, không chặn); gắn thẻ hoặc có trợ thì hết", () => {
+    const build = (d: { hostId?: string; coHostId?: string; noAssistant?: boolean }) => R.buildRosterShifts([], [slot("o1")], [{ slotId: "o1", ...d }], [], WEEK, "2026-10-18");
+    const codes = (d: { hostId?: string; coHostId?: string; noAssistant?: boolean }) => R.analyzeRoster(build(d), rules, WEEK, name, () => 5).issues.map((i) => i.code);
+    expect(codes({ hostId: "henry" })).toContain("co_pending");
+    expect(R.ISSUE_SEVERITY.co_pending).toBe("hole");
+    expect(codes({ hostId: "henry" })).not.toContain("no_co");
+    expect(codes({ hostId: "henry", noAssistant: true })).not.toContain("co_pending");
+    expect(codes({ hostId: "henry", noAssistant: true })).not.toContain("no_co");
+    expect(codes({ hostId: "henry", coHostId: "giang" })).not.toContain("co_pending");
+    // Thẻ không đi cùng trợ: có trợ thì noAssistant bị bỏ.
+    expect(build({ hostId: "henry", coHostId: "giang", noAssistant: true })[0].noAssistant).toBeFalsy();
+    // Ca chưa có host vẫn là 'no_host' + 'no_co' như cũ.
+    const empty = R.analyzeRoster(R.buildRosterShifts([], [slot("o2")], [], [], WEEK, "2026-10-18"), rules, WEEK, name).issues.map((i) => i.code);
+    expect(empty).toEqual(expect.arrayContaining(["no_host", "no_co"]));
+  });
+
+  test("No Asst (0207): ca đã công bố đọc thẻ từ ca chờ đăng ký gốc; thiếu trợ mà không có thẻ vẫn cảnh báo no_co", () => {
+    const sessions = [ca("s1", { coHostId: undefined, date: "2026-10-14" }), ca("s2", { coHostId: undefined, date: "2026-10-15", startTime: "10:00", endTime: "13:00" })];
+    const slots = [slot("g1", { status: "finalized", sessionId: "s1", noAssistant: true })];
+    const shifts = R.buildRosterShifts(sessions, slots, [], [], WEEK, "2026-10-18");
+    expect(shifts.find((s) => s.key === "s:s1")?.noAssistant).toBe(true);
+    expect(shifts.find((s) => s.key === "s:s1")?.finalSlotId).toBe("g1");
+    expect(shifts.find((s) => s.key === "s:s2")?.finalSlotId).toBeUndefined();
+    const an = R.analyzeRoster(shifts, rules, WEEK, name, () => 5);
+    expect((an.byShift.get("s:s1") ?? []).map((i) => i.code)).not.toContain("no_co");
+    expect((an.byShift.get("s:s2") ?? []).map((i) => i.code)).toContain("no_co");
+  });
+
   test("ca đổi người giữa ca chỉ tính phút người đó đứng", () => {
     const seg = ca("g", {
       startTime: "10:00",
@@ -204,6 +232,16 @@ describe("familiarity + candidates", () => {
     expect(cost[0].talentId).toBe("khanh");
     const co = C.rankCandidates(target, "co_host", { ...ctxOf(shifts, "gmv"), perf }, an);
     expect(co.every((c) => c.perf === undefined)).toBe(true);
+  });
+
+  test("No Asst (0207): tự lấp bỏ qua vai trợ của ca đã gắn thẻ, ca không gắn vẫn được xếp trợ", () => {
+    const slots = [slot("o1"), slot("o2", { startTime: "10:00", endTime: "13:00", studioId: "r-2" })];
+    const shifts = R.buildRosterShifts([], slots, [{ slotId: "o1", hostId: "henry", noAssistant: true }, { slotId: "o2", hostId: "khanh" }], [], WEEK, "2026-10-18");
+    const res = C.autofillWeek(ctxOf(shifts, "balance"));
+    const coOf = (slotId: string) => res.shifts.find((s) => s.slotId === slotId)?.coHostId;
+    expect(coOf("o1")).toBeUndefined();
+    expect(coOf("o2")).toBeDefined();
+    expect(res.assignments.some((a) => a.slotId === "o1" && a.role === "co_host")).toBe(false);
   });
 
   test("tự lấp: chỉ ca mở, không xếp một người vào hai ca trùng giờ", () => {

@@ -47,6 +47,8 @@ export interface MonthStatus {
   noHostWithSignup: number;
   /** Ca mở đã có host nháp. */
   drafted: number;
+  /** Ca mở đã có host nháp nhưng chưa có trợ / No Asst (0207) — công bố bỏ qua, talent vẫn đăng ký trợ được. */
+  needCo: number;
   /** Tuần (Thứ 2) có ca nháp chưa công bố. */
   weeksToPublish: string[];
   /** Hạn đăng ký sắp tới gần nhất của các ca còn chờ host (hết hạn cả thì hạn muộn nhất đã qua). */
@@ -61,8 +63,10 @@ export interface HalfStatus {
   publishBy?: string;
   /** Ca mở trong đợt chưa có host nháp. */
   noHost: number;
-  /** Ca nháp (có host) trong đợt mà tuần chưa công bố. */
+  /** Ca nháp (có host + trợ hoặc No Asst) trong đợt mà tuần chưa công bố. */
   toPublish: number;
+  /** Ca nháp có host trong đợt mà chưa có trợ / No Asst (0207). */
+  needCo: number;
   /** Thứ Hai của các tuần có ca nháp chưa công bố trong đợt. */
   weeksToPublish: string[];
   /** Ngày sớm nhất trong đợt có ca chưa host (để nhảy tới tuần đó). */
@@ -95,8 +99,11 @@ export function monthStatus(x: MonthStatusInput): MonthStatus {
   const draftBy = new Map(x.drafts.map((d) => [d.slotId, d]));
   const withHost = open.filter((sl) => !!draftBy.get(sl.id)?.hostId);
   const noHostSlots = open.filter((sl) => !draftBy.get(sl.id)?.hostId);
+  // 0207: nháp có host mà chưa trợ, chưa No Asst thì công bố bỏ qua ⇒ chưa tính là "sẵn sàng công bố".
+  const needCoSlots = withHost.filter((sl) => !draftBy.get(sl.id)?.coHostId && !draftBy.get(sl.id)?.noAssistant);
+  const readySlots = withHost.filter((sl) => !!draftBy.get(sl.id)?.coHostId || !!draftBy.get(sl.id)?.noAssistant);
   const published = new Set(x.weeks.filter((w) => w.publishedAt).map((w) => w.weekStart));
-  const weeksToPublish = [...new Set(withHost.map((sl) => isoWeekStart(sl.date)).filter((w) => !published.has(w)))].sort();
+  const weeksToPublish = [...new Set(readySlots.map((sl) => isoWeekStart(sl.date)).filter((w) => !published.has(w)))].sort();
   const dl = (sl: ShiftSlot) => slotDeadline(sl.date, x.milestones, undefined, sl.signupDeadline);
   const noHostDl = noHostSlots.map(dl);
   const future = noHostDl.filter((d): d is string => !!d && d > x.now).sort();
@@ -104,7 +111,7 @@ export function monthStatus(x: MonthStatusInput): MonthStatus {
   const deadline = future[0] ?? past.at(-1);
   const halves: HalfStatus[] = ([1, 2] as const).map((half) => {
     const inHalf = (sl: ShiftSlot) => halfOf(sl.date) === half;
-    const pub = withHost.filter((sl) => inHalf(sl) && !published.has(isoWeekStart(sl.date)));
+    const pub = readySlots.filter((sl) => inHalf(sl) && !published.has(isoWeekStart(sl.date)));
     const nh = noHostSlots.filter(inHalf);
     const m = x.milestones;
     return {
@@ -113,6 +120,7 @@ export function monthStatus(x: MonthStatusInput): MonthStatus {
       publishBy: half === 1 ? m?.publishBy1 : m?.publishBy2,
       noHost: nh.length,
       toPublish: pub.length,
+      needCo: needCoSlots.filter(inHalf).length,
       weeksToPublish: [...new Set(pub.map((sl) => isoWeekStart(sl.date)))].sort(),
       firstNoHostDate: nh.map((sl) => sl.date).sort()[0]
     };
@@ -126,6 +134,7 @@ export function monthStatus(x: MonthStatusInput): MonthStatus {
   else if (noHostSlots.length > 0 && noHostDl.some((d) => !d)) phase = "no_deadline";
   else if (noHostSlots.length > 0 && future.length > 0) phase = "signup";
   else if (noHostSlots.length > 0) phase = "staff";
+  else if (needCoSlots.length > 0) phase = "staff";
   else if (weeksToPublish.length > 0) phase = "publish";
   else phase = "done";
 
@@ -143,6 +152,7 @@ export function monthStatus(x: MonthStatusInput): MonthStatus {
     noHost: noHostSlots.length,
     noHostWithSignup: noHostSlots.filter((sl) => regSlots.has(sl.id)).length,
     drafted: withHost.length,
+    needCo: needCoSlots.length,
     weeksToPublish,
     deadline,
     halves

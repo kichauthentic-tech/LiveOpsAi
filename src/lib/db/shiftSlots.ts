@@ -23,6 +23,8 @@ interface DbShiftSlot {
   template_id: string | null;
   plan_id: string | null;
   signup_deadline?: string | null;
+  no_assistant?: boolean | null;
+  open_need?: "host" | "co_host" | null;
 }
 
 const toHhMm = (t: string) => t.slice(0, 5);
@@ -44,7 +46,9 @@ function fromDb(row: DbShiftSlot): ShiftSlot {
     createdBy: row.created_by ?? undefined,
     templateId: row.template_id ?? undefined,
     planId: row.plan_id ?? undefined,
-    signupDeadline: row.signup_deadline ?? undefined
+    signupDeadline: row.signup_deadline ?? undefined,
+    noAssistant: row.no_assistant ? true : undefined,
+    openNeed: row.open_need ?? undefined
   };
 }
 
