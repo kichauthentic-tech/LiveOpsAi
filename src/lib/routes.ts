@@ -33,8 +33,7 @@ const AGENCY_TAB_SLUGS: Record<string, string> = {
   // talent
   my_shifts: "ca-cua-toi",
   shift_registered: "da-dang-ky",
-  my_talent_profile: "ho-so",
-  talent_settings: "cai-dat"
+  my_talent_profile: "ho-so"
 };
 
 const BRAND_TAB_SLUGS: Record<string, string> = {
@@ -57,7 +56,7 @@ const invert = (m: Record<string, string>) => Object.fromEntries(Object.entries(
 // brand → tab Hợp Đồng của brand. Run-rate gộp vào Dashboard (22/10). Điều Phối Phát Hành gộp vào Toàn Cảnh Brand (23/10).
 // Phòng Điều Hành gộp vào Bảng Vận Hành (24/10): trả id cũ "control_room" để App mở đúng chế độ "Cả tháng" rồi đổi về "calendar".
 // Bàn Trainer đổi tên thành Điều Phối Lịch Live (24/10): link cũ /ban-trainer vẫn mở màn này.
-const AGENCY_SLUG_TO_TAB: Record<string, string> = { ...invert(AGENCY_TAB_SLUGS), "cam-ket-hop-dong": "crm", "ho-tro-van-hanh": "calendar", "hom-nay": "my_shifts", "run-rate": "agency_overview", "phat-hanh-report": "brands_overview", "phong-dieu-hanh": "control_room", "ban-trainer": "roster" };
+const AGENCY_SLUG_TO_TAB: Record<string, string> = { ...invert(AGENCY_TAB_SLUGS), "cam-ket-hop-dong": "crm", "ho-tro-van-hanh": "calendar", "hom-nay": "my_shifts", "run-rate": "agency_overview", "phat-hanh-report": "brands_overview", "phong-dieu-hanh": "control_room", "ban-trainer": "roster", "cai-dat": "account_settings" };
 const BRAND_SLUG_TO_TAB: Record<string, string> = { ...invert(BRAND_TAB_SLUGS), "rate-card": "brand_commitment_view" };
 
 /** "Franklin Sports" → "franklin-sports". Bỏ dấu tiếng Việt, đ → d. */

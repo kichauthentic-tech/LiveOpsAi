@@ -94,7 +94,6 @@ const BrandAffiliateTable = lazyNamed(() => import("./components/brand-workspace
 const BrandNextMonthPlan = lazyNamed(() => import("./components/brand-workspace/BrandNextMonthPlan"), "BrandNextMonthPlan");
 const BrandDataRaw = lazyNamed(() => import("./components/brand-workspace/BrandDataRaw"), "BrandDataRaw");
 const AccountSettings = lazyNamed(() => import("./components/AccountSettings"), "AccountSettings");
-const TalentSettings = lazyNamed(() => import("./components/TalentSettings"), "TalentSettings");
 const MyTalentProfile = lazyNamed(() => import("./components/MyTalentProfile"), "MyTalentProfile");
 const SessionLedger = lazyNamed(() => import("./components/SessionLedger"), "SessionLedger");
 const LiveCalendar = lazyNamed(() => import("./components/LiveCalendar"), "LiveCalendar");
@@ -156,7 +155,6 @@ const TAB_CHUNKS: Record<string, { preload: () => void }[]> = {
   brand_dataraw: [BrandDataRaw],
   talents: [TalentMatcher],
   my_talent_profile: [MyTalentProfile],
-  talent_settings: [TalentSettings],
   studios: [StudioEquipment],
   crm: [CrmProjects],
   tiktok_api: [TikTokApiAutomation],
@@ -2445,19 +2443,10 @@ export default function App() {
                     payrollSessions={sessions}
                     financeRecords={financeRecords}
                     talentRateHistory={talentRateHistory}
-                    onOpenSettings={() => setActiveTab("talent_settings")}
+                    onOpenAccount={() => setActiveTab("account_settings")}
                   />
                 )}
 
-                {activeTab === "talent_settings" && currentRole === "talent" && (
-                  <TalentSettings
-                    activeUser={activeUser}
-                    myTalent={talents.find((t) => t.id === activeUser.assignedTalentId)}
-                    onSaveMyProfile={handleSaveMyTalentProfile}
-                    onOpenAccount={() => setActiveTab("account_settings")}
-                    onBack={() => setActiveTab("my_talent_profile")}
-                  />
-                )}
 
                 {activeTab === "studios" && (
                   <StudioEquipment
@@ -2601,7 +2590,12 @@ export default function App() {
                 )}
 
                 {activeTab === "account_settings" && (
-                  <AccountSettings activeUser={activeUser} onUpdateUser={handleUpdateUser} />
+                  <AccountSettings
+                    activeUser={activeUser}
+                    onUpdateUser={handleUpdateUser}
+                    myTalent={currentRole === "talent" ? talents.find((t) => t.id === activeUser.assignedTalentId) : undefined}
+                    onSaveMyProfile={currentRole === "talent" ? handleSaveMyTalentProfile : undefined}
+                  />
                 )}
                 </>
                 )}

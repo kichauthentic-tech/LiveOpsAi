@@ -1,5 +1,5 @@
 import React from "react";
-import { UserCog, X } from "lucide-react";
+import { ChevronRight, X } from "lucide-react";
 import { PermissionKey, SystemUser, UserRole } from "../types";
 import { NavGroup } from "../lib/appNav";
 
@@ -145,12 +145,12 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
           })}
     </nav>
 
-    {/* User Card — bấm để mở Tài Khoản Của Tôi (thay cho mục nav riêng đã bỏ) */}
+    {/* Thẻ tên — bấm để mở trang Tài khoản (tên, hồ sơ, lịch điện thoại, email, mật khẩu; 09/11 gộp luôn "Cài đặt" của talent) */}
     <div className={`mt-auto border-t border-[var(--border)] ${sidebarCollapsed ? "p-3 md:p-2" : "p-3"}`}>
       <button
         type="button"
         onClick={() => onSelectTab("account_settings")}
-        title={`${activeUser.name} • ${currentRole} — Tài Khoản Của Tôi`}
+        title={`${activeUser.name} • ${currentRole} — Tài khoản`}
         className={`w-full flex items-center gap-3 rounded-xl border transition-colors text-left ${
           activeTab === "account_settings"
             ? "bg-[var(--accent)]/10 border-[var(--accent)]/20"
@@ -176,7 +176,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
             {activeUser.customRoleTitle || currentRole.toUpperCase()}
           </p>
         </div>
-        <UserCog
+        <ChevronRight
           className={`w-4 h-4 text-[var(--text-faint)] shrink-0 ${sidebarCollapsed ? "md:hidden" : ""}`}
         />
       </button>

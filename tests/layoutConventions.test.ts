@@ -430,19 +430,24 @@ test("Talent: không màn nào in số 0 từ cột nhập tay talents.total_gmv
   }
 });
 
-test("Hồ Sơ Của Tôi (tab Tôi): số đứng trước form, và ô trống nói lý do thay vì in 0", () => {
+test("Hồ Sơ Của Tôi (tab Tôi): số đứng trước, hai bảng một hàng thẳng dòng, và ô trống nói lý do thay vì in 0", () => {
   const src = readFileSync(join(SRC, "components/MyTalentProfile.tsx"), "utf8");
-  // Thứ tự khối (bản 2, 16/10): giờ + thu nhập tháng → bảng công → hiệu suất → thông tin tự sửa → đổi email. Trước 30/09 hai form
+  // Thứ tự khối (bản 3, 09/11): giờ + thu nhập tháng → Hiệu suất (trái) + Bảng công (phải) cùng một hàng. Trước 30/09 hai form
   // ghi chiếm trọn màn đầu 812px ở 375px, đẩy hiệu suất và lương ra ngoài màn.
-  // Từ 08/11 hai form (và lịch điện thoại, mật khẩu) tách sang màn Cài đặt (TalentSettings.tsx): tab "Tôi" chỉ còn số liệu.
-  const order = ["Tháng này", "Bảng công", "Hiệu suất"].map((c) => src.indexOf(`{/* ${c}`));
+  const order = ["Tháng này", "Hiệu suất", "Bảng công"].map((c) => src.indexOf(`{/* ${c}`));
   expect(order.every((i) => i >= 0), `thiếu comment mốc khối: ${order}`).toBe(true);
   expect(order, `thứ tự khối sai: ${order}`).toEqual([...order].sort((a, b) => a - b));
-  // Form ghi nằm ở màn Cài đặt riêng, gập sẵn (<details>), không còn ở tab "Tôi".
+  // Tab "Tôi" chỉ còn số liệu: không form, không nút Cài đặt (mọi chỉnh sửa ở trang Tài khoản, vào từ thẻ tên góc trái dưới).
   expect(src).not.toMatch(/<form/);
-  const settings = readFileSync(join(SRC, "components/TalentSettings.tsx"), "utf8");
-  expect(settings).toMatch(/\{\/\* Thông tin tự sửa \*\/\}\s*<details/);
-  expect(settings).toMatch(/\{\/\* Đổi email đăng nhập \*\/\}\s*<details/);
+  expect(src).not.toMatch(/onOpenSettings|>\s*Cài đặt\s*</);
+  const account = readFileSync(join(SRC, "components/AccountSettings.tsx"), "utf8");
+  expect(account).toMatch(/<CalendarFeedCard/);
+  expect(account).toMatch(/Thông tin cá nhân/);
+  expect(account).toMatch(/Email đăng nhập/);
+  // Hai bảng dùng chung độ cao hàng để dòng thứ N ngang nhau: cùng hằng số dòng tiêu đề / dòng dữ liệu.
+  expect(src).toMatch(/const TD_ROW = "h-10 /);
+  expect(src).toMatch(/\$\{PERF_COLS\} \$\{TD_ROW\}/);
+  expect(src).toMatch(/\$\{LOG_COLS\} \$\{TD_ROW\}/);
   // Rate chưa nhập phải nói "ops chưa nhập", không in "0/live". Không có ô hoa hồng theo GMV (user chốt 06/10: talent
   // chỉ ăn rate giờ/phiên) — hiện lại "Hoa hồng ops chưa nhập" là hứa một khoản không tồn tại.
   expect(src).toContain("ops chưa nhập");
@@ -452,9 +457,9 @@ test("Hồ Sơ Của Tôi (tab Tôi): số đứng trước form, và ô trống
   const total = src.indexOf("{money(income.total)}");
   const guard = src.indexOf("income.rows.length === 0 ? (");
   expect(guard >= 0 && guard < total, "tổng thu nhập phải nằm sau nhánh rows.length === 0").toBe(true);
-  // Hiệu suất: không in khoảng tin cậy ở mặt chính (chỉ trong "Cách tính"), chỉ dòng có kết luận.
-  expect(src).toMatch(/standing\.clear\.map/);
-  expect(src.indexOf("reliabilityText(r)")).toBeGreaterThan(src.indexOf("Cách tính · xem từng kênh"));
+  // Hiệu suất (09/11, user bỏ so sánh nhóm): chỉ số của chính mình, vai trợ không hiện GMV (GMV của ca tính cho host).
+  expect(src).not.toMatch(/standing|reliabilityText|trung bình nhóm/);
+  expect(src).toMatch(/r\.role === "host" \? fmtVndShort\(r\.gmv\)/);
 });
 
 test("App talent: có lịch sử ca đã chạy, và không nói 'không còn ca nào' với người chưa có ca", () => {

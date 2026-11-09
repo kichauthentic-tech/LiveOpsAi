@@ -64,7 +64,7 @@ export const TABS_NEEDING_SHELL_ONLY = new Set(["brand_dataraw", "brand_ads_repo
 
 // Tab render được nhưng cố ý KHÔNG nằm trong sidebar (vào từ menu user ở Header). Phải khai
 // báo ở đây vì isTabAllowed coi "không có nav item" là không được phép.
-export const TABS_WITHOUT_NAV_ITEM = new Set(["account_settings", "talent_settings"]);
+export const TABS_WITHOUT_NAV_ITEM = new Set(["account_settings"]);
 
 // Tab mặc định khi đăng nhập/đổi user, theo role — module Dashboard đã bị xoá (chờ chốt
 // cấu trúc data raw để build lại), nên không còn tab "dashboard"/"brand_dashboard" nào để về.

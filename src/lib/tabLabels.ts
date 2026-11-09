@@ -30,7 +30,7 @@ export const AGENCY_TAB_LABELS: Record<string, string> = {
   shift_registered: "Ca đã đăng ký",
   talent_calendar: "Lịch & Studio", // đã bỏ khỏi app talent 08/11 — giữ tên để "Lượt Mở Tab" đọc được lượt cũ,
   my_talent_profile: "Tôi",
-  talent_settings: "Cài đặt"
+  talent_settings: "Cài đặt" // đã gộp vào Tài khoản 09/11 — giữ tên để "Lượt Mở Tab" đọc được lượt cũ
 };
 
 // Cùng id nhưng talent thấy tên khác (menu talent).

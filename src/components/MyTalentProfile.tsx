@@ -1,26 +1,25 @@
 import { platformText } from "../lib/metricGlossary";
 import React, { useMemo, useState } from "react";
 import { SystemUser, Talent, LiveSession, SessionFinance, TalentRateHistoryEntry } from "../types";
-import { Settings, ShieldAlert, ChevronRight, Clock, Wallet, Clapperboard, TrendingUp } from "lucide-react";
-import { computeTalentRealTotals } from "../lib/metrics/avgGmv";
+import { ShieldAlert, ChevronRight, Clock, Wallet, Clapperboard, Store } from "lucide-react";
 import { computeTalentMonthlyIncome } from "../lib/pnl";
 import { todayVn } from "../lib/performance/brandCommitment";
 
 import { fmtDateVn, fmtFixed, fmtVndShort, fmtVndFull } from "../lib/format";
 import { MonthPicker } from "./common/MonthPicker";
 import { talentRoleLabel } from "../lib/talentName";
-import { getTodayDate } from "../lib/dateUtils";
+import { addDays } from "../lib/dateUtils";
 import { monthSummary, myRole } from "../lib/talent/myShifts";
-import { myChannelStanding, STANDING_DAYS } from "../lib/talent/standing";
-import { splitStanding, standingSentence } from "../lib/talent/agenda";
-import { reliabilityText } from "../lib/report/deepAnalysis";
+import { channelReach, myChannelRoleSummary } from "../lib/talent/channelSummary";
 import { sessionMinutes } from "../lib/staffSegments";
 import { PlatformChip } from "./common/PlatformChip";
 
-// Tab "Tôi" của app talent (bản 2, 16/10). Người làm live vào đây để hỏi "tháng này tôi làm bao nhiêu giờ, được bao nhiêu" ⇒ giờ
-// + thu nhập đứng đầu, rồi bảng công từng ca, rồi hiệu suất. Bản 1 dài 3.120px ở 375px; khối hiệu suất in khoảng tin cậy
-// ("+16% (−16% … +48%)") cho mọi kênh — đo 16/10: 96/105 dòng là "trong dao động", 27/36 người không có dòng nào kết luận ⇒ chỉ
-// hiện dòng có kết luận, nói bằng chữ. Thông tin cá nhân / email / mật khẩu thu vào cuối, gập sẵn.
+// Tab "Tôi" của app talent (bản 3, 09/11). Người làm live vào đây để hỏi "tháng này tôi làm bao nhiêu giờ, được bao nhiêu" ⇒ giờ
+// + thu nhập đứng đầu, rồi MỘT hàng hai bảng: "Hiệu suất theo brand × sàn × vai" (trái) và "Bảng công" từng ca (phải).
+// Hai bảng dùng CÙNG độ cao hàng (tiêu đề, hàng lọc, hàng tiêu đề cột, mỗi dòng 40px) nên dòng thứ N của hai bên nằm ngang nhau.
+// Hiệu suất chỉ có số của chính mình, KHÔNG so với nhóm (user bỏ 09/11); vai trợ chỉ ca + giờ vì GMV của ca tính cho host.
+// Mọi chỉnh sửa tài khoản (tên, số điện thoại, ảnh, lịch điện thoại, email, mật khẩu) nằm ở trang Tài khoản, vào từ thẻ tên ở
+// góc trái dưới thanh bên (điện thoại: bấm tên/ảnh ở đầu trang này) — không còn nút Cài đặt.
 // Thu nhập = rate × giờ (không có hoa hồng theo GMV — user chốt 06/10), cùng công thức Finance & P&L.
 
 interface MyTalentProfileProps {
@@ -31,20 +30,28 @@ interface MyTalentProfileProps {
   payrollSessions: LiveSession[];
   financeRecords: SessionFinance[];
   talentRateHistory: TalentRateHistoryEntry[];
-  // KHÔNG dùng chung handleUpdateTalent của App: handler đó tự nuốt lỗi bằng window.alert rồi
-  // trả void, nên try/catch dưới đây thành code chết và form luôn báo "Đã cập nhật" kể cả khi DB
-  // không ghi được gì (bug C3). Handler riêng này bắt buộc phải để lỗi nổi lên.
-  /** Mở màn Cài đặt (lịch điện thoại, thông tin cá nhân, mật khẩu, email). */
-  onOpenSettings: () => void;
+  /** Mở trang Tài khoản — chỉ dùng trên điện thoại (không có thanh bên), nơi bấm tên/ảnh ở đầu trang là cửa vào. */
+  onOpenAccount: () => void;
 }
 
 const money = (n: number) => Math.round(n).toLocaleString("vi-VN");
 const WEEKDAY = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
 const dayLabel = (d: string) => `${WEEKDAY[new Date(`${d}T00:00:00`).getDay()]} ${fmtDateVn(d, false)}`;
 const h1 = (h: number) => `${fmtFixed(h, h % 1 ? 1 : 0)}h`;
+const hFixed = (h: number) => `${fmtFixed(h, 1)}h`;
 
-const CARD = "bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 space-y-3";
+const CARD = "bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 space-y-3 min-w-0";
 const SECTION_TITLE = "text-sm font-black text-[var(--text)]";
+// Độ cao cố định để hai bảng đứng cạnh nhau thẳng hàng: dòng tiêu đề + hàng lọc 34px, hàng tiêu đề cột 28px, dòng dữ liệu 40px.
+const TOP_ROW = "min-h-[34px] flex flex-wrap items-center justify-between gap-2";
+const TH_ROW = "h-7 items-center whitespace-nowrap gap-x-1.5 px-0.5 text-2xs font-bold text-[var(--text-faint)] border-b border-[var(--border)]";
+const TD_ROW = "h-10 items-center gap-x-1.5 px-0.5 text-xs border-t border-[var(--border-muted)] whitespace-nowrap";
+const PERF_COLS = "grid grid-cols-[minmax(0,1fr)_5.2rem_2.4rem_3.4rem_5.4rem_4.2rem]";
+const LOG_COLS = "grid grid-cols-[4.8rem_minmax(0,1fr)_5.6rem_2.6rem_5rem]";
+// Điện thoại: bảng cuộn ngang trong khung, cột Brand · sàn vẫn đủ chỗ cho chip sàn.
+const PERF_MIN = "min-w-[34rem]";
+const LOG_MIN = "min-w-[32rem]";
+
 const Tile: React.FC<{ icon: React.ReactNode; label: string; tone?: "accent" | "default"; children: React.ReactNode; sub?: React.ReactNode }> = ({ icon, label, tone = "default", children, sub }) => (
   <div className={`rounded-2xl border p-3.5 min-w-0 ${tone === "accent" ? "border-amber-500/30 bg-amber-950/30" : "border-[var(--border)] bg-[var(--surface)]"}`}>
     <div className="flex items-center gap-1.5 text-2xs font-bold text-[var(--text-muted)]">{icon}{label}</div>
@@ -52,7 +59,29 @@ const Tile: React.FC<{ icon: React.ReactNode; label: string; tone?: "accent" | "
     {sub && <div className="mt-1 text-2xs text-[var(--text-faint)] leading-snug">{sub}</div>}
   </div>
 );
-const SETTING_ROW = "cursor-pointer list-none flex items-center justify-between gap-2 px-4 py-3 min-h-11 text-sm font-bold text-[var(--text)]";
+
+// Nút chọn kiểu seg-on của app (accent 18%, viền 45%).
+const Seg: React.FC<{ label: string; value: string; options: { v: string; text: string }[]; onChange: (v: string) => void }> = ({ label, value, options, onChange }) => (
+  <div role="group" aria-label={label} className="inline-flex flex-wrap gap-1">
+    {options.map((o) => (
+      <button
+        key={o.v}
+        type="button"
+        onClick={() => onChange(o.v)}
+        aria-pressed={value === o.v}
+        className={`min-h-8 px-2.5 rounded-lg border text-xs ${value === o.v ? "seg-on" : "border-[var(--border-muted)] text-[var(--text-muted)] hover:text-[var(--text)]"}`}
+      >
+        {o.text}
+      </button>
+    ))}
+  </div>
+);
+
+const RoleTag: React.FC<{ role: "host" | "assistant" }> = ({ role }) => (
+  <span className={`inline-flex items-center h-5 px-2 rounded-full border text-2xs font-bold ${role === "host" ? "seg-on" : "border-[var(--border-muted)] text-[var(--text-muted)]"}`}>
+    {role === "host" ? "Host" : "Trợ live"}
+  </span>
+);
 
 // Ô trống phải nói VÌ SAO trống, không in số 0. Số 0 ở màn hồ sơ của chính mình đọc như "lương của bạn bằng 0" — ops CHƯA NHẬP
 // rate ở 33/33 talent (30/09).
@@ -65,11 +94,15 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
   payrollSessions,
   financeRecords,
   talentRateHistory,
-  onOpenSettings
+  onOpenAccount
 }) => {
   const myTalent = talents.find((t) => t.id === activeUser.assignedTalentId);
 
   const [incomeMonth, setIncomeMonth] = useState(() => todayVn().slice(0, 7));
+  const [perfPeriod, setPerfPeriod] = useState<"month" | "90d">("90d");
+  const [perfRole, setPerfRole] = useState<"all" | "host" | "assistant">("all");
+  const [perfPlatform, setPerfPlatform] = useState<"all" | "TikTok" | "Shopee">("all");
+  const [logBrand, setLogBrand] = useState("all");
 
   const financeBySessionId = useMemo(() => {
     const map: Record<string, SessionFinance> = {};
@@ -97,8 +130,6 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
     return m;
   }, [income]);
 
-  // id rỗng ⇒ trả về toàn 0, gọi được cả khi chưa gắn hồ sơ talent (tránh nhánh null trong JSX).
-  const myReal = useMemo(() => computeTalentRealTotals(sessions, myTalent?.id ?? ""), [sessions, myTalent]);
   // Ca đã chạy đọc `payrollSessions` (gồm ca loại khỏi báo cáo — vẫn là giờ đã làm); hiệu suất đọc `sessions` (activeSessions).
   const month = useMemo(() => (myTalent ? monthSummary(payrollSessions, myTalent.id, incomeMonth) : null), [payrollSessions, myTalent, incomeMonth]);
   const monthDone = useMemo(
@@ -110,7 +141,16 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
         : [],
     [payrollSessions, myTalent, incomeMonth]
   );
-  const standing = useMemo(() => splitStanding(myChannelStanding(sessions, myTalent?.id, getTodayDate())), [sessions, myTalent]);
+
+  // Hiệu suất theo brand × sàn × vai: kỳ "Tháng" theo tháng đang chọn, kỳ "90 ngày" tính tới hôm nay.
+  const today = todayVn();
+  const perfRows90 = useMemo(() => myChannelRoleSummary(sessions, myTalent?.id, addDays(today, -90), today), [sessions, myTalent, today]);
+  const perfRowsMonth = useMemo(() => myChannelRoleSummary(sessions, myTalent?.id, `${incomeMonth}-01`, `${incomeMonth}-31`), [sessions, myTalent, incomeMonth]);
+  const perfRows = (perfPeriod === "month" ? perfRowsMonth : perfRows90).filter(
+    (r) => (perfRole === "all" || r.role === perfRole) && (perfPlatform === "all" || r.platform === perfPlatform)
+  );
+  const reach = channelReach(perfRows90);
+  const monthLabel = `Tháng ${Number(incomeMonth.slice(5))}`;
 
   if (!activeUser.assignedTalentId || !myTalent) {
     return (
@@ -139,6 +179,8 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
   const initials = myTalent.name.trim().split(/\s+/).slice(-2).map((w) => w[0]?.toUpperCase() ?? "").join("");
   const progress = doneHours + leftHours > 0 ? (doneHours / (doneHours + leftHours)) * 100 : 0;
   const tableHours = monthDone.reduce((a, s) => a + (incomeBySession.get(s.id)?.hours ?? sessionMinutes(s) / 60), 0);
+  const logBrands = [...new Set(monthDone.map((s) => s.brandName))];
+  const logRows = monthDone.filter((s) => logBrand === "all" || s.brandName === logBrand);
   const incomeValue = myTalent.rateHidden ? (
     <span className="text-sm text-[var(--text-muted)]">chưa xem được</span>
   ) : income.rows.length === 0 ? (
@@ -157,18 +199,13 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
         : income.rows.length === 0 && monthDone.length > 0
           ? "Ca nạp bù từ file của tháng cũ không vào bảng lương ở đây — lương những tháng đó đã chốt ngoài app."
           : null;
-  const standingLine =
-    standing.clear.length + standing.unclear.length === 0
-      ? "Chưa có số liệu"
-      : standing.clear.length === 0
-        ? `${standing.unclear.length} kênh · chưa đủ số để so`
-        : `${standing.clear.filter((r) => r.verdict === "above").length} kênh trên · ${standing.clear.filter((r) => r.verdict === "below").length} dưới TB`;
 
   return (
-    <div className="space-y-4 max-w-2xl lg:max-w-6xl">
+    <div className="space-y-4 max-w-2xl lg:max-w-7xl">
       {/* 1. Danh tính + chọn tháng */}
       <header className="flex flex-wrap items-center justify-between gap-3 px-1">
-        <div className="flex items-center gap-3 min-w-0">
+        {/* Điện thoại không có thanh bên ⇒ tên/ảnh là cửa vào trang Tài khoản; từ md trở lên cửa vào là thẻ tên ở góc trái dưới. */}
+        <button type="button" onClick={onOpenAccount} aria-label="Mở tài khoản của tôi" className="flex items-center gap-3 min-w-0 text-left md:pointer-events-none md:cursor-default">
           {myTalent.avatar ? (
             <img src={myTalent.avatar} alt="" className="w-11 h-11 rounded-full object-cover border border-[var(--border)]" />
           ) : (
@@ -178,13 +215,9 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
             <h2 className="text-lg font-black text-[var(--text)] leading-tight truncate">{myTalent.name}</h2>
             <p className="text-xs text-[var(--text-muted)]">{talentRoleLabel(myTalent.role)} · rate {rateText}</p>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <MonthPicker value={incomeMonth} onChange={setIncomeMonth} size="sm" />
-          <button type="button" onClick={onOpenSettings} aria-label="Cài đặt" title="Cài đặt" className="min-h-9 px-3 flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-xs font-bold text-[var(--text-muted)] hover:text-[var(--text)] hover:border-[var(--accent)]">
-            <Settings className="w-4 h-4" /> Cài đặt
-          </button>
-        </div>
+          <ChevronRight className="w-4 h-4 text-[var(--text-faint)] shrink-0 md:hidden" />
+        </button>
+        <MonthPicker value={incomeMonth} onChange={setIncomeMonth} size="sm" />
       </header>
 
       {/* Tháng này: 4 con số trả lời "tháng này tôi thế nào" trong một hàng */}
@@ -198,8 +231,8 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
             <Tile icon={<Clapperboard className="w-3.5 h-3.5" />} label="Ca đã live" sub={month.done.count > 0 ? `${h1(month.done.hostHours)} host · ${h1(month.done.coHours)} trợ` : undefined}>
               {month.done.count > 0 ? `${month.done.count} ca` : <span className="text-sm"><Empty>chưa có</Empty></span>}
             </Tile>
-            <Tile icon={<TrendingUp className="w-3.5 h-3.5" />} label="So với nhóm" sub={`${STANDING_DAYS} ngày gần nhất · chi tiết bên dưới`}>
-              <span className="text-sm font-bold leading-snug block">{standingLine}</span>
+            <Tile icon={<Store className="w-3.5 h-3.5" />} label="Đang làm cho" sub={reach.brands.length > 0 ? `${reach.brands.join(" · ")} · ${reach.platforms.length} sàn` : "90 ngày gần nhất"}>
+              {reach.brands.length > 0 ? `${reach.brands.length} brand` : <span className="text-sm"><Empty>chưa có</Empty></span>}
             </Tile>
           </div>
           {doneHours + leftHours > 0 && (
@@ -214,46 +247,91 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
         </section>
       )}
 
-      {/* Bảng công (trái, rộng) + Hiệu suất / từ trước tới nay (phải) */}
-      <div className="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:gap-4 lg:items-start">
-        <section className={`${CARD} min-w-0`} aria-label="Bảng công tháng">
-          <div className="flex items-baseline justify-between gap-2">
+      {/* Hai bảng cùng một hàng: Hiệu suất (trái) + Bảng công (phải), dòng thứ N ngang nhau */}
+      <div className="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-4 lg:items-start">
+        {/* Hiệu suất: chỉ số của chính mình theo brand × sàn × vai */}
+        <section className={CARD} aria-label="Hiệu suất theo brand và vai">
+          <div className={TOP_ROW}>
+            <h3 className={SECTION_TITLE}>Hiệu suất của bạn theo brand và vai</h3>
+            <Seg
+              label="Kỳ"
+              value={perfPeriod}
+              onChange={(v) => setPerfPeriod(v as "month" | "90d")}
+              options={[{ v: "month", text: monthLabel }, { v: "90d", text: "90 ngày" }]}
+            />
+          </div>
+          <div className="min-h-[34px] flex flex-wrap items-center gap-x-4 gap-y-1">
+            <Seg label="Vai" value={perfRole} onChange={(v) => setPerfRole(v as typeof perfRole)} options={[{ v: "all", text: "Tất cả vai" }, { v: "host", text: "Host" }, { v: "assistant", text: "Trợ live" }]} />
+            <Seg label="Sàn" value={perfPlatform} onChange={(v) => setPerfPlatform(v as typeof perfPlatform)} options={[{ v: "all", text: "Cả hai sàn" }, { v: "TikTok", text: "TikTok" }, { v: "Shopee", text: "Shopee" }]} />
+          </div>
+          <div className="overflow-x-auto -mx-1 px-1">
+            <div className={PERF_MIN}>
+              <div className={`${PERF_COLS} ${TH_ROW}`}>
+                <span>Brand · sàn</span><span>Vai</span><span className="text-right">Ca</span><span className="text-right">Giờ</span><span className="text-right">{platformText("GMV", "all")}</span><span className="text-right">GMV/giờ</span>
+              </div>
+              {perfRows.length === 0 ? (
+                <p className="text-xs text-[var(--text-faint)] py-6 text-center border-t border-[var(--border-muted)]">Chưa có ca nào khớp bộ lọc trong kỳ này.</p>
+              ) : (
+                perfRows.map((r) => (
+                  <div key={`${r.brandId}|${r.platform}|${r.role}`} className={`${PERF_COLS} ${TD_ROW}`}>
+                    <span className="font-black text-[var(--text)] flex items-center gap-1.5 min-w-0 overflow-hidden">{r.brandName} <PlatformChip platform={r.platform} /></span>
+                    <span><RoleTag role={r.role} /></span>
+                    <span className="text-right font-black tabular-nums text-[var(--text)]">{r.sessions}</span>
+                    <span className="text-right font-black tabular-nums text-[var(--text)]">{hFixed(r.hours)}</span>
+                    {/* Vai trợ: ô GMV để trống — GMV của ca tính cho host, cộng sang trợ là đếm đôi. */}
+                    <span className="text-right tabular-nums text-[var(--text-muted)]">{r.role === "host" ? fmtVndShort(r.gmv) : ""}</span>
+                    <span className="text-right tabular-nums text-[var(--text-muted)]">{r.role === "host" ? fmtVndShort(r.gmvPerHour) : ""}</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+          <p className="text-2xs text-[var(--text-faint)]">Vai trợ live chỉ tính số ca và giờ. Vai host có thêm {platformText("GMV", "all")} của các ca bạn host. TikTok và Shopee luôn tách riêng.</p>
+        </section>
+
+        {/* Bảng công */}
+        <section className={CARD} aria-label="Bảng công tháng">
+          <div className={TOP_ROW}>
             <h3 className={SECTION_TITLE}>Bảng công{monthDone.length > 0 ? ` · ${monthDone.length} ca` : ""}</h3>
             <span className="text-2xs text-[var(--text-faint)]">thấy sai giờ thì báo OP</span>
+          </div>
+          <div className="min-h-[34px] flex items-center">
+            {logBrands.length > 1 && (
+              <Seg label="Lọc bảng công" value={logBrand} onChange={setLogBrand} options={[{ v: "all", text: "Tất cả" }, ...logBrands.map((b) => ({ v: b, text: b }))]} />
+            )}
           </div>
           {monthDone.length === 0 ? (
             <p className="text-xs text-[var(--text-faint)] py-6 text-center">Tháng này chưa có ca nào đã live.</p>
           ) : (
             <>
-              <div className="hidden sm:grid grid-cols-[5.5rem_minmax(0,1fr)_4.5rem_3.5rem_5.5rem] gap-2 px-1 text-2xs font-bold text-[var(--text-faint)] border-b border-[var(--border)] pb-1.5">
-                <span>Ngày</span><span>Brand · sàn</span><span>Vai</span><span className="text-right">Giờ</span><span className="text-right">Thành tiền</span>
-              </div>
-              <div className="max-h-[28rem] lg:max-h-[60vh] overflow-y-auto -mx-1">
-                {monthDone.map((s) => {
-                  const pay = incomeBySession.get(s.id);
-                  const asHost = myRole(s, myTalent.id) === "host";
-                  return (
-                    <div key={s.id} className="grid grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[5.5rem_minmax(0,1fr)_4.5rem_3.5rem_5.5rem] items-center gap-x-2 gap-y-0.5 text-xs px-1 py-2 border-b border-[var(--border-muted)] last:border-0">
-                      <div className="min-w-0 sm:contents">
-                        <p className="text-[var(--text-muted)] tabular-nums sm:order-1">
-                          {dayLabel(s.date)} <span className="text-[var(--text-faint)] sm:hidden">· {s.startTime}–{s.endTime}</span>
-                        </p>
-                        <p className="font-bold text-[var(--text)] flex flex-wrap items-center gap-1.5 sm:order-2 min-w-0">
-                          {s.brandName} <PlatformChip platform={s.platform} />
-                          <span className="hidden sm:inline text-2xs font-normal text-[var(--text-faint)]">{s.startTime}–{s.endTime}</span>
-                        </p>
-                        <p className="text-2xs text-[var(--text-faint)] sm:text-xs sm:text-[var(--text-muted)] sm:order-3">
-                          {asHost ? "Host" : "Trợ live"}
+              <div className="overflow-x-auto -mx-1 px-1">
+                <div className={LOG_MIN}>
+                  <div className={`${LOG_COLS} ${TH_ROW}`}>
+                    <span>Ngày</span><span>Brand · sàn</span><span>Vai</span><span className="text-right">Giờ</span><span className="text-right">Thành tiền</span>
+                  </div>
+                  <div className="max-h-[28rem] lg:max-h-[60vh] overflow-y-auto">
+                    {logRows.map((s) => {
+                      const pay = incomeBySession.get(s.id);
+                      const asHost = myRole(s, myTalent.id) === "host";
+                      return (
+                        <div key={s.id} className={`${LOG_COLS} ${TD_ROW}`}>
+                          <span className="text-[var(--text-muted)] tabular-nums">{dayLabel(s.date)}</span>
+                          <span className="font-black text-[var(--text)] flex items-center gap-1.5 min-w-0 overflow-hidden">
+                            {s.brandName} <PlatformChip platform={s.platform} />
+                            <span className="text-2xs font-normal text-[var(--text-faint)]">{s.startTime}–{s.endTime}</span>
+                          </span>
                           {/* GMV chỉ ở ca mình làm HOST — GMV của ca tính cho host (cùng luật assistSessionCount ở Talent Pool). */}
-                          {asHost && s.actualGmv > 0 ? ` · ${platformText("GMV", "all")} ${fmtVndShort(s.actualGmv)}` : ""}
-                        </p>
-                      </div>
-                      <p className="font-mono font-bold text-[var(--text)] text-right sm:order-4">{h1(pay?.hours ?? sessionMinutes(s) / 60)}</p>
-                      <p className="hidden sm:block font-mono text-right text-[var(--text-muted)] sm:order-5">{pay && pay.payout > 0 ? money(pay.payout) : ""}</p>
-                      {pay && pay.payout > 0 && <p className="sm:hidden col-span-2 text-right text-2xs text-[var(--text-muted)]">{money(pay.payout)}</p>}
-                    </div>
-                  );
-                })}
+                          <span className="text-[var(--text-muted)]">
+                            {asHost ? "Host" : "Trợ live"}
+                            {asHost && s.actualGmv > 0 ? <span className="text-[var(--text-faint)]"> · {fmtVndShort(s.actualGmv)}</span> : null}
+                          </span>
+                          <span className="font-mono font-bold text-[var(--text)] text-right">{h1(pay?.hours ?? sessionMinutes(s) / 60)}</span>
+                          <span className="font-mono text-right text-[var(--text-muted)]">{pay && pay.payout > 0 ? money(pay.payout) : ""}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
               <div className="flex items-center justify-between gap-2 border-t border-[var(--border)] pt-2 px-1 text-xs font-black text-[var(--text)]">
                 <span>Tổng tháng</span>
@@ -263,83 +341,6 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
           )}
           <p className="text-2xs text-[var(--text-faint)]">Số tạm tính theo rate hiện tại — có thể đổi khi ca chưa đối soát xong hoặc rate vừa được cập nhật.</p>
         </section>
-
-        <div className="space-y-4 min-w-0">
-          {/* Hiệu suất: chỉ dòng có kết luận, nói bằng chữ */}
-          <section className={CARD} aria-label="Hiệu suất so trung bình nhóm">
-            <div className="flex items-baseline justify-between gap-2">
-              <h3 className={SECTION_TITLE}>Bạn so với trung bình nhóm</h3>
-              <span className="text-2xs text-[var(--text-faint)]">{STANDING_DAYS} ngày gần nhất</span>
-            </div>
-            {standing.clear.length + standing.unclear.length === 0 ? (
-              <p className="text-xs text-[var(--text-faint)]">Chưa có ca nào có số liệu trong {STANDING_DAYS} ngày gần nhất.</p>
-            ) : (
-              <>
-                {standing.clear.map((r) => (
-                  <p key={`${r.brandId}|${r.platform}|${r.role}`} className="text-xs text-[var(--text)]">
-                    <b className="inline-flex items-center gap-1">{r.brandName} <PlatformChip platform={r.platform} /></b>, vai {r.role === "host" ? "Host" : "Trợ live"} ({r.sessions} ca):{" "}
-                    <b className={r.verdict === "above" ? "text-emerald-400" : "text-rose-400"}>{platformText("GMV", "all")} {standingSentence(r)}</b>
-                  </p>
-                ))}
-                {standing.unclear.length > 0 && (
-                  <p className="text-xs text-[var(--text-muted)]">
-                    {standing.clear.length > 0 ? `${standing.unclear.length} kênh khác` : `Cả ${standing.unclear.length} kênh bạn đã live`} chưa đủ số để nói bạn cao hay thấp hơn trung bình nhóm.
-                  </p>
-                )}
-                <details className="text-2xs text-[var(--text-faint)]">
-                  <summary className="cursor-pointer font-bold min-h-6 flex items-center">Cách tính · xem từng kênh</summary>
-                  <p className="mt-1">
-                    {platformText("GMV", "all")} thực của ca bạn ÷ {platformText("GMV", "all")} nếu đạt bằng trung bình cả nhóm cùng kênh, cùng tháng, cùng loại ngày (lịch Campaign cố định) và buổi.
-                    Chỉ kết luận cao/thấp khi khoảng tin cậy 95% nằm hẳn một phía.
-                  </p>
-                  <ul className="mt-1.5 space-y-1">
-                    {[...standing.clear, ...standing.unclear].map((r) => (
-                      <li key={`${r.brandId}|${r.platform}|${r.role}`} className="flex flex-wrap gap-x-2">
-                        <span className="text-[var(--text-muted)]">{r.brandName} {r.platform} · {r.role === "host" ? "Host" : "Trợ"} · {r.sessions} ca</span>
-                        <span className="font-mono">{reliabilityText(r)}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-              </>
-            )}
-          </section>
-
-          <details className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl">
-            <summary className={SETTING_ROW}>
-              Từ trước tới nay <ChevronRight className="w-4 h-4 text-[var(--text-faint)]" />
-            </summary>
-            <div className="grid grid-cols-3 gap-2 text-xs px-4 pb-4">
-              <div>
-                <div className="text-[var(--text-muted)]">Ca đã live</div>
-                <div className="font-bold text-[var(--text)]">
-                  {myReal.sessionCount + myReal.assistSessionCount > 0 ? `${myReal.sessionCount + myReal.assistSessionCount} ca` : <Empty>chưa có ca nào</Empty>}
-                </div>
-              </div>
-              <div>
-                <div className="text-[var(--text-muted)]">Giờ live</div>
-                <div className="font-bold text-[var(--text)]">{myReal.hours + myReal.assistHours > 0 ? `${fmtFixed(myReal.hours + myReal.assistHours, 1)}h` : <Empty>chưa có</Empty>}</div>
-              </div>
-              <div>
-                {/* GMV lũy kế cộng từ live_sessions, tách theo sàn (không bao giờ cộng TikTok với Shopee — user chốt 07/10). */}
-                <div className="text-[var(--text-muted)]">{platformText("GMV", "all")} khi làm host</div>
-                <div className="font-bold text-emerald-400">
-                  {myReal.perf.TikTok.gmv > 0 || myReal.perf.Shopee.gmv > 0 ? (
-                    (["TikTok", "Shopee"] as const)
-                      .filter((p) => myReal.perf[p].gmv > 0)
-                      .map((p) => (
-                        <span key={p} className="block">
-                          {fmtVndShort(myReal.perf[p].gmv)} <span className="text-2xs font-normal text-[var(--text-faint)]">{p}</span>
-                        </span>
-                      ))
-                  ) : (
-                    <Empty>chưa có</Empty>
-                  )}
-                </div>
-              </div>
-            </div>
-          </details>
-        </div>
       </div>
     </div>
   );
