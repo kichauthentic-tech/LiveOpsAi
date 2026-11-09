@@ -984,7 +984,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
             </div>
             {!monthWeeks.some((w) => w.start === weekStart) && <span className="text-amber-300">Tuần {dayLabel(weekStart)} – {dayLabel(weekEnd)} không thuộc tháng này — chọn một tuần.</span>}
           </div>
-          <WeekGrid weekStart={weekStart} month={viewMonth} channels={channels} shifts={wk} analysis={analysis} nameOf={nameOf} selectedKey={selectedKey} canAdd={!readOnly} onSelect={setSelectedKey} onAdd={addShift} channelMeta={channelMeta} />
+          <WeekGrid weekStart={weekStart} month={viewMonth} channels={channels} shifts={wk} analysis={analysis} nameOf={nameOf} roleOf={(id) => talentById.get(id)?.role} selectedKey={selectedKey} canAdd={!readOnly} onSelect={setSelectedKey} onAdd={addShift} channelMeta={channelMeta} />
         </div>
         <section className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 space-y-2" aria-label="Khối lượng nhân sự">
           <div className="flex flex-wrap items-baseline justify-between gap-2">

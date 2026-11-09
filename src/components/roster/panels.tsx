@@ -38,13 +38,15 @@ export const WeekGrid: React.FC<{
   shifts: RosterShift[];
   analysis: RosterAnalysis;
   nameOf: (id: string) => string;
+  /** Vai hồ sơ của talent ("Host"/"Assistant") — để đếm người đã đăng ký theo host / trợ trên thẻ ca mở. */
+  roleOf?: (id: string) => string | undefined;
   selectedKey: string | null;
   canAdd: boolean;
   onSelect: (key: string) => void;
   onAdd: (channel: ChannelRow, date: string) => void;
   /** Bản gọn 25/10: giờ tháng + một kết luận dưới tên kênh (thay chế độ "Tháng này"). */
   channelMeta?: (channel: ChannelRow) => React.ReactNode;
-}> = ({ weekStart, month, channels, shifts, analysis, nameOf, selectedKey, canAdd, onSelect, onAdd, channelMeta }) => {
+}> = ({ weekStart, month, channels, shifts, analysis, nameOf, roleOf, selectedKey, canAdd, onSelect, onAdd, channelMeta }) => {
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)).filter((d) => !month || d.slice(0, 7) === month);
   const labelW = channelMeta ? 168 : 140;
   return (
@@ -85,7 +87,11 @@ export const WeekGrid: React.FC<{
                           {s.kind === "open" && <span className="ml-1 text-2xs font-bold text-sky-300">{s.drafted ? "nháp" : "mở"}</span>}
                           <span className="block truncate text-[var(--text)]">{s.hostId ? nameOf(s.hostId) : <span className="text-red-300 font-bold">thiếu host</span>}</span>
                           <span className="block truncate text-[var(--text-muted)]">{s.coHostId ? nameOf(s.coHostId) : s.noAssistant ? <span className="text-[var(--text-faint)]">No Asst</span> : <span className="text-amber-300">{s.kind === "open" && s.hostId ? "cần trợ · chưa công bố" : "thiếu trợ"}</span>}</span>
-                          {s.kind === "open" && s.registrants.length > 0 && <span className="block text-2xs text-emerald-300">{s.registrants.length} báo rảnh</span>}
+                          {s.kind === "open" && (() => {
+                            const nCo = s.registrants.filter((id) => roleOf?.(id) === "Assistant").length;
+                            const nHost = s.registrants.length - nCo;
+                            return <span className={`block text-2xs ${s.registrants.length > 0 ? "text-emerald-300" : "text-[var(--text-faint)]"}`}>ĐK: {nHost} host · {nCo} trợ</span>;
+                          })()}
                         </button>
                       );
                     })}
