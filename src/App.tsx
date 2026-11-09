@@ -568,6 +568,13 @@ export default function App() {
   // phải tự nhớ lọc — đúng loại lỗi sẽ quên ở màn thứ tư. Chỉ Sổ Ca nhận mảng thô (`sessions`) để
   // ops còn tìm lại và bỏ cờ; không có đường đó thì cờ là một chiều.
   const activeSessions = useMemo(() => sessions.filter((s) => !s.excludedFromReports), [sessions]);
+  // Brand đã ngừng hợp tác (CRM → trạng thái "Đã dừng"): ẩn khỏi mọi màn vận hành/số liệu chung, KHÔNG xoá dữ liệu. Các màn cần lịch sử
+  // đầy đủ — hồ sơ host (TalentMatcher, MyTalentProfile), Hiệu Suất Host, Finance/Accounting (lương ca cũ), Sổ Ca, CRM (để bật lại) —
+  // vẫn nhận `brands`/`activeSessions` nguyên vẹn.
+  const hiddenBrandIds = useMemo(() => new Set(brands.filter((b) => b.contractStatus === "Completed").map((b) => b.id)), [brands]);
+  const visibleBrands = useMemo(() => brands.filter((b) => !hiddenBrandIds.has(b.id)), [brands, hiddenBrandIds]);
+  const visibleSessions = useMemo(() => activeSessions.filter((s) => !hiddenBrandIds.has(s.brandId)), [activeSessions, hiddenBrandIds]);
+  const visibleRawSessions = useMemo(() => sessions.filter((s) => !hiddenBrandIds.has(s.brandId)), [sessions, hiddenBrandIds]);
   // Chỉ Sổ Ca nhận danh sách này (prop riêng, không trộn vào `sessions`) — xem SessionLedger.
   const excludedSessions = useMemo(() => sessions.filter((s) => s.excludedFromReports), [sessions]);
 
@@ -631,8 +638,8 @@ export default function App() {
   // được trên điện thoại — có lịch mới cần xem (1) + chỗ bị xếp trùng giờ; KHÔNG đếm ca "cần giao" (admin giao trên máy phòng
   // live, user chốt 16/10). Chấm của "Đăng ký" = ca đang mở mình chưa đăng ký.
   const myTalentIdForApp = currentRole === "talent" ? activeUser.assignedTalentId : undefined;
-  const talentMyShifts = useMemo(() => mySessions(activeSessions, myTalentIdForApp), [activeSessions, myTalentIdForApp]);
-  const talentClashCount = useMemo(() => myClashes(activeSessions, myTalentIdForApp, getTodayDate()).length, [activeSessions, myTalentIdForApp]);
+  const talentMyShifts = useMemo(() => mySessions(visibleSessions, myTalentIdForApp), [activeSessions, myTalentIdForApp]);
+  const talentClashCount = useMemo(() => myClashes(visibleSessions, myTalentIdForApp, getTodayDate()).length, [activeSessions, myTalentIdForApp]);
   const talentOpenCount = useMemo(() => {
     if (!myTalentIdForApp) return 0;
     const mine = new Set(shiftRegistrations.filter((r) => r.talentId === myTalentIdForApp).map((r) => r.slotId));
@@ -648,7 +655,7 @@ export default function App() {
   }, [setSessions, setShiftSlots]);
   const sessionDrafts = useSessionDrafts(activeTab === "calendar" && isOpsRole, reloadSessionsAndSlots);
   const talentAckCount = useMemo(
-    () => (talentAcks ? myPendingAcks(activeSessions, myTalentIdForApp, talentAcks, talentAcksAt).length : 0),
+    () => (talentAcks ? myPendingAcks(visibleSessions, myTalentIdForApp, talentAcks, talentAcksAt).length : 0),
     [activeSessions, myTalentIdForApp, talentAcks, talentAcksAt]
   );
 
@@ -665,13 +672,13 @@ export default function App() {
       // rỗng và không có cách nào thoát ngoài mở switcher. Brand đã nạp xong mà không có id đó
       // thì về Agency. Chỉ xét sau khi brands nạp xong, nếu không lần mở đầu (brands = []) sẽ
       // luôn văng về Agency dù workspace hợp lệ.
-      if (workspace.type === "brand" && brandsLoaded && !brands.some((b) => b.id === workspace.brandId)) {
+      if (workspace.type === "brand" && brandsLoaded && !visibleBrands.some((b) => b.id === workspace.brandId)) {
         return { type: "agency" };
       }
       return workspace;
     }
     return { type: "agency" };
-  }, [currentRole, workspace, activeUser.assignedBrandId, brandsLoaded, brands]);
+  }, [currentRole, workspace, activeUser.assignedBrandId, brandsLoaded, visibleBrands]);
   const currentBrandId = effectiveWorkspace.type === "brand" ? effectiveWorkspace.brandId : undefined;
   const currentBrandName = brands.find((b) => b.id === currentBrandId)?.name || "Brand";
 
@@ -693,7 +700,7 @@ export default function App() {
     [brandChannels, sessions, shiftSlots, brandStudios, brandPlatformRates]
   );
   // Kỳ vọng GMV trên dòng ca của Bảng Vận Hành (25/10) — tính sau khi danh sách đã vẽ.
-  const shiftExpect = useShiftExpectations({ enabled: activeTab === "calendar" && isOpsRole, today: todayVn(), sessions: activeSessions, shiftSlots, brands, channels, params: engineParams });
+  const shiftExpect = useShiftExpectations({ enabled: activeTab === "calendar" && isOpsRole, today: todayVn(), sessions: visibleSessions, shiftSlots, brands: visibleBrands, channels, params: engineParams });
   // Sàn agency đang chạy (có ít nhất một kênh).
   const agencyPlatforms: ReportPlatform[] = useMemo(() => {
     const ps = REPORT_PLATFORMS.filter((p) => channels.some((c) => c.platform === p));
@@ -717,7 +724,7 @@ export default function App() {
   const singlePlatform: ReportPlatform = platformScope;
   // Tab của workspace brand nhận ca/ca mở/studio của brand ĐÚNG phạm vi (brand khác giữ nguyên vì engine/OpsSupport đọc lịch toàn agency).
   const inScope = (x: { brandId?: string; platform?: string | null }) => x.brandId !== currentBrandId || inChannelScope(x, brandScope);
-  const platformSessions = useMemo(() => (effectiveWorkspace.type === "brand" ? activeSessions.filter(inScope) : activeSessions), [effectiveWorkspace.type, activeSessions, currentBrandId, brandScope]); // eslint-disable-line react-hooks/exhaustive-deps
+  const platformSessions = useMemo(() => (effectiveWorkspace.type === "brand" ? visibleSessions.filter(inScope) : visibleSessions), [effectiveWorkspace.type, activeSessions, currentBrandId, brandScope]); // eslint-disable-line react-hooks/exhaustive-deps
   const platformSlots = useMemo(() => (effectiveWorkspace.type === "brand" ? shiftSlots.filter(inScope) : shiftSlots), [effectiveWorkspace.type, shiftSlots, currentBrandId, brandScope]); // eslint-disable-line react-hooks/exhaustive-deps
   const platformBrandStudios = useMemo(() => (effectiveWorkspace.type === "brand" ? brandStudios.filter(inScope) : brandStudios), [effectiveWorkspace.type, brandStudios, currentBrandId, brandScope]); // eslint-disable-line react-hooks/exhaustive-deps
   const pickAgencyScope = (scope: ChannelScope) => {
@@ -758,7 +765,7 @@ export default function App() {
   };
   // Kênh brand × sàn cho bộ chọn workspace ở Header (07/10): brand hai sàn hiện thành mục riêng từng sàn + Tổng.
   const brandPlatformsMap = useMemo(
-    () => Object.fromEntries(brands.map((b) => [b.id, platformsOfBrand(channels, b.id)])) as Record<string, ReportPlatform[]>,
+    () => Object.fromEntries(visibleBrands.map((b) => [b.id, platformsOfBrand(channels, b.id)])) as Record<string, ReportPlatform[]>,
     [brands, channels]
   );
 
@@ -1476,7 +1483,7 @@ export default function App() {
   const navGroups =
     effectiveWorkspace.type === "brand" ? BRAND_NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => !hiddenBrandTabs.has(i.id)) })) : AGENCY_NAV_GROUPS;
   // Brand có kênh trên một sàn — danh sách brand của màn số liệu agency theo sàn đó.
-  const brandsOn = (p: ReportPlatform) => brands.filter((b) => (brandPlatformsMap[b.id] ?? []).includes(p));
+  const brandsOn = (p: ReportPlatform) => visibleBrands.filter((b) => (brandPlatformsMap[b.id] ?? []).includes(p));
   // Màn "mọi kênh" của agency khi đang "Tất cả": mỗi sàn một khối (đầu khối có nhãn sàn), số hiệu suất không cộng giữa hai sàn.
   // Bố cục 18/10: tiêu đề trang vẽ MỘT lần ở đây; trong từng khối, PageHeader của component thành đầu khối "Các kênh X" với
   // nút/bộ lọc của khối (PlatformBlockContext) — trước đó mỗi sàn lặp nguyên thẻ tiêu đề + mô tả + bộ chọn tháng. `lead` = khối
@@ -1773,7 +1780,7 @@ export default function App() {
               workspace={isOpsRole ? effectiveWorkspace : undefined}
               onWorkspaceChange={isOpsRole ? handleWorkspaceChange : undefined}
               brandPlatforms={brandPlatformsMap}
-              brands={brands}
+              brands={visibleBrands}
               notifications={{
                 items: notifications.items,
                 unreadCount: notifications.unreadCount,
@@ -1962,7 +1969,7 @@ export default function App() {
 
                 {activeTab === "roster" && (
                   <RosterBoard
-                    sessions={sessions}
+                    sessions={visibleRawSessions}
                     shiftSlots={shiftSlots}
                     shiftRegistrations={shiftRegistrations}
                     talents={talents}
@@ -1971,7 +1978,7 @@ export default function App() {
                     brandChannels={channels}
                     brandStudios={brandStudios}
                     studios={studios}
-                    brands={brands}
+                    brands={visibleBrands}
                     currentRole={currentRole}
                     currentUserId={activeUser.id}
                     onCreateSlot={handleCreateShiftSlot}
@@ -1999,9 +2006,9 @@ export default function App() {
                     <OpsBoard
                       aside={isOpsRole ? (
                         <TodoPanel
-                        brands={brands}
+                        brands={visibleBrands}
                         channels={channels}
-                        sessions={activeSessions}
+                        sessions={visibleSessions}
                         shiftSlots={shiftSlots}
                         rates={brandPlatformRates}
                         termPeriods={termsPeriods}
@@ -2025,10 +2032,10 @@ export default function App() {
                         }}
                       />
                       ) : undefined}
-                      sessions={activeSessions}
+                      sessions={visibleSessions}
                       shiftSlots={shiftSlots}
                       shiftRegistrations={shiftRegistrations}
-                      brands={brands}
+                      brands={visibleBrands}
                       studios={activeStudios}
                       talents={activeTalents}
                       currentRole={currentRole}
@@ -2051,9 +2058,9 @@ export default function App() {
                         <>
                         {/* Khối lập kế hoạch + cam kết giờ là việc THÁNG — 25/10 chuyển từ "Hôm nay & tuần" sang đây (audit 24/10, user chốt). */}
                         <OpsPlanningTodo
-                          brands={brands}
+                          brands={visibleBrands}
                           channels={channels}
-                          sessions={activeSessions}
+                          sessions={visibleSessions}
                           talents={activeTalents}
                           shiftSlots={shiftSlots}
                           shiftRegistrations={shiftRegistrations}
@@ -2062,8 +2069,8 @@ export default function App() {
                           onOpenMonthPlan={(brandId, platform) => openMonthPlanFor(brandId, platform)}
                         />
                         <OpsMonthView
-                          sessions={activeSessions}
-                          brands={brands}
+                          sessions={visibleSessions}
+                          brands={visibleBrands}
                           brandChannels={channels}
                           shiftSlots={shiftSlots}
                           brandStudios={brandStudios}
@@ -2089,7 +2096,7 @@ export default function App() {
                         <OpsSupport
                           win={win}
                           expected={shiftExpect.byId ? shiftExpect.byId.get(win.id) : null}
-                          sessions={activeSessions}
+                          sessions={visibleSessions}
                           promoSchemes={promoSchemes}
                           engineParams={engineParams}
                           camp={shiftExpect.campOf(win.brandId, win.platform)}
@@ -2102,12 +2109,12 @@ export default function App() {
                 {activeTab === "studio_calendar" && (
                   <LiveCalendar
                     channels={channels}
-                    sessions={activeSessions}
+                    sessions={visibleSessions}
                     shiftSlots={shiftSlots}
                     shiftRegistrations={shiftRegistrations}
                     studios={activeStudios}
                     talents={activeTalents}
-                    brands={brands}
+                    brands={visibleBrands}
                     brandStudios={brandStudios}
                     onUpdateSession={handleUpdateSession}
                     onSwitchSessionPlatform={handleSwitchSessionPlatform}
@@ -2131,9 +2138,9 @@ export default function App() {
 
                 {activeTab === "my_shifts" && currentRole === "talent" && (
                   <TalentToday
-                    sessions={activeSessions}
+                    sessions={visibleSessions}
                     shiftSlots={shiftSlots}
-                    brands={brands}
+                    brands={visibleBrands}
                     talents={activeTalents}
                     currentRole={currentRole}
                     myTalentId={activeUser.assignedTalentId}
@@ -2149,12 +2156,12 @@ export default function App() {
                       <LiveCalendar
                         title="Lịch ca"
                         channels={channels}
-                        sessions={activeSessions}
+                        sessions={visibleSessions}
                         shiftSlots={shiftSlots}
                         shiftRegistrations={shiftRegistrations}
                         studios={activeStudios}
                         talents={activeTalents}
-                        brands={brands}
+                        brands={visibleBrands}
                         brandStudios={brandStudios}
                         myTalentId={activeUser.assignedTalentId}
                         currentUserId={activeUser.id}
@@ -2171,7 +2178,7 @@ export default function App() {
                   <TalentShiftSignup
                     mode={activeTab === "shift_registered" ? "registered" : "open"}
                     onOpenTab={setActiveTab}
-                    brands={brands}
+                    brands={visibleBrands}
                     shiftSlots={shiftSlots}
                     shiftRegistrations={shiftRegistrations}
                     myTalentId={activeUser.assignedTalentId}
@@ -2187,7 +2194,7 @@ export default function App() {
                     brands={agencyBrands}
                     channels={channels}
                     studios={activeStudios}
-                    sessions={activeSessions}
+                    sessions={visibleSessions}
                     shiftSlots={shiftSlots}
                     promoSchemes={promoSchemes}
                     onPlanLocked={reloadShiftSlots}
@@ -2205,12 +2212,12 @@ export default function App() {
                   <AgencyDashboard
                     platform={agencyPlatformState}
                     platforms={agencyPlatforms}
-                    allBrands={brands.filter((b) => agencyPlatforms.some((p) => brandsOn(p).includes(b)))}
+                    allBrands={visibleBrands.filter((b) => agencyPlatforms.some((p) => brandsOn(p).includes(b)))}
                     onPickPlatform={pickAgencyScope}
                     today={todayVn()}
                     brands={agencyBrands}
                     brandChannels={channels}
-                    sessions={activeSessions}
+                    sessions={visibleSessions}
                     shiftSlots={shiftSlots}
                     engineParams={engineParams}
                     currentRole={currentRole}
@@ -2229,7 +2236,7 @@ export default function App() {
                   perPlatformBlocks((p) => <HostPerformance key={p} platform={p} sessions={activeSessions} brands={brandsOn(p)} />)
                 )}
 
-                {activeTab === "leaderboard" && <Leaderboard sessions={activeSessions} />}
+                {activeTab === "leaderboard" && <Leaderboard sessions={visibleSessions} />}
 
                 {activeTab === "brands_overview" && (
                   perPlatformBlocks((p) => <BrandsOverview
@@ -2237,7 +2244,7 @@ export default function App() {
                     platform={p}
                     brands={brandsOn(p)}
                     brandChannels={channels}
-                    sessions={activeSessions}
+                    sessions={visibleSessions}
                     brandPlatformRates={brandPlatformRates}
                     termPeriods={termsPeriods}
                     monthlyReports={monthlyReports}
@@ -2552,8 +2559,8 @@ export default function App() {
                       onUpdate={handleUpdateAiAgentPrompt}
                     />
                     <EngineTrainingPanel
-                      brands={brands}
-                      sessions={activeSessions}
+                      brands={visibleBrands}
+                      sessions={visibleSessions}
                       shiftSlots={shiftSlots}
                       promoSchemes={promoSchemes}
                       params={engineParams}
