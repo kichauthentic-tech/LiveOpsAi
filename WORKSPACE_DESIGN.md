@@ -233,7 +233,7 @@
   kéo FRANKLIN SPE → FRANKLIN ⇒ hộp xác nhận ⇒ ca + shift_slot thành TikTok/FRANKLIN, ca kế hoạch Shopee 4,5M thành "chưa có ca", ca tăng
   cường TikTok 10,5M (đề xuất), nhật ký "Đổi sàn của ca".
 
-- **05/11: AUDIT BẢO MẬT TÀI CHÍNH / RATE TRƯỚC LAUNCH (chưa commit, `0197` CHƯA CHẠY)** — replay 0001→0196 có quyền mặc định Supabase, thử đọc/ghi
+- **05/11: AUDIT BẢO MẬT TÀI CHÍNH / RATE TRƯỚC LAUNCH (đã push a2f00b4; `0198` RAN trước 09/11, `0197` RAN 09/11)** — replay 0001→0196 có quyền mặc định Supabase, thử đọc/ghi
   bằng 10 danh tính (anon, ceo, admin, ops, trainer, talent, brand A, brand chưa gắn brand, talent chưa gắn hồ sơ, đăng nhập không có profile).
   **Ổn:** anon 0 bảng; production `disable_signup: true` (đọc `/auth/v1/settings` — bắt buộc giữ, vì tài khoản tự đăng ký luôn vào role `talent`);
   `session_finance` chỉ ceo/admin (+ trainer đọc); `talents_secure` che rate với ops/brand/talent khác; bảng gốc `talents` chỉ GRANT cột `id`;
@@ -243,7 +243,7 @@
   người từ đó); ops ghi được `talents.rate_*`. 0197: ghi lịch sử chỉ ceo/admin (tách insert/update/delete), trigger `guard_talent_rate_write`
   chặn non-ceo/admin đổi rate. Kiểm: `supabase/tests/0197_rate_privacy.sql` 12 OK (đỏ ở mục 3 khi thiếu 0197), migration chạy 2 lần sạch, ma
   trận ops sau vá chỉ đổi đúng dòng lịch sử rate; `sqlGuards` 14/14. Sau vá ops ở Điều Phối thấy "Chi phí người: chưa tính được" (đúng ý).
-  **`0198_talent_read_scope.sql` (cùng ngày, CHƯA CHẠY, chạy sau 0197):** (A) **lỗ nặng nhất:** `talents_secure` là view một bảng chạy
+  **`0198_talent_read_scope.sql` (cùng ngày, đã chạy trước 0197 — kiểm 09/11 thấy `brands_secure` có trên prod):** (A) **lỗ nặng nhất:** `talents_secure` là view một bảng chạy
   quyền owner + Supabase tự GRANT ALL ⇒ mọi phiên đã đăng nhập (talent, brand, không profile) UPDATE/DELETE/INSERT được `talents`
   (xoá host = cascade mất lịch sử rate, `session_staff_segments`, đăng ký, gỡ host khỏi mọi ca) — revoke quyền ghi trên 4 view; (B)
   `notify_ops`/`notify_talent` gọi thẳng qua /rpc với nội dung tuỳ ý (host/brand bắn thông báo giả) — revoke execute (chỉ 2 hàm
@@ -413,7 +413,8 @@
 - **Lịch 2 đợt + Nhận target brand (06/11, `0200` ĐÃ CHẠY, đã push):** kiểm bản deploy. Rồi: Điều Phối → "Mở lịch tháng 12" đặt 4 mốc; sau họp monthly vào Kế Hoạch
   Tháng từng kênh → "Nhận target brand…". Chưa thử ghi thật (mở ca bổ sung, đặt mốc).
 - **Đổi sàn khi kéo ca (06/11, `0199` đã chạy, đã push):** deploy client.
-- **0197 + 0198 (05/11):** chạy `0197_rate_privacy.sql` rồi `0198_talent_read_scope.sql` ở SQL Editor TRƯỚC khi phát tài khoản cho host
+- **0197 + 0198 (05/11):** ĐÃ CHẠY cả hai (0198 trước, 0197 chạy 09/11 — trước đó `talent_rate_history` vẫn còn policy `write_ceo_ops` FOR ALL nên ops đọc được rate). Đã kiểm `pg_policies` 09/11: chỉ còn read_ceo_admin_self + insert/update/delete_ceo_admin. Chưa thử đăng nhập ops thật.
+  **Rate thật nhập 09/11:** 48/50 talent ghi từ file nhân sự riêng của user (số cuối trong ô cast; trợ đặt cả `rate_per_hour` = `assistant_rate_per_hour`, người vừa host vừa trợ đặt hai số riêng); Bin đổi role → Assistant; B.Hân/X.Hưng = 0 (chưa qua thử việc); Tiểu Linh chưa nhập. Theo ý user rate mới áp cho TOÀN BỘ lịch sử: mỗi talent (47 người) chỉ còn 1 dòng `talent_rate_history` mở từ 01/01/2020 — mọi ca cũ/mới đều tính theo rate hiện tại (số cũ không còn). `C.Hoàng` đã gộp vào `Châu Hoàng` (giữ bản ghi có tài khoản đăng nhập thật; 25 ca co_host chuyển sang, bản ghi C.Hoàng xoá). Tài khoản đăng nhập test `C.Hoàng` còn lại nhưng không gắn talent — user quyết xử lý. Không ghi số rate vào repo. Gốc: chạy `0197_rate_privacy.sql` rồi `0198_talent_read_scope.sql` ở SQL Editor TRƯỚC khi phát tài khoản cho host
   (client lùi về bảng `brands` nếu chưa có view nên thứ tự với deploy không quan trọng). Kiểm: ops → Điều Phối "Chi phí người" = chưa tính
   được; host đăng nhập → lịch agency vẫn có tên brand + tên host.
 - **Điều khoản hợp tác (31/10, `0191` ĐÃ CHẠY):** CRM → Hợp đồng & giá từng brand × sàn → "Tạo từ cấu hình hiện tại" (hoặc chọn gói mẫu) → đặt ngày áp dụng (gợi ý: đầu tháng) → Lưu. Brand có Ads/booking: nhập chi tiêu Ads / số creator ở khối "Tính phí tháng". Rồi mở Kế Toán so doanh thu hợp đồng với sổ. **HOÃN theo user (31/10) tới khi có hình thức hợp tác thật của từng brand:** hình thức live (trọn ca/cấp host/thuê phòng/không có ca) mới là nhãn; khoản cả tháng chưa vào Finance & P&L từng ca; bù giờ chưa tự cộng sang tháng sau; chi tiêu Ads/creator nhập tay ở tab Tính phí tháng; chưa brand nào khai điều khoản. Bố cục CRM = 4 tab (Điều khoản · Hợp đồng · Tính phí tháng · Kênh, host, phòng); Kế Toán có "chi tiết phí" chỉ đọc.
