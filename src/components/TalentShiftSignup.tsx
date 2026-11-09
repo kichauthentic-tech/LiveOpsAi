@@ -83,10 +83,6 @@ export default function TalentShiftSignup({ mode, onOpenTab, brands, shiftSlots,
     [shiftRegistrations, myTalentId]
   );
   const allOpen = useMemo(() => openSlotsFrom(shiftSlots, today), [shiftSlots, today]);
-  // Tháng "đã chốt" = đã có ít nhất một ca được chốt (không còn là ca mở). Ca mở CHƯA ai xếp (openNeed='host' mặc định, 0208) chỉ gắn "Cần host"
-  // ở tháng đã chốt (ca sót lại); tháng chưa chốt (vd. T12 đang mở đăng ký) ca nào cũng chưa xếp nên nhãn không có nghĩa, ẩn đi.
-  const settledMonths = useMemo(() => new Set(shiftSlots.filter((s) => s.status !== "open").map((s) => s.date.slice(0, 7))), [shiftSlots]);
-  const needOf = (slot: ShiftSlot) => (slot.openNeed === "host" && !settledMonths.has(slot.date.slice(0, 7)) ? undefined : slot.openNeed);
   const openSlots = useMemo(() => allOpen.filter((s) => mineBySlot.has(s.id) === (mode === "registered")), [allOpen, mineBySlot, mode]);
   const booked = useMemo(() => myShifts.filter((s) => s.status !== "Cancelled"), [myShifts]);
 
@@ -155,10 +151,10 @@ export default function TalentShiftSignup({ mode, onOpenTab, brands, shiftSlots,
           <span className="ml-2 font-sans text-xs font-medium text-[var(--text-faint)]">{hoursText(slotHours(slot))}</span>
         </p>
         {/* 0207: ca đã có người nháp nhưng còn thiếu đúng vai này — không lộ tên người, chỉ vai cần. */}
-        {needOf(slot) && (
+        {slot.openNeed && (
           <p className="mt-1.5">
             <span className="inline-flex text-2xs font-bold px-2 py-0.5 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-300">
-              {needOf(slot) === "co_host" ? "Cần trợ live" : "Cần host"}
+              {slot.openNeed === "co_host" ? "Cần trợ live" : "Cần host"}
             </span>
           </p>
         )}
