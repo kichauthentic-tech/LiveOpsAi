@@ -29,6 +29,8 @@ export interface SessionSnapshot {
   isEstimated: boolean;
   /** Mốc ranh giới = giờ hết ca. */
   boundaryAt: string;
+  /** 0205: mốc giao ca do ops nhập tay (không bị tự tính lại). */
+  boundaryManual: boolean;
   /** 0174: GMV đúng của ca do trợ/OPS gõ (file tải trễ lẫn phần ca sau). Vắng = dùng số file. */
   typedGmv?: number;
   /** 0203: room còn live sang ca nối khi tải file ⇒ số đã chia tạm theo giờ tới giờ hết ca (chưa ai gõ số đúng). */
@@ -45,6 +47,7 @@ interface DbSnapshot {
   row_count: number;
   is_estimated: boolean | null;
   boundary_at: string;
+  boundary_manual?: boolean | null;
   typed_gmv?: number | null;
   auto_split?: boolean | null;
 }
@@ -88,6 +91,7 @@ export async function fetchSessionSnapshot(sessionId: string): Promise<SessionSn
     rowCount: snap.row_count,
     isEstimated: snap.is_estimated === true,
     boundaryAt: snap.boundary_at,
+    boundaryManual: snap.boundary_manual === true,
     typedGmv: snap.typed_gmv == null ? undefined : Number(snap.typed_gmv),
     autoSplit: snap.auto_split === true,
     rooms: ((rowData ?? []) as DbSnapshotRow[]).map((r) => ({
@@ -143,6 +147,19 @@ export async function setSessionSnapshotGmv(sessionId: string, gmv: number | nul
   const { error } = await supabase.rpc("set_session_snapshot_gmv", { p_session_id: sessionId, p_gmv: gmv });
   if (error) {
     if (error.code === "PGRST202") throw new Error("Chưa chạy migration 0174 nên chưa sửa được GMV của ca.");
+    throw error;
+  }
+  return fetchSessionById(sessionId);
+}
+
+/**
+ * Giờ giao ca THỰC do ops nhập (0205) — dùng khi file không cho biết giờ giao (room chạy liên tục, chỉ đổi người). Ưu tiên hơn số tự tính
+ * (giờ hết ca + trễ vào ca + phút nghỉ giữa room). `null` = bỏ, về số tự tính.
+ */
+export async function setSessionHandoverTime(sessionId: string, at: string | null): Promise<LiveSession> {
+  const { error } = await supabase.rpc("set_session_handover_time", { p_session_id: sessionId, p_at: at });
+  if (error) {
+    if (error.code === "PGRST202") throw new Error("Chưa chạy migration 0205 nên chưa nhập được giờ giao ca.");
     throw error;
   }
   return fetchSessionById(sessionId);

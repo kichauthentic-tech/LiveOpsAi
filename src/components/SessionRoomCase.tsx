@@ -15,10 +15,10 @@ import {
   linkSessionRoom,
   unlinkSessionRoom
 } from "../lib/db/sessionRoomLinks";
-import { SessionSnapshot, fetchSessionSnapshot } from "../lib/db/sessionLiveSnapshots";
+import { SessionSnapshot, fetchSessionSnapshot, setSessionHandoverTime } from "../lib/db/sessionLiveSnapshots";
 import { parseSnapshotFile, type ParsedSnapshotFile } from "../lib/liveSnapshot/extractRooms";
 import { BREAK_REASONS, BreakReason, adjacentShiftChain, breakReasonLabel, breakReasonShort, nextLinkStatus, roomsFromPrev, runOverRoom } from "../lib/liveSnapshot/roomCases";
-import { CROSS_TOL_MS, flexWindow, timelineLayout } from "../lib/liveSnapshot/timeline";
+import { CROSS_TOL_MS, flexWindow, timelineLayout, vnClock } from "../lib/liveSnapshot/timeline";
 import { SessionTimeline } from "./SessionTimeline";
 import { MoreMenu, type MoreMenuItem } from "./ui/MoreMenu";
 import { sessionWindow, shortRoomId } from "../lib/liveSnapshot/roomSelection";
@@ -81,6 +81,8 @@ export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSes
   const [pickedNext, setPickedNext] = useState("");
 
   const [partForm, setPartForm] = useState<{ reason: BreakReason; note: string } | null>(null);
+  // Giờ giao ca thực (0205): HH:MM đang gõ, null = form đóng.
+  const [handoverTime, setHandoverTime] = useState<string | null>(null);
   const [pendingFile, setPendingFile] = useState<{ fileName: string; parsed: ParsedSnapshotFile } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -118,7 +120,8 @@ export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSes
   // Cửa sổ ca trượt theo giờ live thật: host vào trễ rồi bù đủ giờ kế hoạch ⇒ ca và các ca nối sau trượt cùng lượng, không bị coi là lấn sang ca sau.
   const planWin = sessionWindow(s);
   const chainStartsMs = chain.map((x) => sessionWindow(x).startMs);
-  const win = flexWindow(planWin, snapshot?.rooms ?? [], chainStartsMs);
+  const manualEndMs = snapshot?.boundaryManual && !snapshot.isEstimated ? Date.parse(snapshot.boundaryAt) : undefined;
+  const win = flexWindow(planWin, snapshot?.rooms ?? [], chainStartsMs, manualEndMs);
   const overRoom = snapshot && !snapshot.isEstimated ? runOverRoom(snapshot.rooms, win) : undefined;
   const suggestKey = overRoom && canEdit && !links.next && !dismissed && !loading ? overRoom.roomId : "";
   useEffect(() => {
@@ -181,6 +184,21 @@ export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSes
   const doEstimate = async (prevId: string, nextId: string, label: string) => {
     if (!(await confirm(`Chia ƯỚC LƯỢNG theo thời gian cho ca ${label} (vì không có file lúc giao ca)? Số của cả hai ca sẽ gắn nhãn ước lượng, tới khi trợ tải lên file thật.`, { danger: true }))) return;
     await run(() => estimateHandoverSplit(prevId, nextId));
+  };
+
+  // HH:MM (giờ VN) → thời điểm gần giờ hết ca kế hoạch nhất (ca qua nửa đêm: 00:10 thuộc hôm sau).
+  const handoverIsoFrom = (hm: string): string | null => {
+    if (!/^\d{2}:\d{2}$/.test(hm)) return null;
+    const day = new Date(planWin.endMs + 7 * 3600000).toISOString().slice(0, 10);
+    const base = Date.parse(`${day}T${hm}:00+07:00`);
+    if (!Number.isFinite(base)) return null;
+    const best = [base - 86400000, base, base + 86400000].sort((a, b) => Math.abs(a - planWin.endMs) - Math.abs(b - planWin.endMs))[0];
+    return new Date(best).toISOString();
+  };
+  const saveHandoverTime = async (hm: string | null) => {
+    const iso = hm === null ? null : handoverIsoFrom(hm);
+    if (hm !== null && !iso) { setError("Giờ giao ca không hợp lệ (HH:MM)."); return; }
+    if (await run(() => setSessionHandoverTime(s.id, iso))) setHandoverTime(null);
   };
 
   const handleFile = async (file: File) => {
@@ -273,6 +291,7 @@ export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSes
       ? timelineLayout({
           win: planWin, // timelineLayout tự trượt theo lượng trễ (cả chuỗi ca nối)
           chainStartsMs,
+          manualEndMs,
           rooms,
           parts,
           prev: prev ? shiftOf(prev, true) : prevShift && crossesStart ? shiftOf(prevShift, false) : undefined,
@@ -286,6 +305,7 @@ export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSes
     ? [
         ...(!next ? [{ label: `Nối sang ca sau (${unit} chạy tiếp)`, onClick: () => void openChooser(), disabled: busy }] : []),
         ...(next ? [{ label: "Gỡ nối với ca sau", onClick: () => void doUnlink(), disabled: busy, danger: true }] : []),
+        ...(snapshot && !snapshot.isEstimated ? [{ label: snapshot.boundaryManual ? "Sửa giờ giao ca thực" : "Nhập giờ giao ca thực", onClick: () => setHandoverTime(vnClock(win.endMs)), disabled: busy }] : []),
         ...(snapshot ? [{ label: "Thêm lượt restart (tải file riêng)", onClick: () => setPartForm({ reason: "network", note: "" }), disabled: busy }] : []),
         ...parts.map((p) => ({ label: `Xoá lượt ${p.partNo} (${breakReasonShort(p.reason)})`, onClick: () => void removePart(p), disabled: busy, danger: true }))
       ]
@@ -302,6 +322,24 @@ export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSes
   const body = (
     <div className="space-y-3">
       {layout && <SessionTimeline layout={layout} unit={unit} />}
+      {snapshot?.boundaryManual && handoverTime === null && (
+        <p className="text-2xs text-[var(--text-muted)]">
+          Giờ giao ca {vnClock(Date.parse(snapshot.boundaryAt))} do OPS nhập (thay số tự tính).
+          {canEdit && <button onClick={() => void saveHandoverTime(null)} disabled={busy} className="ml-1.5 underline hover:text-[var(--text)] disabled:opacity-40">Dùng số tự tính</button>}
+        </p>
+      )}
+      {handoverTime !== null && (
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] p-2.5 space-y-2">
+          <p className="text-2xs text-[var(--text-muted)]">
+            Giờ giao ca thực = lúc host này thôi và ca sau nhận. Chỉ cần nhập khi app tính chưa đúng (vd room chạy liên tục, chỉ đổi người). Giờ này quyết định phần số liệu và giờ live của mỗi ca.
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <input type="time" value={handoverTime} onChange={(e) => setHandoverTime(e.target.value)} className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-sm tabular-nums" />
+            <button onClick={() => void saveHandoverTime(handoverTime)} disabled={busy || !handoverTime} className={btnGhost}>Lưu giờ giao ca</button>
+            <button onClick={() => setHandoverTime(null)} disabled={busy} className={btnGhost}>Đóng</button>
+          </div>
+        </div>
+      )}
       {embedded && !snapshot && <p className="text-2xs text-[var(--text-faint)]">Hiện ra sau khi tải file ở bước 1.</p>}
       {snapshot?.isEstimated && <p className="text-2xs text-amber-300">Số ca này đang chia ước lượng theo thời gian — tự cập nhật khi có file thật.</p>}
       {!snapshot && !embedded && (s.liveRoomIds?.length ?? 0) > 1 && (

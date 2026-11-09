@@ -29,6 +29,8 @@ export interface TimelineIn {
   nowMs: number;
   /** Giờ vào ca kế hoạch của các ca trong chuỗi liền kề (để ca nối thừa hưởng lượng trễ của ca đầu). */
   chainStartsMs?: number[];
+  /** Giờ giao ca thực ops đã nhập (0205) — thay giờ hết ca tự tính. */
+  manualEndMs?: number;
 }
 
 export interface TimelineSeg {
@@ -85,38 +87,81 @@ export const MAX_FLEX_MS = 90 * 60000;
  *  - room bắt đầu TRƯỚC giờ vào ca (> 5') là room chạy tiếp từ ca trước ⇒ thừa hưởng lượng trễ của ca nơi room bắt đầu
  *    (ca có giờ vào ca kế hoạch gần nhất ≤ giờ room bắt đầu, lấy từ `chainStartsMs`); không có ca trước ⇒ 0.
  */
-export function flexLateness(win: { startMs: number; endMs: number }, rooms: { startedAt?: string }[], chainStartsMs: number[] = []): number {
-  const starts = rooms.map((r) => (r.startedAt ? Date.parse(r.startedAt) : NaN)).filter((n) => Number.isFinite(n));
-  if (starts.length === 0) return 0;
-  const first = Math.min(...starts);
-  let origin = win.startMs;
-  if (first < win.startMs - CROSS_TOL_MS) {
-    const before = chainStartsMs.filter((s) => s < win.startMs && s <= first + CROSS_TOL_MS);
-    if (before.length === 0) return 0; // host bật sớm, không có ca trước
-    origin = Math.max(...before);
-  }
-  const late = first - origin;
-  return late <= CROSS_TOL_MS ? 0 : Math.min(late, MAX_FLEX_MS); // trễ ≤ 5' không tính (cùng dung sai với 0203/0204)
+export function flexLateness(win: { startMs: number; endMs: number }, rooms: FlexRoom[], chainStartsMs: number[] = []): number {
+  return flexShift(win, rooms, chainStartsMs).endShiftMs;
 }
 
-/** Cửa sổ ca sau khi trượt theo lượng trễ (cả giờ vào ca và giờ hết ca). */
+/** Phòng chỉ cần giờ bắt đầu / kết thúc (file giao ca). */
+export type FlexRoom = { startedAt?: string; endedAt?: string };
+
+/** Khoảng nghỉ giữa hai room liên tiếp được coi là tắt bật lại (restart) — cùng ngưỡng 1'..30' với migration 0205. */
+export const PAUSE_MIN_MS = 60000;
+export const PAUSE_MAX_MS = 30 * 60000;
+
+/**
+ * Tách lượng trượt của ca thành: `startShiftMs` = trễ vào ca (hoặc thừa hưởng từ ca trước) — dời cả giờ vào ca; `endShiftMs` =
+ * trễ + tổng khoảng NGHỈ giữa các room của chính ca này (tắt bật lại 1'..30') — dời giờ hết ca/giờ giao ca (0205: host nghỉ 6'
+ * thì phải live thêm 6' mới đủ giờ kế hoạch). Cả hai kẹp 0..90'.
+ */
+export function flexShift(
+  win: { startMs: number; endMs: number },
+  rooms: FlexRoom[],
+  chainStartsMs: number[] = []
+): { startShiftMs: number; endShiftMs: number; pauseMs: number; inherited: boolean } {
+  const spans = rooms
+    .map((r) => ({ s: r.startedAt ? Date.parse(r.startedAt) : NaN, e: r.endedAt ? Date.parse(r.endedAt) : NaN }))
+    .filter((x) => Number.isFinite(x.s))
+    .sort((a, b) => a.s - b.s);
+  if (spans.length === 0) return { startShiftMs: 0, endShiftMs: 0, pauseMs: 0, inherited: false };
+  const first = spans[0].s;
+  let base: number;
+  const inherited = first < win.startMs - CROSS_TOL_MS;
+  if (inherited) {
+    const before = chainStartsMs.filter((s) => s < win.startMs && s <= first + CROSS_TOL_MS);
+    if (before.length === 0) return { startShiftMs: 0, endShiftMs: 0, pauseMs: 0, inherited: false }; // host bật sớm, không có ca trước
+    const late = first - Math.max(...before);
+    base = late <= CROSS_TOL_MS ? 0 : Math.min(late, MAX_FLEX_MS);
+  } else {
+    const late = first - win.startMs;
+    base = late <= CROSS_TOL_MS ? 0 : Math.min(late, MAX_FLEX_MS); // trễ ≤ 5' không tính (cùng dung sai với 0203/0204)
+  }
+  // Khoảng nghỉ giữa các room chạm ca này (room kết thúc sau giờ vào ca).
+  const inShift = spans.filter((x) => (Number.isFinite(x.e) ? x.e : x.s) > win.startMs);
+  let pause = 0;
+  for (let i = 1; i < inShift.length; i++) {
+    const prevEnd = inShift[i - 1].e;
+    if (!Number.isFinite(prevEnd)) continue;
+    const gap = inShift[i].s - prevEnd;
+    if (gap > PAUSE_MIN_MS && gap <= PAUSE_MAX_MS) pause += gap;
+  }
+  return { startShiftMs: base, endShiftMs: Math.min(base + pause, MAX_FLEX_MS), pauseMs: pause, inherited };
+}
+
+/**
+ * Cửa sổ ca sau khi trượt: giờ vào ca dời theo trễ vào ca, giờ hết ca dời theo trễ + phút nghỉ. `manualEndMs` = giờ giao ca thực
+ * ops đã nhập (0205) — thay giờ hết ca tự tính.
+ */
 export function flexWindow(
   win: { startMs: number; endMs: number },
-  rooms: { startedAt?: string }[],
-  chainStartsMs: number[] = []
+  rooms: FlexRoom[],
+  chainStartsMs: number[] = [],
+  manualEndMs?: number
 ): { startMs: number; endMs: number } {
-  const late = flexLateness(win, rooms, chainStartsMs);
-  return late > 0 ? { startMs: win.startMs + late, endMs: win.endMs + late } : win;
+  const { startShiftMs, endShiftMs } = flexShift(win, rooms, chainStartsMs);
+  const startMs = win.startMs + startShiftMs;
+  const endMs = manualEndMs && Number.isFinite(manualEndMs) ? manualEndMs : win.endMs + endShiftMs;
+  return startShiftMs > 0 || endMs !== win.endMs ? { startMs, endMs } : win;
 }
 
 export function timelineLayout(input: TimelineIn): TimelineLayout {
   const { nowMs } = input;
-  // Cửa sổ hiệu lực: cả chuỗi ca nối trượt theo lượng trễ (ca này + ca trước/sau trên trục).
-  const late = flexLateness(input.win, input.rooms, input.chainStartsMs);
-  const win = late > 0 ? { startMs: input.win.startMs + late, endMs: input.win.endMs + late } : input.win;
+  // Cửa sổ hiệu lực: cả chuỗi ca nối trượt theo lượng trễ + phút nghỉ (ca này + ca trước/sau trên trục).
+  const shift = flexShift(input.win, input.rooms, input.chainStartsMs);
+  const win = flexWindow(input.win, input.rooms, input.chainStartsMs, input.manualEndMs);
+  const late = shift.endShiftMs;
   const slide = (x?: TimelineShiftIn): TimelineShiftIn | undefined => (x && late > 0 ? { ...x, startMs: x.startMs + late, endMs: x.endMs + late } : x);
-  const prev = slide(input.prev);
-  const next = slide(input.next);
+  const prev = input.prev && shift.inherited && shift.startShiftMs > 0 ? { ...input.prev, startMs: input.prev.startMs + shift.startShiftMs, endMs: input.prev.endMs + shift.startShiftMs } : input.prev;
+  const next = input.manualEndMs && input.next ? { ...input.next, startMs: win.endMs, endMs: input.next.endMs + (win.endMs - input.win.endMs) } : slide(input.next);
   const spans = input.rooms
     .map((r) => {
       const s = r.startedAt ? Date.parse(r.startedAt) : NaN;

@@ -7,7 +7,7 @@ const iso = (hm: string) => new Date(at(hm)).toISOString();
 const win = { startMs: at("10:00"), endMs: at("13:00") };
 
 describe("timelineLayout", () => {
-  test("FUJIWA: 2 room, nghỉ 11', room 2 chạy qua 13:00 sang ca sau đã nối", () => {
+  test("FUJIWA: 2 room, nghỉ 11' ⇒ ca trượt tới 13:11 (0205), room 2 chạy qua 13:11 sang ca sau đã nối", () => {
     const l = timelineLayout({
       win,
       rooms: [
@@ -19,15 +19,18 @@ describe("timelineLayout", () => {
       nowMs: at("22:00")
     });
     expect(l.ticks.map((t) => t.label)).toEqual(["10:00", "11:00", "12:00", "13:00", "14:00", "15:00"]);
-    expect(l.me).toEqual({ leftPct: 0, widthPct: 60 });
-    expect(l.next).toMatchObject({ leftPct: 60, widthPct: 40, linked: true });
+    // Trục 10:00 → 15:11 (311'): ca = 10:00–13:11 (191'), ca sau 13:11–15:11.
+    expect(l.me.leftPct).toBe(0);
+    expect(l.me.widthPct).toBeCloseTo((191 / 311) * 100, 5);
+    expect(l.next).toMatchObject({ linked: true });
+    expect(l.next!.leftPct).toBeCloseTo((191 / 311) * 100, 5);
     expect(l.turns).toHaveLength(2);
     expect(l.turns[0].reason).toBeUndefined();
     expect(l.turns[1].reason).toBe("manual_restart");
-    expect(l.turns[1].outside).toHaveLength(1); // 13:00–13:13 thuộc ca sau
-    expect(l.turns[1].inside!.leftPct + l.turns[1].inside!.widthPct).toBeCloseTo(60, 5);
+    expect(l.turns[1].outside).toHaveLength(1); // 13:11–13:13 thuộc ca sau
+    expect(l.turns[1].inside!.leftPct + l.turns[1].inside!.widthPct).toBeCloseTo((191 / 311) * 100, 5);
     expect(l.gaps).toEqual([expect.objectContaining({ minutes: 11 })]);
-    expect(l.cutEndPct).toBe(60);
+    expect(l.cutEndPct).toBeUndefined(); // room chỉ lố 2' so với giờ giao 13:11 (≤ dung sai 5')
     expect(l.cutStartPct).toBeUndefined();
   });
 
@@ -130,5 +133,41 @@ describe("flexWindow — cả chuỗi ca nối trượt theo giờ vào trễ (0
     });
     expect(l.prev!.leftPct + l.prev!.widthPct).toBeCloseTo(l.me.leftPct, 5);
     expect(l.cutStartPct).toBeCloseTo(l.me.leftPct, 5); // room chạy tiếp từ ca trước ⇒ vạch giao ca ở đúng giờ vào ca đã trượt
+  });
+});
+
+
+describe("0205: phút nghỉ giữa room + giờ giao ca thực", () => {
+  const rooms = [
+    { startedAt: iso("10:09"), endedAt: iso("12:10") },
+    { startedAt: iso("12:16"), endedAt: iso("13:40") }
+  ];
+  test("ca FUJIWA 09/11: vào trễ 9' + nghỉ 6' ⇒ ca 10:09–13:15, đủ 180' live", () => {
+    const w = flexWindow(win, rooms);
+    expect(vnClock(w.startMs)).toBe("10:09");
+    expect(vnClock(w.endMs)).toBe("13:15");
+    const live = (at("12:10") - at("10:09") + (at("13:15") - at("12:16"))) / 60000;
+    expect(live).toBe(180);
+  });
+  test("nghỉ ngoài 1'–30' không tính (45' không phải tắt bật lại)", () => {
+    const w = flexWindow(win, [
+      { startedAt: iso("10:00"), endedAt: iso("11:00") },
+      { startedAt: iso("11:45"), endedAt: iso("13:00") }
+    ]);
+    expect(w).toEqual(win);
+  });
+  test("ops nhập giờ giao ca thực ⇒ thay số tự tính, ca sau bắt đầu từ đó", () => {
+    const w = flexWindow(win, rooms, [], at("13:20"));
+    expect(vnClock(w.endMs)).toBe("13:20");
+    const l = timelineLayout({
+      win,
+      rooms: rooms.map((r, i) => ({ roomId: `r${i}`, ...r })),
+      parts: [],
+      next: { startMs: at("13:00"), endMs: at("15:00"), label: "Khanh", linked: true },
+      nowMs: at("22:00"),
+      manualEndMs: at("13:20")
+    });
+    expect(l.cutEndPct).toBeDefined();
+    expect(vnClock(l.axisEndMs)).toBe("15:20");
   });
 });
