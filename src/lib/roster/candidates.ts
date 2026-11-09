@@ -140,8 +140,9 @@ function whatIf(shift: RosterShift, talentId: string, ctx: RankContext, an: Rost
   const curWeek = list.filter((e) => e.shift.date >= ctx.weekStart && e.shift.date <= weekEnd).reduce((s, e) => s + e.minutes / 60, 0);
   const inWeek = shift.date >= ctx.weekStart && shift.date <= weekEnd;
   const after = curWeek + (inWeek ? shiftHours(shift) : 0);
-  if (after > ctx.rules.maxWeekHours) return { blocked: `Sẽ thành ${fmtH(after)} giờ/tuần`, issues: [], weekHours: curWeek };
   const issues: string[] = [];
+  // 09/11 (0206): quá giờ tuần chỉ CẢNH BÁO — vẫn chọn được; có cảnh báo thì Tự fill bỏ qua người này (c.issues.length === 0).
+  if (after > ctx.rules.maxWeekHours) issues.push(`sẽ thành ${fmtH(after)} giờ/tuần (tối đa ${ctx.rules.maxWeekHours})`);
   const lateMin = (() => {
     const [h, m] = ctx.rules.lateEndTime.split(":").map(Number);
     return h * 60 + m;

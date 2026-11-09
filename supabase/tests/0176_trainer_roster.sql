@@ -162,11 +162,8 @@ select 't', 'b1740000-0000-0000-0000-00000000000a', 'VERA', current_setting('t.w
 insert into shift_slots (id, date, start_time, end_time, brand_id, brand_name, status) values
   ('e1740000-0000-0000-0000-000000000005', current_setting('t.wk')::date + 6, '20:00', '23:30', 'b1740000-0000-0000-0000-00000000000a', 'VERA', 'open');
 insert into roster_drafts (slot_id, host_id) values ('e1740000-0000-0000-0000-000000000005', 'c1740000-0000-0000-0000-000000000003');
-select pg_temp.must_fail('4a quá 48 giờ ⇒ không công bố',
-  format($q$select publish_roster_week(%L::date)$q$, current_setting('t.wk')), 'Quá 48');
-update roster_rules set max_week_hours = 60 where id = 1;
-select pg_temp.chk('4b nâng ngưỡng ⇒ công bố được', (publish_roster_week(current_setting('t.wk')::date) ->> 'published')::int = 1);
-update roster_rules set max_week_hours = 48 where id = 1;
+-- 0206: quá 48 giờ chỉ CẢNH BÁO ở client — DB vẫn công bố (trước 0206 chỗ này là must_fail 'Quá 48').
+select pg_temp.chk('4a quá 48 giờ ⇒ vẫn công bố được (0206: chỉ cảnh báo)', (publish_roster_week(current_setting('t.wk')::date) ->> 'published')::int = 1);
 
 -- ============ 5) Đổi người / dời giờ sau công bố ============
 select pg_temp.must_fail('5a đổi người không lý do',
@@ -179,8 +176,9 @@ select pg_temp.chk('5c ghi nhật ký + báo người bị rút', (select count(
   and (select count(*) from notifications where kind = 'shift_unassigned') = 1);
 update live_sessions set date = current_setting('t.wk')::date + 2, start_time = '15:00', end_time = '18:00' where id = 'd1740000-0000-0000-0000-000000000001';
 select roster_reassign('d1740000-0000-0000-0000-000000000001', 'c1740000-0000-0000-0000-000000000002', null, 'đổi lại');
-select pg_temp.must_fail('5d thêm người đã 48,5 giờ tuần đó (T.Toàn) ⇒ chặn',
-  $q$select roster_reassign('d1740000-0000-0000-0000-000000000001', 'c1740000-0000-0000-0000-000000000002', 'c1740000-0000-0000-0000-000000000003', 'thử')$q$, 'tối đa');
+-- 0206: thêm người đã quá 48 giờ tuần đó (T.Toàn) vẫn đổi được (trước 0206 là must_fail 'tối đa').
+select pg_temp.chk('5d thêm người đã quá 48 giờ ⇒ vẫn đổi được (0206)',
+  (roster_reassign('d1740000-0000-0000-0000-000000000001', 'c1740000-0000-0000-0000-000000000002', 'c1740000-0000-0000-0000-000000000003', 'thử')).co_host_id = 'c1740000-0000-0000-0000-000000000003');
 select pg_temp.chk('5e dời giờ có lý do',
   (roster_move_session('d1740000-0000-0000-0000-000000000001', current_setting('t.wk')::date + 2, '14:00', '16:00', 'Brand đổi khung')).start_time = '14:00');
 select pg_temp.chk('5e2 nhật ký dời giờ', (select count(*) from roster_changes where kind = 'move') = 1);

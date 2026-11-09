@@ -298,6 +298,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
   const warns = weekIssues.filter((i) => i.severity === "warn");
   const openShifts = wk.filter((s) => s.kind === "open");
   const draftedCount = openShifts.filter((s) => s.drafted).length;
+  const overWeek = warns.filter((i) => i.code === "week_over");
   const outsideDrafts = openShifts.filter((s) => s.drafted && s.date.slice(0, 7) !== viewMonth).length;
   const weekCost = wk.reduce((s, x) => s + shiftCost(x, p.talents, p.talentRateHistory).amount, 0);
   const costMissing = wk.filter((x) => shiftCost(x, p.talents, p.talentRateHistory).missing).length;
@@ -589,9 +590,18 @@ export const RosterBoard: React.FC<Props> = (p) => {
       for (const d of drafts) if (p.shiftSlots.some((sl) => sl.id === d.slotId && rangeWeeks.some(([w]) => sl.date >= w && sl.date <= weekEndOf(w)))) [d.hostId, d.coHostId].forEach((x) => x && people.add(x));
       const msg = [
         `Công bố ${rangeWeeks.length} tuần (${rangeWeeks.map(([w]) => `${dayLabel(w)}–${dayLabel(weekEndOf(w))}`).join("; ")})?`,
+      // 0206: quá giờ tuần chỉ cảnh báo — liệt kê từng tuần/người trước khi công bố.
+      const overLines = rangeWeeks.flatMap(([w]) =>
+        analyzeRoster(buildRosterShifts(p.sessions, p.shiftSlots, drafts, p.shiftRegistrations, addDays(w, -7), addDays(w, 7)), rules, w, nameOf, undefined, brandRules)
+          .issues.filter((i) => i.code === "week_over")
+          .map((i) => `tuần ${dayLabel(w)}: ${i.text.replace(/ có (.+) trong tuần.*/, " $1")}`)
+      );
         `${total}+ ca nháp thành ca thật; khoảng ${people.size} host/trợ nhận tin (mỗi người một tin cho mỗi tuần).`,
-        "Tuần vắt qua ngày cuối của phạm vi được công bố trọn tuần, gồm cả nháp ngoài phạm vi."
-      ].join("\n");
+        "Tuần vắt qua ngày cuối của phạm vi được công bố trọn tuần, gồm cả nháp ngoài phạm vi.",
+        overLines.length > 0 ? `⚠ Quá ${rules.maxWeekHours} giờ/tuần (không chặn): ${overLines.join("; ")}.` : ""
+      ]
+        .filter(Boolean)
+        .join("\n");
       if (!(await confirm(msg, { confirmLabel: `Công bố ${rangeWeeks.length} tuần` }))) return;
       let published = 0;
       let notified = 0;
@@ -643,7 +653,9 @@ export const RosterBoard: React.FC<Props> = (p) => {
         `${draftedCount} ca nháp sẽ thành ca thật, mỗi host/trợ nhận MỘT tin liệt kê ca của mình.`,
         outsideDrafts > 0 ? `Công bố theo tuần nên gồm cả ${outsideDrafts} ca nháp ngoài tháng ${Number(viewMonth.slice(5))} (ngày đang ẩn trên lưới).` : "",
         holes > 0 ? `${holes} ca mở chưa có host sẽ vẫn mở (không công bố).` : "",
-        warns.length > 0 ? `Còn ${warns.length} cảnh báo (không chặn).` : ""
+        // 0206: quá giờ tuần chỉ cảnh báo — nêu đích danh để người công bố nhìn thấy trước khi bấm.
+        overWeek.length > 0 ? `⚠ Quá ${rules.maxWeekHours} giờ/tuần (không chặn): ${overWeek.map((i) => i.text.replace(/ có (.+) trong tuần.*/, " $1")).join("; ")}.` : "",
+        warns.length - overWeek.length > 0 ? `Còn ${warns.length - overWeek.length} cảnh báo khác (không chặn).` : ""
       ]
         .filter(Boolean)
         .join("\n");
@@ -748,7 +760,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
   if (st1.phase === "none" && !desk.loading)
     todos.push({ key: "next", tone: "bad", text: `${mNext[0].toUpperCase()}${mNext.slice(1)} bắt đầu sau ${daysToNext} ngày, chưa mở ca nào.`, sub: `${noCommitNext}/${desk.nextRows.length} kênh chưa có giờ cam kết.`, action: { label: `Mở lịch ${mNext}`, run: openWizard } });
   else if (st1.phase === "no_deadline")
-    todos.push({ key: "next", tone: "bad", text: `${st1.openSlots} ca mở ${mNext} chưa có hạn đăng ký.`, sub: "Đặt hạn để talent biết hạn chót và app nhắc từng người.", action: { label: "Đặt hạn đăng ký", run: openWizard } });
+    todos.push({ key: "next", tone: "warn", text: `${mNext[0].toUpperCase()}${mNext.slice(1)} đang nhận đăng ký (chưa đặt hạn): ${st1.slotsWithSignup}/${st1.openSlots} ca có người báo rảnh.`, sub: `${st1.noHost} ca chưa có host. Đặt hạn là tuỳ chọn — chốt miệng với talent cũng được.`, action: { label: "Đặt hạn (không bắt buộc)", run: openWizard } });
   else if (st1.phase === "signup")
     todos.push({ key: "next", tone: "warn", text: `${mNext[0].toUpperCase()}${mNext.slice(1)} đang nhận đăng ký tới ${fmtWhen(st1.deadline!)}: ${st1.slotsWithSignup}/${st1.openSlots} ca có người báo rảnh.`, action: { label: "Chép tin nhắc người chưa đăng ký", run: () => nudge(m1) } });
   else if (st1.phase === "staff")

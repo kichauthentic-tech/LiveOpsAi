@@ -43,7 +43,13 @@ function describe(c: MonthCard): { tone: keyof typeof PILL; label: string; text:
         ? { tone: "off", label: "Chưa tới", text: `Mở lịch sau khi tháng ${m - 1 || 12} xong đăng ký.` }
         : { tone: "bad", label: "Chưa mở ca", text: c.noneText ?? "Chưa có ca cho talent đăng ký.", action: { kind: "next", label: `Mở lịch tháng ${m}` } };
     case "no_deadline":
-      return { tone: "warn", label: "Chưa đặt hạn đăng ký", text: `${s.openSlots} ca mở chờ talent đăng ký.`, action: { kind: "next", label: "Đặt hạn đăng ký" } };
+      // Không bắt buộc đặt hạn (chốt miệng cũng được) — chỉ là tuỳ chọn, không tô cảnh báo.
+      return {
+        tone: "off",
+        label: "Đang nhận đăng ký",
+        text: `${s.openSlots} ca mở · ${s.slotsWithSignup} ca có người báo rảnh · ${s.signedPeople} người đã đăng ký · chưa đặt hạn`,
+        action: { kind: "next", label: "Đặt hạn (không bắt buộc)" }
+      };
     case "signup":
       return {
         tone: "warn",

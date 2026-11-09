@@ -34,6 +34,8 @@ test("tháng chưa có ca nào = Chưa mở ca; tháng chứa hôm nay = Live; t
 test("có ca mở mà chưa đặt hạn → no_deadline; hạn còn ở tương lai → đang nhận đăng ký, đếm ca có người + số người", () => {
   const slots = [slot("a", "2026-11-02"), slot("b", "2026-11-03"), slot("c", "2026-11-04"), slot("x", "2026-12-01")];
   expect(monthStatus(base({ slots })).phase).toBe("no_deadline");
+  // 09/11: chưa đặt hạn KHÔNG phải lỗi (chốt miệng) — thanh tiến độ đứng ở bước "Đăng ký", không kẹt ở "Mở ca".
+  expect(monthStatus(base({ slots })).steps).toEqual(["done", "cur", "todo", "todo", "todo"]);
   const st = monthStatus(base({ slots, milestones: { month: "2026-11", signupDeadline: "2026-10-30T10:00:00.000Z" }, registrations: [reg("a", "t1"), reg("a", "t2"), reg("b", "t1"), reg("x", "t9")] }));
   expect(st.phase).toBe("signup");
   expect(st.openSlots).toBe(3);

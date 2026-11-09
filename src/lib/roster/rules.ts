@@ -5,8 +5,8 @@ import { hasSessionData } from "../sessionStatus";
 import { sessionDurationHours } from "../pnl";
 
 // Điều Phối Lịch Live — luật lịch tuần. Hàm thuần: nhận ca thật + ca mở (kèm người nháp) của một khoảng ngày, trả lỗi/cảnh báo theo ca.
-// Ngưỡng ở bảng roster_rules (0176); DB chỉ CHẶN quá max_week_hours (lúc công bố/đổi người) và trùng người (0143) — mọi luật còn
-// lại là cảnh báo để trainer tự quyết (user chốt 13/10).
+// Ngưỡng ở bảng roster_rules (0176); DB chỉ CHẶN trùng người (0143) — mọi luật còn lại là cảnh báo để trainer tự quyết (user chốt
+// 13/10). Quá max_week_hours cũng chỉ cảnh báo từ 09/11 (migration 0206: lịch sheet đã có người vượt 48h, chặn thì không công bố được tuần đó).
 
 export interface RosterRules {
   maxWeekHours: number;
@@ -212,7 +212,7 @@ export type IssueSeverity = "block" | "hole" | "warn";
 
 export const ISSUE_SEVERITY: Record<IssueCode, IssueSeverity> = {
   clash: "block",
-  week_over: "block",
+  week_over: "warn",
   draft_no_host: "block",
   no_host: "hole",
   no_co: "warn",

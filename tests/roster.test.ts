@@ -83,7 +83,7 @@ describe("analyzeRoster", () => {
     expect(clash.every((i) => i.severity === "block")).toBe(true);
   });
 
-  test("quá 48 giờ/tuần là lỗi chặn; 40–48 chỉ cảnh báo; tuần trước không cộng vào", () => {
+  test("quá 48 giờ/tuần chỉ cảnh báo (từ 0206); 40–48 cũng cảnh báo; tuần trước không cộng vào", () => {
     const many = Array.from({ length: 17 }, (_, i) =>
       ca(`m${i}`, { date: `2026-10-${String(12 + (i % 7)).padStart(2, "0")}`, startTime: `${String(6 + Math.floor(i / 7) * 3).padStart(2, "0")}:00`, endTime: `${String(9 + Math.floor(i / 7) * 3).padStart(2, "0")}:00`, coHostId: undefined })
     );
@@ -91,6 +91,9 @@ describe("analyzeRoster", () => {
     const an = R.analyzeRoster(R.buildRosterShifts([...many, prevWeek], [], [], [], "2026-10-05", "2026-10-18"), rules, WEEK, name);
     expect(an.weekHours.get("toan")).toBe(51);
     expect(an.issues.filter((i) => i.code === "week_over")).toHaveLength(1);
+    // 09/11 (0206): quá 48 giờ chỉ CẢNH BÁO — không chặn công bố.
+    expect(an.issues.find((i) => i.code === "week_over")?.severity).toBe("warn");
+    expect(an.issues.some((i) => i.severity === "block" && i.code === "week_over")).toBe(false);
     const an2 = R.analyzeRoster(R.buildRosterShifts(many.slice(0, 14), [], [], [], "2026-10-05", "2026-10-18"), rules, WEEK, name);
     expect(an2.issues.find((i) => i.code === "week_warn")?.severity).toBe("warn");
   });
@@ -156,6 +159,19 @@ describe("familiarity + candidates", () => {
     expect(list[0].talentId).toBe("khanh");
     expect(list.find((c) => c.talentId === "busy")?.blocked).toMatch(/Đang ở ca/);
     expect(list.some((c) => c.talentId === "tro")).toBe(false);
+  });
+
+  test("quá 48 giờ/tuần (0206): người vẫn chọn được, chỉ kèm cảnh báo — không bị chặn như ca trùng giờ", () => {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const full = Array.from({ length: 16 }, (_, i) =>
+      ca(`f${i}`, { hostId: "khanh", coHostId: undefined, date: `2026-10-${pad(12 + (i % 7))}`, startTime: `${pad(6 + Math.floor(i / 7) * 3)}:00`, endTime: `${pad(9 + Math.floor(i / 7) * 3)}:00` })
+    );
+    const shifts = R.buildRosterShifts(full, [slot("o1")], [], [], WEEK, "2026-10-18");
+    const target = shifts.find((s) => s.key === "o:o1")!;
+    const an = R.analyzeRoster(shifts, rules, WEEK, name);
+    const k = C.rankCandidates(target, "host", ctxOf(shifts, "balance"), an).find((c) => c.talentId === "khanh")!;
+    expect(k.blocked).toBeUndefined();
+    expect(k.issues.some((t) => /giờ\/tuần/.test(t))).toBe(true);
   });
 
   test("chi phí: rate tại ngày ca, trợ ưu tiên rate trợ, không rate = 'missing' (không phải 0)", () => {

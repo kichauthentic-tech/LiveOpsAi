@@ -144,7 +144,7 @@ export const ShiftPanel: React.FC<Props> = ({ shift, analysis, ctx, talents, his
             )}
           </div>
         )}
-        {!lockedPeople && blocked > 0 && <p className="text-2xs text-[var(--text-faint)]">Ẩn {blocked} người bận ca trùng giờ hoặc sẽ quá {ctx.rules.maxWeekHours}h tuần.</p>}
+        {!lockedPeople && blocked > 0 && <p className="text-2xs text-[var(--text-faint)]">Ẩn {blocked} người đang bận ca trùng giờ.</p>}
         {!lockedPeople && (everyone || unregistered > 0) && (
           <button type="button" onClick={() => setEveryone((v) => !v)} className="text-2xs font-bold text-[var(--accent-text)] hover:underline">
             {everyone ? "Chỉ hiện người đã đăng ký" : `Xem cả ${unregistered} người chưa đăng ký`}

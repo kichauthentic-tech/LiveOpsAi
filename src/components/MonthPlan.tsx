@@ -974,7 +974,10 @@ export default function MonthPlan({
       ? `\n\n⚠ ${crossBrand.clashes.length} ca TRÙNG PHÒNG với brand khác (vd ${crossBrand.clashes[0].date.slice(8)}/${crossBrand.clashes[0].date.slice(5, 7)} ${crossBrand.clashes[0].startTime}: ${crossBrand.clashes[0].roomTakenBy}). Chốt vẫn gắn phòng này — phải đổi phòng từng ca sau.`
       : "";
     const capNote = overCapacity ? `\n\n⚠ Ngày ${overCapacity.date.slice(8)}/${overCapacity.date.slice(5, 7)} ${overCapacity.startTime} có ${overCapacity.concurrent} ca chạy cùng lúc toàn agency — có ${studios.length} phòng, ${hostCapacity} người host.` : "";
-    if (!(await confirm(`${locked ? "Chốt lại" : "Chốt"} kế hoạch ${brandLabel(brand?.name)} tháng ${fmtMonth(month)}: ${drafts.length} ca${matchedCount > 0 ? ` (${matchedCount} gắn ca đã nhập, ${drafts.length - matchedCount} chờ đăng ký)` : " chờ đăng ký"}?${warn}${targetWarn}${sumNote}${relockNote}${studioNote}${clashNote}${capNote}${matchedNote}${pastNote}`))) return;
+    // 09/11 (audit mở lịch): chốt kế hoạch THÁNG SAU lần đầu ⇒ mỗi talent nhận một tin "đã mở đăng ký" cho TỪNG kênh chốt lẻ. Mở nhiều kênh
+    // cùng lúc nên dùng "Mở lịch tháng sau" (Điều Phối Lịch Live): chốt một giao dịch, một tin. Hạn đăng ký không bắt buộc — chỉ nhắc, không chặn.
+    const signupNote = !locked && month > today.slice(0, 7) ? "\n\nTalent sẽ nhận tin \"đã mở đăng ký\" cho kênh này. Mở nhiều kênh một lúc thì dùng Mở lịch tháng sau (Điều Phối Lịch Live) để talent chỉ nhận 1 tin; hạn đăng ký không bắt buộc." : "";
+    if (!(await confirm(`${locked ? "Chốt lại" : "Chốt"} kế hoạch ${brandLabel(brand?.name)} tháng ${fmtMonth(month)}: ${drafts.length} ca${matchedCount > 0 ? ` (${matchedCount} gắn ca đã nhập, ${drafts.length - matchedCount} chờ đăng ký)` : " chờ đăng ký"}?${warn}${targetWarn}${sumNote}${relockNote}${studioNote}${clashNote}${capNote}${matchedNote}${pastNote}${signupNote}`))) return;
     const p = await save({ committing: true });
     if (!p) return;
     setSaving(true);

@@ -18,13 +18,15 @@ test("mốc mặc định = ngày 10/15/20/25 tháng trước; mở muộn thì 
   expect(defaultMilestones("2026-12", "2026-11-03")).toEqual({ d1Date: "2026-11-10", d1Time: "17:00", d2Date: "2026-11-20", d2Time: "17:00", p1: "2026-11-15", p2: "2026-11-25" });
   // Tháng 1 ⇒ mốc ở tháng 12 năm trước.
   expect(defaultMilestones("2027-01", "2026-12-01").d1Date).toBe("2026-12-10");
-  // Mở lịch tháng 12 vào 18/11: hạn đợt 1 đã qua ⇒ ngày mai; chốt đợt 1 sau hạn; đợt 2 giữ 20/25.
+  // Mở lịch tháng 12 vào 9/11 (09/11, audit): hạn đợt 1 gốc 10/11 chỉ còn 1 ngày ⇒ dời tới hôm nay + 3 ngày = 12/11; các mốc sau giữ.
+  expect(defaultMilestones("2026-12", "2026-11-09")).toEqual({ d1Date: "2026-11-12", d1Time: "17:00", d2Date: "2026-11-20", d2Time: "17:00", p1: "2026-11-15", p2: "2026-11-25" });
+  // Mở lịch tháng 12 vào 18/11: hạn đợt 1 đã qua ⇒ hôm nay + 3 ngày; chốt đợt 1 sau hạn; đợt 2 dồn theo, chốt đợt 2 giữ 25.
   const late = defaultMilestones("2026-12", "2026-11-18");
-  expect(late).toMatchObject({ d1Date: "2026-11-19", p1: "2026-11-20", d2Date: "2026-11-20", p2: "2026-11-25" });
+  expect(late).toMatchObject({ d1Date: "2026-11-21", p1: "2026-11-22", d2Date: "2026-11-22", p2: "2026-11-25" });
   expect(milestoneError(late)).toBeNull();
-  // Mở lịch vào 26/11: mọi mốc dồn sau ngày mai.
+  // Mở lịch vào 26/11: mọi mốc dồn sau hôm nay + 3 ngày, thứ tự vẫn đúng.
   const veryLate = defaultMilestones("2026-12", "2026-11-26");
-  expect(veryLate).toMatchObject({ d1Date: "2026-11-27", p1: "2026-11-28", d2Date: "2026-11-28", p2: "2026-11-29" });
+  expect(veryLate).toMatchObject({ d1Date: "2026-11-29", p1: "2026-11-30", d2Date: "2026-11-30", p2: "2026-12-01" });
   expect(milestoneError(veryLate)).toBeNull();
 });
 

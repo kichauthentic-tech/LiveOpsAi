@@ -9,6 +9,8 @@ import { addDays } from "../dateUtils";
 /** Ngày cuối của đợt 1. */
 export const HALF_SPLIT_DAY = 15;
 export const DEFAULT_SIGNUP_TIME = "17:00";
+/** Mở lịch muộn: hạn đăng ký đầu tiên cách hôm nay ít nhất ngần này ngày (gợi ý mặc định, người đặt vẫn sửa được). */
+export const MIN_SIGNUP_LEAD_DAYS = 3;
 
 export type Half = 1 | 2;
 export const halfOf = (date: string): Half => (Number(date.slice(8, 10)) > HALF_SPLIT_DAY ? 2 : 1);
@@ -47,13 +49,14 @@ const prevMonth = (m: string) => {
 };
 
 /**
- * Mốc mặc định cho tháng `month`: ngày 10/15/20/25 của tháng trước. Mốc đã qua (mở lịch muộn) dời tới ngày mai, các mốc sau giữ
- * khoảng cách tối thiểu 1 ngày để thứ tự vẫn đúng: hạn đợt 1 < chốt đợt 1, hạn đợt 2 < chốt đợt 2.
+ * Mốc mặc định cho tháng `month`: ngày 10/15/20/25 của tháng trước. Mốc đã qua (mở lịch muộn) dời tới `today + MIN_SIGNUP_LEAD_DAYS`
+ * (09/11: mặc định cũ "ngày mai" cho talent chưa tới 1 ngày để đăng ký ca 1–15/12), các mốc sau giữ khoảng cách tối thiểu 1 ngày
+ * để thứ tự vẫn đúng: hạn đợt 1 < chốt đợt 1, hạn đợt 2 < chốt đợt 2.
  */
 export function defaultMilestones(month: string, today: string): MilestoneDraft {
   const pm = prevMonth(month);
   const at = (d: number) => `${pm}-${String(d).padStart(2, "0")}`;
-  const floor = addDays(today, 1);
+  const floor = addDays(today, MIN_SIGNUP_LEAD_DAYS);
   const d1 = at(10) < floor ? floor : at(10);
   const p1 = at(15) <= d1 ? addDays(d1, 1) : at(15);
   const d2 = at(20) <= d1 ? addDays(d1, 1) : at(20);

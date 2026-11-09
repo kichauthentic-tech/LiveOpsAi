@@ -16,7 +16,7 @@ export type MonthPhase =
   | "past"
   /** Chưa có ca nào (cả ca đã chốt lẫn ca mở). */
   | "none"
-  /** Có ca mở chưa có host mà chưa có hạn đăng ký (đợt của ca chưa đặt hạn). */
+  /** Có ca mở chưa có host mà chưa đặt hạn đăng ký — KHÔNG phải lỗi (chốt miệng cũng được, user 09/11): vẫn nhận đăng ký, chỉ chưa có hạn. */
   | "no_deadline"
   /** Hạn đăng ký còn ở tương lai, còn ca mở chưa có host nháp. */
   | "signup"
@@ -82,7 +82,7 @@ export interface MonthStatusInput {
   milestones?: MonthMilestones;
 }
 
-const STEP_OF: Record<MonthPhase, number> = { none: 0, no_deadline: 0, signup: 1, staff: 2, publish: 3, done: 4, live: 4, past: 5 };
+const STEP_OF: Record<MonthPhase, number> = { none: 0, no_deadline: 1, signup: 1, staff: 2, publish: 3, done: 4, live: 4, past: 5 };
 
 export function monthStatus(x: MonthStatusInput): MonthStatus {
   const inMonth = (d: string) => d.slice(0, 7) === x.month;
