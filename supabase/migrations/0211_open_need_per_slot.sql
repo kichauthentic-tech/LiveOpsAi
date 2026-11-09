@@ -1,4 +1,4 @@
--- 0209 — Nhãn "Cần host / Cần trợ live" tính THEO TỪNG CA, không mặc định cho mọi ca mở (10/11). Sửa 0208.
+-- 0211 — Nhãn "Cần host / Cần trợ live" tính THEO TỪNG CA, không mặc định cho mọi ca mở (10/11). Sửa 0208.
 --
 -- Vì sao: 0208 gán 'host' cho MỌI ca mở chưa có nháp ⇒ T12 (473 ca chưa ai xếp, chưa chốt) cũng hiện "Cần host". Luật user chốt: ca chỉ có nhãn khi
 -- chính ca đó đã được trainer xử lý (nháp thiếu vai) — không suy từ ca khác trong tháng. 12 ca T11 còn mở sau khi chốt là ngoại lệ: giữ 'host'.
