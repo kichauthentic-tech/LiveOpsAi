@@ -15,7 +15,6 @@ import { CampaignDayRibbon, CampaignDayBanner } from "../ui/CampaignDayRibbon";
 import { SchemeWeekStrip } from "./SchemeWeekStrip";
 import { SchemeDayPanel } from "./SchemeDayPanel";
 import {
-  SessionCardLegend,
   SessionEventCard,
   SESSION_TONE,
   buildSessionMeta,
@@ -378,9 +377,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
             )}
           </>
         }
-      >
-        <SessionCardLegend showCancelled showTiming={!brandViewer} />
-      </PageHeader>
+      />
 
 
       {viewMode === "month" && emptySchemeWeeks > 0 && (

@@ -15,7 +15,6 @@ import { isMine } from "../lib/talent/myShifts";
 import {
   SessionEventCard,
   SESSION_TONE,
-  SessionCardLegend,
   buildSessionMeta,
   buildDurationBadge,
   buildPctBadge,
@@ -879,7 +878,6 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   </span>
                 );
               })}
-              <SessionCardLegend showTiming />
             </div>
           </div>
 
@@ -1070,7 +1068,6 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
               </h3>
               {canEdit && <p className="text-xs text-[var(--text-muted)]">Kéo thả để đổi lịch</p>}
             </div>
-            <SessionCardLegend showTiming />
           </div>
 
           {/* Luôn 7 cột như Lịch Tháng (user 08/11) — dưới xl cuộn ngang thay vì xếp 7 ngày thành một cột dọc dài. */}
@@ -1318,7 +1315,6 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                 {daySessions.length} ca đã chốt · {daySlots.length} ca chờ đăng ký · {totalHours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h live.{canEdit ? " Kéo thẻ ca sang hàng phòng khác để đổi phòng (giữ giờ) — phòng sàn kia của cùng brand thì đổi luôn sàn." : ""}
               </p>
             </div>
-            <SessionCardLegend showTiming />
           </div>
 
           <div className="overflow-x-auto rounded-xl border border-[var(--border)]/80 scrollbar-thin">

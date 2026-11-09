@@ -92,39 +92,6 @@ const StatusIcon: React.FC<{ tone: SessionCardTone }> = ({ tone }) => {
   return null;
 };
 
-/** Chú giải trạng thái thẻ — dùng chung mọi lịch, đúng các biểu tượng StatusIcon vẽ.
- * `variant="slot"` cho lịch Nhân sự ca (ca mở / đã chốt / đã huỷ, không có live/xong). */
-export const SessionCardLegend: React.FC<{ showCancelled?: boolean; showTiming?: boolean; variant?: "session" | "slot"; className?: string }> = ({
-  showCancelled,
-  showTiming,
-  variant = "session",
-  className = ""
-}) => (
-  <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs font-semibold text-[var(--text-muted)] ${className}`}>
-    {variant === "session" ? (
-      <>
-        <span className="inline-flex items-center gap-1.5"><span className="sc-live" /> Đang live</span>
-        <span className="inline-flex items-center gap-1.5"><CheckCircle2 className="sc-st text-emerald-600 dark:text-emerald-400" strokeWidth={2.4} /> Đã xong</span>
-        {showCancelled && <span className="inline-flex items-center gap-1.5"><XCircle className="sc-st text-rose-600 dark:text-rose-400" strokeWidth={2.4} /> Đã huỷ</span>}
-        <span className="inline-flex items-center gap-1.5"><Clock className="sc-st" strokeWidth={2.4} /> Chờ đăng ký (viền đứt)</span>
-        {showTiming && (
-          <>
-            <span className="inline-flex items-center gap-1.5"><span className="sc-dur" data-kind="ot">OT +25p</span> Live quá giờ (OT)</span>
-            <span className="inline-flex items-center gap-1.5"><span className="sc-dur" data-kind="early">Kết thúc sớm ≥ 30 phút</span> Live thiếu giờ (kết thúc sớm)</span>
-            <span className="inline-flex items-center gap-1.5"><span className="sc-pill sc-pill-split"><b data-level="hit">112%</b><i>25M</i></span> % Target (xanh ≥100% · đỏ &lt;60%)</span>
-          </>
-        )}
-      </>
-    ) : (
-      <>
-        <span className="inline-flex items-center gap-1.5"><Clock className="sc-st" strokeWidth={2.4} /> Ca mở, chờ đăng ký (viền đứt)</span>
-        <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded-[4px] border-[1.5px] border-solid border-[var(--text-muted)]" /> Đã chốt (viền liền)</span>
-        <span className="inline-flex items-center gap-1.5"><XCircle className="sc-st text-rose-600 dark:text-rose-400" strokeWidth={2.4} /> Đã huỷ (giờ gạch, mờ)</span>
-      </>
-    )}
-  </div>
-);
-
 export const SessionEventCard: React.FC<SessionEventCardProps> = ({
   theme,
   brand,
