@@ -1,5 +1,5 @@
 import { platformText } from "../lib/metricGlossary";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { SystemUser, Talent, LiveSession, SessionFinance, TalentRateHistoryEntry } from "../types";
 import { ShieldAlert, ChevronRight, Clock, Wallet, Clapperboard, Store } from "lucide-react";
 import { computeTalentMonthlyIncome } from "../lib/pnl";
@@ -13,6 +13,9 @@ import { monthSummary, myRole } from "../lib/talent/myShifts";
 import { channelReach, myChannelRoleSummary } from "../lib/talent/channelSummary";
 import { sessionMinutes } from "../lib/staffSegments";
 import { PlatformChip } from "./common/PlatformChip";
+import { RateLockGate } from "./talent/RateLockGate";
+import { useAuth } from "../hooks/useAuth";
+import { isRateUnlocked } from "../lib/talent/rateLock";
 
 // Tab "Tôi" của app talent (bản 3, 09/11). Người làm live vào đây để hỏi "tháng này tôi làm bao nhiêu giờ, được bao nhiêu" ⇒ giờ
 // + thu nhập đứng đầu, rồi MỘT hàng hai bảng: "Hiệu suất theo brand × sàn × vai" (trái) và "Bảng công" từng ca (phải).
@@ -87,7 +90,7 @@ const RoleTag: React.FC<{ role: "host" | "assistant" }> = ({ role }) => (
 // rate ở 33/33 talent (30/09).
 const Empty: React.FC<{ children: React.ReactNode }> = ({ children }) => <span className="font-normal text-[var(--text-faint)]">{children}</span>;
 
-export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
+const MyTalentProfileBody: React.FC<MyTalentProfileProps> = ({
   activeUser,
   talents,
   sessions,
@@ -344,4 +347,50 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
       </div>
     </div>
   );
+};
+
+// Cổng mật khẩu (09/11): host/trợ dùng chung PC công ty, người trước quên đăng xuất ⇒ vào Tôi phải nhập lại mật khẩu.
+// Trạng thái mở khoá chỉ nằm trong bộ nhớ của component này: rời tab / tải lại trang / đăng xuất đều khoá lại.
+// Thao tác (chạm, phím, cuộn) gia hạn; không thao tác RATE_LOCK_IDLE_MS thì khoá lại — kiểm cả khi tab bị ẩn rồi hiện lại.
+export const MyTalentProfile: React.FC<MyTalentProfileProps> = (props) => {
+  const { signOut } = useAuth();
+  const lastActive = useRef<number | null>(null);
+  const [unlocked, setUnlocked] = useState(false);
+
+  useEffect(() => {
+    if (!unlocked) return;
+    const touch = () => {
+      lastActive.current = Date.now();
+    };
+    const check = () => {
+      if (!isRateUnlocked(lastActive.current, Date.now())) {
+        lastActive.current = null;
+        setUnlocked(false);
+      }
+    };
+    const events = ["pointerdown", "keydown", "scroll", "touchstart"] as const;
+    for (const e of events) window.addEventListener(e, touch, { passive: true, capture: true });
+    document.addEventListener("visibilitychange", check);
+    const id = window.setInterval(check, 5000);
+    return () => {
+      for (const e of events) window.removeEventListener(e, touch, { capture: true });
+      document.removeEventListener("visibilitychange", check);
+      window.clearInterval(id);
+    };
+  }, [unlocked]);
+
+  if (!unlocked) {
+    const myTalent = props.talents.find((t) => t.id === props.activeUser.assignedTalentId);
+    return (
+      <RateLockGate
+        name={myTalent?.name ?? props.activeUser.name}
+        onUnlocked={() => {
+          lastActive.current = Date.now();
+          setUnlocked(true);
+        }}
+        onSignOut={() => void signOut()}
+      />
+    );
+  }
+  return <MyTalentProfileBody {...props} />;
 };
