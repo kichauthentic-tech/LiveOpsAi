@@ -4,7 +4,7 @@ import { breakReasonShort } from "../lib/liveSnapshot/roomCases";
 import { shortRoomId } from "../lib/liveSnapshot/roomSelection";
 
 // Vẽ dòng thời gian của ca (vị trí tính ở lib/liveSnapshot/timeline.ts). Thanh xanh = room/phiên trong ca này, xanh nhạt = phần
-// thuộc ca kề bên, sọc = nghỉ giữa hai room, vạch đậm = giờ giao ca. Dưới trục: mỗi lượt một viên ngắn (số lượt · lý do · giờ).
+// thuộc ca kề bên, sọc = nghỉ giữa hai room, vạch đậm = giờ giao ca, cam "OT" = đoạn quá giờ kế hoạch (ca không có ca sau). Dưới trục: mỗi lượt một viên ngắn (số lượt · lý do · giờ).
 
 const pos = (s: { leftPct: number; widthPct: number }): React.CSSProperties => ({ left: `${s.leftPct}%`, width: `${s.widthPct}%` });
 const HATCH = "repeating-linear-gradient(45deg, color-mix(in srgb, var(--warning) 55%, transparent) 0 3px, transparent 3px 6px)";
@@ -12,7 +12,7 @@ const HATCH = "repeating-linear-gradient(45deg, color-mix(in srgb, var(--warning
 export function SessionTimeline({ layout: l, unit }: { layout: TimelineLayout; unit: string }) {
   const multi = l.turns.length > 1;
   return (
-    <div className="space-y-1.5" role="img" aria-label={`Dòng thời gian: ${l.turns.length} ${unit}${l.gaps.length ? `, nghỉ ${l.gaps.map((g) => `${g.minutes} phút`).join(", ")}` : ""}`}>
+    <div className="space-y-1.5" role="img" aria-label={`Dòng thời gian: ${l.turns.length} ${unit}${l.gaps.length ? `, nghỉ ${l.gaps.map((g) => `${g.minutes} phút`).join(", ")}` : ""}${l.overtime ? `, quá giờ kế hoạch ${l.overtime.minutes} phút` : ""}`}>
       <div className="relative h-4 text-2xs text-[var(--text-faint)] tabular-nums">
         {l.ticks.map((t, i) => (
           <span
@@ -51,6 +51,18 @@ export function SessionTimeline({ layout: l, unit }: { layout: TimelineLayout; u
             )}
           </React.Fragment>
         ))}
+        {l.overtime && (
+          <>
+            <div
+              className="absolute top-[3px] bottom-[3px] rounded-r bg-[var(--warning)] flex items-center justify-center overflow-hidden"
+              style={pos(l.overtime)}
+              title={`Quá giờ kế hoạch ${l.overtime.minutes} phút`}
+            >
+              {l.overtime.widthPct > 6 && <span className="text-2xs font-black text-white">OT</span>}
+            </div>
+            <div className="absolute -top-1 -bottom-1 w-0.5 bg-[var(--text)]" style={{ left: `${l.overtime.fromPct}%` }} />
+          </>
+        )}
         {[l.cutStartPct, l.cutEndPct].map((c, i) =>
           c === undefined ? null : <div key={`c${i}`} className="absolute -top-1 -bottom-1 w-0.5 bg-[var(--text)]" style={{ left: `${c}%` }} />
         )}

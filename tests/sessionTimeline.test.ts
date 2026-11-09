@@ -171,3 +171,40 @@ describe("0205: phút nghỉ giữa room + giờ giao ca thực", () => {
     expect(vnClock(l.axisEndMs)).toBe("15:20");
   });
 });
+
+describe("0209: ca không có ca nối sau — giờ giao ca kéo theo giờ room tắt", () => {
+  // Franklin Shopee 09/11 20:00–22:00: room 20:03 → 22:33:52, ops khai OT 30'.
+  const w = { startMs: at("20:00"), endMs: at("22:00") };
+  const room = [{ startedAt: iso("20:03"), endedAt: new Date(at("22:33") + 52000).toISOString() }];
+  test("không ca sau ⇒ ca kéo tới giờ tắt room (live 2h30), không còn phần 'lấn ca sau'", () => {
+    const f = flexWindow(w, room, [], undefined, true);
+    expect(f.startMs).toBe(w.startMs);
+    expect(f.endMs).toBe(at("22:33") + 52000);
+    const l = timelineLayout({ win: w, rooms: room.map((r) => ({ roomId: "r", ...r })), parts: [], nowMs: at("23:59"), noNextShift: true });
+    expect(l.cutEndPct).toBeUndefined();
+    expect(l.turns[0].outside).toHaveLength(0);
+    // Đoạn OT = 22:00 → 22:33:52, vạch ở 22:00.
+    expect(l.overtime?.minutes).toBe(34);
+    expect(l.overtime!.fromPct).toBeGreaterThan(70);
+    expect(l.overtime!.leftPct + l.overtime!.widthPct).toBeCloseTo(100, 5);
+  });
+  test("trượt vì vào trễ / ca có ca sau / nhập tay ⇒ không vẽ OT", () => {
+    const late = [{ roomId: "r", startedAt: iso("20:10"), endedAt: iso("22:10") }];
+    expect(timelineLayout({ win: w, rooms: late, parts: [], nowMs: at("23:00"), noNextShift: true }).overtime).toBeUndefined();
+    expect(timelineLayout({ win: w, rooms: room.map((r) => ({ roomId: "r", ...r })), parts: [], nowMs: at("23:59"), noNextShift: false }).overtime).toBeUndefined();
+    expect(timelineLayout({ win: w, rooms: room.map((r) => ({ roomId: "r", ...r })), parts: [], nowMs: at("23:59"), noNextShift: true, manualEndMs: at("22:20") }).overtime).toBeUndefined();
+  });
+  test("có ca sau (noNextShift = false) ⇒ giữ mốc 22:00 như cũ", () => {
+    expect(flexWindow(w, room, [], undefined, false)).toEqual(w);
+  });
+  test("room lố ≤ 5' ⇒ không kéo; còn room chưa tắt ⇒ không kéo", () => {
+    expect(flexWindow(w, [{ startedAt: iso("20:00"), endedAt: iso("22:05") }], [], undefined, true)).toEqual(w);
+    expect(flexWindow(w, [{ startedAt: iso("20:00") }], [], undefined, true)).toEqual(w);
+  });
+  test("kẹp tối đa +90' so với giờ hết ca kế hoạch", () => {
+    expect(flexWindow(w, [{ startedAt: iso("20:00"), endedAt: new Date(at("22:00") + 3 * 3600000).toISOString() }], [], undefined, true).endMs).toBe(at("22:00") + 90 * 60000);
+  });
+  test("ops nhập giờ giao ca thực vẫn được ưu tiên hơn số tự kéo", () => {
+    expect(vnClock(flexWindow(w, room, [], at("22:20"), true).endMs)).toBe("22:20");
+  });
+});

@@ -121,7 +121,13 @@ export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSes
   const planWin = sessionWindow(s);
   const chainStartsMs = chain.map((x) => sessionWindow(x).startMs);
   const manualEndMs = snapshot?.boundaryManual && !snapshot.isEstimated ? Date.parse(snapshot.boundaryAt) : undefined;
-  const win = flexWindow(planWin, snapshot?.rooms ?? [], chainStartsMs, manualEndMs);
+  // 0209: ca KHÔNG có ca nối sau (khớp private.session_has_next_shift: liên kết room, hoặc ca cùng brand + sàn bắt đầu đúng giờ hết ca ±5')
+  // thì giờ giao ca kéo theo giờ room tắt (tối đa +90'). Ca đã gõ GMV khác số file giữ mốc cũ (người gõ chủ động cắt số).
+  const hasNextShift = !!links.next || chain.some((x) => x.id !== s.id && Math.abs(sessionWindow(x).startMs - planWin.endMs) <= 5 * 60000);
+  const fileGmvSum = (snapshot?.rooms ?? []).reduce((a, r) => a + (r.fileGmv ?? r.gmv), 0);
+  const typedCut = snapshot?.typedGmv != null && Math.abs(snapshot.typedGmv - fileGmvSum) > 0.5;
+  const noNextShift = !hasNextShift && !typedCut;
+  const win = flexWindow(planWin, snapshot?.rooms ?? [], chainStartsMs, manualEndMs, noNextShift);
   const overRoom = snapshot && !snapshot.isEstimated ? runOverRoom(snapshot.rooms, win) : undefined;
   const suggestKey = overRoom && canEdit && !links.next && !dismissed && !loading ? overRoom.roomId : "";
   useEffect(() => {
@@ -292,6 +298,7 @@ export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSes
           win: planWin, // timelineLayout tự trượt theo lượng trễ (cả chuỗi ca nối)
           chainStartsMs,
           manualEndMs,
+          noNextShift,
           rooms,
           parts,
           prev: prev ? shiftOf(prev, true) : prevShift && crossesStart ? shiftOf(prevShift, false) : undefined,

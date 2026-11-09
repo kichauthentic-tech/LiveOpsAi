@@ -31,6 +31,8 @@ export interface TimelineIn {
   chainStartsMs?: number[];
   /** Giờ giao ca thực ops đã nhập (0205) — thay giờ hết ca tự tính. */
   manualEndMs?: number;
+  /** Ca không có ca nối sau (0209): giờ giao ca kéo theo giờ room tắt (tối đa +90'). */
+  noNextShift?: boolean;
 }
 
 export interface TimelineSeg {
@@ -65,6 +67,8 @@ export interface TimelineLayout {
   /** Có room chạy qua giờ vào ca / giờ hết ca ⇒ vẽ vạch cắt ở đó. */
   cutStartPct?: number;
   cutEndPct?: number;
+  /** Ca không có ca sau mà room chạy quá giờ hết ca (0209): đoạn quá giờ kế hoạch (OT) — vẽ khác màu, vạch ở giờ hết ca kế hoạch. */
+  overtime?: TimelineSeg & { minutes: number; fromPct: number };
 }
 
 const HOUR = 3600000;
@@ -145,19 +149,33 @@ export function flexWindow(
   win: { startMs: number; endMs: number },
   rooms: FlexRoom[],
   chainStartsMs: number[] = [],
-  manualEndMs?: number
+  manualEndMs?: number,
+  noNextShift = false
 ): { startMs: number; endMs: number } {
   const { startShiftMs, endShiftMs } = flexShift(win, rooms, chainStartsMs);
   const startMs = win.startMs + startShiftMs;
-  const endMs = manualEndMs && Number.isFinite(manualEndMs) ? manualEndMs : win.endMs + endShiftMs;
+  let endMs = manualEndMs && Number.isFinite(manualEndMs) ? manualEndMs : win.endMs + endShiftMs;
+  if (noNextShift && !(manualEndMs && Number.isFinite(manualEndMs))) endMs = extendEndToRoomEnd(win, rooms, endMs);
   return startShiftMs > 0 || endMs !== win.endMs ? { startMs, endMs } : win;
+}
+
+/**
+ * Ca KHÔNG có ca nối sau mà room tắt muộn hơn (giờ hết ca + trễ + 5') ⇒ giờ giao ca = giờ tắt room, tối đa giờ hết ca kế hoạch + 90'
+ * (migration 0209, hàm `private.session_flex_boundary_at`). Còn room chưa tắt ⇒ chưa biết giờ kết thúc, giữ nguyên.
+ */
+function extendEndToRoomEnd(win: { startMs: number; endMs: number }, rooms: FlexRoom[], endMs: number): number {
+  const timed = rooms.filter((r) => r.startedAt && Number.isFinite(Date.parse(r.startedAt)));
+  if (timed.length === 0 || timed.some((r) => !r.endedAt || !Number.isFinite(Date.parse(r.endedAt)))) return endMs;
+  const last = Math.max(...timed.map((r) => Date.parse(r.endedAt!)));
+  if (last <= endMs + CROSS_TOL_MS) return endMs;
+  return Math.max(endMs, Math.min(last, win.endMs + MAX_FLEX_MS));
 }
 
 export function timelineLayout(input: TimelineIn): TimelineLayout {
   const { nowMs } = input;
   // Cửa sổ hiệu lực: cả chuỗi ca nối trượt theo lượng trễ + phút nghỉ (ca này + ca trước/sau trên trục).
   const shift = flexShift(input.win, input.rooms, input.chainStartsMs);
-  const win = flexWindow(input.win, input.rooms, input.chainStartsMs, input.manualEndMs);
+  const win = flexWindow(input.win, input.rooms, input.chainStartsMs, input.manualEndMs, input.noNextShift);
   const late = shift.endShiftMs;
   const slide = (x?: TimelineShiftIn): TimelineShiftIn | undefined => (x && late > 0 ? { ...x, startMs: x.startMs + late, endMs: x.endMs + late } : x);
   const prev = input.prev && shift.inherited && shift.startShiftMs > 0 ? { ...input.prev, startMs: input.prev.startMs + shift.startShiftMs, endMs: input.prev.endMs + shift.startShiftMs } : input.prev;
@@ -215,10 +233,15 @@ export function timelineLayout(input: TimelineIn): TimelineLayout {
     reach = Math.max(reach, spans[i].e);
   }
 
+  // Đoạn quá giờ kế hoạch: chỉ khi giờ giao ca được kéo theo room (không ca sau, không nhập tay) — trượt vì vào trễ/nghỉ thì ca vẫn đủ giờ KH, không phải OT.
+  const planEnd = flexWindow(input.win, input.rooms, input.chainStartsMs, undefined, false).endMs;
+  const ot = input.noNextShift && !input.manualEndMs && win.endMs > planEnd ? { ...seg(planEnd, win.endMs), minutes: Math.round((win.endMs - planEnd) / 60000), fromPct: pct(planEnd) } : undefined;
+
   return {
     axisStartMs,
     axisEndMs,
     ticks,
+    overtime: ot,
     me: seg(win.startMs, win.endMs),
     prev: prev ? { ...seg(prev.startMs, Math.min(prev.endMs, win.startMs)), label: prev.label, linked: prev.linked } : undefined,
     next: next ? { ...seg(Math.max(next.startMs, win.endMs), next.endMs), label: next.label, linked: next.linked } : undefined,
