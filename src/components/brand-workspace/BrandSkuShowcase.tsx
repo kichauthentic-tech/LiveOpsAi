@@ -1,3 +1,4 @@
+import { Switch } from "../ui/Switch";
 import React, { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "../common/PageHeader";
 import { BrandSku, UserRole } from "../../types";
@@ -336,7 +337,7 @@ export const BrandSkuShowcase: React.FC<BrandSkuShowcaseProps> = ({ brandId, cur
                 {!canEdit && <th className="py-2.5 px-2 text-right">Giá gốc</th>}
                 {!canEdit && <th className="py-2.5 px-2 text-right">Xả kho %</th>}
                 <th className="py-2.5 px-2">Chủ lực</th>
-                <th className="py-2.5 px-2">Trạng thái</th>
+                <th className="py-2.5 px-2">{canEdit ? "Lên sóng" : "Trạng thái"}</th>
                 {canEdit && <th className="py-2.5 px-4"></th>}
               </tr>
             </thead>
@@ -345,7 +346,7 @@ export const BrandSkuShowcase: React.FC<BrandSkuShowcaseProps> = ({ brandId, cur
                 const perf = perfOf(s);
                 const cur = perfIn(perf, scopeKeys);
                 return (
-                  <tr key={s.id} className="border-b border-[var(--border-muted)] align-middle">
+                  <tr key={s.id} className={`border-b border-[var(--border-muted)] align-middle ${s.status === "inactive" ? "opacity-60" : ""}`}>
                     <td className="py-2.5 px-4 whitespace-nowrap">
                       {canEdit ? (
                         s.pinOrder > 0 ? (
@@ -394,11 +395,7 @@ export const BrandSkuShowcase: React.FC<BrandSkuShowcaseProps> = ({ brandId, cur
                     </td>
                     <td className="py-2.5 px-2">
                       {canEdit ? (
-                        <select value={s.status} onChange={(e) => handlePatch(s.id, { status: e.target.value as BrandSku["status"] })} className={`p-1.5 font-bold ${sel}`}>
-                          {(Object.keys(STATUS_LABEL) as BrandSku["status"][]).map((s2) => (
-                            <option key={s2} value={s2}>{STATUS_LABEL[s2]}</option>
-                          ))}
-                        </select>
+                        <Switch checked={s.status === "active"} onChange={(v) => handlePatch(s.id, { status: v ? "active" : "inactive" })} label={`${s.name}: ${STATUS_LABEL[s.status]}`} />
                       ) : (
                         <span className="text-[var(--text-muted)] font-bold">{STATUS_LABEL[s.status]}</span>
                       )}

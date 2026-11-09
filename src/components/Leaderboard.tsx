@@ -262,6 +262,7 @@ const CampaignView: React.FC<{ events: CampaignEvent[]; payouts: TargetPayout[];
   const [picked, setPick] = useState<CampaignDayType | null>(null);
   const pick = picked && events.some((e) => e.type === picked) ? picked : defaultPick;
   const ev = events.find((e) => e.type === pick) ?? null;
+  const [listOpen, setListOpen] = useState<CampaignDayType | null>(null);
 
   if (events.length === 0)
     return <p className={`${CARD} p-5 text-xs text-[var(--text-muted)]`}>Tháng này chưa có ca Campaign nào trong lịch.</p>;
@@ -336,13 +337,39 @@ const CampaignView: React.FC<{ events: CampaignEvent[]; payouts: TargetPayout[];
         })}
       </div>
 
-      {ev && (
-        <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-label={`Ca ${EVENT_NAME[ev.type]}`}>
-          {ev.shifts.map((sh) => (
-            <ShiftCard key={sh.session.id} sh={sh} showAccount={showAccount} />
-          ))}
-        </section>
-      )}
+      {/* Cửa sổ gọn 09/11: ca CHƯA live (sắp tới, chưa có số) gập thành một dòng — đo 09/11: D-Day đang diễn ra có 70/72 thẻ "sắp
+          live" không một số nào, trang dài 6,8 màn. Ca đang live / đã xong vẫn hiện thẻ vì thẻ có số; bấm "Xem danh sách" mở phần còn lại. */}
+      {ev &&
+        (() => {
+          const upcoming = ev.shifts.filter((sh) => sh.upcoming);
+          const shown = listOpen === ev.type ? ev.shifts : ev.shifts.filter((sh) => !sh.upcoming);
+          return (
+            <>
+              {shown.length > 0 && (
+                <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-label={`Ca ${EVENT_NAME[ev.type]}`}>
+                  {shown.map((sh) => (
+                    <ShiftCard key={sh.session.id} sh={sh} showAccount={showAccount} />
+                  ))}
+                </section>
+              )}
+              {upcoming.length > 0 && (
+                <div className={`${CARD} p-4 flex flex-wrap items-center justify-between gap-2`}>
+                  <p className="text-xs text-[var(--text-muted)]">
+                    <b className="text-[var(--text)]">{upcoming.length} ca sắp live</b> · chưa có số
+                  </p>
+                  <button
+                    type="button"
+                    aria-expanded={listOpen === ev.type}
+                    onClick={() => setListOpen(listOpen === ev.type ? null : ev.type)}
+                    className="min-h-9 px-3 rounded-xl border border-[var(--border)] text-xs font-bold text-[var(--text)] hover:bg-[var(--surface-elevated)]"
+                  >
+                    {listOpen === ev.type ? "Ẩn ca sắp live" : "Xem danh sách"}
+                  </button>
+                </div>
+              )}
+            </>
+          );
+        })()}
 
       <section className={`${CARD} p-4 sm:p-5`}>
         <h3 className="text-xs font-bold text-[var(--text)]">Suất thưởng Ca đạt target trong tháng</h3>

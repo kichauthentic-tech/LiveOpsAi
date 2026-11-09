@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Trash2 } from "lucide-react";
+import { ChipPicker } from "../ui/ChipChoice";
 import { AffiliateActualEntry, AffiliateEntryStatus } from "../../types";
 import { CampOverrides } from "../../lib/campaignDays";
 import {
@@ -205,34 +206,28 @@ export function AffiliatePlanTable({ rows, month, fxRate, readOnly, campOverride
                     {readOnly ? (
                       <span className={`px-2 py-0.5 rounded text-xs font-semibold ${CAMP_STYLE[r.campName ?? ""] ?? ""}`}>{r.campName || "—"}</span>
                     ) : (
-                      <select
-                        aria-label={label(r, "Camp")}
-                        value={r.campName ?? ""}
-                        onChange={(ev) => onChange(r, { campName: ev.target.value || undefined })}
-                        className={`min-h-6 rounded px-1.5 py-0.5 text-xs font-semibold outline-none ${CAMP_STYLE[r.campName ?? ""] ?? "bg-[var(--surface-elevated)]"}`}
-                      >
-                        <option value="">—</option>
-                        {CAMP_NAMES.map((c) => (
-                          <option key={c} value={c}>{c}</option>
-                        ))}
-                      </select>
+                      <ChipPicker
+                        label={label(r, "Camp")}
+                        options={CAMP_NAMES}
+                        value={(r.campName || undefined) as (typeof CAMP_NAMES)[number] | undefined}
+                        onChange={(v) => onChange(r, { campName: v })}
+                        styleFor={(v) => CAMP_STYLE[v ?? ""]}
+                        clearable
+                      />
                     )}
                   </td>
                   <td className={cellL}>
                     {readOnly ? (
                       <span className={`px-2 py-0.5 rounded text-xs font-semibold ${CAMPAIGN_STYLE[r.campaignType ?? ""] ?? ""}`}>{r.campaignType || "—"}</span>
                     ) : (
-                      <select
-                        aria-label={label(r, "Quy mô")}
-                        value={r.campaignType ?? ""}
-                        onChange={(ev) => onChange(r, { campaignType: ev.target.value || undefined })}
-                        className={`min-h-6 rounded px-1.5 py-0.5 text-xs font-semibold outline-none ${CAMPAIGN_STYLE[r.campaignType ?? ""] ?? "bg-[var(--surface-elevated)]"}`}
-                      >
-                        <option value="">—</option>
-                        {CAMPAIGN_TYPES.map((t) => (
-                          <option key={t} value={t}>{t}</option>
-                        ))}
-                      </select>
+                      <ChipPicker
+                        label={label(r, "Quy mô")}
+                        options={CAMPAIGN_TYPES}
+                        value={(r.campaignType || undefined) as (typeof CAMPAIGN_TYPES)[number] | undefined}
+                        onChange={(v) => onChange(r, { campaignType: v })}
+                        styleFor={(v) => CAMPAIGN_STYLE[v ?? ""]}
+                        clearable
+                      />
                     )}
                   </td>
                   <td className={cellR}>
@@ -282,16 +277,14 @@ export function AffiliatePlanTable({ rows, month, fxRate, readOnly, campOverride
                     {readOnly ? (
                       <span className={`px-2 py-0.5 rounded text-xs font-semibold ${STATUS_STYLE[st]}`}>{STATUS_LABEL[st]}</span>
                     ) : (
-                      <select
-                        aria-label={label(r, "Trạng thái")}
+                      <ChipPicker
+                        label={label(r, "Trạng thái")}
+                        options={Object.keys(STATUS_LABEL) as AffiliateEntryStatus[]}
                         value={st}
-                        onChange={(ev) => onChange(r, { status: ev.target.value as AffiliateEntryStatus })}
-                        className={`min-h-6 rounded px-1.5 py-0.5 text-xs font-semibold outline-none ${STATUS_STYLE[st]}`}
-                      >
-                        {(Object.keys(STATUS_LABEL) as AffiliateEntryStatus[]).map((s) => (
-                          <option key={s} value={s}>{STATUS_LABEL[s]}</option>
-                        ))}
-                      </select>
+                        onChange={(v) => v && onChange(r, { status: v })}
+                        display={(v) => STATUS_LABEL[v]}
+                        styleFor={(v) => (v ? STATUS_STYLE[v] : undefined)}
+                      />
                     )}
                   </td>
                   {showActuals && <td className={`${cellR} ${st === "done" ? "text-red-600 font-semibold" : autoCls}`}>{st === "done" && r.directGmv != null ? fmtVndFull(r.directGmv) : "—"}</td>}

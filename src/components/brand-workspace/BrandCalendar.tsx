@@ -187,6 +187,12 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
   }, [brandSessions, month]);
 
   const cells: (number | null)[] = [...Array(leadingBlanks).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
+  // Số tuần (hàng lưới tháng) chưa có chương trình khuyến mãi — ghi một lần trên lưới thay vì một câu mỗi tuần (09/11).
+  let emptySchemeWeeks = 0;
+  for (let r = 0; r < cells.length; r += 7) {
+    const dates = cells.slice(r, r + 7).filter((d): d is number => d !== null).map((d) => `${month}-${`${d}`.padStart(2, "0")}`);
+    if (dates.length > 0 && !brandSchemes.some((sc) => dates.some((d) => d >= sc.startDate && d <= sc.endDate))) emptySchemeWeeks += 1;
+  }
 
   const slotsByDate = useMemo(() => {
     const map = new Map<string, ShiftSlot[]>();
@@ -377,6 +383,11 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
       </PageHeader>
 
 
+      {viewMode === "month" && emptySchemeWeeks > 0 && (
+        <p className="text-2xs text-[var(--text-faint)] -mb-2">
+          {emptySchemeWeeks} tuần chưa ghi khuyến mãi{canManageSchemes ? " · bấm “+ Khuyến mãi” ở tuần cần thêm" : ""}
+        </p>
+      )}
       {viewMode === "month" && (
       <PosterCalendarGrid weekdayLabels={WEEKDAY_LABELS} weekendIndices={WEEKEND_COLUMNS} minWidthClassName="min-w-[1080px] xl:min-w-0">
         {cells.map((day, idx) => {
@@ -395,6 +406,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
               onAdd={onAddScheme}
               onUpdate={onUpdateScheme}
               onDelete={onDeleteScheme}
+              compactEmpty
             />
           );
 

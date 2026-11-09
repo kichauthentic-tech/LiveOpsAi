@@ -32,6 +32,9 @@ interface SchemeWeekStripProps {
   onAdd?: (scheme: { title: string; description: string; startDate: string; endDate: string; brandId: string; category: string }) => Promise<void>;
   onUpdate?: (id: string, patch: Partial<Pick<PromoScheme, "title" | "description" | "startDate" | "endDate" | "category">>) => Promise<void>;
   onDelete?: (id: string) => Promise<void>;
+  /** Lịch tháng (09/11): tuần chưa có khuyến mãi không ghi câu "Chưa ghi khuyến mãi tuần này" (lặp ~5–6 lần/tháng) — chỉ còn nút
+   *  nhỏ "+ Khuyến mãi" cho người được sửa; câu đếm số tuần trống nằm một lần trên lưới. */
+  compactEmpty?: boolean;
 }
 
 interface PackedSegment {
@@ -80,7 +83,7 @@ function buildPackedSegments(weekSchemes: PromoScheme[], weekDates: (string | nu
 
 const EMPTY_DRAFT = { category: "", content: "", startDate: "", endDate: "" };
 
-export const SchemeWeekStrip: React.FC<SchemeWeekStripProps> = ({ brandId, weekDates, schemes, canManage, onAdd, onUpdate, onDelete }) => {
+export const SchemeWeekStrip: React.FC<SchemeWeekStripProps> = ({ brandId, weekDates, schemes, canManage, onAdd, onUpdate, onDelete, compactEmpty = false }) => {
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<{ text: string; category: string; startDate: string; endDate: string }>({
@@ -149,6 +152,17 @@ export const SchemeWeekStrip: React.FC<SchemeWeekStripProps> = ({ brandId, weekD
       setBusy(false);
     }
   };
+
+  if (compactEmpty && weekSchemes.length === 0 && !open) {
+    if (!canManage) return null;
+    return (
+      <div className="col-span-7 -mt-1 mb-1 flex justify-end">
+        <button onClick={() => setOpen(true)} className="min-h-6 inline-flex items-center gap-1 px-2 rounded-lg text-2xs font-semibold text-[var(--text-faint)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]/60">
+          <Plus className="w-3 h-3" /> Khuyến mãi{weekLabel ? ` · ${weekLabel}` : ""}
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="col-span-7 -mt-1 mb-1.5">

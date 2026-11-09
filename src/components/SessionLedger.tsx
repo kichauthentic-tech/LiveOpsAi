@@ -188,9 +188,9 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
   // của ca chỉ có khi đã chốt Kế Hoạch Tháng — chưa chốt thì cả cột là "—" (đo 29/09: 47/47 dòng).
   const showTargetCol = !isBrandView && rows.some((s) => !!s.targetGmv);
   // Trước hai chỗ cứng colSpan 13 trong khi bảng chỉ có 12 cột; nay đếm theo đúng các cột đang dựng:
-  // 10 cột luôn có (Giờ, Host, Trạng thái, Giờ live, GMV, Orders, GMV/giờ, Dữ liệu, Sự cố, nút)
-  // + 1 cột đổi theo view (Brand cho ops / Views cho brand) + Target GMV nếu có ca nào có target.
-  const colCount = 11 + (showTargetCol ? 1 : 0);
+  // 9 cột luôn có (Giờ, Host, Giờ live, GMV, Orders, GMV/giờ, Dữ liệu, Sự cố, nút) + 1 cột đổi theo view (Brand cho ops / Views
+  // cho brand) + Trạng thái (chỉ brand — 09/11 OPS gộp trạng thái vào ô 3 chấm) + Target GMV nếu có ca nào có target.
+  const colCount = 10 + (isBrandView ? 1 : 0) + (showTargetCol ? 1 : 0);
 
   // Số ca trong bộ lọc hiện tại mà người đang xem KHÔNG được thấy số (brand + tháng chưa phát
   // hành). Các ca đó đóng góp 0 vào mọi ô KPI ở dải tổng bên dưới, nên phải nói ra: không thì
@@ -397,7 +397,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
                 <th className="py-2.5 px-4 sticky-col">Giờ</th>
                 {!isBrandView && <th className="py-2.5 px-2">Brand</th>}
                 <th className="py-2.5 px-2">Host</th>
-                <th className="py-2.5 px-2">Trạng thái</th>
+                {isBrandView && <th className="py-2.5 px-2">Trạng thái</th>}
                 {/* M4: ở điện thoại bảng rộng 972px (2,8× bề ngang máy). Giữ 6 cột trả lời "ca nào, ai chạy,
                     ra bao nhiêu"; 5 cột phụ chỉ hiện từ sm trở lên — cùng cách Đợt 0 đã làm cho CeoBrief. */}
                 <th className={`${SUB_COL} text-right`}>Giờ live</th>
@@ -406,7 +406,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
                 <th className={`${SUB_COL} text-right`}>Orders</th>
                 {isBrandView && <th className={`${SUB_COL} text-right`}>{viewsHead}</th>}
                 <th className={`${SUB_COL} text-right`}>{platformText("GMV/giờ", platformScope)}</th>
-                <th className="py-2.5 px-2">{isBrandView ? "Số liệu" : "Dữ liệu"}</th>
+                <th className="py-2.5 px-2">{isBrandView ? "Số liệu" : <span title="Ba chấm = File · Giao ca · Đối soát. Chấm rỗng = bước còn thiếu.">File · Giao ca · Đối soát</span>}</th>
                 <th className={SUB_COL}>Sự cố</th>
                 <th className="py-2.5 px-2" />
               </tr>
@@ -442,6 +442,10 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
                       <span className="sticky left-4 inline-block">
                         {fmtDate(day.date)}
                         <span className="text-[var(--text-faint)] font-normal"> · {day.sessions.length} ca</span>
+                        {!isBrandView && (() => {
+                          const noNumbers = day.sessions.filter((x) => needsClosing(x, today) && !(x.actualGmv > 0)).length;
+                          return noNumbers > 0 ? <span className="text-[var(--warning)]"> · {noNumbers} ca chưa có số</span> : null;
+                        })()}
                       </span>
                     </td>
                   </tr>
@@ -486,14 +490,15 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
                             <span className="block text-2xs text-[var(--text-faint)]">+ {s.coHostName}</span>
                           )}
                         </td>
-                        <td className="py-2.5 px-2">
-                          <span className={`text-2xs font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${STATUS_CLS[s.status]}`}>
-                            {STATUS_LABEL[s.status]}
-                          </span>
-                          {!isBrandView && s.isBackfill && (
-                            <span className="block text-2xs text-[var(--text-faint)] mt-0.5">nạp bù</span>
-                          )}
-                        </td>
+                        {/* Cửa sổ gọn 09/11: OPS không còn cột Trạng thái (15/15 ca một ngày đều "Đã xong" — không phân biệt gì);
+                            trạng thái khác "Đã xong" hiện ngay trong ô 3 chấm. Brand vẫn giữ cột. */}
+                        {isBrandView && (
+                          <td className="py-2.5 px-2">
+                            <span className={`text-2xs font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${STATUS_CLS[s.status]}`}>
+                              {STATUS_LABEL[s.status]}
+                            </span>
+                          </td>
+                        )}
                         <td className={`${SUB_COL} text-right text-[var(--text-muted)] whitespace-nowrap`}>
                           {s.liveDurationMinutes ? fmtHours(s.liveDurationMinutes / 60) : <span className="text-[var(--text-faint)]">({fmtHours(hours)})</span>}
                         </td>
@@ -648,29 +653,26 @@ const TrustBadge: React.FC<{ session: LiveSession }> = ({ session }) => {
 const PipelineDots: React.FC<{ session: LiveSession; today: string }> = ({ session, today }) => {
   const relevant = needsClosing(session, today);
   if (!relevant) {
-    const why = session.status === "Cancelled" ? "Đã huỷ — không cần số" : session.isBackfill ? "Nhập từ file — không cần giao ca" : "Chưa diễn ra";
-    return <span className="text-2xs text-[var(--text-faint)] whitespace-nowrap">{why}</span>;
+    const why = session.status === "Cancelled" ? "Đã huỷ" : session.isBackfill ? "Nạp từ file" : session.status === "Live Now" ? "Đang live" : "Chưa diễn ra";
+    return <span className={`text-2xs whitespace-nowrap ${session.status === "Live Now" ? "font-bold text-[var(--danger)]" : "text-[var(--text-faint)]"}`}>{why}</span>;
   }
   const steps: { label: string; done: boolean }[] = [
     { label: "File", done: hasSnapshot(session) },
     { label: "Giao ca", done: hasReport(session) },
     { label: "Đối soát", done: isReconciled(session) }
   ];
-  // Bố cục 18/10: bước còn thiếu tô vàng ngay trên ô (trước: 3 ô viền xám/xanh xuống dòng trong cột hẹp + thêm một dòng chữ vàng
-  // "Chưa up file số liệu · Chưa giao ca · Chưa đối soát" lặp đúng các ô xám ⇒ mỗi ca cao 3–4 dòng).
+  // Cửa sổ gọn 09/11 (demo user duyệt): ba ô chữ "File · Giao ca · Đối soát" lặp mỗi dòng (×96 ở Sổ Ca tháng) thành ba chấm; tên
+  // bước nằm một lần ở tiêu đề cột + title/aria-label. Chấm đặc xanh = xong, chấm rỗng vàng = còn thiếu.
+  const label = steps.map((s) => `${s.label}: ${s.done ? "xong" : "chưa"}`).join(" · ");
   return (
-    <div className="flex items-center gap-1 whitespace-nowrap" title={steps.map((s) => `${s.label}: ${s.done ? "✓" : "chưa"}`).join(" · ")}>
+    <span className="inline-flex items-center gap-1 whitespace-nowrap" title={label} aria-label={label} role="img">
       {steps.map((s) => (
         <span
           key={s.label}
-          className={`inline-flex items-center gap-0.5 text-2xs font-bold px-1.5 py-0.5 rounded ${
-            s.done ? "text-emerald-400" : "bg-amber-500/10 text-amber-300"
-          }`}
-        >
-          {s.done ? <CheckCircle2 className="w-3 h-3" /> : <Circle className="w-3 h-3" />}
-          {s.label}
-        </span>
+          className={`inline-block w-2.5 h-2.5 rounded-full border-2 ${s.done ? "bg-[var(--success)] border-[var(--success)]" : "border-[var(--warning)]"}`}
+        />
       ))}
-    </div>
+      {session.status === "Live Now" && <span className="ml-1 text-2xs font-bold text-[var(--danger)]">Đang live</span>}
+    </span>
   );
 };

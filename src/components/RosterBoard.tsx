@@ -116,7 +116,8 @@ interface Todo {
 const STAFF: UserRole[] = ["ceo", "admin", "operations", "trainer"];
 const loadMode = (): RankMode => {
   try {
-    return localStorage.getItem("roster.mode") === "cost" ? "cost" : "balance";
+    const m = localStorage.getItem("roster.mode");
+    return m === "cost" || m === "gmv" ? m : "balance";
   } catch {
     return "balance";
   }
@@ -273,9 +274,10 @@ export const RosterBoard: React.FC<Props> = (p) => {
   );
   const brandRules = useMemo(() => (p.talentRules && p.talentRules.length > 0 ? buildBrandRuleIndex(p.talentRules, (id) => p.brands.find((b) => b.id === id)?.name ?? "brand") : undefined), [p.talentRules, p.brands]);
   const analysis = useMemo(() => analyzeRoster(shifts, rules, weekStart, nameOf, familiar, brandRules), [shifts, rules, weekStart, nameOf, familiar, brandRules]);
+  const hostPerf = useMemo(() => buildHostPerformance(p.sessions, getTodayDate()), [p.sessions]);
   const ctx: RankContext = useMemo(
-    () => ({ shifts, rules, weekStart, fam, talents: p.talents, history: p.talentRateHistory, mode, nameOf, brandRules }),
-    [shifts, rules, weekStart, fam, p.talents, p.talentRateHistory, mode, nameOf, brandRules]
+    () => ({ shifts, rules, weekStart, fam, talents: p.talents, history: p.talentRateHistory, mode, nameOf, brandRules, perf: hostPerf }),
+    [shifts, rules, weekStart, fam, p.talents, p.talentRateHistory, mode, nameOf, brandRules, hostPerf]
   );
   const wk = useMemo(() => shifts.filter((s) => s.date >= weekStart && s.date <= weekEnd), [shifts, weekStart, weekEnd]);
 
@@ -1016,7 +1018,8 @@ export const RosterBoard: React.FC<Props> = (p) => {
                     {(
                       [
                         ["balance", "Cân bằng"],
-                        ["cost", "Chi phí thấp"]
+                        ["cost", "Tiết kiệm chi phí"],
+                        ["gmv", "Tối ưu GMV"]
                       ] as const
                     ).map(([k, l]) => (
                       <button key={k} type="button" aria-pressed={mode === k} onClick={() => changeMode(k)} className={`px-3 py-1.5 rounded-lg ${mode === k ? "seg-on" : "text-[var(--text-muted)]"}`}>
@@ -1095,6 +1098,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
           onAssign={(s, r, t, reason) => void assign(s, r, t, reason)}
           onMove={(s, v) => void move(s, v)}
           onRemove={(s) => void remove(s)}
+          onMode={changeMode}
         />
       )}
     </div>

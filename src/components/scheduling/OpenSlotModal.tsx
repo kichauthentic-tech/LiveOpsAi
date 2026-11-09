@@ -9,6 +9,7 @@ import { findBrandStudioId } from "../../lib/db/brandStudios";
 import { loadRememberedBrandId, pickDefaultBrandId, rememberBrandId } from "../../lib/defaultBrand";
 import { useToast } from "../../hooks/useToast";
 import { useConfirm } from "../../hooks/useConfirm";
+import { BrandLogo } from "../ui/BrandLogo";
 
 // Q2 (audit 2026-09-21): con đường DUY NHẤT tạo ca ngoài Kế Hoạch Tháng là "mở ca chờ đăng ký" —
 // ca đi vào Đăng Ký & Chốt Lịch như mọi ca khác (talent đăng ký, ops chốt host, target từ kế hoạch
@@ -78,6 +79,29 @@ export const OpenSlotModal: React.FC<OpenSlotModalProps> = ({
 
   const brandName = fixedBrand?.name ?? brands.find((b) => b.id === brandId)?.name ?? "";
   const studio = studios.find((s) => s.id === studioId);
+  const [pickStudio, setPickStudio] = useState(false);
+  const pickBrand = (id: string) => {
+    setBrandId(id);
+    rememberBrandId(id);
+    const p = pickPlatform(id, platform ?? undefined);
+    setPlatform(p);
+    const def = p ? findBrandStudioId(brandStudios, id, p) : "";
+    if (def) setStudioId(def);
+  };
+  const pickPlatform2 = (p: ReportPlatform) => {
+    setPlatform(p);
+    const def = findBrandStudioId(brandStudios, brandId, p);
+    if (def) setStudioId(def);
+  };
+  // Hôm nay / Mai / Ngày mở form (nếu khác) — ngày khác mới mở ô lịch.
+  const quickDays = useMemo(() => {
+    const today = getTodayDate();
+    const tomorrow = new Date(Date.parse(`${today}T00:00:00Z`) + 86400000).toISOString().slice(0, 10);
+    const out = [{ date: today, label: "Hôm nay" }, { date: tomorrow, label: `Mai · ${fmtDateVn(tomorrow, false)}` }];
+    if (initialDate && initialDate !== today && initialDate !== tomorrow) out.push({ date: initialDate, label: fmtDateVn(initialDate, false) });
+    return out;
+  }, [initialDate]);
+  const [otherDay, setOtherDay] = useState(false);
 
   // Khung giờ brand này hay live (theo ca đã có + ca đang mở) — bấm 1 phát thay vì gõ giờ. Ca nạp bù
   // mang giờ thật của room (10:58, 23:01…) nên làm tròn 30' trước khi gom.
@@ -159,84 +183,98 @@ export const OpenSlotModal: React.FC<OpenSlotModalProps> = ({
           </div>
           <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text)] p-1 rounded-lg"><X className="w-5 h-5" /></button>
         </div>
-        <p className="text-2xs text-[var(--text-muted)] bg-[var(--surface-base)]/60 border border-[var(--border)] rounded-xl p-2.5">
-          Ca hiện ở <b>Bảng Vận Hành</b> (talent thấy ở Đăng Ký Ca) để talent đăng ký rảnh, ops chốt Host/Trợ sau. Ca đều đặn hằng tháng nên lập ở Kế Hoạch Tháng — chỗ này cho ca phát sinh. <b>Ca mở ở đây nằm ngoài kế hoạch nên không có target</b> (không cộng vào target tháng); muốn ca có target thì thêm vào lưới Kế Hoạch Tháng.
-        </p>
+        {/* Cửa sổ gọn 09/11 (demo user duyệt): đoạn mở đầu 57 chữ → một dòng; brand / kênh / ngày chọn bằng ô chạm, phòng tự điền theo
+            kênh (bấm "Đổi" mới hiện danh sách phòng). */}
+        <p className="text-2xs text-[var(--text-faint)]">Ca ngoài kế hoạch, không có target.</p>
 
         <form onSubmit={submit} className="space-y-3 text-xs">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <label className="block">
-              <span className="font-bold text-[var(--text-muted)] block mb-1">Brand</span>
-              {fixedBrand ? (
-                <div className={`${input} font-bold`}>{brandName || "—"}</div>
-              ) : (
-                <select
-                  value={brandId}
-                  onChange={(e) => {
-                    setBrandId(e.target.value);
-                    rememberBrandId(e.target.value);
-                    const p = pickPlatform(e.target.value, platform ?? undefined);
-                    setPlatform(p);
-                    const def = p ? findBrandStudioId(brandStudios, e.target.value, p) : "";
-                    if (def) setStudioId(def);
-                  }}
-                  className={input}
+          {fixedBrand ? (
+            <p className="font-bold text-[var(--text)] text-sm">{brandName || "—"}</p>
+          ) : (
+            <div role="group" aria-label="Brand" className="flex flex-wrap gap-1.5">
+              {brands.map((b) => (
+                <button
+                  key={b.id}
+                  type="button"
+                  aria-pressed={b.id === brandId}
+                  onClick={() => pickBrand(b.id)}
+                  className={`min-h-9 px-3 rounded-xl border font-bold flex items-center gap-1.5 ${b.id === brandId ? "seg-on" : "border-[var(--border)] text-[var(--text)]"}`}
                 >
-                  {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-                </select>
-              )}
-            </label>
-            <label className="block">
-              <span className="font-bold text-[var(--text-muted)] block mb-1">Kênh (sàn)</span>
-              {platformsFor(brandId).length === 0 ? (
-                <div className={`${input} text-amber-300`}>Chưa có kênh — thêm ở CRM</div>
-              ) : (
-                <select
-                  id="open-slot-platform"
-                  value={platform ?? ""}
-                  onChange={(e) => {
-                    const p = e.target.value as ReportPlatform;
-                    setPlatform(p);
-                    const def = findBrandStudioId(brandStudios, brandId, p);
-                    if (def) setStudioId(def);
-                  }}
-                  className={input}
+                  <BrandLogo brand={b} size="xs" />
+                  {b.name}
+                </button>
+              ))}
+            </div>
+          )}
+          {platformsFor(brandId).length === 0 ? (
+            <p className="text-amber-300">{brandName || "Brand"} chưa có kênh — thêm ở CRM.</p>
+          ) : (
+            <div role="group" aria-label="Kênh (sàn)" className="flex flex-wrap gap-1.5">
+              {platformsFor(brandId).map((p) => (
+                <button
+                  key={p}
+                  id={p === platform ? "open-slot-platform" : undefined}
+                  type="button"
+                  aria-pressed={p === platform}
+                  onClick={() => pickPlatform2(p)}
+                  className={`min-h-9 px-3 rounded-xl border font-bold ${p === platform ? "seg-on" : "border-[var(--border)] text-[var(--text)]"}`}
                 >
-                  {platformsFor(brandId).map((p) => <option key={p} value={p}>{brandName} · {p}</option>)}
-                </select>
-              )}
-            </label>
-            <label className="block">
-              <span className="font-bold text-[var(--text-muted)] block mb-1">Phòng</span>
-              <select value={studioId} onChange={(e) => setStudioId(e.target.value)} className={input}>
-                <option value="">— Chưa gán phòng —</option>
-                {studios.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.roomNumber})</option>)}
-              </select>
-            </label>
+                  {p}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="flex flex-wrap items-center gap-2 text-[var(--text-muted)]">
+            <span>
+              Phòng: <b className="text-[var(--text)]">{studio ? `${studio.name} (${studio.roomNumber})` : "chưa gán"}</b>
+            </span>
+            {!pickStudio && (
+              <button type="button" onClick={() => setPickStudio(true)} className="px-2 py-1 rounded-lg border border-[var(--border)] text-2xs font-bold text-[var(--text)]">
+                Đổi
+              </button>
+            )}
           </div>
+          {pickStudio && (
+            <select aria-label="Phòng" value={studioId} onChange={(e) => setStudioId(e.target.value)} className={input}>
+              <option value="">— Chưa gán phòng —</option>
+              {studios.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.roomNumber})</option>)}
+            </select>
+          )}
 
           {presets.length > 0 && (
-            <div className="space-y-1">
-              <span className="font-bold text-[var(--text-muted)] block">Khung giờ {brandName || "brand"} hay live</span>
-              <div className="flex flex-wrap gap-1.5">
-                {presets.map((p) => {
-                  const on = p.start === start && p.end === end;
-                  return (
-                    <button key={`${p.start}${p.end}`} type="button" onClick={() => { setStart(p.start); setEnd(p.end); }}
-                      className={`px-2.5 py-1.5 rounded-lg border font-mono font-bold text-2xs ${on ? "seg-on" : "bg-[var(--surface-base)] text-[var(--text-muted)] border-[var(--border)] hover:border-[var(--accent)]/60"}`}>
-                      {p.start}–{p.end}
-                    </button>
-                  );
-                })}
-              </div>
+            <div role="group" aria-label={`Khung giờ ${brandName || "brand"} hay live`} className="flex flex-wrap gap-1.5">
+              {presets.map((p) => {
+                const on = p.start === start && p.end === end;
+                return (
+                  <button key={`${p.start}${p.end}`} type="button" aria-pressed={on} onClick={() => { setStart(p.start); setEnd(p.end); }}
+                    className={`min-h-9 px-3 rounded-xl border font-mono font-bold ${on ? "seg-on" : "border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--accent)]/60"}`}>
+                    {p.start}–{p.end}
+                  </button>
+                );
+              })}
             </div>
           )}
 
-          <div className="grid grid-cols-3 gap-3">
-            <label className="block">
-              <span className="font-bold text-[var(--text-muted)] block mb-1">Ngày</span>
-              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={`${input} font-mono`} required />
-            </label>
+          <div role="group" aria-label="Ngày" className="flex flex-wrap gap-1.5">
+            {quickDays.map((d) => (
+              <button key={d.date} type="button" aria-pressed={!otherDay && date === d.date} onClick={() => { setDate(d.date); setOtherDay(false); }}
+                className={`min-h-9 px-3 rounded-xl border font-bold ${!otherDay && date === d.date ? "seg-on" : "border-[var(--border)] text-[var(--text)]"}`}>
+                {d.label}
+              </button>
+            ))}
+            <button type="button" aria-pressed={otherDay} onClick={() => setOtherDay(true)}
+              className={`min-h-9 px-3 rounded-xl border font-bold ${otherDay ? "seg-on" : "border-[var(--border)] text-[var(--text)]"}`}>
+              Ngày khác…
+            </button>
+          </div>
+
+          <div className={`grid gap-3 ${otherDay ? "grid-cols-3" : "grid-cols-2"}`}>
+            {otherDay && (
+              <label className="block">
+                <span className="font-bold text-[var(--text-muted)] block mb-1">Ngày</span>
+                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={`${input} font-mono`} required />
+              </label>
+            )}
             <label className="block">
               <span className="font-bold text-[var(--text-muted)] block mb-1">Bắt đầu</span>
               <input type="time" value={start} onChange={(e) => setStart(e.target.value)} className={`${input} font-mono`} required />

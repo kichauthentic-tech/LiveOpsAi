@@ -23,11 +23,11 @@ describe("AffiliatePlanTable", () => {
   test("ops có ô nhập + nút xoá; brand chỉ đọc không có", () => {
     const ops = render(false);
     expect(ops).toContain("<input");
-    expect(ops).toContain("<select");
+    expect(ops).toContain("aria-expanded=\"false\""); // ô chạm ChipPicker (09/11) thay ô chọn thả xuống
     expect(ops).toContain("Xoá phiên");
     const brand = render(true);
     expect(brand).not.toContain("<input");
-    expect(brand).not.toContain("<select");
+    expect(brand).not.toContain("aria-expanded=");
     expect(brand).not.toContain("Xoá phiên");
   });
   test("phiên huỷ không vào tổng: 700tr + 100tr, 12 giờ (8 + 4)", () => {

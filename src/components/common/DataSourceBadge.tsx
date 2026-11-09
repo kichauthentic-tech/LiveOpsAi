@@ -9,12 +9,36 @@ interface DataSourceBadgeProps {
   /** Sàn của ca (0139) — chỉ để tooltip nói đúng nguồn đối soát; mặc định TikTok. */
   platform?: LiveSession["platform"];
   className?: string;
+  /** "dot" = chấm màu một chạm (cửa sổ gọn 09/11, bảng dài như Finance: nhãn "Số Lúc Giao Ca" lặp ×95) — chú giải đặt một lần
+   *  bằng <DataSourceLegend />. */
+  variant?: "pill" | "dot";
 }
 
-export const DataSourceBadge: React.FC<DataSourceBadgeProps> = ({ dataSource, platform = "TikTok", className = "" }) => {
+const DOT: Record<"reconciled" | "handover" | "estimate", { cls: string; label: string }> = {
+  reconciled: { cls: "bg-[var(--success)]", label: "Đã đối soát" },
+  handover: { cls: "bg-sky-500", label: "Số lúc giao ca" },
+  estimate: { cls: "bg-amber-500", label: "Tạm tính" }
+};
+
+export const DataSourceLegend: React.FC<{ className?: string }> = ({ className = "" }) => (
+  <span className={`inline-flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs text-[var(--text-muted)] ${className}`}>
+    {(Object.keys(DOT) as (keyof typeof DOT)[]).map((k) => (
+      <span key={k} className="inline-flex items-center gap-1">
+        <span className={`inline-block w-2.5 h-2.5 rounded-full ${DOT[k].cls}`} />
+        {DOT[k].label}
+      </span>
+    ))}
+  </span>
+);
+
+export const DataSourceBadge: React.FC<DataSourceBadgeProps> = ({ dataSource, platform = "TikTok", className = "", variant = "pill" }) => {
   const prof = profileOf({ platform });
   const shop = prof.shopLabel;
   const tier = dataSourceTier({ dataSource });
+  if (variant === "dot") {
+    const d = DOT[tier === "reconciled" ? "reconciled" : tier === "handover" ? "handover" : "estimate"];
+    return <span role="img" aria-label={d.label} title={d.label} className={`inline-block w-2.5 h-2.5 rounded-full align-middle ${d.cls} ${className}`} />;
+  }
   if (tier === "reconciled") {
     return (
       <span

@@ -328,8 +328,10 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
                         <span className="ml-auto font-normal text-[var(--accent-text)]">{open ? "Đóng" : canEdit ? "Sửa" : "Xem"}</span>
                       </span>
                       <span className="block text-[var(--text-muted)] mt-0.5">
-                        Cam kết {fmtMonth(thisMonth.slice(0, 7))}: {monthCommit && monthCommit.committedHours > 0 ? <b className="text-[var(--text)]">{monthCommit.committedHours.toLocaleString("vi-VN")}h{contract ? "" : " (nhập ở Kế Hoạch Tháng, chưa có hợp đồng)"}</b> : contract ? <b className="text-[var(--text)]">{contract.monthlyHours.toLocaleString("vi-VN")}h/tháng</b> : missing}
-                        {" · "}Giá ({b.billingModel === "hourly" ? "theo giờ" : "theo %"}): {price ? <b className="text-[var(--text)]">{price}</b> : missing}
+                        Cam kết {fmtMonth(thisMonth.slice(0, 7))}: {monthCommit && monthCommit.committedHours > 0 ? <><b className="text-[var(--text)]">{monthCommit.committedHours.toLocaleString("vi-VN")}h</b>{!contract && <span className="ml-1 rounded-full border border-[var(--border)] bg-[var(--surface-elevated)] px-1.5 text-2xs font-bold text-[var(--text-muted)]" title="Số giờ nhập ở Kế Hoạch Tháng — kênh chưa có hợp đồng">chưa có HĐ</span>}</> : contract ? <b className="text-[var(--text)]">{contract.monthlyHours.toLocaleString("vi-VN")}h/tháng</b> : missing}
+                        {/* 09/11: nhãn giá lấy theo điều khoản kênh (chuỗi giá đã ghi "/giờ" hay "% NMV") — trước ghi "Giá (theo %)" theo cách tính cũ cấp
+                            brand cạnh giá theo giờ của kênh (VERA, CROCS). */}
+                        {" · "}Giá: {price ? <b className="text-[var(--text)]">{price}</b> : missing}
                         {" · "}Phòng: {studio ? <b className="text-[var(--text)]">{studio.name}</b> : missing}
                       </span>
                     </button>

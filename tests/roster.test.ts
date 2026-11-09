@@ -171,6 +171,20 @@ describe("familiarity + candidates", () => {
     expect(list[0].qualified).toBe(true);
   });
 
+  test("tối ưu GMV (09/11): host chỉ số Performance cao lên đầu; người chưa có chỉ số giữ ×1,00; vai trợ không dùng chỉ số", () => {
+    const shifts = R.buildRosterShifts([], [slot("o1")], [], [], WEEK, "2026-10-18");
+    const target = shifts[0];
+    const an = R.analyzeRoster(shifts, rules, WEEK, name);
+    const perf = new Map([["henry", { index: 1.4, n: 30 }], ["khanh", { index: 0.95, n: 20 }]]);
+    const gmv = C.rankCandidates(target, "host", { ...ctxOf(shifts, "gmv"), perf }, an);
+    expect(gmv[0].talentId).toBe("henry");
+    expect(gmv[0].perf?.index).toBe(1.4);
+    const cost = C.rankCandidates(target, "host", { ...ctxOf(shifts, "cost"), perf }, an);
+    expect(cost[0].talentId).toBe("khanh");
+    const co = C.rankCandidates(target, "co_host", { ...ctxOf(shifts, "gmv"), perf }, an);
+    expect(co.every((c) => c.perf === undefined)).toBe(true);
+  });
+
   test("tự lấp: chỉ ca mở, không xếp một người vào hai ca trùng giờ", () => {
     const shifts = R.buildRosterShifts([], [slot("o1"), slot("o2", { brandId: "crocs", startTime: "19:30", endTime: "22:30", studioId: "r-2" })], [], [], WEEK, "2026-10-18");
     const res = C.autofillWeek(ctxOf(shifts, "balance"));

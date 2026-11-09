@@ -2,6 +2,7 @@ import type { LiveSession, Talent, TalentRateHistoryEntry } from "../../types";
 import { addDays, dateTimeRangesOverlap } from "../dateUtils";
 import { effectiveSegments } from "../staffSegments";
 import { findTalentRateAsOf } from "../pnl";
+import type { HostPerf } from "./monthPlanner";
 import {
   absRange,
   analyzeRoster,
@@ -83,7 +84,10 @@ export function plannedCost(t: Talent | undefined, history: readonly TalentRateH
   return { amount: perSession, hourly: false, missing: perSession <= 0 };
 }
 
-export type RankMode = "balance" | "cost";
+// "gmv" (09/11, user yêu cầu): ưu tiên host có chỉ số Performance cao (GMV/giờ ÷ kỳ vọng cùng kênh × khung giờ, co về 1,00 theo số
+// ca — cùng chỉ số "Xếp cả tháng"). Bằng chứng yếu (r = 0,23, xem chú thích đầu file) nên chỉ là chế độ trainer CHỦ ĐỘNG chọn, mặc định
+// vẫn "balance"; UI luôn ghi số ca làm căn cứ.
+export type RankMode = "balance" | "cost" | "gmv";
 
 export interface RankContext {
   shifts: RosterShift[];
@@ -96,6 +100,8 @@ export interface RankContext {
   nameOf: (talentId: string) => string;
   /** Điều khoản về host với brand (0191): host bị brand từ chối / độc quyền brand khác không vào danh sách gợi ý. */
   brandRules?: BrandRuleIndex;
+  /** Chỉ số Performance host 90 ngày (`buildHostPerformance`) — dùng ở "balance" (nhẹ) và "gmv". */
+  perf?: ReadonlyMap<string, HostPerf>;
 }
 
 export interface Candidate {
@@ -108,6 +114,8 @@ export interface Candidate {
   weekHours: number;
   issues: string[];
   cost: PlannedCost;
+  /** Chỉ số Performance (chỉ vai host). */
+  perf?: HostPerf;
   registered: boolean;
   /** Đủ điều kiện để xếp theo giá: quen kênh (host ≥ 3 ca host / trợ ≥ 3 ca), không cảnh báo, tuần ≤ 36 giờ sau khi xếp. */
   qualified: boolean;
@@ -188,7 +196,26 @@ export function rankCandidates(shift: RosterShift, role: RosterRole, ctx: RankCo
     if (ctx.brandRules?.preferred.has(`${shift.brandId}|${t.id}`)) score += 20;
     const known = role === "host" ? f.host >= 3 : f.host + f.co >= 3;
     const qualified = known && w.issues.length === 0 && w.weekHours + h <= SOFT_WEEK_CAP && !cost.missing;
-    out.push({ talentId: t.id, score, famHost: f.host, famCo: f.co, weekHours: w.weekHours, issues: w.issues, cost, registered, qualified });
+    const perf = role === "host" ? ctx.perf?.get(t.id) : undefined;
+    out.push({ talentId: t.id, score, famHost: f.host, famCo: f.co, weekHours: w.weekHours, issues: w.issues, cost, registered, qualified, perf });
+  }
+  // Cân bằng (09/11, demo user duyệt): thêm nhẹ hiệu suất (host) và chi phí tương đối trong danh sách — cùng tinh thần trọng số "Cân bằng"
+  // của Xếp cả tháng. Không đủ rate thì phần chi phí = 0 (không phạt người thiếu rate ở chế độ này).
+  const priced = out.filter((c) => !c.blocked && !c.cost.missing).map((c) => c.cost.amount);
+  const cMin = Math.min(...priced);
+  const cMax = Math.max(...priced);
+  const perf01 = (c: Candidate) => (c.perf ? Math.max(0, Math.min(1, (c.perf.index - 0.85) / 0.6)) : 0.25);
+  const cost01 = (c: Candidate) => (c.cost.missing || !(cMax > cMin) ? 0.5 : (cMax - c.cost.amount) / (cMax - cMin));
+  if (ctx.mode === "balance") for (const c of out) if (!c.blocked) c.score += (role === "host" ? 15 * perf01(c) : 0) + 12 * cost01(c);
+  if (ctx.mode === "gmv" && role === "host") {
+    // Người quen kênh (≥ 3 ca host), không cảnh báo lên trước; trong nhóm đó chỉ số Performance cao trước, hoà thì điểm cân bằng.
+    const ok = (c: Candidate) => c.famHost >= 3 && c.issues.length === 0;
+    return out.sort(
+      (x, y) =>
+        Number(!!x.blocked) - Number(!!y.blocked) ||
+        Number(ok(y)) - Number(ok(x)) ||
+        (ok(x) && ok(y) ? (y.perf?.index ?? 1) - (x.perf?.index ?? 1) || y.score - x.score : y.score - x.score)
+    );
   }
   if (ctx.mode === "cost") {
     return out.sort(

@@ -1,3 +1,4 @@
+import { ChipPicker } from "../ui/ChipChoice";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { AffiliateActualEntry, AffiliatePlanMonth, LiveSession, UserRole } from "../../types";
 import { fetchAffiliateActuals, replaceAffiliateActuals } from "../../lib/db/affiliateActuals";
@@ -1012,34 +1013,27 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
                 readOnly ? (
                   <span className={`px-2 py-0.5 rounded text-xs font-semibold ${CAMPAIGN_STYLE[e.campaignType ?? ""] ?? ""}`}>{e.campaignType || "—"}</span>
                 ) : (
-                  <select
-                    aria-label={cellLabel(e, label)}
-                    value={e.campaignType ?? ""}
-                    onChange={(ev) => update(e, { campaignType: ev.target.value || undefined })}
-                    className={`min-h-6 rounded px-1.5 py-0.5 text-xs font-semibold outline-none ${CAMPAIGN_STYLE[e.campaignType ?? ""] ?? "bg-[var(--surface-elevated)]"}`}
-                  >
-                    <option value="">—</option>
-                    {CAMPAIGN_TYPES.map((t) => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </select>
+                  <ChipPicker
+                    label={cellLabel(e, label)}
+                    options={CAMPAIGN_TYPES}
+                    value={(e.campaignType || undefined) as (typeof CAMPAIGN_TYPES)[number] | undefined}
+                    onChange={(v) => update(e, { campaignType: v })}
+                    styleFor={(v) => CAMPAIGN_STYLE[v ?? ""]}
+                    clearable
+                  />
                 )
               )}
               {metricRow("Camp", (e, label) =>
                 readOnly ? (
                   <span className="text-xs font-semibold">{e.campName || "—"}</span>
                 ) : (
-                  <select
-                    aria-label={cellLabel(e, label)}
-                    value={e.campName ?? ""}
-                    onChange={(ev) => update(e, { campName: ev.target.value || undefined })}
-                    className="min-h-6 rounded px-1.5 py-0.5 text-xs font-semibold outline-none bg-[var(--surface-elevated)]"
-                  >
-                    <option value="">—</option>
-                    {CAMP_NAMES.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
+                  <ChipPicker
+                    label={cellLabel(e, label)}
+                    options={CAMP_NAMES}
+                    value={(e.campName || undefined) as (typeof CAMP_NAMES)[number] | undefined}
+                    onChange={(v) => update(e, { campName: v })}
+                    clearable
+                  />
                 )
               )}
               {metricRow("Kế hoạch", (e) => (

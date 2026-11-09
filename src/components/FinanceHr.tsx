@@ -12,10 +12,10 @@ import {
   TalentRateHistoryEntry,
   BrandPlatformRateHistoryEntry
 } from "../types";
-import { DollarSign, TrendingUp, CheckCircle2, XCircle, Clock } from "lucide-react";
+import { DollarSign, TrendingUp, CheckCircle2, XCircle, Clock, ChevronRight } from "lucide-react";
 import { PNL_MISSING_LABEL, PnlMissingInput, computeSessionPnl, isPnlSession } from "../lib/pnl";
 import { sessionAdsCost } from "../lib/metrics/adsCost";
-import { DataSourceBadge } from "./common/DataSourceBadge";
+import { DataSourceBadge, DataSourceLegend } from "./common/DataSourceBadge";
 import { dataQuality } from "../lib/performance/hostPerformance";
 import { errorMessage } from "../lib/errorMessage";
 import { todayVn } from "../lib/performance/brandCommitment";
@@ -139,6 +139,21 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
   // cộng cả ca đang tính bằng rate 0 / % hoa hồng mặc định 15% trong code ⇒ 17/10 hiện "576.190.636 (100,0%)" trong khi
   // Dashboard ghi "Chưa tính được · 0/164 ca đủ dữ liệu tiền". Từng ca bên dưới vẫn hiện số tạm kèm nhãn "Thiếu …".
   const completeRows = useMemo(() => rows.filter((r) => r.missingInputs.length === 0), [rows]);
+  // Bảng ca gập theo kênh brand × sàn (09/11). Tiền của nhóm chỉ cộng ca đủ dữ liệu (luật §4.5), ghi "x/y ca" khi thiếu.
+  const [openGroups, setOpenGroups] = useState<Set<string>>(() => new Set());
+  const rowGroups = useMemo(() => {
+    const m = new Map<string, { key: string; brandName: string; platform: ReportPlatform; rows: typeof rows; profit: number; complete: number; pending: number }>();
+    for (const r of rows) {
+      const p = platformOf(r.session);
+      const k = `${r.session.brandId}|${p}`;
+      const g = m.get(k) ?? { key: k, brandName: r.session.brandName, platform: p, rows: [], profit: 0, complete: 0, pending: 0 };
+      g.rows.push(r);
+      if (r.missingInputs.length === 0) { g.profit += r.netProfit; g.complete += 1; }
+      if (r.finance.approvalStatus !== "approved" && r.finance.approvalStatus !== "rejected") g.pending += 1;
+      m.set(k, g);
+    }
+    return [...m.values()].sort((a, b) => a.brandName.localeCompare(b.brandName) || a.platform.localeCompare(b.platform));
+  }, [rows]);
   // Bố cục 18/10: mọi ca cùng thiếu đúng một bộ (đo T10: 215/215 ca "Thiếu rate host · rate trợ live · % commission") thì nhãn
   // từng dòng chỉ lặp lại khối cảnh báo phía trên 215 lần — ẩn đi; ca thiếu khác nhau thì ghi chữ vàng trên dòng (không còn
   // viên đỏ đặc).
@@ -362,6 +377,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
           </p>
         ) : (
           <div className="overflow-x-auto">
+            <DataSourceLegend className="mb-2" />
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-left text-[var(--text-muted)] border-b border-[var(--border)]">
@@ -376,7 +392,33 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                 </tr>
               </thead>
               <tbody>
-                {rows.map(({ session: s, finance, talent, isHourly, agencyCommissionRate, grossAgencyRev, hostPayout, netProfit, hostPaidHourly, billableHours, otMinutes, earlyLeaveMinutes, coHost, coHostPayout, coHostPaidHourly, coHostUsesAssistantRate, missingInputs, excluded, payouts, segmented }) => {
+                {/* Cửa sổ gọn 09/11 (demo user duyệt): bảng ca gập theo kênh (đo 08/11: 11,3 màn, nhãn "Số lúc giao ca" ×95) — dòng tổng
+                    từng kênh, bấm mới mở từng ca; nguồn số thành chấm màu, chú giải một lần trên bảng. */}
+                {rowGroups.map((g) => {
+                  const open = openGroups.has(g.key);
+                  return (
+                    <React.Fragment key={g.key}>
+                      <tr className="border-b border-[var(--border)] bg-[var(--surface-elevated)]/40">
+                        <td colSpan={8} className="p-0">
+                          <button
+                            type="button"
+                            aria-expanded={open}
+                            onClick={() => setOpenGroups((cur) => { const n = new Set(cur); if (n.has(g.key)) n.delete(g.key); else n.add(g.key); return n; })}
+                            className="w-full flex flex-wrap items-center gap-x-3 gap-y-1 py-2 px-1 text-left hover:bg-[var(--surface-elevated)]"
+                          >
+                            <ChevronRight className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-90" : ""}`} />
+                            <b className="text-[var(--text)]">{g.brandName}</b> <PlatformChip platform={g.platform} />
+                            <span className="text-[var(--text-muted)]">{g.rows.length} ca</span>
+                            <span className={`font-mono font-bold ${g.complete === 0 ? "text-[var(--text-faint)]" : g.profit >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                              P&amp;L {g.complete > 0 ? money(g.profit) : "—"}
+                              {g.complete < g.rows.length && <span className="font-normal text-2xs text-[var(--text-faint)]"> ({g.complete}/{g.rows.length} ca đủ dữ liệu)</span>}
+                            </span>
+                            {g.pending > 0 && <span className="text-2xs text-[var(--text-muted)]">{g.pending} chờ duyệt</span>}
+                            <span className="inline-flex gap-0.5">{g.rows.slice(0, 40).map((r) => <DataSourceBadge key={r.session.id} variant="dot" dataSource={r.session.dataSource} platform={r.session.platform} />)}</span>
+                          </button>
+                        </td>
+                      </tr>
+                      {open && g.rows.map(({ session: s, finance, talent, isHourly, agencyCommissionRate, grossAgencyRev, hostPayout, netProfit, hostPaidHourly, billableHours, otMinutes, earlyLeaveMinutes, coHost, coHostPayout, coHostPaidHourly, coHostUsesAssistantRate, missingInputs, excluded, payouts, segmented }) => {
                   return (
                   <tr key={s.id} className="border-b border-[var(--border)]/60 align-middle">
                     <td className="py-2 pr-3">
@@ -397,7 +439,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                     </td>
                     <td className="py-2 pr-3">
                       <div className={`font-bold text-[var(--text-muted)] ${excluded ? "line-through" : ""}`}>{money(s.actualGmv)}</div>
-                      <DataSourceBadge dataSource={s.dataSource} platform={s.platform} className="mt-0.5" />
+                      <DataSourceBadge variant="dot" dataSource={s.dataSource} platform={s.platform} className="mt-0.5" />
                     </td>
                     <td className="py-2 pr-3">
                       {isHourly ? (
@@ -505,6 +547,9 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                       )}
                     </td>
                   </tr>
+                  );
+                })}
+                    </React.Fragment>
                   );
                 })}
               </tbody>
