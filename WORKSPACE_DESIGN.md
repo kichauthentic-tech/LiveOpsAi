@@ -409,6 +409,7 @@
 
 **Cần user làm:**
 - **0207 (09/11, CHƯA CHẠY):** chạy sau 0205/0206 (độc lập, thứ tự nào cũng được). Rồi thử như mục "No Asst" ở §1; sau đó kiểm `select open_need, count(*) from shift_slots where status='open' group by 1`.
+- **0208 (09/11, ĐÃ CHẠY 10/11, verified 485 ca mở = 'host'):** ca mở chưa có nháp có `open_need='host'`; trigger BEFORE trên `shift_slots` tự tính theo nháp/mặc định 'host'; xoá nháp ⇒ 'host'; ca không còn mở ⇒ null. Talent chỉ thấy "Cần host" của ca CHƯA nháp ở tháng ĐÃ CHỐT (tháng có ≥1 ca không còn mở — `settledMonths` ở `TalentShiftSignup.tsx`); tháng chưa chốt (T12) ẩn vì ca nào cũng chưa xếp. Nhãn từ nháp ("Cần trợ live") hiện mọi tháng. Chưa kiểm thẻ trên màn talent thật và trigger tạo ca mới.
 - **0203 (08/11, ĐÃ CHẠY, đã push):** kiểm bản deploy (cửa sổ ca VERA 08/11 18:00 có "≈ 3,9M" + dòng vàng chia tạm).
 - **Lịch 2 đợt + Nhận target brand (06/11, `0200` ĐÃ CHẠY, đã push):** kiểm bản deploy. Rồi: Điều Phối → "Mở lịch tháng 12" đặt 4 mốc; sau họp monthly vào Kế Hoạch
   Tháng từng kênh → "Nhận target brand…". Chưa thử ghi thật (mở ca bổ sung, đặt mốc).
