@@ -59,6 +59,7 @@ export const ShiftPanel: React.FC<Props> = ({ shift, analysis, ctx, talents, his
   // Cửa sổ gọn 09/11: một vai một lúc (ô chạm Host / Trợ), Dời ca mở từ ⋯.
   const [roleTab, setRoleTab] = useState<RosterRole>(() => (!shift.hostId || shift.coHostId ? "host" : "co_host"));
   const [moving, setMoving] = useState(false);
+  const [everyone, setEveryone] = useState(false);
 
   const past = shift.date < getTodayDate();
   const lockedPeople = readOnly || past || shift.segmented;
@@ -67,7 +68,10 @@ export const ShiftPanel: React.FC<Props> = ({ shift, analysis, ctx, talents, his
 
   const roleBlock = (role: RosterRole) => {
     const cur = role === "host" ? shift.hostId : shift.coHostId;
-    const list = rankCandidates(shift, role, ctx, analysis);
+    // 09/11: chỉ gợi ý trong nhóm đã đăng ký ca này, rồi mới áp luật (bận / quá giờ tuần) + chế độ xếp hạng. "Xem cả người chưa đăng ký" là lối thoát.
+    const full = rankCandidates(shift, role, ctx, analysis);
+    const list = everyone ? full : full.filter((c) => c.registered);
+    const unregistered = full.length - full.filter((c) => c.registered).length;
     const ok = list.filter((c) => !c.blocked).slice(0, 8);
     const blocked = list.length - list.filter((c) => !c.blocked).length;
     const curCost = cur ? plannedCost(talentById.get(cur), history, role, shift.date, shiftHours(shift)) : null;
@@ -133,10 +137,19 @@ export const ShiftPanel: React.FC<Props> = ({ shift, analysis, ctx, talents, his
                 ))}
               </tbody>
             </table>
-            {ok.length === 0 && <p className="text-xs text-[var(--text-muted)] py-2">Không còn ai rảnh và đủ điều kiện.</p>}
+            {ok.length === 0 && (
+              <p className="text-xs text-[var(--text-muted)] py-2">
+                {everyone ? "Không còn ai rảnh và đủ điều kiện." : shift.registrants.length === 0 ? "Chưa ai đăng ký ca này." : "Người đã đăng ký đều đang bận hoặc không đủ điều kiện."}
+              </p>
+            )}
           </div>
         )}
         {!lockedPeople && blocked > 0 && <p className="text-2xs text-[var(--text-faint)]">Ẩn {blocked} người bận ca trùng giờ hoặc sẽ quá {ctx.rules.maxWeekHours}h tuần.</p>}
+        {!lockedPeople && (everyone || unregistered > 0) && (
+          <button type="button" onClick={() => setEveryone((v) => !v)} className="text-2xs font-bold text-[var(--accent-text)] hover:underline">
+            {everyone ? "Chỉ hiện người đã đăng ký" : `Xem cả ${unregistered} người chưa đăng ký`}
+          </button>
+        )}
       </section>
     );
   };

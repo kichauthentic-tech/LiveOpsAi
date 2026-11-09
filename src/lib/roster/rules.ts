@@ -85,6 +85,9 @@ export function buildRosterShifts(
     list.push(r.talentId);
     regsBySlot.set(r.slotId, list);
   }
+  // Ca đã lên lịch vẫn là slot cũ (shift_slots.session_id) ⇒ giữ danh sách người từng đăng ký slot đó để đổi người chỉ gợi ý trong nhóm đã đăng ký.
+  const regsBySession = new Map<string, string[]>();
+  for (const sl of slots) if (sl.sessionId && regsBySlot.has(sl.id)) regsBySession.set(sl.sessionId, regsBySlot.get(sl.id)!);
   const out: RosterShift[] = [];
   for (const s of sessions) {
     if (s.status === "Cancelled" || s.date < from || s.date > to) continue;
@@ -107,7 +110,7 @@ export function buildRosterShifts(
       drafted: false,
       segmented: hasStaffSegments(s),
       hasData: hasSessionData(s),
-      registrants: []
+      registrants: regsBySession.get(s.id) ?? []
     });
   }
   for (const sl of slots) {

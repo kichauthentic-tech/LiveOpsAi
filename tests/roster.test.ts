@@ -95,6 +95,11 @@ describe("analyzeRoster", () => {
     expect(an2.issues.find((i) => i.code === "week_warn")?.severity).toBe("warn");
   });
 
+  test("ca đã lên lịch giữ danh sách người đã đăng ký slot gốc (đổi người chỉ gợi ý trong nhóm đó)", () => {
+    const shifts = R.buildRosterShifts([ca("s1", { date: "2026-10-14" })], [slot("o1", { sessionId: "s1" })], [], [{ id: "r1", slotId: "o1", talentId: "khanh", registeredAt: "" }], WEEK, "2026-10-18");
+    expect(shifts.find((s) => s.key === "s:s1")?.registrants).toEqual(["khanh"]);
+  });
+
   test("ca mở: nháp chỉ có trợ = chặn công bố; ca trống = 'hole'; host chưa quen kênh = cảnh báo", () => {
     const shifts = R.buildRosterShifts([], [slot("o1"), slot("o2", { startTime: "10:00", endTime: "13:00" })], [{ slotId: "o1", coHostId: "giang" }], [], WEEK, "2026-10-18");
     const an = R.analyzeRoster(shifts, rules, WEEK, name);
