@@ -1,21 +1,10 @@
 import { supabase } from "../supabaseClient";
 import { TikTokConnectionStatus, TikTokWebhookEvent } from "../../types";
+import { authedFetch } from "../authedFetch";
 
 // Access/refresh tokens live server-side only (table `tiktok_shop_connections` has no
 // client-readable RLS policy at all) — every call here either proxies through server.ts
 // (status/authorize/disconnect) or reads the non-sensitive append-only event log directly.
-async function authedFetch(path: string, init?: RequestInit): Promise<Response> {
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  return fetch(path, {
-    ...init,
-    headers: {
-      ...(init?.headers || {}),
-      Authorization: `Bearer ${token ?? ""}`
-    }
-  });
-}
-
 export async function fetchTikTokStatus(): Promise<TikTokConnectionStatus> {
   const res = await authedFetch("/api/tiktok/status");
   if (!res.ok) {

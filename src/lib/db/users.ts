@@ -1,5 +1,6 @@
 import { supabase } from "../supabaseClient";
 import { PermissionKey, SystemUser, UserRole, Talent } from "../../types";
+import { authedFetch } from "../authedFetch";
 
 interface DbProfile {
   id: string;
@@ -93,18 +94,6 @@ export interface InviteUserPayload {
   // nhiên (không gửi email mời) và set must_change_password=true. Không có = luồng "Tạo Tài
   // Khoản Mới" thường (Phân Quyền & Role), gửi email mời như cũ.
   generatePassword?: boolean;
-}
-
-async function authedFetch(path: string, init: RequestInit): Promise<Response> {
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  return fetch(path, {
-    ...init,
-    headers: {
-      ...(init.headers || {}),
-      Authorization: `Bearer ${token ?? ""}`
-    }
-  });
 }
 
 // Creating a real login account requires Supabase's admin API (service role key),

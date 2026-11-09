@@ -650,6 +650,9 @@ Chữ brand thấy trong Report Tháng (component `report/*`, `*MonthlyReportTab
 - **Bản chụp Report Tháng:** đổi công thức `fetch*Slice` ⇒ tăng `PIECE_VERSION`; đổi tổng hợp product_list ⇒ tăng
   `PRODUCT_AGG_VERSION`; report đọc trường mới của ca ⇒ thêm vào `SNAPSHOT_SESSION_FIELDS` (+ `SESSION_SIG_FIELDS`). jsonb
   không giữ thứ tự khoá — so theo giá trị, không so `JSON.stringify`.
+  **Từ chối người gọi qua `denyCaller(res, caller, "Chỉ tài khoản …")`** (09/11): `no_token`/`invalid_token` ⇒ 401 + "Phiên đăng nhập đã hết hạn…", sai role ⇒ 403.
+  Route mới KHÔNG tự viết `res.status(403)` cho nhánh `!caller.userId`. Client gọi route này chỉ qua `lib/authedFetch.ts` (bản duy nhất): gặp 401 thì
+  `refreshSession` thử lại một lần, vẫn 401 ⇒ `signOut({scope:"local"})` về màn đăng nhập. (Trước đó phiên bị Supabase thu hồi hiện sai thành "không phải CEO/Admin".)
 - **Server** (`src/server/*`, `api/*`): import tương đối PHẢI có đuôi `.js` (`tests/serverImports.test.ts`). Xác thực qua
   `authUserOf` / `requireRoleCaller(req, roles)`. Sau deploy: `curl https://live-ops-ai.vercel.app/api/health` phải 200.
 

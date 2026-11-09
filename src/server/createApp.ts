@@ -98,6 +98,21 @@ export function createApp() {
     return { userId: data.user.id };
   };
 
+  // Trả lời khi `requireRoleCaller`/`authUserOf` không ra được người gọi. Phân biệt hai chuyện mà trước đây cùng một
+  // câu "Chỉ tài khoản CEO/Admin…": (1) phiên đăng nhập không còn hợp lệ → 401 + bảo đăng nhập lại (client tự đăng xuất
+  // khi nhận 401, xem src/lib/authedFetch.ts); (2) đăng nhập rồi nhưng sai role → 403 như cũ, kèm lý do để chẩn đoán.
+  const callerDenial = (caller: CallerResult, forbiddenMsg: string): { status: 401 | 403; error: string } => {
+    const reason = caller.reason ?? "unknown";
+    if (reason === "no_token" || reason.startsWith("invalid_token")) {
+      return { status: 401, error: `Phiên đăng nhập đã hết hạn hoặc đã bị thu hồi. Hãy đăng nhập lại rồi thử lại. (${reason})` };
+    }
+    return { status: 403, error: `${forbiddenMsg} (${reason})` };
+  };
+  const denyCaller = (res: express.Response, caller: CallerResult, forbiddenMsg: string) => {
+    const d = callerDenial(caller, forbiddenMsg);
+    return res.status(d.status).json({ error: d.error });
+  };
+
   // Như authUserOf, thêm điều kiện `profiles.role` thuộc `roles`.
   const requireRoleCaller = async (req: express.Request, roles: readonly string[]): Promise<CallerResult> => {
     const caller = await authUserOf(req);
@@ -147,7 +162,7 @@ export function createApp() {
       }
       const caller = await requireCeoCaller(req);
       if (!caller.userId) {
-        return res.status(403).json({ error: `Chỉ tài khoản CEO/Admin mới được tạo tài khoản mới. (${caller.reason})` });
+        return denyCaller(res, caller, "Chỉ tài khoản CEO/Admin mới được tạo tài khoản mới.");
       }
       const { name, email, role, customRoleTitle, assignedBrandId, assignedTalentId, newTalentProfile, generatePassword } = req.body || {};
       if (!name || !email || !role) {
@@ -315,7 +330,7 @@ export function createApp() {
   // CEO không đụng tài khoản Admin (cùng luật xoá tài khoản).
   const requireManageTarget = async (req: express.Request, targetId: string): Promise<{ error?: [number, string] }> => {
     const caller = await requireCeoCaller(req);
-    if (!caller.userId) return { error: [403, `Chỉ tài khoản CEO/Admin mới làm được việc này. (${caller.reason})`] };
+    if (!caller.userId) { const d = callerDenial(caller, "Chỉ tài khoản CEO/Admin mới làm được việc này."); return { error: [d.status, d.error] }; }
     if (targetId === caller.userId) return { error: [400, "Tài khoản của chính mình thì sửa ở Tài Khoản Của Tôi."] };
     const { data: target } = await supabaseAdmin!.from("profiles").select("role").eq("id", targetId).maybeSingle();
     if (!target) return { error: [404, "Không thấy tài khoản."] };
@@ -371,7 +386,7 @@ export function createApp() {
       }
       const caller = await requireCeoCaller(req);
       if (!caller.userId) {
-        return res.status(403).json({ error: `Chỉ tài khoản CEO/Admin mới được xóa tài khoản. (${caller.reason})` });
+        return denyCaller(res, caller, "Chỉ tài khoản CEO/Admin mới được xóa tài khoản.");
       }
       const callerId = caller.userId;
       const { id } = req.params;
@@ -410,7 +425,7 @@ export function createApp() {
       const promptsQuery = supabaseAdmin.from("ai_agent_prompts").select("*").order("category").order("agent_key");
       const [caller, { data, error }] = await Promise.all([requireAdminCaller(req), promptsQuery]);
       if (!caller.userId) {
-        return res.status(403).json({ error: `Chỉ tài khoản Admin mới được xem AI Training Center. (${caller.reason})` });
+        return denyCaller(res, caller, "Chỉ tài khoản Admin mới được xem AI Training Center.");
       }
       if (error) {
         return res.status(500).json({ error: error.message });
@@ -429,7 +444,7 @@ export function createApp() {
       }
       const caller = await requireAdminCaller(req);
       if (!caller.userId) {
-        return res.status(403).json({ error: `Chỉ tài khoản Admin mới được sửa AI Training Center. (${caller.reason})` });
+        return denyCaller(res, caller, "Chỉ tài khoản Admin mới được sửa AI Training Center.");
       }
       const callerId = caller.userId;
       const { agentKey } = req.params;
@@ -524,7 +539,7 @@ export function createApp() {
       }
       const caller = await requireCeoCaller(req);
       if (!caller.userId) {
-        return res.status(403).json({ error: `Chỉ tài khoản CEO/Admin mới được kết nối TikTok Shop. (${caller.reason})` });
+        return denyCaller(res, caller, "Chỉ tài khoản CEO/Admin mới được kết nối TikTok Shop.");
       }
       pruneExpiredOAuthStates();
       const state = crypto.randomBytes(16).toString("hex");
@@ -607,7 +622,7 @@ export function createApp() {
       return res.json({ configured: false, connected: false });
     }
     if (!(await authUserOf(req)).userId) {
-      return res.status(403).json({ error: "Cần đăng nhập để xem trạng thái kết nối." });
+      return res.status(401).json({ error: "Cần đăng nhập để xem trạng thái kết nối." });
     }
     const { data, error } = await supabaseAdmin
       .from("tiktok_shop_connections")
@@ -638,7 +653,7 @@ export function createApp() {
       }
       const caller = await requireCeoCaller(req);
       if (!caller.userId) {
-        return res.status(403).json({ error: `Chỉ tài khoản CEO/Admin mới được ngắt kết nối TikTok Shop. (${caller.reason})` });
+        return denyCaller(res, caller, "Chỉ tài khoản CEO/Admin mới được ngắt kết nối TikTok Shop.");
       }
       // FIX L10 (audit 2026-08-21): .neq("shop_id", "") xoá MỌI hàng (mọi shop_id khác chuỗi rỗng
       // đều khớp) thay vì đúng shop đang được ngắt — nếu có nhiều shop kết nối cùng lúc, ngắt 1
