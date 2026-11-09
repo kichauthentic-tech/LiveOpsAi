@@ -296,9 +296,9 @@ export const RosterBoard: React.FC<Props> = (p) => {
   const weekIssues = analysis.issues;
   const blocks = weekIssues.filter((i) => i.severity === "block");
   const warns = weekIssues.filter((i) => i.severity === "warn");
+  const overWeek = warns.filter((i) => i.code === "week_over");
   const openShifts = wk.filter((s) => s.kind === "open");
   const draftedCount = openShifts.filter((s) => s.drafted).length;
-  const overWeek = warns.filter((i) => i.code === "week_over");
   const outsideDrafts = openShifts.filter((s) => s.drafted && s.date.slice(0, 7) !== viewMonth).length;
   const weekCost = wk.reduce((s, x) => s + shiftCost(x, p.talents, p.talentRateHistory).amount, 0);
   const costMissing = wk.filter((x) => shiftCost(x, p.talents, p.talentRateHistory).missing).length;
@@ -588,14 +588,14 @@ export const RosterBoard: React.FC<Props> = (p) => {
       const total = rangeWeeks.reduce((n, [, c]) => n + c, 0);
       const people = new Set<string>();
       for (const d of drafts) if (p.shiftSlots.some((sl) => sl.id === d.slotId && rangeWeeks.some(([w]) => sl.date >= w && sl.date <= weekEndOf(w)))) [d.hostId, d.coHostId].forEach((x) => x && people.add(x));
-      const msg = [
-        `Công bố ${rangeWeeks.length} tuần (${rangeWeeks.map(([w]) => `${dayLabel(w)}–${dayLabel(weekEndOf(w))}`).join("; ")})?`,
       // 0206: quá giờ tuần chỉ cảnh báo — liệt kê từng tuần/người trước khi công bố.
       const overLines = rangeWeeks.flatMap(([w]) =>
         analyzeRoster(buildRosterShifts(p.sessions, p.shiftSlots, drafts, p.shiftRegistrations, addDays(w, -7), addDays(w, 7)), rules, w, nameOf, undefined, brandRules)
           .issues.filter((i) => i.code === "week_over")
           .map((i) => `tuần ${dayLabel(w)}: ${i.text.replace(/ có (.+) trong tuần.*/, " $1")}`)
       );
+      const msg = [
+        `Công bố ${rangeWeeks.length} tuần (${rangeWeeks.map(([w]) => `${dayLabel(w)}–${dayLabel(weekEndOf(w))}`).join("; ")})?`,
         `${total}+ ca nháp thành ca thật; khoảng ${people.size} host/trợ nhận tin (mỗi người một tin cho mỗi tuần).`,
         "Tuần vắt qua ngày cuối của phạm vi được công bố trọn tuần, gồm cả nháp ngoài phạm vi.",
         overLines.length > 0 ? `⚠ Quá ${rules.maxWeekHours} giờ/tuần (không chặn): ${overLines.join("; ")}.` : ""
