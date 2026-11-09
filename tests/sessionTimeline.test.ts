@@ -1,6 +1,6 @@
 // Dòng thời gian Cửa sổ ca (08/11): vị trí room / khoảng nghỉ / vạch giao ca trên trục — số thật ca FUJIWA 08/11 10:00–13:00.
 import { describe, expect, test } from "vitest";
-import { timelineLayout, vnClock } from "../src/lib/liveSnapshot/timeline";
+import { flexWindow, timelineLayout, vnClock } from "../src/lib/liveSnapshot/timeline";
 
 const at = (hm: string) => Date.parse(`2026-11-08T${hm}:00+07:00`);
 const iso = (hm: string) => new Date(at(hm)).toISOString();
@@ -74,5 +74,61 @@ describe("timelineLayout", () => {
     expect(l.turns).toEqual([]);
     expect(l.me.widthPct).toBe(100);
     expect(vnClock(at("13:13"))).toBe("13:13");
+  });
+});
+
+describe("flexWindow — cả chuỗi ca nối trượt theo giờ vào trễ (09/11)", () => {
+  const w = { startMs: at("18:00"), endMs: at("21:00") };
+  const w2 = { startMs: at("21:00"), endMs: at("00:00") + 24 * 3600000 };
+  const w3 = { startMs: at("00:00") + 24 * 3600000, endMs: at("03:00") + 24 * 3600000 };
+  const starts = [w.startMs, w2.startMs, w3.startMs];
+  test("host 1 vào 18:10 ⇒ ca 1 trượt 18:10–21:10", () => {
+    expect(flexWindow(w, [{ startedAt: iso("18:10") }], starts)).toEqual({ startMs: at("18:10"), endMs: at("21:10") });
+  });
+  test("ca 2 có room chạy tiếp từ 18:10 ⇒ trượt 21:10–00:10", () => {
+    const f = flexWindow(w2, [{ startedAt: iso("18:10") }], starts);
+    expect(f.startMs).toBe(at("21:10"));
+    expect(f.endMs).toBe(at("00:10") + 24 * 3600000);
+  });
+  test("ca 3 vẫn cùng room 18:10 ⇒ trượt 10' (thừa hưởng từ đầu chuỗi)", () => {
+    expect(flexWindow(w3, [{ startedAt: iso("18:10") }], starts).startMs).toBe(w3.startMs + 10 * 60000);
+  });
+  test("ca 3 chạy tiếp room của ca 2 bật 21:12 ⇒ trượt 12'", () => {
+    expect(flexWindow(w3, [{ startedAt: iso("21:12") }], starts).startMs).toBe(w3.startMs + 12 * 60000);
+  });
+  test("vào trễ ≤ 5' coi như đúng giờ", () => {
+    expect(flexWindow(w, [{ startedAt: iso("18:05") }], starts)).toEqual(w);
+    expect(flexWindow(w, [{ startedAt: iso("18:06") }], starts).startMs).toBe(at("18:06"));
+  });
+  test("vào đúng giờ ⇒ giữ nguyên", () => {
+    expect(flexWindow(w, [{ startedAt: iso("18:00") }], starts)).toEqual(w);
+  });
+  test("host bật sớm (không có ca trước) ⇒ không trượt", () => {
+    expect(flexWindow(w, [{ startedAt: iso("17:40") }], [w.startMs])).toEqual(w);
+  });
+  test("trễ 2h ⇒ kẹp 90'", () => {
+    expect(flexWindow(w, [{ startedAt: iso("20:00") }], starts).endMs).toBe(at("21:00") + 90 * 60000);
+  });
+  test("chưa có room ⇒ giữ nguyên", () => {
+    expect(flexWindow(w, [], starts)).toEqual(w);
+  });
+  test("timelineLayout: ca 1 vào trễ 10' bù đủ 3h không vẽ vạch cắt / phần lấn ca sau", () => {
+    const l = timelineLayout({ win: w, rooms: [{ roomId: "r", startedAt: iso("18:10"), endedAt: iso("21:10") }], parts: [], nowMs: at("23:00"), chainStartsMs: starts });
+    expect(l.cutEndPct).toBeUndefined();
+    expect(l.turns[0].outside).toEqual([]);
+    expect(l.me.leftPct + l.me.widthPct).toBeCloseTo(100, 5);
+    expect(l.turns[0].inside).toEqual(l.me); // phòng phủ kín khung ca đã trượt
+  });
+  test("timelineLayout: ca 2 nối từ ca 1 — ca trước trượt theo, không hở khoảng trống", () => {
+    const l = timelineLayout({
+      win: w2,
+      rooms: [{ roomId: "r", startedAt: iso("18:10"), endedAt: new Date(at("00:10") + 24 * 3600000).toISOString() }],
+      parts: [],
+      prev: { startMs: w.startMs, endMs: w.endMs, label: "A", linked: true },
+      nowMs: at("23:00") + 24 * 3600000,
+      chainStartsMs: starts
+    });
+    expect(l.prev!.leftPct + l.prev!.widthPct).toBeCloseTo(l.me.leftPct, 5);
+    expect(l.cutStartPct).toBeCloseTo(l.me.leftPct, 5); // room chạy tiếp từ ca trước ⇒ vạch giao ca ở đúng giờ vào ca đã trượt
   });
 });

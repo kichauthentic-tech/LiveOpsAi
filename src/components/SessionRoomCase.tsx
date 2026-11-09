@@ -18,7 +18,7 @@ import {
 import { SessionSnapshot, fetchSessionSnapshot } from "../lib/db/sessionLiveSnapshots";
 import { parseSnapshotFile, type ParsedSnapshotFile } from "../lib/liveSnapshot/extractRooms";
 import { BREAK_REASONS, BreakReason, adjacentShiftChain, breakReasonLabel, breakReasonShort, nextLinkStatus, roomsFromPrev, runOverRoom } from "../lib/liveSnapshot/roomCases";
-import { CROSS_TOL_MS, timelineLayout } from "../lib/liveSnapshot/timeline";
+import { CROSS_TOL_MS, flexWindow, timelineLayout } from "../lib/liveSnapshot/timeline";
 import { SessionTimeline } from "./SessionTimeline";
 import { MoreMenu, type MoreMenuItem } from "./ui/MoreMenu";
 import { sessionWindow, shortRoomId } from "../lib/liveSnapshot/roomSelection";
@@ -115,7 +115,10 @@ export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSes
   const chain = allSessions ? adjacentShiftChain(s, allSessions) : [s];
 
   // Room chạy qua giờ giao (chưa kết thúc / kết thúc sau giờ hết ca) mà chưa nối ⇒ tự mở danh sách ca sau để trợ chỉ xác nhận.
-  const win = sessionWindow(s);
+  // Cửa sổ ca trượt theo giờ live thật: host vào trễ rồi bù đủ giờ kế hoạch ⇒ ca và các ca nối sau trượt cùng lượng, không bị coi là lấn sang ca sau.
+  const planWin = sessionWindow(s);
+  const chainStartsMs = chain.map((x) => sessionWindow(x).startMs);
+  const win = flexWindow(planWin, snapshot?.rooms ?? [], chainStartsMs);
   const overRoom = snapshot && !snapshot.isEstimated ? runOverRoom(snapshot.rooms, win) : undefined;
   const suggestKey = overRoom && canEdit && !links.next && !dismissed && !loading ? overRoom.roomId : "";
   useEffect(() => {
@@ -268,7 +271,8 @@ export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSes
   const layout =
     snapshot && !snapshot.isEstimated && timed.length > 0
       ? timelineLayout({
-          win,
+          win: planWin, // timelineLayout tự trượt theo lượng trễ (cả chuỗi ca nối)
+          chainStartsMs,
           rooms,
           parts,
           prev: prev ? shiftOf(prev, true) : prevShift && crossesStart ? shiftOf(prevShift, false) : undefined,

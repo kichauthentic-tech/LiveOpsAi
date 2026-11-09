@@ -27,6 +27,8 @@ export interface TimelineIn {
   next?: TimelineShiftIn;
   /** Room chưa có giờ kết thúc (đang live) vẽ tới mốc này. */
   nowMs: number;
+  /** Giờ vào ca kế hoạch của các ca trong chuỗi liền kề (để ca nối thừa hưởng lượng trễ của ca đầu). */
+  chainStartsMs?: number[];
 }
 
 export interface TimelineSeg {
@@ -73,8 +75,48 @@ export function vnClock(ms: number): string {
   return `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
 }
 
+/** Tối đa lượng trễ được bù (cùng giới hạn với migration 0204). */
+export const MAX_FLEX_MS = 90 * 60000;
+
+/**
+ * Lượng trễ (ms) của ca — cùng quy tắc `private.session_lateness` ở migration 0204 (09/11, user: host vào trễ 10–15' rồi tự bù
+ * đủ giờ thì ca và các ca nối sau TRƯỢT cùng lượng đó, mỗi ca giữ độ dài kế hoạch):
+ *  - room đầu tiên bắt đầu trong ca (hoặc trễ so với giờ vào ca) ⇒ lượng trễ = giờ room bắt đầu − giờ vào ca kế hoạch, kẹp 0..90' (trễ ≤ 5' coi như đúng giờ);
+ *  - room bắt đầu TRƯỚC giờ vào ca (> 5') là room chạy tiếp từ ca trước ⇒ thừa hưởng lượng trễ của ca nơi room bắt đầu
+ *    (ca có giờ vào ca kế hoạch gần nhất ≤ giờ room bắt đầu, lấy từ `chainStartsMs`); không có ca trước ⇒ 0.
+ */
+export function flexLateness(win: { startMs: number; endMs: number }, rooms: { startedAt?: string }[], chainStartsMs: number[] = []): number {
+  const starts = rooms.map((r) => (r.startedAt ? Date.parse(r.startedAt) : NaN)).filter((n) => Number.isFinite(n));
+  if (starts.length === 0) return 0;
+  const first = Math.min(...starts);
+  let origin = win.startMs;
+  if (first < win.startMs - CROSS_TOL_MS) {
+    const before = chainStartsMs.filter((s) => s < win.startMs && s <= first + CROSS_TOL_MS);
+    if (before.length === 0) return 0; // host bật sớm, không có ca trước
+    origin = Math.max(...before);
+  }
+  const late = first - origin;
+  return late <= CROSS_TOL_MS ? 0 : Math.min(late, MAX_FLEX_MS); // trễ ≤ 5' không tính (cùng dung sai với 0203/0204)
+}
+
+/** Cửa sổ ca sau khi trượt theo lượng trễ (cả giờ vào ca và giờ hết ca). */
+export function flexWindow(
+  win: { startMs: number; endMs: number },
+  rooms: { startedAt?: string }[],
+  chainStartsMs: number[] = []
+): { startMs: number; endMs: number } {
+  const late = flexLateness(win, rooms, chainStartsMs);
+  return late > 0 ? { startMs: win.startMs + late, endMs: win.endMs + late } : win;
+}
+
 export function timelineLayout(input: TimelineIn): TimelineLayout {
-  const { win, prev, next, nowMs } = input;
+  const { nowMs } = input;
+  // Cửa sổ hiệu lực: cả chuỗi ca nối trượt theo lượng trễ (ca này + ca trước/sau trên trục).
+  const late = flexLateness(input.win, input.rooms, input.chainStartsMs);
+  const win = late > 0 ? { startMs: input.win.startMs + late, endMs: input.win.endMs + late } : input.win;
+  const slide = (x?: TimelineShiftIn): TimelineShiftIn | undefined => (x && late > 0 ? { ...x, startMs: x.startMs + late, endMs: x.endMs + late } : x);
+  const prev = slide(input.prev);
+  const next = slide(input.next);
   const spans = input.rooms
     .map((r) => {
       const s = r.startedAt ? Date.parse(r.startedAt) : NaN;
@@ -86,7 +128,7 @@ export function timelineLayout(input: TimelineIn): TimelineLayout {
     .filter((x) => Number.isFinite(x.s) && x.e >= x.s)
     .sort((a, b) => a.s - b.s);
 
-  const axisStartMs = Math.min(win.startMs, prev?.startMs ?? Infinity, ...spans.map((x) => x.s));
+  const axisStartMs = Math.min(input.win.startMs, win.startMs, prev?.startMs ?? Infinity, ...spans.map((x) => x.s));
   let axisEndMs = Math.max(win.endMs, next?.endMs ?? -Infinity, ...spans.map((x) => x.e));
   if (!(axisEndMs > axisStartMs)) axisEndMs = axisStartMs + HOUR;
   const total = axisEndMs - axisStartMs;
