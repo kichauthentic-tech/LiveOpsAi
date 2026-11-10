@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 
-export type Theme = "yfb" | "midnight" | "sand" | "paper" | "sage" | "daylight";
+export type Theme = "yfb" | "midnight" | "sand" | "paper" | "sage" | "daylight" | "bento";
 
 export const THEME_OPTIONS: Array<{ id: Theme; label: string; dark: boolean; hint: string }> = [
   { id: "yfb", label: "YFB", dark: true, hint: "Đen vàng" },
@@ -8,7 +8,8 @@ export const THEME_OPTIONS: Array<{ id: Theme; label: string; dark: boolean; hin
   { id: "sand", label: "Sand", dark: false, hint: "Sáng, tông kem" },
   { id: "paper", label: "Paper", dark: false, hint: "Trắng giấy, họp với brand" },
   { id: "sage", label: "Sage", dark: false, hint: "Sáng dịu, bo tròn" },
-  { id: "daylight", label: "Daylight", dark: false, hint: "Tương phản cao, chữ to, mặc định" }
+  { id: "daylight", label: "Daylight", dark: false, hint: "Tương phản cao, chữ to, mặc định" },
+  { id: "bento", label: "Bento", dark: false, hint: "Nền kem, thẻ nổi bo lớn" }
 ];
 
 // Font riêng của theme (05/11) — chỉ tải khi có người chọn theme đó, theme cũ giữ font hệ thống nên không tốn gì thêm.
@@ -16,7 +17,8 @@ export const THEME_OPTIONS: Array<{ id: Theme; label: string; dark: boolean; hin
 const THEME_FONTS: Partial<Record<Theme, string>> = {
   paper: "Be+Vietnam+Pro:wght@400;500;600;700;800;900",
   sage: "Nunito+Sans:wght@400;500;600;700;800;900",
-  daylight: "Lexend:wght@400;500;600;700;800;900"
+  daylight: "Lexend:wght@400;500;600;700;800;900",
+  bento: "Plus+Jakarta+Sans:wght@400;500;600;700;800"
 };
 
 export type Density = "compact" | "normal" | "comfy";

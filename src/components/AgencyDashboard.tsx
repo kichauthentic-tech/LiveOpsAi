@@ -20,6 +20,7 @@ import type { TabPrefetchCtx } from "../lib/db/prefetch";
 import { useToast } from "../hooks/useToast";
 import { PageHeader } from "./common/PageHeader";
 import { SectionNav } from "./common/SectionNav";
+import { MotionRoot } from "./ui/Motion";
 import { channelRefs, useChannelCards } from "./dashboard/useChannelCards";
 import { ddmm, useTooltip } from "./dashboard/shared";
 import { PlatformTab } from "./dashboard/period/PlatformTab";
@@ -189,6 +190,7 @@ export const AgencyDashboard: React.FC<AgencyDashboardProps> = (props) => {
   const seg = (on: boolean) => `px-3 py-1.5 rounded-lg text-xs font-bold min-h-[30px] transition-colors whitespace-nowrap ${on ? "seg-on" : "text-[var(--text-muted)] hover:text-[var(--text)]"}`;
 
   return (
+    <MotionRoot>
     <div className="space-y-5" onMouseMove={tooltip.onMove} onMouseLeave={tooltip.onLeave}>
       <PageHeader icon={LayoutDashboard} title={lockBrandId && pickedBrand ? `Dashboard · ${pickedBrand.name}` : "Dashboard"} tabs={<>
           {!lockBrandId && <div className="flex gap-1 rounded-xl border border-[var(--border)] p-1" role="tablist" aria-label="Phần của Dashboard">
@@ -271,5 +273,6 @@ export const AgencyDashboard: React.FC<AgencyDashboardProps> = (props) => {
       ) : null}
       {tooltip.node}
     </div>
+    </MotionRoot>
   );
 };

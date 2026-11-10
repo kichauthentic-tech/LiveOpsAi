@@ -169,6 +169,51 @@
   --font-sans: Lexend, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
+/* Bento (10/11) — kiểu "bento dashboard": nền kem, thẻ trắng bo lớn có bóng mềm thay cho viền, nút xanh ngọc. Font Plus Jakarta Sans
+   (có bộ chữ tiếng Việt trên Google Fonts, kiểm 10/11). Bóng của thẻ: luật `.theme-bento [class~="bg-[var(--surface)]"]` bên dưới. */
+.theme-bento {
+  --surface-base: #f1efe8;
+  --surface: #ffffff;
+  --surface-elevated: #f4f2ec;
+  --surface-hover: #e9e6dc;
+  --surface-muted: rgba(244, 242, 236, 0.8);
+  --text: #14211e;
+  --text-muted: #47524e;
+  --text-faint: #5c6662;
+  --border: #e3e0d6;
+  --border-muted: rgba(227, 224, 214, 0.7);
+  --accent: #0f766e;
+  --accent-hover: #115e59;
+  --accent-text: #0f6a63;
+  --accent-contrast: #ffffff;
+  --success: #15803d;
+  --warning: #b45309;
+  --danger: #c2332b;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+  --font-sans: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+/* Thẻ (nền --surface, bo xl/2xl) nổi bằng bóng mềm, viền gần như ẩn — không sửa từng component. Ngoài @layer nên thắng utility. */
+.theme-bento [class~="bg-[var(--surface)]"][class*="rounded-2xl"],
+.theme-bento [class~="bg-[var(--surface)]"][class*="rounded-xl"] {
+  border-color: var(--border-muted);
+  box-shadow: 0 1px 2px rgba(20, 33, 30, 0.04), 0 10px 28px -14px rgba(20, 33, 30, 0.14);
+}
+
+/*
+  Chuyển động dùng chung (10/11, đi cùng components/ui/Motion.tsx): thanh tiến độ chạy ra từ trái khi khối hiện (.bar-grow, chỉ
+  transform), nội dung tab mờ dần vào khi đổi tab (.tab-in — KHÔNG dùng transform: phần tử cha có transform làm lệch cửa sổ
+  position:fixed bên trong). Tắt khi người dùng chọn giảm chuyển động.
+*/
+.bar-grow { transform-origin: left center; animation: bar-grow 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both; }
+@keyframes bar-grow { from { transform: scaleX(0); } }
+.tab-in { animation: tab-in 0.24s ease-out both; }
+@keyframes tab-in { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .bar-grow, .tab-in { animation: none; }
+}
+
 /*
   Màu của Report Tháng (06/11 — user: "sao còn report chưa, đồng bộ toàn bộ"). Trước đây report là skin đen-vàng CỐ ĐỊNH
   (theme.ts PAL) bất kể theme. Nay xem trong app thì theo theme; FILE HTML/PDF gửi brand vẫn đen-vàng YFB: khung dựng bản xuất có

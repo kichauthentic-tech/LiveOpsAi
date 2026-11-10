@@ -1989,7 +1989,8 @@ export default function App() {
                 {!tabDataReady && !TABS_WITHOUT_CORE_DATA.has(activeTab) ? (
                   <TabLoading />
                 ) : (
-                <>
+                // .tab-in: nội dung tab mờ dần vào mỗi lần đổi tab (ErrorBoundary key={activeTab} mount lại khối này). Chỉ opacity — xem index.css.
+                <div className="tab-in space-y-6">
                 {/* Thanh chọn sàn ở màn hẹp — từ lg nó nằm trên thanh đầu cạnh bộ chọn workspace (Header `scopeControl`). */}
                 {channelBar(true) && <div className="lg:hidden">{channelBar(true)}</div>}
                 {activeTab === "sessions" && (
@@ -2651,7 +2652,7 @@ export default function App() {
                     onSaveMyProfile={currentRole === "talent" ? handleSaveMyTalentProfile : undefined}
                   />
                 )}
-                </>
+                </div>
                 )}
               </Suspense>
               </ErrorBoundary>

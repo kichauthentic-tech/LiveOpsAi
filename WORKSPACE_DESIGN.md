@@ -175,6 +175,18 @@
   CROCS host hạng 1 Huỳnh Thái Toàn 1,16; trợ hạng 1 Lê Đức Duy 10/15 ca (account 47%); T11 hiện 72 ca D-Day đã xếp; 375px 0 tràn. **Chưa
   làm:** role trainer/talent chưa thấy màn (chỉ ai có `manage_sessions`); chưa có nút xuất danh sách nhận thưởng; chưa thử theme sáng bằng mắt.
 
+- **10/11: KIỂU "BENTO DASHBOARD" + CHUYỂN ĐỘNG — đợt 1 (nền tảng + màn mẫu; KHÔNG migration)** — user gửi ảnh dashboard bento (thẻ bo lớn,
+  số to, chuyển động mượt bằng framer-motion) và bảo "làm đi". **Code:** thêm dependency `motion`; `components/ui/Motion.tsx`
+  (`MotionRoot`, `Reveal`, `Collapse`, `CountUp`); `index.css` thêm theme thứ 7 `.theme-bento` (nền kem, nút xanh ngọc, bo lớn, font Plus
+  Jakarta Sans, thẻ nổi bằng bóng mềm qua luật `.theme-bento [class~="bg-[var(--surface)]"]`), `.bar-grow`, `.tab-in`; `useTheme.tsx` thêm
+  dòng Bento (KHÔNG đổi theme mặc định — vẫn Daylight); `App.tsx` bọc nội dung tab bằng `<div className="tab-in space-y-6">` (mờ dần vào khi
+  đổi tab, mọi theme); **màn mẫu = Dashboard › Tổng quan account** (`OverviewTab`): thẻ sàn số lớn chạy số + thanh tiến độ, 4 ô đếm rủi ro
+  thay hàng viên chữ, dòng account hiện lần lượt + nổi khi rê chuột, khối hành động bung/gập mượt. **Verify:** trang thử dữ liệu giả
+  (Playwright) ở Bento/YFB/Daylight 1440px + Bento 375px: 0 tràn ngang, 0 lỗi console; `uiReadability` (7 theme) xanh. **CHƯA xem trên app
+  thật** (phiên cloud không có `.env`). **Chưa làm (đợt sau, chờ user duyệt cảm giác):** áp `Reveal`/`CountUp` cho tab Toàn sàn / Brand và các
+  màn tổng quan khác; `StatTile` chạy số. **Bẫy phiên cloud:** `cdn.sheetjs.com` bị chặn mạng ⇒ `npm ci` hỏng; cài tạm `xlsx@0.18.5` từ npm
+  (`--no-package-lock`) để build/test — `exportCenter.test` đỏ vì bản thay này. 3 test đỏ CÓ SẴN trước đợt này, chưa sửa:
+  `bundleSplit` + `platformProfiles` (PnlStatementView import recharts / rẽ nhánh `=== "Shopee"`), `uiReadability` (PlanMonthGrid `text-[10px]`).
 - **06/11: 3 THEME MỚI + BỐ CỤC CHUNG (đã commit + push 06/11, KHÔNG migration)** — từ đề xuất "10 theme + tối ưu layout" (05/11, Google Stitch,
   artifact BaurhxvVcwg1x36Gon2WwN; Stitch MCP gọi thẳng `stitch.googleapis.com/mcp` bằng key của project PickdiOperator). User chốt theme
   **Paper / Sage / Daylight** + 4 điểm bố cục. **Code:** `index.css` thêm `.theme-paper/-sage/-daylight` (15 màu + `--radius-lg/xl/2xl`
@@ -627,6 +639,10 @@ Chữ brand thấy trong Report Tháng (component `report/*`, `*MonthlyReportTab
   `rounded-[Npx]`; tab/chọn kỳ của trang vào prop `tabs` của `PageHeader`, mô tả vào `description` (thành ⓘ); khối cấp trang của màn dài
   gắn `data-section="tên ngắn"` (hoặc prop `nav` của `BlockHead`/`Sect`) và đặt `<SectionNav />` dưới PageHeader; bảng rộng cuộn ngang
   thì cột đầu `sticky-col` (hàng chọn = `data-open`); theme mới = khối `.theme-x` + 1 dòng `THEME_OPTIONS` (+ `THEME_FONTS` nếu có font).
+  10/11 chuyển động: chỉ qua `ui/Motion.tsx` (không import `motion` trực tiếp ở màn); gốc màn bọc `<MotionRoot>` (thư viện nằm trong chunk
+  của màn, không vào bundle chính); khối hiện lần lượt = `Reveal index`, dòng bấm được thêm `lift`; số lớn = `CountUp` với đúng hàm định dạng
+  của màn; bung/gập = `Collapse`; thanh tiến độ = class `bar-grow`. Chỉ transform/opacity; KHÔNG đặt transform lên khối bọc cả tab (làm lệch
+  cửa sổ `position:fixed`). Mọi thứ phải tắt được khi người dùng chọn giảm chuyển động.
 - **Màu brand** qua `getBrandTheme(brandName)`; **logo** qua `<BrandLogo>`; **ca trên lịch** qua `<SessionEventCard>`
   (`buildSessionMeta`/`buildSlotMeta`). Theme sáng là lớp chuyển màu CSS cuối `index.css` — component cứ viết dark-first.
 - **Tiền:** `fmtVndShort` (chỗ chật: "50M", "1,23B") / `fmtVndFull` (con số chính xác) trong `lib/format.ts`; không "đ",

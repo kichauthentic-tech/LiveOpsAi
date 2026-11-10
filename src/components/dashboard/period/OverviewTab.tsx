@@ -9,10 +9,12 @@ import type { ReportPlatform } from "../../../lib/reportPlatform";
 import { BrandLogo } from "../../ui/BrandLogo";
 import { PlatformChip } from "../../common/PlatformChip";
 import { LiveFunnel } from "../LiveFunnel";
-import { Card, ddmm, money, pct } from "../shared";
+import { CountUp, Collapse, Reveal } from "../../ui/Motion";
+import { ddmm, money, pct } from "../shared";
 
 // Tab "Tổng quan account" của Dashboard (demo duyệt 24/10/2026): mọi kênh brand × sàn của MỌI sàn trên một bảng, xếp theo rủi ro.
 // Chỉ trình bày — số và câu chữ dựng ở lib/performance/accountOverview.ts từ thẻ kênh. Tổng chỉ theo từng sàn (không cộng chéo sàn).
+// 10/11: bố cục "bento" — thẻ sàn số lớn + thanh tiến độ, 4 ô đếm rủi ro, các khối hiện lần lượt (ui/Motion.tsx; gốc màn bọc MotionRoot).
 
 const TONE_BORDER: Record<RowTone, string> = { bad: "var(--danger)", warn: "var(--warning)", good: "var(--success)", off: "var(--border)" };
 const TONE_PILL: Record<RowTone, string> = {
@@ -21,6 +23,7 @@ const TONE_PILL: Record<RowTone, string> = {
   good: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
   off: "bg-[var(--surface-elevated)] text-[var(--text-faint)] border-[var(--border)]"
 };
+const TONE_NUM: Record<RowTone, string> = { bad: "text-[var(--danger)]", warn: "text-[var(--warning)]", good: "text-[var(--success)]", off: "text-[var(--text-muted)]" };
 const Pill: React.FC<{ tone: RowTone; children: React.ReactNode }> = ({ tone, children }) => (
   <span className={`inline-flex self-start items-center text-2xs font-bold px-2 py-0.5 rounded-full border leading-snug ${TONE_PILL[tone]}`}>{children}</span>
 );
@@ -51,31 +54,50 @@ export const OverviewTab: React.FC<{
 
   return (
     <div className="space-y-5">
-      <div className="grid gap-2.5 md:grid-cols-2">
-        {summaries.map((s) => (
-          <Card key={s.platform} className="!p-4">
-            <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-              <PlatformChip platform={s.platform} />
-              <Fig label="Thực đạt / Target" value={s.pace.target ? `${money(s.pace.actual)} / ${money(s.pace.target)}` : "—"} />
-              <Fig label="Run-rate theo kế hoạch" value={s.pace.targetToDate > 0 ? pct(s.pace.actual / s.pace.targetToDate) : "—"} />
-              <Fig label="Dự báo cuối tháng" value={s.pace.target ? <>~{money(s.pace.forecast)} <span className={`text-xs font-bold ${s.pace.forecast / s.pace.target < 0.9 ? "text-rose-400" : "text-amber-300"}`}>{pct(s.pace.forecast / s.pace.target)}</span></> : "—"} />
-              <Fig label="Ca chưa có số liệu" value={String(s.waiting)} />
-            </div>
-          </Card>
+      <div className="grid gap-3 md:grid-cols-2">
+        {summaries.map((s, i) => {
+          const { actual, target, targetToDate, forecast } = s.pace;
+          const tick = target && targetToDate > 0 ? clamp((targetToDate / target) * 100) : null;
+          return (
+            <Reveal key={s.platform} index={i} className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5">
+              <div className="flex items-center justify-between gap-3">
+                <PlatformChip platform={s.platform} />
+                <span className="text-xs text-[var(--text-faint)]">Thực đạt / Target</span>
+              </div>
+              <p className="mt-3 flex flex-wrap items-baseline gap-x-2 text-3xl font-black tabular-nums tracking-tight text-[var(--text)]">
+                <CountUp value={actual} format={money} />
+                <span className="text-sm font-bold tracking-normal text-[var(--text-muted)]">{target ? `/ ${money(target)}` : "chưa có target"}</span>
+              </p>
+              {target ? (
+                <div className="relative mt-3 h-2.5 rounded-full bg-[var(--surface-elevated)]" role="img" aria-label={`Thực đạt ${money(actual)} trên target ${money(target)}`}>
+                  <div className="absolute inset-0 overflow-hidden rounded-full">
+                    <i className="bar-grow block h-full rounded-full bg-[var(--accent)]" style={{ width: `${clamp((actual / target) * 100)}%` }} />
+                  </div>
+                  {tick != null && <b className="absolute -top-1 -bottom-1 w-0.5 rounded bg-[var(--text)] opacity-75" style={{ left: `${tick}%` }} title="Target luỹ kế tới hôm nay" />}
+                </div>
+              ) : null}
+              <div className="mt-4 grid grid-cols-3 gap-3">
+                <Fig label="Run-rate theo kế hoạch" value={targetToDate > 0 ? pct(actual / targetToDate) : "—"} />
+                <Fig label="Dự báo cuối tháng" value={target ? <>~{money(forecast)} <span className={`text-xs font-bold ${forecast / target < 0.9 ? "text-rose-400" : "text-amber-300"}`}>{pct(forecast / target)}</span></> : "—"} />
+                <Fig label="Ca chưa có số liệu" value={String(s.waiting)} />
+              </div>
+            </Reveal>
+          );
+        })}
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {([["bad", count("bad"), "account rủi ro cao"], ["warn", count("warn"), "account rủi ro"], ["off", count("off"), "chưa đủ dữ liệu / tạm dừng"], ["good", saveable, "bù được bằng giờ live"]] as const).map(([tone, n, label], i) => (
+          <Reveal key={tone} index={summaries.length + i} className="flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
+            <CountUp value={n} format={(v) => String(Math.round(v))} className={`text-3xl font-black tabular-nums tracking-tight ${TONE_NUM[tone]}`} />
+            <span className="text-xs font-medium leading-snug text-[var(--text-muted)]">{label}</span>
+          </Reveal>
         ))}
       </div>
 
-      <div className="space-y-2">
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-1">
-          <h3 className="text-base font-black text-[var(--text)]">Tổng quan account</h3>
-          <span className="text-xs text-[var(--text-faint)]">{rows.length} account · sắp xếp theo mức rủi ro · bấm một dòng để xem hành động đề xuất</span>
-        </div>
-        <div className="flex flex-wrap gap-1.5 px-1">
-          <Pill tone="bad">{count("bad")} rủi ro cao</Pill>
-          <Pill tone="warn">{count("warn")} rủi ro</Pill>
-          <Pill tone="off">{count("off")} chưa đủ dữ liệu / tạm dừng</Pill>
-          <Pill tone="good">{saveable} bù được bằng giờ live</Pill>
-        </div>
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-1">
+        <h3 className="text-base font-black text-[var(--text)]">Tổng quan account</h3>
+        <span className="text-xs text-[var(--text-faint)]">{rows.length} account · sắp xếp theo mức rủi ro · bấm một dòng để xem hành động đề xuất</span>
       </div>
 
       {loading ? (
@@ -85,12 +107,12 @@ export const OverviewTab: React.FC<{
           <div className="hidden xl:grid grid-cols-[150px_190px_minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,1.15fr)_150px_16px] gap-4 px-4 text-2xs font-semibold text-[var(--text-faint)]" aria-hidden="true">
             <span>Account</span><span>Trạng thái</span><span>Tiến độ tháng · <span className="font-normal">vạch = target luỹ kế, vòng = dự báo</span></span><span>Khả năng bù thiếu hụt</span><span>Phân rã {platformText("GMV/giờ", "all")} · Daily so tháng trước</span><span>Giờ cam kết</span><span />
           </div>
-          {rows.map((r) => {
+          {rows.map((r, i) => {
             const isOpen = open.has(r.key);
             const brand = brandOf.get(r.brandId);
             const actions = accountActions(r, today, fmtVndShort, LEVER_OWNER);
             return (
-              <div key={r.key} className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden" style={{ borderLeft: `3px solid ${TONE_BORDER[r.tone]}` }}>
+              <Reveal key={r.key} index={i} lift className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden" style={{ borderLeft: `3px solid ${TONE_BORDER[r.tone]}` }}>
                 <button type="button" onClick={() => toggle(r.key)} aria-expanded={isOpen}
                   className="w-full text-left grid gap-x-4 gap-y-3 p-4 hover:bg-[var(--surface-hover)]/40 grid-cols-[minmax(0,1fr)_16px] md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_16px] xl:grid-cols-[150px_190px_minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,1.15fr)_150px_16px] xl:items-center">
                   <div className="flex items-center gap-2.5 min-w-0">
@@ -108,8 +130,7 @@ export const OverviewTab: React.FC<{
                   <div className="flex flex-col gap-1 min-w-0 col-span-2 md:col-span-2 xl:col-span-1"><Label>Phân rã {platformText("GMV/giờ", r.platform)}</Label><Why r={r} /></div>
                   <div className="flex flex-col gap-1 min-w-0 col-span-2 md:col-span-1"><Label>Giờ cam kết</Label><Hours r={r} /></div>
                 </button>
-                {isOpen && (
-                  <div className="border-t border-[var(--border)] px-4 py-3 grid gap-3 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] xl:pl-[182px]">
+                <Collapse open={isOpen} className="border-t border-[var(--border)] px-4 py-3 grid gap-3 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] xl:pl-[182px]">
                     {r.funnels.length > 0 && (
                       <div className="xl:col-span-2">
                         <p className="text-xs font-bold text-[var(--text-muted)] mb-1.5">Phễu LIVE</p>
@@ -124,9 +145,8 @@ export const OverviewTab: React.FC<{
                       {r.state !== "off" && <button type="button" onClick={() => onOpenBrand(r.brandId, r.platform)} className="font-bold text-[var(--accent-text)] hover:underline min-h-[28px]">Xem chi tiết brand →</button>}
                       <button type="button" onClick={() => onOpenMonthPlan(r.brandId, r.platform)} className="font-bold text-[var(--accent-text)] hover:underline min-h-[28px]">Mở Kế Hoạch Tháng →</button>
                     </div>
-                  </div>
-                )}
-              </div>
+                </Collapse>
+              </Reveal>
             );
           })}
         </div>
@@ -158,7 +178,7 @@ const Progress: React.FC<{ r: AccountRow }> = ({ r }) => {
   return (
     <>
       <div className="relative h-2.5 rounded-full bg-[var(--surface-base)] border border-[var(--border)]" role="img" aria-label={`Thực đạt ${money(r.actual)} trên target ${money(r.target)}`}>
-        <i className="absolute inset-y-0 left-0 rounded-full opacity-85" style={{ width: `${fill}%`, background: TONE_BORDER[r.tone === "off" ? "off" : r.tone] }} />
+        <i className="bar-grow absolute inset-y-0 left-0 rounded-full opacity-85" style={{ width: `${fill}%`, background: TONE_BORDER[r.tone === "off" ? "off" : r.tone] }} />
         {tick != null && <b className="absolute -top-1 -bottom-1 w-0.5 rounded bg-[var(--text)] opacity-75" style={{ left: `${tick}%` }} />}
         {fc != null && <b className="absolute top-1/2 w-3 h-3 -mt-1.5 -ml-1.5 rounded-full border-2 border-[var(--text)] bg-[var(--surface)]" style={{ left: `${fc}%` }} />}
       </div>

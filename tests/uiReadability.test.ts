@@ -48,7 +48,7 @@ function themeTokens(): Record<string, Record<string, string>> {
 
 test("mọi theme đều có token và chữ đạt 4.5:1 trên nền thẻ", () => {
   const themes = themeTokens();
-  expect(Object.keys(themes).sort()).toEqual(["daylight", "midnight", "paper", "sage", "sand", "yfb"]);
+  expect(Object.keys(themes).sort()).toEqual(["bento", "daylight", "midnight", "paper", "sage", "sand", "yfb"]);
   const fails: string[] = [];
   for (const [name, t] of Object.entries(themes)) {
     for (const fg of ["text", "text-muted", "text-faint", "accent-text"]) {
