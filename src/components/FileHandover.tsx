@@ -11,6 +11,9 @@ import { fetchSnapshotParts } from "../lib/db/sessionRoomLinks";
 import { suggestedRestartCount } from "../lib/liveSnapshot/roomCases";
 import { profileOf } from "../lib/platforms/profiles";
 import { durationDeviationInfo } from "../lib/sessionStatus";
+import { fetchSessionTimeCheck } from "../lib/db/sessionTimeChecks";
+import { timeSuggestion, type SessionTimeCheck } from "../lib/shiftTime";
+import { vnClock } from "../lib/liveSnapshot/timeline";
 
 // Giao ca, MỘT luồng cho cả hai sàn (TikTok user chốt 06/10 tối; Shopee chuyển sang file 08/10, migration 0154): (1) up file số liệu
 // tải từ sàn ngay khi hết ca — TikTok Creator-Live-Performance, Shopee Live List — file giữ đúng ranh giới ca nối (số cộng dồn của
@@ -50,13 +53,34 @@ export function FileHandover({ session: s, isOps = false, allSessions, onSaved, 
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chạy theo ca + số room, không theo state sự cố đang gõ
   }, [s.id, roomCount]);
 
-  // File cho thấy live ngắn hơn lịch (≥ 10 phút) mà ca chưa giao: hiện sẵn "Kết thúc sớm" đúng số phút để trợ chỉ cần chọn lý do (0180 —
-  // Điều Phối Lịch Live đo giờ mất theo lý do). Gợi ý tính lúc vẽ; trợ đổi bất kỳ ô nào thì giữ đúng thứ trợ chọn.
+  // Giờ ca theo luật 0213 (giờ room bật + đủ giờ lịch, ca sau nối tiếp) — DB tính, không phụ thuộc lúc tải file.
+  const [check, setCheck] = useState<SessionTimeCheck | null>(null);
+  useEffect(() => {
+    let alive = true;
+    fetchSessionTimeCheck(s.id)
+      .then((c) => alive && setCheck(c))
+      .catch(() => undefined);
+    return () => { alive = false; };
+  }, [s.id, s.actualStartAt, s.actualEndAt, s.liveDurationMinutes, s.report?.handoverAt]);
+  const sug = timeSuggestion(check);
+
+  // Gợi ý sẵn khi ca chưa giao và trợ chưa đụng ô nào (trợ đổi bất kỳ ô nào thì giữ đúng thứ trợ chọn):
+  //   * có giờ ca 0213: chỉ CA CUỐI chuỗi / ca đơn — room tắt thật muộn hơn ⇒ OT, sớm hơn ⇒ Kết thúc sớm (ca giữa chuỗi luôn đủ giờ).
+  //   * DB chưa chạy 0213: như cũ, file ngắn hơn lịch ≥ 10' ⇒ Kết thúc sớm (0180).
+  // "Trễ" KHÔNG chọn sẵn — chỉ điền sẵn số phút room bật trễ để trợ chạm là đúng số (T11: 3/3 ca trễ 7–9' đều live bù đủ giờ).
   const [touched, setTouched] = useState(false);
   const early = durationDeviationInfo(s);
   const earlyMin = early?.kind === "early" ? early.minutes : 0;
-  const shown =
-    !touched && !s.report?.handoverAt && earlyMin > 0 && !incidents.on.includes("early") ? { ...incidents, on: [...incidents.on, "early" as const], earlyMinutes: earlyMin } : incidents;
+  let shown = incidents;
+  if (!touched && !s.report?.handoverAt) {
+    if (check) {
+      if (sug.otMinutes && !shown.on.includes("ot")) shown = { ...shown, on: [...shown.on, "ot" as const], otMinutes: sug.otMinutes };
+      else if (sug.earlyMinutes && !shown.on.includes("early")) shown = { ...shown, on: [...shown.on, "early" as const], earlyMinutes: sug.earlyMinutes };
+    } else if (earlyMin > 0 && !shown.on.includes("early")) {
+      shown = { ...shown, on: [...shown.on, "early" as const], earlyMinutes: earlyMin };
+    }
+  }
+  if (sug.lateMinutes && !shown.on.includes("late") && !s.report?.lateMinutes) shown = { ...shown, lateMinutes: sug.lateMinutes };
   const changeIncidents = (v: typeof incidents) => {
     setTouched(true);
     setIncidents(v);
@@ -85,6 +109,7 @@ export function FileHandover({ session: s, isOps = false, allSessions, onSaved, 
           <SessionRoomCase key={s.id} session={s} canEdit isOps={isOps} allSessions={allSessions} onSessionsUpdated={onSaved} embedded restartFlagged={shown.on.includes("restart")} />
         </Step>
         <Step no={3} state={stepState(false, fileDone)} title="Ca có gì khác?" hint="bỏ qua nếu không" last>
+          {check && <ShiftTimeLine check={check} lateMinutes={sug.lateMinutes} />}
           <HandoverIncidents value={shown} onChange={changeIncidents} />
         </Step>
       </ol>
@@ -139,5 +164,17 @@ function Step({ no, state, title, hint, last = false, children }: { no: number; 
         {children}
       </div>
     </li>
+  );
+}
+
+/** Một dòng: giờ ca app tính từ file (không theo giờ tải file) + nhắc khi room bật trễ / còn live lúc xuất file. */
+function ShiftTimeLine({ check: c, lateMinutes }: { check: SessionTimeCheck; lateMinutes?: number }) {
+  const t = (iso: string) => vnClock(Date.parse(iso));
+  return (
+    <p className="text-xs text-[var(--text-faint)] tabular-nums">
+      Giờ ca theo file: {t(c.startAt)}–{c.endPending ? "?" : t(c.endAt)} · {Math.round(c.liveMinutes)}&apos;
+      {c.endPending && " · room còn live lúc xuất file, giờ kết thúc tính lại khi có file sau giờ tắt"}
+      {lateMinutes != null && ` · room bật trễ ${lateMinutes}' so với lịch, live bù đủ giờ thì không chọn "Trễ"`}
+    </p>
   );
 }

@@ -293,6 +293,8 @@ export interface LiveSessionReport {
   // cảnh báo lệch giờ, không ghi đè).
   otMinutes: number;
   earlyLeaveMinutes: number;
+  /** Trễ mà KHÔNG live bù (phút, 0213) — trừ vào giờ ca + giờ tính lương như kết thúc sớm. Trễ đã live bù đủ giờ thì 0. */
+  lateMinutes: number;
   /** Lý do off sớm khai lúc giao ca (0180) — chỉ có khi earlyLeaveMinutes > 0. */
   earlyLeaveReason?: EarlyLeaveReason;
   statusNote: string;
