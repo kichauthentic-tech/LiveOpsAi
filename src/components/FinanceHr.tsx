@@ -418,7 +418,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                           </button>
                         </td>
                       </tr>
-                      {open && g.rows.map(({ session: s, finance, talent, isHourly, agencyCommissionRate, grossAgencyRev, hostPayout, netProfit, hostPaidHourly, billableHours, otMinutes, earlyLeaveMinutes, coHost, coHostPayout, coHostPaidHourly, coHostUsesAssistantRate, missingInputs, excluded, payouts, segmented }) => {
+                      {open && g.rows.map(({ session: s, finance, talent, isHourly, agencyCommissionRate, grossAgencyRev, hostPayout, netProfit, hostPaidHourly, billableHours, otMinutes, earlyLeaveMinutes, lateMinutes, coHost, coHostPayout, coHostPaidHourly, coHostUsesAssistantRate, missingInputs, excluded, payouts, segmented }) => {
                   return (
                   <tr key={s.id} className="border-b border-[var(--border)]/60 align-middle">
                     <td className="py-2 pr-3">
@@ -489,6 +489,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                           {fmtFixed(billableHours, 2)}h × rate/giờ
                           {otMinutes > 0 && <span className="text-emerald-400 font-bold"> · OT +{otMinutes}p</span>}
                           {earlyLeaveMinutes > 0 && <span className="text-amber-400 font-bold"> · kết thúc sớm −{earlyLeaveMinutes} phút</span>}
+                          {lateMinutes > 0 && <span className="text-amber-400 font-bold"> · trễ −{lateMinutes} phút</span>}
                         </div>
                       )}
                       {/* Trợ live có công (user chốt 2026-09-18) — hiện tách dòng để ops thấy Net

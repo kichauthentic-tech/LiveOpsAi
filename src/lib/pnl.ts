@@ -76,6 +76,8 @@ export interface SessionPnl {
   billableHours: number;
   otMinutes: number;
   earlyLeaveMinutes: number;
+  /** Trễ không live bù (0213), trừ như kết thúc sớm. */
+  lateMinutes: number;
   // Audit Module 3 (2026-09-18, user chốt): TRỢ LIVE CÓ ĐƯỢC TRẢ CÔNG. Trước đó P&L chỉ trả cho
   // host_id, co_host_id không xuất hiện ở đâu — Net Profit bị thổi phồng đúng bằng khoản này.
   // Trợ live trả theo rate card của CHÍNH HỌ (talent_rate_history tại ngày ca, rơi về talents),
@@ -141,7 +143,8 @@ export const PNL_MISSING_LABEL: Record<PnlMissingInput, string> = {
 export function billableSessionHours(session: LiveSession): number {
   const scheduled = sessionDurationHours(session.startTime, session.endTime);
   const otMinutes = session.report?.otMinutes ?? 0;
-  const earlyLeaveMinutes = session.report?.earlyLeaveMinutes ?? 0;
+  // Trễ không live bù (0213) trừ như kết thúc sớm.
+  const earlyLeaveMinutes = (session.report?.earlyLeaveMinutes ?? 0) + (session.report?.lateMinutes ?? 0);
   return Math.max(0, scheduled + (otMinutes - earlyLeaveMinutes) / 60);
 }
 
@@ -232,7 +235,7 @@ export function computeSessionPnl(
     // đứng tới cuối ca của vai đó. Không có hoa hồng GMV theo người ở đây (user chốt 06/10) — phần % nếu có chỉ chia
     // theo phần giờ, giữ công thức cũ cho ca không đổi người.
     const durMin = sessionMinutes(session);
-    const adjHours = ((session.report?.otMinutes ?? 0) - (session.report?.earlyLeaveMinutes ?? 0)) / 60;
+    const adjHours = ((session.report?.otMinutes ?? 0) - (session.report?.earlyLeaveMinutes ?? 0) - (session.report?.lateMinutes ?? 0)) / 60;
     payouts = [];
     for (const role of ["host", "co_host"] as const) {
       const segs = segmentsOfRole(session, role);
@@ -303,6 +306,7 @@ export function computeSessionPnl(
     billableHours,
     otMinutes: session.report?.otMinutes ?? 0,
     earlyLeaveMinutes: session.report?.earlyLeaveMinutes ?? 0,
+    lateMinutes: session.report?.lateMinutes ?? 0,
     coHost,
     coHostPayout,
     coHostPaidHourly,

@@ -233,7 +233,8 @@ export function sessionIncidents(s: LiveSession): SessionIncident[] {
   const out: SessionIncident[] = [];
   if (r.restartCount > 0) out.push({ key: "restart", label: `Restart ×${r.restartCount}`, internal: false });
   if (r.crossLive) out.push({ key: "crossLive", label: "Cross-live", internal: false });
-  if (r.hostLate) out.push({ key: "hostLate", label: "Host trễ", internal: true });
+  // 0213: "Trễ" không gán cho host — có khi trợ trễ. Có số phút khi trễ mà không live bù.
+  if (r.hostLate || (r.lateMinutes ?? 0) > 0) out.push({ key: "hostLate", label: (r.lateMinutes ?? 0) > 0 ? `Trễ ${r.lateMinutes}'` : "Trễ", internal: true });
   if (r.otMinutes > 0) out.push({ key: "ot", label: `OT ${r.otMinutes}'`, internal: true });
   if (r.earlyLeaveMinutes > 0) out.push({ key: "earlyLeave", label: `Kết thúc sớm ${r.earlyLeaveMinutes}'${r.earlyLeaveReason ? ` · ${EARLY_REASON_LABEL[r.earlyLeaveReason]}` : ""}`, internal: true });
   return out;

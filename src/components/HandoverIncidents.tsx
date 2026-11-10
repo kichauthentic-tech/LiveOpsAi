@@ -5,12 +5,15 @@ import { EARLY_REASON_LABEL, MINUTE_PRESETS, parseCount } from "../lib/handover"
 // "Đúng giờ, không sự cố" (Working File T8–T9: ô sự cố trống 76–100%, không phân biệt được "không có" với "quên ghi").
 
 export type Incident = "ot" | "early" | "restart" | "late";
-const INCIDENT_LABEL: Record<Incident, string> = { ot: "OT", early: "Kết thúc sớm", restart: "Restart", late: "Host trễ" };
+// "Trễ" không gán cho host (user 10/11: có khi trợ trễ). Chọn = trễ mà KHÔNG live bù — số phút trừ vào giờ ca (0213).
+const INCIDENT_LABEL: Record<Incident, string> = { ot: "OT", early: "Kết thúc sớm", restart: "Restart", late: "Trễ" };
 
 export interface IncidentState {
   on: Incident[];
   otMinutes: number;
   earlyMinutes: number;
+  /** Trễ không live bù (phút). */
+  lateMinutes: number;
   restarts: number;
   /** Lý do off sớm (0180) — Điều Phối Lịch Live tách phần giờ mất vì bán kém khỏi sự cố/người/brand. */
   earlyReason: EarlyLeaveReason | null;
@@ -22,8 +25,8 @@ export function incidentsFromReport(r: LiveSessionReport | undefined): IncidentS
   if (r?.otMinutes) on.push("ot");
   if (r?.earlyLeaveMinutes) on.push("early");
   if (r?.restartCount) on.push("restart");
-  if (r?.hostLate) on.push("late");
-  return { on, otMinutes: r?.otMinutes || 30, earlyMinutes: r?.earlyLeaveMinutes || 30, restarts: r?.restartCount || 1, earlyReason: r?.earlyLeaveReason ?? null, note: r?.statusNote ?? "" };
+  if (r?.hostLate || (r?.lateMinutes ?? 0) > 0) on.push("late");
+  return { on, otMinutes: r?.otMinutes || 30, earlyMinutes: r?.earlyLeaveMinutes || 30, lateMinutes: r?.lateMinutes || 15, restarts: r?.restartCount || 1, earlyReason: r?.earlyLeaveReason ?? null, note: r?.statusNote ?? "" };
 }
 
 /** Giá trị gửi RPC: sự cố không chọn thì 0/false dù ô phút còn số cũ. */
@@ -34,6 +37,7 @@ export function incidentValues(v: IncidentState) {
     earlyLeaveReason: v.on.includes("early") ? v.earlyReason : null,
     restartCount: v.on.includes("restart") ? v.restarts : 0,
     hostLate: v.on.includes("late"),
+    lateMinutes: v.on.includes("late") ? v.lateMinutes : 0,
     statusNote: v.note.trim()
   };
 }
@@ -66,8 +70,8 @@ export function HandoverIncidents({ value, onChange, label }: { value: IncidentS
           </button>
         ))}
       </div>
-      {(["ot", "early"] as const).filter((k) => value.on.includes(k)).map((k) => {
-        const field = k === "ot" ? "otMinutes" : "earlyMinutes";
+      {(["ot", "early", "late"] as const).filter((k) => value.on.includes(k)).map((k) => {
+        const field = k === "ot" ? "otMinutes" : k === "early" ? "earlyMinutes" : "lateMinutes";
         const val = value[field];
         return (
           <div key={k} className="flex flex-wrap items-center gap-1.5 text-xs">

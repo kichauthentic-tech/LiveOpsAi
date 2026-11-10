@@ -18,6 +18,7 @@ import { unackedSoon } from "../lib/talent/acks";
 import type { BoardView } from "../lib/todoList";
 import { SessionWindow } from "./SessionWindow";
 import { SwapApprovalQueue } from "./shiftSwap/SwapApprovalQueue";
+import { ShiftTimeQueue } from "./ShiftTimeQueue";
 import { PageHeader } from "./common/PageHeader";
 import { StatTile } from "./common/StatTile";
 import { SlotDetailModal } from "./scheduling/SlotDetailModal";
@@ -608,7 +609,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
       {(
         <div hidden={view !== "day"} className={aside ? "grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px] xl:grid-rows-[auto_1fr] items-start" : "space-y-4"}>
             {isOps && (
-              <div className="min-w-0 xl:col-start-1 xl:row-start-1">
+              <div className="min-w-0 xl:col-start-1 xl:row-start-1 space-y-4">
               <NeedsQueue
                 backlogByDay={backlogByDay}
                 backlogTotal={backlog.length}
@@ -621,6 +622,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
                 onDay={pickDay}
                 onFilter={(f) => { setRange("today"); setFilter((x) => (x === f ? null : f)); }}
               />
+              <ShiftTimeQueue sessions={sessions} today={today} brandName={(id) => brandById.get(id)?.name ?? "Brand"} onOpen={setOpenId} />
               </div>
             )}
             {aside && <aside className="min-w-0 xl:col-start-2 xl:row-start-1 xl:row-span-2 xl:sticky xl:top-0">{aside}</aside>}

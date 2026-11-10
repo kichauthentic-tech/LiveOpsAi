@@ -109,6 +109,7 @@ interface DbSessionReport {
   host_late: boolean;
   ot_minutes: number;
   early_leave_minutes: number;
+  late_minutes?: number | null;
   early_leave_reason?: EarlyLeaveReason | null;
   status_note: string;
   gmv_total: number | null;
@@ -150,6 +151,7 @@ function reportFromDb(row: DbSessionReport): LiveSessionReport {
     hostLate: row.host_late,
     otMinutes: row.ot_minutes ?? 0,
     earlyLeaveMinutes: row.early_leave_minutes ?? 0,
+    lateMinutes: row.late_minutes ?? 0,
     earlyLeaveReason: row.early_leave_reason ?? undefined,
     statusNote: row.status_note,
     gmvTotal: row.gmv_total ?? undefined,
