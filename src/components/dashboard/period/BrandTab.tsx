@@ -121,7 +121,7 @@ export const BrandTab: React.FC<{
           {lens === "wave" && (
             <Card>
               <BlockHead title="Theo loại ngày Campaign" sub={`Tính đến ngày có dữ liệu cuối (${ddmm(r.asOf!)}) · bấm một dòng: Key Metrics và nhân sự live bên dưới đổi theo loại ngày đó`} />
-              <RowsTable kind="Loại ngày" rows={waves.rows} total={waves.total} selected={scope.wave ?? ""} onPick={(id) => id && set({ wave: id as CampDayBucket })} card={card} lastHead="Target còn lại" remaining totalClickable={false} />
+              <RowsTable kind="Loại ngày" rows={waves.rows} total={waves.total} selected={scope.wave ?? ""} onPick={(id) => id && set({ wave: id as CampDayBucket })} card={card} lastHead="Target còn lại" remaining totalClickable={false} wholePeriod />
             </Card>
           )}
           {lens === "day" && (
@@ -165,24 +165,18 @@ const RunRateHead: React.FC<{ vm: AccountVM; onNavigate: (tab: string) => void }
   const fill = card?.landing ? TONE_FILL[card.landing.key] : "var(--text-faint)";
   const rrColor = TONE_VAR[toneOfPct(t.runRate)];
   const fc = card?.forecast ?? null;
-  const pM = t.target ? t.actual / t.target : null, pPlan = t.target ? t.targetToDate / t.target : null, pF = fc && t.target ? fc.p50 / t.target : null;
+  const pM = t.target ? t.actual / t.target : null, pF = fc && t.target ? fc.p50 / t.target : null;
   const lead = fc && (t.runRate ?? 0) >= 0.95 && card?.landing && (card.landing.key === "unlikely" || card.landing.key === "short") ? `Run-rate ${pct(t.runRate)} nhưng vẫn "${LANDING_LABEL[card.landing.key]}": dự báo` : "Dự báo";
   const tentative = r.tail.shifts > 0;
-  const small = "rounded-xl border border-[var(--border)] bg-[var(--surface-base)] px-3 py-2 grid grid-rows-[auto_auto_auto_auto] text-left min-w-0";
+  const small = "rounded-xl border border-[var(--border)] bg-[var(--surface-base)] px-3 py-2 grid grid-rows-[auto_auto_auto_auto] text-center justify-items-center min-w-0";
   return (
     <div className="relative rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-6 overflow-hidden">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-[0.14]" style={{ background: `radial-gradient(900px 260px at 0% 0%, ${chartColor(vm.brand.name)}, transparent 70%)` }} />
       <div className="relative grid gap-5 lg:grid-cols-[300px_minmax(0,1fr)] items-start">
         <div className="flex flex-col items-center gap-2">
-          <RunRateGauge value={t.runRate} tone={toneOfPct(t.runRate)} color={rrColor} />
+          <RunRateGauge value={pM} tone={toneOfPct(pM)} color={fill} />
           {card && <CardPill card={card} />}
-          <div className="grid grid-cols-2 gap-2 w-full mt-1">
-            <div className={small}>
-              <span className="text-2xs text-[var(--text-faint)] truncate">% Target tháng</span>
-              <b className="text-lg font-black text-[var(--text)] tabular-nums leading-tight">{pct(pM)}</b>
-              <span className="text-2xs text-[var(--text-faint)] truncate tabular-nums">{money(t.actual)} / {money(t.target)}</span>
-              <span className="text-2xs text-[var(--text-faint)] truncate">target luỹ kế {pct(pPlan)}</span>
-            </div>
+          <div className="grid grid-cols-1 gap-2 w-full mt-1">
             <div className={small}>
               <span className="text-2xs text-[var(--text-faint)] truncate">Dự báo cuối tháng</span>
               <b className="text-lg font-black tabular-nums leading-tight" style={{ color: fc ? fill : "var(--text-faint)" }}>{fc ? pct(pF) : "—"}</b>
@@ -257,27 +251,28 @@ const NoPlan: React.FC<{ vm: AccountVM | null; brand: Brand; platform: ReportPla
 // Bảng tuần / loại ngày, dòng cuối "Cả tháng tới nay"
 // ---------------------------------------------------------------------------
 
-const RowsTable: React.FC<{ kind: string; rows: LensRow[]; total: LensRow; selected: string; onPick: (id: string) => void; card: AccountVM["card"] | null; lastHead: string; remaining?: boolean; totalClickable?: boolean; foot?: string }> = ({ kind, rows, total, selected, onPick, card, lastHead, remaining, totalClickable = true, foot }) => {
+const RowsTable: React.FC<{ kind: string; rows: LensRow[]; total: LensRow; selected: string; onPick: (id: string) => void; card: AccountVM["card"] | null; lastHead: string; remaining?: boolean; totalClickable?: boolean; foot?: string; wholePeriod?: boolean }> = ({ kind, rows, total, selected, onPick, card, lastHead, remaining, totalClickable = true, foot, wholePeriod }) => {
   const fcLine = card?.forecast && card.target ? `dự báo ~${money(card.forecast.p50)} · ${pct(card.forecast.p50 / card.target)}` : "";
   return (
     <div className="mt-3">
-      <Table head={[kind, "Đã đạt", "Target tới nay", "Run-rate", lastHead]}>
+      <Table head={[kind, "Đã đạt", wholePeriod ? "Target cả kỳ" : "Target tới nay", wholePeriod ? "Run-rate cả kỳ" : "Run-rate", lastHead]}>
         {[...rows, total].map((w) => {
           const isTot = w.id === "", fut = !isTot && w.status === "next" && w.targetToDate === 0;
           const on = (selected || "") === w.id;
           const clickable = !fut && (!isTot || totalClickable);
-          const tone = toneOfPct(w.runRate);
+          const rr = wholePeriod ? (w.target > 0 ? w.actual / w.target : null) : w.runRate;
+          const tone = toneOfPct(rr);
           const last = remaining ? w.target - w.targetToDate : w.target;
           return (
             <tr key={w.id || "tot"} onClick={clickable ? () => onPick(w.id) : undefined} aria-selected={on}
               className={`${clickable ? "cursor-pointer hover:bg-[var(--surface-hover)]/40" : ""} ${on ? "bg-[var(--accent)]/10" : ""} ${isTot ? "border-t-2 border-[var(--border)] font-bold" : ""} ${fut ? "opacity-60" : ""}`}>
               <td className={TD}><b className="text-[var(--text)]">{w.name}</b><span className="block text-2xs font-normal text-[var(--text-faint)]">{w.when}{!isTot && w.status === "live" && kind === "Tuần" ? " · đang chạy" : !isTot && w.status === "done" && kind === "Tuần" ? " · đã xong" : ""}</span></td>
               <td className={TD}>{fut ? "—" : money(w.actual)}</td>
-              <td className={TD}>{fut ? <span className="text-[var(--text-faint)]">chưa tới</span> : money(w.targetToDate)}</td>
+              <td className={TD}>{fut ? <span className="text-[var(--text-faint)]">chưa tới</span> : money(wholePeriod ? w.target : w.targetToDate)}</td>
               <td className={TD}>
                 <span className="inline-flex items-center gap-2 justify-end">
-                  <span className="relative w-20 h-2 rounded-full bg-[var(--surface-base)] hidden sm:inline-block"><i className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${fut || w.runRate == null ? 0 : Math.min(100, (w.runRate / 1.2) * 100)}%`, background: TONE_VAR[tone] }} /><b className="absolute -top-0.5 -bottom-0.5 w-px bg-[var(--text-faint)]" style={{ left: `${100 / 1.2}%` }} /></span>
-                  <b className="tabular-nums" style={{ color: TONE_VAR[tone] }}>{fut ? "—" : pct(w.runRate)}</b>
+                  <span className="relative w-20 h-2 rounded-full bg-[var(--surface-base)] hidden sm:inline-block"><i className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${fut || rr == null ? 0 : Math.min(100, (rr / 1.2) * 100)}%`, background: TONE_VAR[tone] }} /><b className="absolute -top-0.5 -bottom-0.5 w-px bg-[var(--text-faint)]" style={{ left: `${100 / 1.2}%` }} /></span>
+                  <b className="tabular-nums" style={{ color: TONE_VAR[tone] }}>{fut ? "—" : pct(rr)}</b>
                 </span>
               </td>
               <td className={TD}>{last > 0 ? money(last) : "—"}{isTot && fcLine && <span className="block text-2xs font-normal text-[var(--text-faint)]">{fcLine}</span>}</td>
