@@ -723,7 +723,11 @@ export type AppNotificationKind =
   | "shift_dropout_request"   // 0116/Đ7 — talent báo không đi được ca đã chốt; gửi cho OPS
   | "handover_due"            // 0144 — hết ca 15 phút chưa giao ca (gửi trợ live, ca không trợ thì OPS)
   | "roster_published"        // 0176 — trainer công bố lịch tuần: một tin tóm tắt ca của người nhận
-  | "signup_open";            // 0176 — trainer mở đăng ký tuần, kèm hạn chót
+  | "signup_open"             // 0176 — trainer mở đăng ký tuần, kèm hạn chót
+  | "swap_request"            // 0212 — có talent muốn nhường/đổi ca với bạn (chờ bạn đồng ý)
+  | "swap_peer_answer"        // 0212 — người kia đã đồng ý / không nhận yêu cầu của bạn
+  | "swap_pending_ops"        // 0212 — hai bên đã đồng ý, chờ trainer/OPs duyệt
+  | "swap_decided";           // 0212 — trainer/OPs đã duyệt hoặc từ chối
 
 export interface AppNotification {
   id: string;

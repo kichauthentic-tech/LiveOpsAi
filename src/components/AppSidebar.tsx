@@ -124,7 +124,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                         className={`w-4 h-4 shrink-0 ${isActive ? "text-[var(--accent-text)]" : "text-[var(--text-muted)]"}`}
                       />
                       {/* Thu gọn: badge NEW co lại thành chấm nhỏ trên icon cho khỏi mất tín hiệu. */}
-                      {sidebarCollapsed && item.badge && (
+                      {sidebarCollapsed && (item.badge || !!item.count) && (
                         <span className="hidden md:block absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-rose-500" />
                       )}
                     </div>
@@ -132,6 +132,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                   </div>
 
                   <div className={`flex items-center gap-1.5 shrink-0 ${sidebarCollapsed ? "md:hidden" : ""}`}>
+                    {!!item.count && <span className="min-w-5 h-5 px-1.5 rounded-full bg-rose-600 text-white text-2xs font-bold inline-flex items-center justify-center" aria-label={`${item.count} việc chờ`}>{item.count}</span>}
                     {item.badge && (
                       // Bố cục 18/10: nhãn đỏ viết hoa "CHƯA DÙNG" là chỗ chói nhất sidebar cho một mục không ai dùng — chữ mờ là đủ báo.
                       <span className="text-2xs font-medium text-[var(--text-faint)]">{item.badge}</span>
