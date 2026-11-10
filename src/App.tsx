@@ -32,6 +32,8 @@ import { fetchAllMonthlyReports } from "./lib/db/monthlyReports";
 import { fetchBoostTargets, fetchLockedPlanTargets } from "./lib/db/monthPlans";
 import { errorMessage } from "./lib/errorMessage";
 import { requestShiftDropout } from "./lib/db/notifications";
+import { createShiftSwap, respondShiftSwap, cancelShiftSwap, decideShiftSwap, type CreateSwapInput } from "./lib/db/shiftSwaps";
+import { useShiftSwaps } from "./hooks/useShiftSwaps";
 import {
   Menu,
   ShieldCheck,
@@ -242,6 +244,8 @@ export default function App() {
   // tự chịu lỗi ("chuông hỏng không được làm hỏng app"). Đăng xuất ⇒ `session` null ⇒ hook xoá items
   // như trước.
   const notifications = useNotifications(!!session);
+  // Nhường/đổi ca giữa talent (0212): talent thấy yêu cầu có tên mình, ops/trainer thấy tất cả (RLS). Brand không cần.
+  const swaps = useShiftSwaps(!!session && (currentRole === "talent" || currentRole === "trainer" || isOpsRole));
   // "shift_scheduling" chỉ là fallback cho lần đầu mở app khi chưa biết role (localStorage rỗng);
   // role thật được set lại ngay bằng getDefaultTabForRole() khi profile load xong (bên dưới).
   // Link riêng cho từng trang (lib/routes.ts, audit UX 2026-09-26): mở app bằng một link cụ thể thì link
@@ -1295,6 +1299,46 @@ export default function App() {
     }
   };
 
+  // Nhường/đổi ca giữa talent (0212). Bốn thao tác đều: gọi RPC (DB kiểm luật), báo lỗi bằng toast, nạp lại danh sách yêu cầu;
+  // duyệt thì nạp lại cả lịch vì ca vừa đổi người.
+  const runSwap = async (fn: () => Promise<void>, okMsg: string, failMsg: string, reloadSessions = false): Promise<boolean> => {
+    try {
+      await fn();
+      if (okMsg) showToast(okMsg);
+      await swaps.reload();
+      if (reloadSessions) setSessions(await fetchSessions());
+      return true;
+    } catch (e: unknown) {
+      showToast(`${failMsg}: ${errorMessage(e)}`);
+      await swaps.reload();
+      return false;
+    }
+  };
+  const swapActions = {
+    requests: swaps.items,
+    talents,
+    create: (input: CreateSwapInput) =>
+      runSwap(async () => void (await createShiftSwap(input)), "Đã gửi — chờ người kia đồng ý, rồi trainer/OPs duyệt. Lịch chưa đổi.", "Không gửi được"),
+    respond: (id: string, accept: boolean) =>
+      runSwap(() => respondShiftSwap(id, accept), accept ? "Đã đồng ý — chờ trainer/OPs duyệt." : "Đã từ chối.", "Không trả lời được"),
+    cancel: (id: string) => runSwap(() => cancelShiftSwap(id), "Đã thu hồi yêu cầu.", "Không thu hồi được"),
+    decide: (id: string, approve: boolean, note: string) =>
+      runSwap(() => decideShiftSwap(id, approve, note), approve ? "Đã duyệt — lịch đã đổi." : "Đã từ chối.", "Không duyệt được", approve)
+  };
+  // Yêu cầu của mình vừa được duyệt (người kia/ops bấm ở máy khác) ⇒ lịch đã đổi, nạp lại ca. Lần nạp đầu không tính.
+  const approvedSwapKey = swaps.items.filter((r) => r.status === "approved").map((r) => r.id).sort().join(",");
+  const approvedSwapSeen = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    if (!swaps.loaded) return;
+    if (approvedSwapSeen.current === null) {
+      approvedSwapSeen.current = approvedSwapKey;
+      return;
+    }
+    if (approvedSwapSeen.current === approvedSwapKey) return;
+    approvedSwapSeen.current = approvedSwapKey;
+    void fetchSessions().then(setSessions).catch(() => undefined);
+  }, [swaps.loaded, approvedSwapKey, setSessions]);
+
   // Handlers for "Đăng Ký & Chốt Lịch Host" (Giai đoạn 14a)
   const handleCreateShiftSlot = async (slot: ShiftSlot): Promise<boolean> => {
     try {
@@ -1480,8 +1524,11 @@ export default function App() {
   const hiddenBrandTabs = new Set(
     effectiveWorkspace.type === "brand" ? profileOf(currentBrandPlatforms[0]).hiddenBrandTabs.filter((t) => currentBrandPlatforms.every((p) => profileOf(p).hiddenBrandTabs.includes(t))) : []
   );
-  const navGroups =
+  // Yêu cầu đổi/nhường ca đã được người kia đồng ý, chờ trainer/OPs duyệt (0212): số đỏ ở mục nơi duyệt — thấy từ mọi màn, bấm vào là tới thẻ duyệt.
+  const swapWaiting = isOpsRole || currentRole === "trainer" ? swaps.items.filter((r) => r.status === "pending_ops").length : 0;
+  const baseNavGroups =
     effectiveWorkspace.type === "brand" ? BRAND_NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => !hiddenBrandTabs.has(i.id)) })) : AGENCY_NAV_GROUPS;
+  const navGroups = swapWaiting > 0 ? baseNavGroups.map((g) => ({ ...g, items: g.items.map((i) => (i.id === "calendar" || i.id === "roster" ? { ...i, count: swapWaiting } : i)) })) : baseNavGroups;
   // Brand có kênh trên một sàn — danh sách brand của màn số liệu agency theo sàn đó.
   const brandsOn = (p: ReportPlatform) => visibleBrands.filter((b) => (brandPlatformsMap[b.id] ?? []).includes(p));
   // Màn "mọi kênh" của agency khi đang "Tất cả": mỗi sàn một khối (đầu khối có nhãn sàn), số hiệu suất không cộng giữa hai sàn.
@@ -1710,7 +1757,7 @@ export default function App() {
   }
 
   return (
-    <SessionActionsContext.Provider value={{ setStaffSegments: handleSetStaffSegments, isMonthClosed: (s) => isSessionMonthClosed(monthlyReports, s) }}>
+    <SessionActionsContext.Provider value={{ setStaffSegments: handleSetStaffSegments, isMonthClosed: (s) => isSessionMonthClosed(monthlyReports, s), swap: swapActions }}>
     <div className="flex h-screen w-full bg-[var(--surface-base)] text-[var(--text)] overflow-hidden font-sans antialiased selection:bg-[var(--accent)] selection:text-white">
       {/* Left Sidebar Navigation */}
       <AppSidebar

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { SwapApprovalQueue } from "./shiftSwap/SwapApprovalQueue";
 import { ChevronDown, ChevronLeft, ChevronRight, ClipboardList, FileSpreadsheet, Send, X } from "lucide-react";
 import type { Brand, BrandChannel, BrandStudio, LiveSession, ShiftRegistration, ShiftSlot, Studio, Talent, TalentRateHistoryEntry, UserRole } from "../types";
 import { PageHeader } from "./common/PageHeader";
@@ -925,6 +926,8 @@ export const RosterBoard: React.FC<Props> = (p) => {
         {loadError && <p className="text-xs rounded-lg border border-red-500/30 bg-red-500/10 text-red-300 px-3 py-2">Không tải được dữ liệu Điều Phối Lịch Live: {loadError}</p>}
         {desk.commitError && <p className="text-xs text-amber-300">Không đọc được cam kết hợp đồng — giờ cam kết để trống.</p>}
       </PageHeader>
+
+      {canWrite && <SwapApprovalQueue sessions={p.sessions} />}
 
       <MonthStrip cards={monthCards} viewMonth={viewMonth} today={today} onAction={onMonthAction} />
 

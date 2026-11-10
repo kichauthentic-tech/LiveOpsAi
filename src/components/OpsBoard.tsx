@@ -18,6 +18,7 @@ import { unackedSoon } from "../lib/talent/acks";
 import type { BoardView } from "../lib/todoList";
 import { SessionWindow } from "./SessionWindow";
 import { ShiftTimeQueue } from "./ShiftTimeQueue";
+import { SwapApprovalQueue } from "./shiftSwap/SwapApprovalQueue";
 import { PageHeader } from "./common/PageHeader";
 import { StatTile } from "./common/StatTile";
 import { SlotDetailModal } from "./scheduling/SlotDetailModal";
@@ -592,6 +593,9 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
           </>
         }
       />
+
+      {/* Yêu cầu đổi/nhường ca chờ duyệt (0212) — ngay dưới tiêu đề, cả hai chế độ xem (user 10/11: thông báo chuông dễ miss). */}
+      {isOps && <SwapApprovalQueue sessions={sessions} />}
 
       {isOps && (
         <div hidden={view !== "day"} className="space-y-4">

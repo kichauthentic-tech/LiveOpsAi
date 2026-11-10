@@ -1,3 +1,5 @@
+import { ShiftSwapPanel } from "./shiftSwap/ShiftSwapPanel";
+import { SwapTheirShiftEntry } from "./shiftSwap/SwapTheirShiftEntry";
 import { platformText } from "../lib/metricGlossary";
 import SearchSelect from "./ui/SearchSelect";
 import React, { useContext, useEffect, useMemo, useState } from "react";
@@ -34,7 +36,7 @@ import { useToast } from "../hooks/useToast";
 import { useConfirm } from "../hooks/useConfirm";
 import { SessionActionsContext } from "../lib/sessionActionsContext";
 import { CLOSED_MONTH_NOTICE } from "../lib/closedMonth";
-import { describeStaff, hasStaffSegments } from "../lib/staffSegments";
+import { describeStaff, effectiveSegments, hasStaffSegments } from "../lib/staffSegments";
 import { HostChangeReports } from "./HostChangeReports";
 import { StaffSegmentsEditor } from "./StaffSegmentsEditor";
 import { METRIC, metricHint } from "../lib/metricGlossary";
@@ -312,6 +314,9 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
 
   // Đ7: chỉ người ĐANG giữ ca, ca chưa diễn ra, ca chưa huỷ. (DB guard lại đúng ba điều này —
   // đây chỉ là để không chào một cái nút chắc chắn lỗi.)
+  // Nhường/đổi ca (0212): có đoạn nào của tôi trong ca (kể cả khi không phải người chính) → nút của tôi; ca của người khác → lối vào B.
+  const iHoldPart = !!viewer.myTalentId && effectiveSegments(s).some((g) => g.talentId === viewer.myTalentId);
+  const swapOpen = !isOps && s.status !== "Cancelled" && s.date >= today && !monthClosed;
   const canDropout = isMine && !isOps && !!onRequestDropout && s.status !== "Cancelled" && s.date >= today;
   const doDropout = async () => {
     if (!onRequestDropout) return;
@@ -666,6 +671,12 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
               <MoreMenu items={moreItems} className={canHandover && handoverDone && !editingHandover ? "" : "ml-auto"} />
             </div>
           )}
+
+          {swapOpen && viewer.myTalentId && (iHoldPart ? (
+            <ShiftSwapPanel session={s} allSessions={allSessions} myTalentId={viewer.myTalentId} />
+          ) : viewer.role === "talent" ? (
+            <SwapTheirShiftEntry session={s} allSessions={allSessions} myTalentId={viewer.myTalentId} />
+          ) : null)}
 
           {canDropout && (
             <div className="pt-3 border-t border-[var(--border)]">

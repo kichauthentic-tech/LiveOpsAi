@@ -12,6 +12,8 @@ export interface NavItem {
   icon: React.ComponentType<{ className?: string }>;
   perm: PermissionKey | undefined;
   badge?: string;
+  /** Số việc đang chờ (vd. yêu cầu đổi ca chờ duyệt) — hiện pill đỏ ở sidebar. Do App gắn lúc render, không khai báo cố định. */
+  count?: number;
 }
 
 /**

@@ -1,3 +1,4 @@
+import { SwapInbox } from "../shiftSwap/SwapInbox";
 import React, { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, Clock, X } from "lucide-react";
 import type { Brand, LiveSession, ShiftSlot, Talent, UserRole } from "../../types";
@@ -169,6 +170,8 @@ export const TalentToday: React.FC<Props> = ({
               </span>
             </button>
           )}
+
+          <SwapInbox sessions={sessions} myTalentId={myTalentId} />
 
           {pendingAcks.length > 0 && onAck && <AckBar pending={pendingAcks} onAck={onAck} />}
 
