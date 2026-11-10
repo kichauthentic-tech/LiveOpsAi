@@ -41,6 +41,9 @@
   --success: #6fcf97;
   --warning: #f2c94c;
   --danger: #eb6b6b;
+  /* Thẻ "mực" (.bento-ink): mặc định đảo màu của theme đang chọn; theme muốn màu riêng thì đặt lại (Bento). */
+  --ink-bg: var(--text);
+  --ink-fg: var(--surface-base);
 }
 
 /* Midnight đứng SAU khối `:root, .theme-yfb`: cùng độ ưu tiên thì khối sau thắng — trước 06/11 nó đứng trước nên chọn Midnight
@@ -189,10 +192,25 @@
   --success: #15803d;
   --warning: #b45309;
   --danger: #c2332b;
+  --ink-bg: #10302b;
+  --ink-fg: #f3f1ea;
   --radius-lg: 0.75rem;
   --radius-xl: 1rem;
   --radius-2xl: 1.5rem;
   --font-sans: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+/* Sidebar của Bento là dải xanh rêu đậm: đặt lại token NGAY TRÊN <aside> nên mọi chữ/viền/nền bên trong tự đổi theo, không sửa
+   AppSidebar. Thẻ "mực" (.bento-ink) của Bento dùng cùng màu này. */
+.theme-bento aside[data-app-sidebar] {
+  --surface: #10302b;
+  --surface-elevated: #1c443d;
+  --surface-hover: #25544b;
+  --text: #f3f1ea;
+  --text-muted: #c2d1cc;
+  --text-faint: #9ab0aa;
+  --border: #24463f;
+  --accent: #5eead4;
+  --accent-text: #7ee7d3;
 }
 /* Thẻ (nền --surface, bo xl/2xl) nổi bằng bóng mềm, viền gần như ẩn — không sửa từng component. Ngoài @layer nên thắng utility. */
 .theme-bento [class~="bg-[var(--surface)]"][class*="rounded-2xl"],
@@ -206,12 +224,27 @@
   transform), nội dung tab mờ dần vào khi đổi tab (.tab-in — KHÔNG dùng transform: phần tử cha có transform làm lệch cửa sổ
   position:fixed bên trong). Tắt khi người dùng chọn giảm chuyển động.
 */
+/* Thẻ "mực" — khối nhấn đảo màu của lưới bento (nền = màu chữ của theme, chữ = màu nền; Bento đặt xanh rêu đậm). Token chữ đặt lại
+   bên trong nên phần tử con cứ dùng text-[var(--text*)] như thường. KHÔNG dùng viên màu kiểu text-rose-400 bên trong (lớp chuyển màu
+   theme sáng sẽ đổi nó thành màu đậm trên nền đậm) — dùng chấm màu + chữ. */
+.bento-ink {
+  background: var(--ink-bg);
+  color: var(--ink-fg);
+  --text: var(--ink-fg);
+  --text-muted: color-mix(in srgb, var(--ink-fg) 78%, var(--ink-bg));
+  --text-faint: color-mix(in srgb, var(--ink-fg) 62%, var(--ink-bg));
+  --border: color-mix(in srgb, var(--ink-fg) 18%, var(--ink-bg));
+  --surface-hover: color-mix(in srgb, var(--ink-fg) 10%, var(--ink-bg));
+}
+/* Vòng đo (SVG): nét chạy từ 0 tới giá trị; --ring-len = chu vi, đặt inline. */
+.ring-grow { animation: ring-grow 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.2s both; }
+@keyframes ring-grow { from { stroke-dashoffset: var(--ring-len); } }
 .bar-grow { transform-origin: left center; animation: bar-grow 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both; }
 @keyframes bar-grow { from { transform: scaleX(0); } }
 .tab-in { animation: tab-in 0.24s ease-out both; }
 @keyframes tab-in { from { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
-  .bar-grow, .tab-in { animation: none; }
+  .bar-grow, .tab-in, .ring-grow { animation: none; }
 }
 
 /*

@@ -16,8 +16,9 @@ export const MotionRoot: React.FC<{ children: React.ReactNode }> = ({ children }
 );
 
 /** Khối hiện dần từ dưới lên; `index` là thứ tự trong nhóm để các khối hiện lần lượt (trễ tối đa 8 bậc — danh sách dài không phải chờ). */
-export const Reveal: React.FC<{ index?: number; lift?: boolean; className?: string; style?: React.CSSProperties; children: React.ReactNode }> = ({ index = 0, lift = false, className, style, children }) => (
+export const Reveal: React.FC<{ index?: number; lift?: boolean; id?: string; className?: string; style?: React.CSSProperties; children: React.ReactNode }> = ({ index = 0, lift = false, id, className, style, children }) => (
   <m.div
+    id={id}
     className={className}
     style={style}
     initial={{ opacity: 0, y: 14 }}

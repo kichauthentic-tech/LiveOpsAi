@@ -34,6 +34,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
   currentRole
 }) => (
   <aside
+    data-app-sidebar
     className={`fixed inset-y-0 left-0 z-50 w-64 bg-[var(--surface)]/90 backdrop-blur-md border-r border-[var(--border)] flex flex-col transition-all duration-300 md:translate-x-0 ${
       mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
     } ${sidebarCollapsed ? "md:w-16" : "md:w-64"}`}

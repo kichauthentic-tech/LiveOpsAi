@@ -178,10 +178,11 @@
 - **10/11: KIỂU "BENTO DASHBOARD" + CHUYỂN ĐỘNG — đợt 1 (nền tảng + màn mẫu; KHÔNG migration)** — user gửi ảnh dashboard bento (thẻ bo lớn,
   số to, chuyển động mượt bằng framer-motion) và bảo "làm đi". **Code:** thêm dependency `motion`; `components/ui/Motion.tsx`
   (`MotionRoot`, `Reveal`, `Collapse`, `CountUp`); `index.css` thêm theme thứ 7 `.theme-bento` (nền kem, nút xanh ngọc, bo lớn, font Plus
-  Jakarta Sans, thẻ nổi bằng bóng mềm qua luật `.theme-bento [class~="bg-[var(--surface)]"]`), `.bar-grow`, `.tab-in`; `useTheme.tsx` thêm
+  Jakarta Sans, thẻ nổi bằng bóng mềm qua luật `.theme-bento [class~="bg-[var(--surface)]"]`; sidebar xanh rêu đậm bằng cách đặt lại token trên
+  `aside[data-app-sidebar]`), thẻ "mực" `.bento-ink` (token `--ink-bg/--ink-fg`, mặc định đảo màu theme), `.bar-grow`, `.ring-grow`, `.tab-in`; `useTheme.tsx` thêm
   dòng Bento (KHÔNG đổi theme mặc định — vẫn Daylight); `App.tsx` bọc nội dung tab bằng `<div className="tab-in space-y-6">` (mờ dần vào khi
-  đổi tab, mọi theme); **màn mẫu = Dashboard › Tổng quan account** (`OverviewTab`): thẻ sàn số lớn chạy số + thanh tiến độ, 4 ô đếm rủi ro
-  thay hàng viên chữ, dòng account hiện lần lượt + nổi khi rê chuột, khối hành động bung/gập mượt. **Verify:** trang thử dữ liệu giả
+  đổi tab, mọi theme); **màn mẫu = Dashboard › Tổng quan account** (`OverviewTab`): lưới bento — thẻ mực "Account cần chú ý" (đếm bad+warn, tối đa 4 dòng, bấm =
+  bung + cuộn tới account; thay hàng viên chữ đếm cũ) cạnh thẻ từng sàn (số lớn chạy số, thanh tiến độ, vòng dự báo/target), dòng account hiện lần lượt + nổi khi rê chuột, khối hành động bung/gập mượt. **Verify:** trang thử dữ liệu giả
   (Playwright) ở Bento/YFB/Daylight 1440px + Bento 375px: 0 tràn ngang, 0 lỗi console; `uiReadability` (7 theme) xanh. **CHƯA xem trên app
   thật** (phiên cloud không có `.env`). **Chưa làm (đợt sau, chờ user duyệt cảm giác):** áp `Reveal`/`CountUp` cho tab Toàn sàn / Brand và các
   màn tổng quan khác; `StatTile` chạy số. **Bẫy phiên cloud:** `cdn.sheetjs.com` bị chặn mạng ⇒ `npm ci` hỏng; cài tạm `xlsx@0.18.5` từ npm
@@ -642,7 +643,9 @@ Chữ brand thấy trong Report Tháng (component `report/*`, `*MonthlyReportTab
   10/11 chuyển động: chỉ qua `ui/Motion.tsx` (không import `motion` trực tiếp ở màn); gốc màn bọc `<MotionRoot>` (thư viện nằm trong chunk
   của màn, không vào bundle chính); khối hiện lần lượt = `Reveal index`, dòng bấm được thêm `lift`; số lớn = `CountUp` với đúng hàm định dạng
   của màn; bung/gập = `Collapse`; thanh tiến độ = class `bar-grow`. Chỉ transform/opacity; KHÔNG đặt transform lên khối bọc cả tab (làm lệch
-  cửa sổ `position:fixed`). Mọi thứ phải tắt được khi người dùng chọn giảm chuyển động.
+  cửa sổ `position:fixed`). Mọi thứ phải tắt được khi người dùng chọn giảm chuyển động. Khối nhấn đảo màu = class `bento-ink` (bên trong
+  dùng token chữ như thường; KHÔNG dùng viên màu `text-rose-400`… — dùng chấm màu + chữ). Khối token theme chỉ được viết đúng dạng
+  `.theme-x {` MỘT lần (test đọc token bằng regex — khối thứ hai cùng tên sẽ ghi đè).
 - **Màu brand** qua `getBrandTheme(brandName)`; **logo** qua `<BrandLogo>`; **ca trên lịch** qua `<SessionEventCard>`
   (`buildSessionMeta`/`buildSlotMeta`). Theme sáng là lớp chuyển màu CSS cuối `index.css` — component cứ viết dark-first.
 - **Tiền:** `fmtVndShort` (chỗ chật: "50M", "1,23B") / `fmtVndFull` (con số chính xác) trong `lib/format.ts`; không "đ",
