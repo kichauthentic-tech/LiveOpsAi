@@ -383,6 +383,16 @@ export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSes
           )
         )}
 
+      {/* Nhắc nối ca LUÔN hiện (10/11): room còn live quá giờ hết ca mà chưa nối ⇒ ca sau mất số. Bấm "Không" chỉ đóng hộp hỏi,
+          dòng nhắc này vẫn ở đó cho tới khi nối (không còn chỉ nằm trong ⋯). */}
+      {canEdit && !next && !chooser && !partForm && snapshot && (overRoom || rooms.some((r) => !r.endedAt)) &&
+        warn(
+          <>{Unit} còn live quá giờ hết ca nhưng CHƯA nối sang ca sau ⇒ ca sau sẽ thiếu số / bị khoá.</>,
+          <button onClick={() => void openChooser()} disabled={busy} className={btnGhost}>
+            <Link2 className="w-3.5 h-3.5" /> Nối sang ca sau
+          </button>
+        )}
+
       {/* Câu hỏi nối ca: chạm chọn ca sau rồi Đúng / Không. */}
       {chooser && (
         <div className="rounded-xl border-[1.5px] border-[var(--accent)]/45 p-3 space-y-2">
