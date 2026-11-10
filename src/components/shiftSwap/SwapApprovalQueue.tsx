@@ -37,7 +37,9 @@ export const SwapApprovalQueue: React.FC<{ sessions: LiveSession[] }> = ({ sessi
   const [nowMs] = useState(() => Date.now());
   const nameOf = useMemo(() => talentNameOf(swap?.talents ?? []), [swap?.talents]);
   const waiting = (swap?.requests ?? []).filter((r) => r.status === "pending_ops").reverse();
-  if (!swap || waiting.length === 0) return null;
+  // Yêu cầu còn chờ người kia trả lời: chưa duyệt được, nhưng người xếp lịch cần thấy là có (chỉ xem).
+  const awaitingPeer = (swap?.requests ?? []).filter((r) => r.status === "pending_peer").reverse();
+  if (!swap || (waiting.length === 0 && awaitingPeer.length === 0)) return null;
 
   const run = async (id: string, fn: () => Promise<boolean>) => {
     setBusyId(id);
@@ -63,6 +65,7 @@ export const SwapApprovalQueue: React.FC<{ sessions: LiveSession[] }> = ({ sessi
       <h3 className="text-sm font-black text-[var(--text)] flex items-center gap-2">
         <ArrowLeftRight className="w-4 h-4 text-amber-300" /> Chờ duyệt đổi / nhường ca <b className="tabular-nums text-amber-300">{waiting.length}</b>
       </h3>
+      {waiting.length === 0 && <p className="text-xs text-[var(--text-muted)]">Chưa có yêu cầu nào người kia đã đồng ý.</p>}
       {waiting.map((r) => {
         const give = sessions.find((s) => s.id === r.give.sessionId);
         const take = r.take ? sessions.find((s) => s.id === r.take!.sessionId) : undefined;
@@ -103,6 +106,20 @@ export const SwapApprovalQueue: React.FC<{ sessions: LiveSession[] }> = ({ sessi
           </div>
         );
       })}
+      {awaitingPeer.length > 0 && (
+        <div className="space-y-1 pt-1">
+          <p className="text-2xs font-bold text-[var(--text-faint)]">Đang chờ người nhận trả lời ({awaitingPeer.length}) — chưa duyệt được</p>
+          {awaitingPeer.map((r) => {
+            const give = sessions.find((s) => s.id === r.give.sessionId);
+            return (
+              <p key={r.id} className="text-xs text-[var(--text-muted)]">
+                <b>{r.fromName}</b> {r.kind === "swap" ? "⇄" : "→"} <b>{r.toName}</b> · {r.kind === "swap" ? "đổi ca" : "nhường ca"}
+                {give ? ` · ${partLabel(give, r.give)}` : ""}
+              </p>
+            );
+          })}
+        </div>
+      )}
     </section>
   );
 };
