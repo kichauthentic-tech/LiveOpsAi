@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Check, Circle, Clock3 } from "lucide-react";
+import { Check, Clock3 } from "lucide-react";
 import type { Brand, LiveSession, ShiftRegistration, ShiftSlot } from "../types";
 import { addDays, getTodayDate, isoWeekStart } from "../lib/dateUtils";
 import { fetchRosterMonths, fetchRosterWeeks, signupDeadlineOf, type RosterMonth, type RosterWeek } from "../lib/db/roster";
@@ -144,7 +144,12 @@ export default function TalentShiftSignup({ mode, onOpenTab, brands, shiftSlots,
         <div className="flex items-center gap-2 min-w-0">
           <BrandLogo brand={slot.brandId ? brandById.get(slot.brandId) : { name: slot.brandName, logo: "" }} size="sm" />
           <span className="font-bold text-sm text-[var(--text)] truncate">{slot.brandName}</span>
-          <PlatformLogo platform={slot.platform} size="sm" className="ml-auto shrink-0" />
+          {mine && myTalentId && !locked ? (
+            <span className="ml-auto shrink-0 w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center" aria-label="Bạn đã đăng ký">
+              <Check className="w-3.5 h-3.5" strokeWidth={3} />
+            </span>
+          ) : null}
+          <PlatformLogo platform={slot.platform} size="sm" className={`shrink-0 ${mine && myTalentId && !locked ? "" : "ml-auto"}`} />
         </div>
         <p className="mt-2 font-mono text-lg font-black leading-none text-[var(--text)]">
           {slot.startTime.slice(0, 5)} – {slot.endTime.slice(0, 5)}
@@ -181,20 +186,7 @@ export default function TalentShiftSignup({ mode, onOpenTab, brands, shiftSlots,
         } ${busy === slot.id ? "opacity-60" : ""}`}
       >
         {head}
-        {mine ? (
-          <p className="mt-3 flex items-center gap-1.5 text-sm font-bold text-emerald-400">
-            <span className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center">
-              <Check className="w-3.5 h-3.5" strokeWidth={3} />
-            </span>
-            Bạn đã đăng ký
-            <span className="ml-auto text-2xs font-medium text-[var(--text-faint)] group-hover:text-rose-300">Chạm để huỷ</span>
-          </p>
-        ) : (
-          <p className="mt-3 flex items-center gap-1.5 text-sm font-bold text-[var(--accent-text)]">
-            <Circle className="w-5 h-5" />
-            Chạm để đăng ký
-          </p>
-        )}
+        <span className="sr-only">{mine ? "Chạm để huỷ" : "Chạm để đăng ký"}</span>
       </button>
     );
   };
