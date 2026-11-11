@@ -49,7 +49,7 @@ describe("CardPill", () => {
 });
 
 describe("Dashboard agency = Tổng quan account (24/10)", () => {
-  test("một dòng mỗi kênh: nhãn + %, dự báo, khả năng bù, phân rã; không chữ cũ", () => {
+  test("một thẻ mỗi kênh: nhãn + %, dự báo; khả năng bù/phân rã nằm trong phần bung (11/11); không chữ cũ", () => {
     const c = world();
     const html = renderToStaticMarkup(React.createElement(OverviewTab, {
       rows: [accountRow(c)], summaries: [{ platform: "TikTok", pace: platformPace([c]), waiting: c.coverage.missingSessions }],
@@ -57,7 +57,6 @@ describe("Dashboard agency = Tổng quan account (24/10)", () => {
     }));
     expect(html).toMatch(/(Đạt target|Sát target|Rủi ro|Hụt target) · (xác suất đạt |dự báo thiếu ~)(\d+|≈ 0)%/);
     expect(html).toMatch(/Dự báo cuối tháng/);
-    expect(html).toMatch(/Bù được|Không bù kịp|Đúng tiến độ/);
     expect(html).not.toMatch(/Giữ nhịp|chạm target|dự kiến|Sẽ hụt|Khó đạt|NaN|undefined|Infinity/);
   });
 });

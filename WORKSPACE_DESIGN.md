@@ -181,8 +181,10 @@
   Jakarta Sans, thẻ nổi bằng bóng mềm qua luật `.theme-bento [class~="bg-[var(--surface)]"]`; sidebar xanh rêu đậm bằng cách đặt lại token trên
   `aside[data-app-sidebar]`), thẻ "mực" `.bento-ink` (token `--ink-bg/--ink-fg`, mặc định đảo màu theme), `.bar-grow`, `.ring-grow`, `.tab-in`; `useTheme.tsx` thêm
   dòng Bento (KHÔNG đổi theme mặc định — vẫn Daylight); `App.tsx` bọc nội dung tab bằng `<div className="tab-in space-y-6">` (mờ dần vào khi
-  đổi tab, mọi theme); **màn mẫu = Dashboard › Tổng quan account** (`OverviewTab`): lưới bento — thẻ mực "Account cần chú ý" (đếm bad+warn, tối đa 4 dòng, bấm =
-  bung + cuộn tới account; thay hàng viên chữ đếm cũ) cạnh thẻ từng sàn (số lớn chạy số, thanh tiến độ, vòng dự báo/target), dòng account hiện lần lượt + nổi khi rê chuột, khối hành động bung/gập mượt. **Verify:** trang thử dữ liệu giả
+  đổi tab, mọi theme); **màn mẫu = Dashboard › Tổng quan account** (`OverviewTab`): lưới bento ÍT CHỮ (11/11, user: "chữ quá nhiều, tiết chế") — thẻ mực "Cần chú ý" (số lớn + tối đa 4 dòng tên · % dự báo; bấm = bung + cuộn tới account),
+  thẻ từng sàn (số thực đạt lớn, thanh, vòng dự báo/target; run-rate + ca chưa có số liệu chỉ còn ở tooltip), rồi LƯỚI THẺ ACCOUNT (tên, % dự báo
+  cỡ lớn tô theo mức rủi ro, thanh, "thực đạt / target"); Bù thiếu hụt / phân rã / giờ cam kết / phễu / hành động đề xuất CHỈ hiện khi bấm thẻ (bảng 6 cột cũ
+  đã bỏ). Quy tắc rút ra: màn tổng quan = số + màu, chữ giải thích vào tooltip hoặc phần bung. **Verify:** trang thử dữ liệu giả
   (Playwright) ở Bento/YFB/Daylight 1440px + Bento 375px: 0 tràn ngang, 0 lỗi console; `uiReadability` (7 theme) xanh. **CHƯA xem trên app
   thật** (phiên cloud không có `.env`). **Chưa làm (đợt sau, chờ user duyệt cảm giác):** áp `Reveal`/`CountUp` cho tab Toàn sàn / Brand và các
   màn tổng quan khác; `StatTile` chạy số. **Bẫy phiên cloud:** `cdn.sheetjs.com` bị chặn mạng ⇒ `npm ci` hỏng; cài tạm `xlsx@0.18.5` từ npm

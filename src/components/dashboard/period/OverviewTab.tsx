@@ -10,12 +10,12 @@ import { BrandLogo } from "../../ui/BrandLogo";
 import { PlatformChip } from "../../common/PlatformChip";
 import { LiveFunnel } from "../LiveFunnel";
 import { CountUp, Collapse, Reveal } from "../../ui/Motion";
-import { ddmm, money, pct } from "../shared";
+import { money, pct } from "../shared";
 
 // Tab "Tổng quan account" của Dashboard (demo duyệt 24/10/2026): mọi kênh brand × sàn của MỌI sàn trên một bảng, xếp theo rủi ro.
 // Chỉ trình bày — số và câu chữ dựng ở lib/performance/accountOverview.ts từ thẻ kênh. Tổng chỉ theo từng sàn (không cộng chéo sàn).
-// 10/11: bố cục "bento" — thẻ mực "Account cần chú ý" (bấm một dòng = bung + cuộn tới account đó) + thẻ từng sàn (số lớn, thanh tiến độ,
-// vòng dự báo), các khối hiện lần lượt (ui/Motion.tsx; gốc màn bọc MotionRoot).
+// 10–11/11: bố cục "bento", ÍT CHỮ — thẻ mực "Cần chú ý" (bấm một dòng = bung + cuộn tới account đó), thẻ từng sàn (số lớn, thanh, vòng dự báo),
+// lưới thẻ account (tên, % dự báo, thanh; bấm mới ra Bù thiếu hụt / phân rã / giờ cam kết / hành động). Khối hiện lần lượt (ui/Motion.tsx).
 
 const TONE_BORDER: Record<RowTone, string> = { bad: "var(--danger)", warn: "var(--warning)", good: "var(--success)", off: "var(--border)" };
 const TONE_PILL: Record<RowTone, string> = {
@@ -48,8 +48,6 @@ export const OverviewTab: React.FC<{
 }> = ({ rows, summaries, brands, loading, today, onOpenBrand, onOpenMonthPlan }) => {
   const [open, setOpen] = useState<Set<string>>(() => new Set());
   const brandOf = new Map(brands.map((b) => [b.id, b]));
-  const count = (t: RowTone) => rows.filter((r) => r.tone === t).length;
-  const saveable = rows.filter((r) => r.rescue.kind === "save").length;
   const risky = rows.filter((r) => r.tone === "bad" || r.tone === "warn");
   // Từ thẻ "cần chú ý": bung dòng account đó và cuộn tới nó.
   const jump = (k: string) => {
@@ -59,132 +57,112 @@ export const OverviewTab: React.FC<{
   const toggle = (k: string) => setOpen((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
 
   return (
-    <div className="space-y-5">
-      <div className="grid gap-3 lg:grid-cols-4 lg:auto-rows-fr">
-        <Reveal className={`bento-ink rounded-2xl p-5 sm:p-6 flex flex-col gap-4 lg:col-span-2 ${summaries.length > 2 ? "lg:row-span-3" : "lg:row-span-2"}`}>
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-medium text-[var(--text-muted)]">Account cần chú ý</p>
-              <p className="mt-1 flex items-baseline gap-2">
-                <CountUp value={risky.length} format={(v) => String(Math.round(v))} className="text-5xl font-black tabular-nums tracking-tight text-[var(--text)]" />
-                <span className="text-sm text-[var(--text-muted)]">/ {rows.length} account</span>
-              </p>
-            </div>
-            <AlertTriangle className="w-5 h-5 text-[var(--text-faint)]" aria-hidden="true" />
+    <div className="space-y-4">
+      <div className="grid gap-3 lg:grid-cols-4">
+        <Reveal className={`bento-ink rounded-2xl p-6 flex flex-col justify-between gap-5 lg:col-span-2 ${summaries.length > 2 ? "lg:row-span-3" : "lg:row-span-2"}`}>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-medium text-[var(--text-muted)]">Cần chú ý</p>
+            <AlertTriangle className="w-4 h-4 text-[var(--text-faint)]" aria-hidden="true" />
           </div>
-          {loading ? (
-            <p className="text-sm text-[var(--text-muted)]">Đang dựng số từng account…</p>
-          ) : risky.length === 0 ? (
-            <p className="text-sm text-[var(--text-muted)]">Không account nào đang ở mức rủi ro.</p>
+          <CountUp value={risky.length} format={(v) => String(Math.round(v))} className="text-7xl font-black tabular-nums tracking-tight text-[var(--text)] leading-none" />
+          {loading ? null : risky.length === 0 ? (
+            <p className="text-sm text-[var(--text-muted)]">Ổn</p>
           ) : (
-            <ul className="divide-y divide-[var(--border)] -my-1">
+            <ul className="divide-y divide-[var(--border)]">
               {risky.slice(0, 4).map((r) => (
                 <li key={r.key}>
-                  <button type="button" onClick={() => jump(r.key)} className="w-full flex items-center gap-3 py-2.5 text-left rounded-lg hover:bg-[var(--surface-hover)] -mx-2 px-2 min-h-[44px]">
+                  <button type="button" onClick={() => jump(r.key)} className="w-full flex items-center gap-3 py-2.5 text-left rounded-lg hover:bg-[var(--surface-hover)] -mx-2 px-2 min-h-[44px]" title={r.status}>
                     <i className="w-2 h-2 rounded-full shrink-0" style={{ background: TONE_BORDER[r.tone] }} aria-hidden="true" />
-                    <span className="min-w-0 flex-1">
-                      <b className="block text-sm text-[var(--text)] truncate">{r.brandName} <span className="font-medium text-[var(--text-faint)]">· {r.platform}</span></b>
-                      <span className="block text-xs text-[var(--text-muted)] truncate">{r.status}</span>
-                    </span>
+                    <b className="min-w-0 flex-1 text-sm text-[var(--text)] truncate">{r.brandName} <span className="font-medium text-[var(--text-faint)]">{r.platform}</span></b>
                     {r.target && r.forecast != null ? <span className="text-sm font-black tabular-nums text-[var(--text)]">{pct(r.forecast / r.target)}</span> : null}
-                    <ChevronRight className="w-4 h-4 text-[var(--text-faint)] shrink-0" aria-hidden="true" />
                   </button>
                 </li>
               ))}
             </ul>
           )}
-          {risky.length > 4 && <p className="text-xs text-[var(--text-faint)]">và {risky.length - 4} account khác ở bảng dưới</p>}
-          <div className="mt-auto grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-[var(--border)]">
-            <Fig label="Rủi ro cao" value={String(count("bad"))} />
-            <Fig label="Rủi ro" value={String(count("warn"))} />
-            <Fig label="Chưa đủ dữ liệu / tạm dừng" value={String(count("off"))} />
-            <Fig label="Bù được bằng giờ live" value={String(saveable)} />
-          </div>
         </Reveal>
 
         {summaries.map((s, i) => {
           const { actual, target, targetToDate, forecast } = s.pace;
           const tick = target && targetToDate > 0 ? clamp((targetToDate / target) * 100) : null;
           return (
-            <Reveal key={s.platform} index={i + 1} className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 lg:col-span-2 flex items-center gap-5">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <PlatformChip platform={s.platform} />
-                  <span className="text-xs text-[var(--text-faint)]">Thực đạt / Target</span>
-                </div>
-                <p className="mt-2 flex flex-wrap items-baseline gap-x-2 text-3xl font-black tabular-nums tracking-tight text-[var(--text)]">
+            <Reveal key={s.platform} index={i + 1} className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 lg:col-span-2 flex items-center gap-5" >
+              <div className="min-w-0 flex-1" title={targetToDate > 0 ? `Run-rate ${pct(actual / targetToDate)} · ${s.waiting} ca chưa có số liệu` : undefined}>
+                <PlatformChip platform={s.platform} />
+                <p className="mt-3 flex flex-wrap items-baseline gap-x-2 text-4xl font-black tabular-nums tracking-tight text-[var(--text)]">
                   <CountUp value={actual} format={money} />
-                  <span className="text-sm font-bold tracking-normal text-[var(--text-muted)]">{target ? `/ ${money(target)}` : "chưa có target"}</span>
+                  <span className="text-sm font-bold tracking-normal text-[var(--text-faint)]">{target ? `/ ${money(target)}` : ""}</span>
                 </p>
                 {target ? (
-                  <div className="relative mt-3 h-2.5 rounded-full bg-[var(--surface-elevated)]" role="img" aria-label={`Thực đạt ${money(actual)} trên target ${money(target)}`}>
+                  <div className="relative mt-4 h-2.5 rounded-full bg-[var(--surface-elevated)]" role="img" aria-label={`Thực đạt ${money(actual)} trên target ${money(target)}`}>
                     <div className="absolute inset-0 overflow-hidden rounded-full">
                       <i className="bar-grow block h-full rounded-full bg-[var(--accent)]" style={{ width: `${clamp((actual / target) * 100)}%` }} />
                     </div>
-                    {tick != null && <b className="absolute -top-1 -bottom-1 w-0.5 rounded bg-[var(--text)] opacity-75" style={{ left: `${tick}%` }} title="Target luỹ kế tới hôm nay" />}
+                    {tick != null && <b className="absolute -top-1 -bottom-1 w-0.5 rounded bg-[var(--text)] opacity-75" style={{ left: `${tick}%` }} />}
                   </div>
                 ) : null}
-                <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2">
-                  <Fig label="Run-rate theo kế hoạch" value={targetToDate > 0 ? pct(actual / targetToDate) : "—"} />
-                  <Fig label="Ca chưa có số liệu" value={String(s.waiting)} />
-                </div>
               </div>
-              {target ? <Ring ratio={forecast / target} caption={`~${money(forecast)}`} /> : null}
+              {target ? <Ring ratio={forecast / target} /> : null}
             </Reveal>
           );
         })}
       </div>
 
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-1">
-        <h3 className="text-base font-black text-[var(--text)]">Tổng quan account</h3>
-        <span className="text-xs text-[var(--text-faint)]">{rows.length} account · sắp xếp theo mức rủi ro · bấm một dòng để xem hành động đề xuất</span>
-      </div>
+      <h3 className="px-1 text-base font-black text-[var(--text)]">Account <span className="font-medium text-[var(--text-faint)]">{rows.length}</span></h3>
 
       {loading ? (
-        <div className="rounded-2xl border border-dashed border-[var(--border)] p-8 text-center text-sm text-[var(--text-muted)]">Đang dựng số từng account…</div>
+        <div className="rounded-2xl border border-dashed border-[var(--border)] p-8 text-center text-sm text-[var(--text-muted)]">Đang tải…</div>
       ) : (
-        <div className="space-y-2">
-          <div className="hidden xl:grid grid-cols-[150px_190px_minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,1.15fr)_150px_16px] gap-4 px-4 text-2xs font-semibold text-[var(--text-faint)]" aria-hidden="true">
-            <span>Account</span><span>Trạng thái</span><span>Tiến độ tháng · <span className="font-normal">vạch = target luỹ kế, vòng = dự báo</span></span><span>Khả năng bù thiếu hụt</span><span>Phân rã {platformText("GMV/giờ", "all")} · Daily so tháng trước</span><span>Giờ cam kết</span><span />
-          </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 items-start">
           {rows.map((r, i) => {
             const isOpen = open.has(r.key);
             const brand = brandOf.get(r.brandId);
             const actions = accountActions(r, today, fmtVndShort, LEVER_OWNER);
+            const ratio = r.target && r.forecast != null ? r.forecast / r.target : null;
+            const fill = r.target ? clamp((r.actual / r.target) * 100) : 0;
+            const tick = r.target && r.targetToDate != null ? clamp((r.targetToDate / r.target) * 100) : null;
             return (
-              <Reveal key={r.key} id={`acct-${r.key}`} index={i} lift className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden" style={{ borderLeft: `3px solid ${TONE_BORDER[r.tone]}` }}>
-                <button type="button" onClick={() => toggle(r.key)} aria-expanded={isOpen}
-                  className="w-full text-left grid gap-x-4 gap-y-3 p-4 hover:bg-[var(--surface-hover)]/40 grid-cols-[minmax(0,1fr)_16px] md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_16px] xl:grid-cols-[150px_190px_minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,1.15fr)_150px_16px] xl:items-center">
-                  <div className="flex items-center gap-2.5 min-w-0">
+              <Reveal key={r.key} id={`acct-${r.key}`} index={i} lift className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
+                <button type="button" onClick={() => toggle(r.key)} aria-expanded={isOpen} className="w-full text-left p-5 hover:bg-[var(--surface-hover)]/40">
+                  <div className="flex items-center gap-2.5">
                     {brand ? <BrandLogo brand={brand} size="md" /> : null}
-                    <div className="min-w-0"><b className="block text-sm text-[var(--text)] truncate">{r.brandName}</b><PlatformChip platform={r.platform} className="mt-0.5" /></div>
+                    <b className="min-w-0 flex-1 text-sm text-[var(--text)] truncate">{r.brandName}</b>
+                    <PlatformChip platform={r.platform} />
+                    <ChevronRight className={`w-4 h-4 text-[var(--text-faint)] transition-transform ${isOpen ? "rotate-90" : ""}`} aria-hidden="true" />
                   </div>
-                  <div className="flex flex-col gap-1 min-w-0 col-span-2 md:col-span-1">
-                    <Label>Trạng thái</Label>
+                  <div className="mt-5 flex items-end justify-between gap-3">
+                    <span className="text-4xl font-black tabular-nums tracking-tight leading-none" style={{ color: ratio == null ? "var(--text-faint)" : TONE_BORDER[r.tone] }}>
+                      {ratio == null ? "—" : <CountUp value={ratio * 100} format={(v) => `${Math.round(v)}%`} />}
+                    </span>
                     <Pill tone={r.tone}>{r.status}</Pill>
-                    <span className="text-2xs text-[var(--text-faint)]">{r.runRate != null ? `Run-rate ${pct(r.runRate)}${r.asOf ? ` · dữ liệu đến ${ddmm(r.asOf)}` : ""}` : r.lastLive ? `ca live cuối ${ddmm(r.lastLive)}` : "chưa có ca live trong tháng"}</span>
                   </div>
-                  <ChevronRight className={`w-4 h-4 text-[var(--text-faint)] transition-transform justify-self-end self-start xl:self-center row-start-1 col-start-2 md:col-start-3 xl:col-start-7 ${isOpen ? "rotate-90" : ""}`} aria-hidden="true" />
-                  <div className="flex flex-col gap-1 min-w-0 col-span-2 md:col-span-3 xl:col-span-1"><Label>Tiến độ tháng</Label><Progress r={r} /></div>
-                  <div className="flex flex-col gap-1 min-w-0 col-span-2 md:col-span-3 xl:col-span-1"><Label>Khả năng bù thiếu hụt</Label><Rescue r={r} /></div>
-                  <div className="flex flex-col gap-1 min-w-0 col-span-2 md:col-span-2 xl:col-span-1"><Label>Phân rã {platformText("GMV/giờ", r.platform)}</Label><Why r={r} /></div>
-                  <div className="flex flex-col gap-1 min-w-0 col-span-2 md:col-span-1"><Label>Giờ cam kết</Label><Hours r={r} /></div>
-                </button>
-                <Collapse open={isOpen} className="border-t border-[var(--border)] px-4 py-3 grid gap-3 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] xl:pl-[182px]">
-                    {r.funnels.length > 0 && (
-                      <div className="xl:col-span-2">
-                        <p className="text-xs font-bold text-[var(--text-muted)] mb-1.5">Phễu LIVE</p>
-                        <LiveFunnel views={r.funnels} showAction={false} />
+                  {r.target ? (
+                    <>
+                      <div className="relative mt-4 h-2 rounded-full bg-[var(--surface-elevated)]" role="img" aria-label={`Thực đạt ${money(r.actual)} trên target ${money(r.target)}`}>
+                        <div className="absolute inset-0 overflow-hidden rounded-full">
+                          <i className="bar-grow block h-full rounded-full" style={{ width: `${fill}%`, background: TONE_BORDER[r.tone] }} />
+                        </div>
+                        {tick != null && <b className="absolute -top-1 -bottom-1 w-0.5 rounded bg-[var(--text)] opacity-75" style={{ left: `${tick}%` }} />}
                       </div>
-                    )}
-                    <div>
-                      <p className="text-xs font-bold text-[var(--text-muted)] mb-1.5">Hành động đề xuất</p>
-                      {actions.length ? <ul className="list-disc pl-5 space-y-1 text-sm text-[var(--text)]">{actions.map((a) => <li key={a}>{a}</li>)}</ul> : <p className="text-sm text-[var(--text-muted)]">Chưa có việc cần làm.</p>}
+                      <p className="mt-2 text-xs tabular-nums text-[var(--text-faint)]"><b className="text-[var(--text-muted)]">{money(r.actual)}</b> / {money(r.target)}</p>
+                    </>
+                  ) : null}
+                </button>
+                <Collapse open={isOpen} className="border-t border-[var(--border)] p-5 space-y-4">
+                  <div className="space-y-1"><Label>Bù thiếu hụt</Label><Rescue r={r} /></div>
+                  <div className="space-y-1"><Label>{platformText("GMV/giờ", r.platform)}</Label><Why r={r} /></div>
+                  <div className="space-y-1"><Label>Giờ cam kết</Label><Hours r={r} /></div>
+                  {r.funnels.length > 0 && <div><Label>Phễu LIVE</Label><div className="mt-1"><LiveFunnel views={r.funnels} showAction={false} /></div></div>}
+                  {actions.length > 0 && (
+                    <div className="space-y-1">
+                      <Label>Hành động</Label>
+                      <ul className="list-disc pl-5 space-y-1 text-sm text-[var(--text)]">{actions.map((a) => <li key={a}>{a}</li>)}</ul>
                     </div>
-                    <div className="flex flex-wrap items-start gap-x-4 gap-y-2 text-xs">
-                      {r.state !== "off" && <button type="button" onClick={() => onOpenBrand(r.brandId, r.platform)} className="font-bold text-[var(--accent-text)] hover:underline min-h-[28px]">Xem chi tiết brand →</button>}
-                      <button type="button" onClick={() => onOpenMonthPlan(r.brandId, r.platform)} className="font-bold text-[var(--accent-text)] hover:underline min-h-[28px]">Mở Kế Hoạch Tháng →</button>
-                    </div>
+                  )}
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                    {r.state !== "off" && <button type="button" onClick={() => onOpenBrand(r.brandId, r.platform)} className="font-bold text-[var(--accent-text)] hover:underline min-h-[28px]">Chi tiết brand →</button>}
+                    <button type="button" onClick={() => onOpenMonthPlan(r.brandId, r.platform)} className="font-bold text-[var(--accent-text)] hover:underline min-h-[28px]">Kế Hoạch Tháng →</button>
+                  </div>
                 </Collapse>
               </Reveal>
             );
@@ -193,7 +171,7 @@ export const OverviewTab: React.FC<{
       )}
 
       <details className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-xs text-[var(--text-muted)]">
-        <summary className="cursor-pointer font-bold">Nguồn số liệu của bảng</summary>
+        <summary className="cursor-pointer font-bold">Nguồn số liệu</summary>
         <ul className="list-disc pl-5 mt-2 space-y-1 leading-snug">
           <li><b className="text-[var(--text)]">Trạng thái, Run-rate, dự báo cuối tháng</b>: thẻ kênh (cùng một lần tính với tab Brand).</li>
           <li><b className="text-[var(--text)]">Cần / Hiện tại</b>: {platformText("GMV/giờ", "all")} cần trên các giờ live còn trong lịch để đạt target, so với {platformText("GMV/giờ", "all")} dự báo của các ca đó.</li>
@@ -206,43 +184,21 @@ export const OverviewTab: React.FC<{
   );
 };
 
-const Label: React.FC<{ children: React.ReactNode }> = ({ children }) => <span className="xl:hidden text-2xs font-semibold text-[var(--text-faint)]">{children}</span>;
-const Fig: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => (
-  <div className="min-w-0"><p className="text-2xs text-[var(--text-faint)]">{label}</p><p className="font-black tabular-nums text-[var(--text)]">{value}</p></div>
-);
-
+const Label: React.FC<{ children: React.ReactNode }> = ({ children }) => <p className="text-xs font-bold text-[var(--text-muted)]">{children}</p>;
 // Vòng đo "dự báo cuối tháng so target": < 90% đỏ, < 100% vàng, đạt thì xanh.
-const Ring: React.FC<{ ratio: number; caption: string }> = ({ ratio, caption }) => {
+const Ring: React.FC<{ ratio: number }> = ({ ratio }) => {
   const R = 30, len = 2 * Math.PI * R, off = len * (1 - Math.min(Math.max(ratio, 0), 1));
   const color = ratio < 0.9 ? "var(--danger)" : ratio < 1 ? "var(--warning)" : "var(--success)";
   return (
-    <div className="shrink-0 flex flex-col items-center gap-1" title="Dự báo cuối tháng so với target tháng">
-      <div className="relative w-20 h-20">
+    <div className="shrink-0" title="Dự báo cuối tháng so với target tháng">
+      <div className="relative w-24 h-24">
         <svg viewBox="0 0 72 72" className="w-full h-full -rotate-90" role="img" aria-label={`Dự báo cuối tháng ${pct(ratio)} target`}>
           <circle cx="36" cy="36" r={R} fill="none" strokeWidth="7" style={{ stroke: "var(--surface-elevated)" }} />
           <circle cx="36" cy="36" r={R} fill="none" strokeWidth="7" strokeLinecap="round" className="ring-grow" strokeDasharray={len} strokeDashoffset={off} style={{ stroke: color, ["--ring-len" as string]: len }} />
         </svg>
         <b className="absolute inset-0 grid place-items-center text-sm font-black tabular-nums text-[var(--text)]">{pct(ratio)}</b>
       </div>
-      <span className="text-2xs text-[var(--text-faint)] text-center leading-tight">Dự báo cuối tháng<br /><b className="text-[var(--text-muted)]">{caption}</b></span>
     </div>
-  );
-};
-
-const Progress: React.FC<{ r: AccountRow }> = ({ r }) => {
-  if (!r.target) return <span className="text-xs text-[var(--text-faint)]">{r.state === "off" ? "không chạy tháng này" : "chưa có target"}</span>;
-  const fill = clamp((r.actual / r.target) * 100), tick = r.targetToDate != null ? clamp((r.targetToDate / r.target) * 100) : null;
-  const fc = r.forecast != null ? clamp((r.forecast / r.target) * 100) : null;
-  return (
-    <>
-      <div className="relative h-2.5 rounded-full bg-[var(--surface-base)] border border-[var(--border)]" role="img" aria-label={`Thực đạt ${money(r.actual)} trên target ${money(r.target)}`}>
-        <i className="bar-grow absolute inset-y-0 left-0 rounded-full opacity-85" style={{ width: `${fill}%`, background: TONE_BORDER[r.tone === "off" ? "off" : r.tone] }} />
-        {tick != null && <b className="absolute -top-1 -bottom-1 w-0.5 rounded bg-[var(--text)] opacity-75" style={{ left: `${tick}%` }} />}
-        {fc != null && <b className="absolute top-1/2 w-3 h-3 -mt-1.5 -ml-1.5 rounded-full border-2 border-[var(--text)] bg-[var(--surface)]" style={{ left: `${fc}%` }} />}
-      </div>
-      <span className="text-xs text-[var(--text-muted)] tabular-nums"><b className="text-[var(--text)]">{money(r.actual)}</b> / {money(r.target)} · {pct(r.actual / r.target)}</span>
-      <span className="text-2xs text-[var(--text-faint)]">{r.targetToDate != null ? `target luỹ kế ${money(r.targetToDate)} · ` : ""}{r.forecast != null ? <>dự báo <b className="text-[var(--text-muted)]">~{money(r.forecast)}</b> ({pct(r.forecast / r.target)})</> : "chưa có dự báo"}</span>
-    </>
   );
 };
 

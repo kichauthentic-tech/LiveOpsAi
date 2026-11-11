@@ -222,7 +222,7 @@ export const AgencyDashboard: React.FC<AgencyDashboardProps> = (props) => {
         </>}>
         {view === "overview" ? (
           <p role="status" className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[var(--text-faint)]">
-            <span>Tháng <b className="text-[var(--text-muted)]">{Number(month.slice(5))}/{month.slice(0, 4)}</b> · mọi sàn, mỗi sàn tính riêng (không cộng chéo)</span>
+            <span title="Mọi sàn, mỗi sàn tính riêng (không cộng chéo)">Tháng <b className="text-[var(--text-muted)]">{Number(month.slice(5))}/{month.slice(0, 4)}</b></span>
             <span>· Dữ liệu đầy đủ đến {allPlatforms.map((p) => `${p} ${coverageOf.get(p) ? ddmm(coverageOf.get(p)!) : "—"}`).join(" · ")}</span>
             {summaries.some((x) => x.waiting > 0) && <button type="button" onClick={() => onNavigate("sessions")} className="min-h-[24px] font-bold text-amber-300 hover:underline">· ca chưa có số liệu: {summaries.map((x) => `${x.platform} ${x.waiting}`).join(" · ")} →</button>}
           </p>
