@@ -109,3 +109,12 @@ describe("chia theo số thật", () => {
     expect(byHost([s]).reduce((x, r) => x + r.gmv, 0)).toBeCloseTo(10_000_000, 3);
   });
 });
+
+describe("GMV gõ tay khi file tải trễ (0215)", () => {
+  test("số gõ so với GMV chính thức của ca, bỏ qua số cộng dồn của room", () => {
+    const s = ca({ actualGmv: 10_000_000, report: { cumGmv: 48_000_000 } as LiveSession["report"], staffCheckpoints: [cp({ source: "typed", cumGmv: 4_000_000, cumViews: undefined, cumOrders: undefined })] });
+    const m = hostMetricShares(s).gmv!;
+    expect(m.get("linh")).toBeCloseTo(0.4);
+    expect(m.get("mia")).toBeCloseTo(0.6);
+  });
+});

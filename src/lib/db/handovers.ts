@@ -39,3 +39,13 @@ export async function applySegmentCheckpointFile(sessionId: string, atMin: numbe
   if (error) throw error;
   return fetchSessionById(sessionId);
 }
+
+/** Gõ GMV đúng của host xuống giữa ca khi file tải trễ (0215). Đơn/lượt xem chia theo % GMV so với số file cũ. */
+export async function setSegmentCheckpointGmv(sessionId: string, atMin: number, gmv: number): Promise<LiveSession> {
+  const { error } = await supabase.rpc("set_segment_checkpoint_gmv", { p_session_id: sessionId, p_at_min: atMin, p_gmv: gmv });
+  if (error) {
+    if (error.code === "PGRST202") throw new Error("Chưa chạy migration 0215 nên chưa gõ tay được GMV lúc đổi host.");
+    throw error;
+  }
+  return fetchSessionById(sessionId);
+}

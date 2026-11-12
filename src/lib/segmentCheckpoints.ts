@@ -71,7 +71,9 @@ function partRatios(s: LiveSession, metric: CheckpointMetric): number[] | null {
   const r = s.report;
   const finalCum = metric === "gmv" ? r?.cumGmv : metric === "views" ? r?.cumViews : r?.cumOrders;
   const official = metric === "gmv" ? s.actualGmv : metric === "views" ? s.totalViews : s.totalOrders;
-  const finalTotal = finalCum != null ? finalCum - base : official ?? 0;
+  // Số gõ tay (0215) là GMV của riêng ca nên cuối ca phải so với số chính thức của ca, không phải số cộng dồn của room.
+  const typed = metric === "gmv" && cps.some((c) => c!.source === "typed");
+  const finalTotal = finalCum != null && !typed ? finalCum - base : official ?? 0;
   parts.push(Math.max(finalTotal - parts.reduce((a, b) => a + b, 0), 0));
 
   const sum = parts.reduce((a, b) => a + b, 0);
