@@ -655,6 +655,27 @@ Chữ brand thấy trong Report Tháng (component `report/*`, `*MonthlyReportTab
   (cổng canh quét cả `src/`). Bảng con không nạp cả kho lúc mở app; nạp theo ca đang mở.
 - **Lượt đọc không dùng dữ liệu `profile` thì gate theo `session`** (lên chặng 1 của đợt nạp). Đừng thêm throttle vào lớp
   đọc (bắn song song nhanh nhất; giới hạn luồng chậm 2–5×). Gộp lời gọi trùng đang bay bằng `dedupeInFlight` — KHÔNG cache.
+  **Ngoại lệ duy nhất (11/11): dòng thô `brand_dataraw_rows`** cache theo `import_id` trong `fetchRowsPaged` (trần 12.000 dòng;
+  `invalidateRawRowsCache` gọi khi ghi đè/xoá đợt ở `brandDataRaw.ts`; test `tests/rawRowsCache.test.ts`). Sau 10 phút KHÔNG tải lại:
+  hỏi dấu của đợt (`imported_at` + `row_count`), chưa đổi thì dùng tiếp; số dòng lệch `row_count` ⇒ không gắn dấu, hết hạn tải lại.
+  Lý do: egress Supabase Free (2,73/5 GB tới 10/11) — bảng này 48 MB, mỗi màn đọc lại trọn đợt.
+- **Giảm egress (11/11; migration `0214` ĐÃ chạy 11/11).** Đo trên app thật bằng cách bọc `fetch` trong trang (JSON đã giải nén):
+  MỘT lượt làm mới danh sách ca = 2,7 MB `live_sessions_secure` + 0,4 MB report, lặp mỗi 5 phút + quay lại tab + sau mỗi lần ghi ca cho
+  mọi người đang mở app ⇒ nguồn lớn nhất. (Kích thước bảng trên đĩa 1,5 MB KHÔNG phản ánh payload JSON — đừng suy egress từ `pg_total_relation_size`.)
+  - **Danh sách ca làm mới theo phần đã đổi** (`sessions.ts`: `loadSessionsFull` / `refreshSessions` / `fetchSessions`, kho thô `store`; test
+    `tests/sessionsDelta.test.ts`): hỏi RPC `sessions_change_stamp()` (0214, ~200 byte) → giống thì không tải; khác thì chỉ tải ca/report có
+    `updated_at` mới hơn mốc trước (lùi 2 phút), đoạn + mốc tải trọn khi md5 đổi; số dòng lệch dấu (xoá, brand không thấy hết dòng, phát hành
+    report đổi) ⇒ tải trọn. `fetchSessions()` (6 chỗ tải lại sau khi ghi ở App.tsx) đi cùng đường này. DB chưa có hàm ⇒ tải trọn như cũ.
+    **Luật:** bảng/cột mới mà danh sách ca phụ thuộc phải (a) thêm vào chuỗi dấu ở migration và `parseStamp`, (b) bảng đó phải đẩy `updated_at`
+    của ca hoặc có phần riêng trong dấu; hook bỏ kết quả một lượt nạp thì gọi `markSessionsUnapplied()`.
+  - **Bản tổng hợp file Sản Phẩm** nhớ theo `id|imported_at` (`readProductAggOfBatch`): SKU mở lại 922 KB → 1 KB, Dashboard brand ~375 → 18 KB.
+  - Poll thông báo + đổi/nhường ca 45 s → 2 phút.
+  - **Kiểm trên app dev nối DB thật sau khi chạy 0214 (admin, 2.059 ca):** dấu trả đủ 6 phần; ép kho về "cũ 3 ngày" rồi làm mới ⇒ nhánh delta
+    tải 233 KB ca + 50 KB report (so với 3,1 MB) và danh sách ra GIỐNG HỆT lượt tải trọn (từng trường, cùng thứ tự); nhịp làm mới nền thật khi
+    không gì đổi chỉ còn `complete_past_sessions` + dấu 0,16 KB; 11 màn agency mở không lỗi. **Chưa kiểm:** ghi thật rồi xem máy khác (không
+    ghi thử lên DB công ty), role brand/talent (nhánh "số dòng lệch ⇒ tải trọn" chỉ có unit test).
+  - **Không làm (có chủ ý):** chỉ đọc cột `raw->…` theo lát cắt (Report/Dashboard brand không đọc dòng thô lúc mở — report đọc bản chụp; lợi ích
+    nhỏ, rủi ro report ra 0 âm thầm); thu hẹp ca talent đọc (user chốt 05/11); cache xuống IndexedDB (dữ liệu brand nằm lại trên máy).
 - **Nạp trước lượt đọc của màn** (`lib/db/prefetch.ts`, test `tests/prefetch.test.ts`): màn export `prefetchX(ctx)` khai
   `prefetchable(name, fn)` và effect MOUNT gọi `.take(...)`; App gọi qua `TAB_DATA_PREFETCH` CHỈ khi `!coreDataReady`.
   Giao đúng một lần, hết hạn 30 s, đổi tab là xoá — KHÔNG phải cache: đường đọc-sau-khi-ghi luôn gọi thẳng hàm db.

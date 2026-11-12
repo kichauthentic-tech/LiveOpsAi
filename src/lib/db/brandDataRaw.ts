@@ -4,6 +4,7 @@ import { assertAffected } from "./assertAffected";
 import { BrandDataRawImport, BrandDataRawRow, DataRawReportType } from "../../types";
 import { ParsedDataRawImport } from "../dataraw/parseDataRawExcel";
 import { prefetchable } from "./prefetch";
+import { invalidateRawRowsCache } from "../dataraw/fetchRowsPaged";
 
 // Module Dataraw Brand Workspace (migration 0052) — xem lib/dataraw/parseDataRawExcel.ts cho
 // cách tách bảng dữ liệu từ 4 loại file Excel TikTok Shop. File chỉ lo CRUD import batch + rows.
@@ -123,6 +124,7 @@ export async function createOrReplaceDataRawImport(
   replaceImportId?: string
 ): Promise<BrandDataRawImport> {
   if (replaceImportId) {
+    invalidateRawRowsCache(replaceImportId);
     const { error: delRowsError } = await supabase.from("brand_dataraw_rows").delete().eq("import_id", replaceImportId);
     if (delRowsError) throw delRowsError;
 
@@ -144,6 +146,7 @@ export async function createOrReplaceDataRawImport(
     if (batchError) throw batchError;
     const batch = importFromDb(batchData as DbImport);
     await insertRowsChunked(batch.id, parsed.rows);
+    invalidateRawRowsCache(batch.id); // lần nữa: có lượt đọc chen giữa lúc đang xoá/ghi lại sẽ nạp dòng dở dang
     return batch;
   }
 
@@ -177,12 +180,14 @@ export async function createOrReplaceDataRawImport(
   }
   const batch = importFromDb(batchData as DbImport);
   await insertRowsChunked(batch.id, parsed.rows);
+  invalidateRawRowsCache(batch.id);
   return batch;
 }
 
 export async function deleteDataRawImport(importId: string): Promise<void> {
   const { data, error } = await supabase.from("brand_dataraw_imports").delete().eq("id", importId).select("id");
   if (error) throw error;
+  invalidateRawRowsCache(importId);
   assertAffected(data, "xoá import Dữ Liệu Gốc");
 }
 

@@ -503,10 +503,134 @@ export async function completePastSessions(): Promise<number> {
   return Number(data ?? 0);
 }
 
-export async function fetchSessions(): Promise<LiveSession[]> {
-  // Hai lượt đọc này độc lập nhau — nối tiếp chỉ cộng dồn RTT vô ích.
-  const [rows, reports, segments, checkpoints] = await Promise.all([fetchAllSessionRows(), fetchAllReports(), fetchAllSegments(), fetchAllCheckpoints()]);
+// "Dấu thay đổi" của danh sách ca (0214): chuỗi ngắn đổi mỗi khi ca / report / đoạn / mốc / trạng thái phát hành đổi. Lượt làm
+// mới nền so dấu trước, giống lần nạp trước thì KHÔNG tải lại cả bảng (egress). null = DB chưa chạy 0214 hoặc lỗi ⇒ tải như cũ.
+let stampRpcMissing = false; // DB chưa chạy 0214: nhớ cho cả phiên, không bắn lại request 404 mỗi nhịp làm mới
+export async function fetchSessionsChangeStamp(): Promise<string | null> {
+  if (stampRpcMissing) return null;
+  const { data, error } = await supabase.rpc("sessions_change_stamp");
+  if (error) {
+    if (error.code === "PGRST202" || error.code === "42883") stampRpcMissing = true;
+    return null;
+  }
+  return typeof data === "string" && data !== "" ? data : null;
+}
+
+
+// ── Làm mới danh sách ca THEO PHẦN ĐÃ ĐỔI (11/11) ────────────────────────────────────────────────────────────────────
+// Đo 11/11 trên app thật (admin, 2.059 ca): MỘT lượt làm mới nền = 2,7 MB live_sessions_secure + 0,4 MB report (JSON đã giải
+// nén), lặp mỗi 5 phút + mỗi lần quay lại tab cho mọi người đang mở app — nguồn egress lớn nhất. Từ 0214:
+//   1. hỏi dấu (~200 byte); giống lần trước ⇒ không tải gì;
+//   2. khác ⇒ chỉ tải ca / report có updated_at mới hơn mốc lần trước (lùi 2 phút cho giao dịch commit trễ), đoạn + mốc
+//      (hai bảng nhỏ) tải lại trọn khi md5 đổi;
+//   3. đối chiếu số dòng với dấu — lệch (có xoá; role không thấy hết dòng như brand; ghi chen giữa) ⇒ tải lại cả bảng.
+// Kho dưới đây là bản THÔ từ server của lượt nạp gần nhất; ghi cục bộ không sửa vào kho (mọi lần ghi đều chạm server và
+// đẩy updated_at nên lượt làm mới sau tự kéo về).
+interface ParsedStamp { raw: string; sCount: number; sMax: string; rCount: number; rMax: string; seg: string; cp: string; pub: string; snap: string }
+export function parseStamp(raw: string | null): ParsedStamp | null {
+  if (!raw) return null;
+  const p = raw.split("|");
+  if (p.length !== 6) return null;
+  const [sc, sMax = ""] = p[0].split("@");
+  const [rc, rMax = ""] = p[1].split("@");
+  const sCount = Number(sc), rCount = Number(rc);
+  if (!Number.isInteger(sCount) || !Number.isInteger(rCount)) return null;
+  return { raw, sCount, sMax, rCount, rMax, seg: p[2], cp: p[3], pub: p[4], snap: p[5] };
+}
+
+interface SessionStore { stamp: ParsedStamp; rows: DbLiveSession[]; reports: DbSessionReport[]; segments: DbStaffSegment[]; checkpoints: DbCheckpoint[]; deltaOk: boolean; unapplied: boolean }
+let store: SessionStore | null = null;
+/** Test + đăng xuất/đổi người dùng: bỏ kho để lượt sau tải trọn. */
+export function __resetSessionStore(): void {
+  store = null;
+  stampRpcMissing = false;
+}
+/** Hook đã BỎ kết quả của lượt nạp vừa rồi (có ghi cục bộ chen giữa) ⇒ lượt làm mới sau phải trả danh sách dù dấu không đổi. */
+export function markSessionsUnapplied(): void {
+  if (store) store.unapplied = true;
+}
+
+const OVERLAP_MS = 2 * 60_000;
+const sinceOf = (iso: string): string | null => {
+  const t = Date.parse(iso);
+  return Number.isNaN(t) ? null : new Date(t - OVERLAP_MS).toISOString();
+};
+const bySessionOrder = (a: DbLiveSession, b: DbLiveSession) =>
+  (a.date < b.date ? 1 : a.date > b.date ? -1 : 0) || (a.start_time < b.start_time ? 1 : a.start_time > b.start_time ? -1 : 0) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+
+/** Nạp trọn (lúc mở app / khi không làm mới theo phần được). Dấu lấy TRƯỚC dữ liệu: có ghi chen giữa thì lượt sau tải thừa, không sót. */
+export async function loadSessionsFull(stampRaw?: string | null): Promise<LiveSession[]> {
+  const stampP = stampRaw !== undefined ? Promise.resolve(stampRaw) : fetchSessionsChangeStamp().catch(() => null);
+  const [st, rows, reports, segments, checkpoints] = await Promise.all([stampP, fetchAllSessionRows(), fetchAllReports(), fetchAllSegments(), fetchAllCheckpoints()]);
+  const stamp = parseStamp(st);
+  store = stamp
+    ? { stamp, rows, reports, segments, checkpoints, deltaOk: rows.length === stamp.sCount && reports.length === stamp.rCount, unapplied: false }
+    : null;
   return assembleSessions(rows, reports, segments, checkpoints);
+}
+
+async function applyDelta(cur: SessionStore, next: ParsedStamp): Promise<boolean> {
+  // month_published (phát hành/thu hồi report) và live_evidence đổi mà dòng ca không đổi ⇒ không dò được theo updated_at.
+  if (next.pub !== cur.stamp.pub) return false;
+  const sessionsChanged = next.sCount !== cur.stamp.sCount || next.sMax !== cur.stamp.sMax;
+  if (next.snap !== cur.stamp.snap && !sessionsChanged) return false;
+  let rows = cur.rows, reports = cur.reports, segments = cur.segments, checkpoints = cur.checkpoints;
+
+  if (sessionsChanged) {
+    const since = sinceOf(cur.stamp.sMax);
+    if (!since || next.sCount < cur.rows.length) return false;
+    const { data, error } = await supabase.from(READ_VIEW).select(readColumns).gt("updated_at", since).limit(PAGE);
+    if (error) return false;
+    const changed = (data as unknown as DbLiveSession[]) ?? [];
+    if (changed.length >= PAGE) return false;
+    const byId = new Map(cur.rows.map((r) => [r.id, r]));
+    for (const r of changed) byId.set(r.id, r);
+    if (byId.size !== next.sCount) return false;
+    rows = [...byId.values()].sort(bySessionOrder);
+  }
+  if (next.rCount !== cur.stamp.rCount || next.rMax !== cur.stamp.rMax) {
+    const since = sinceOf(cur.stamp.rMax);
+    // Chưa có report nào (mốc rỗng) thì tải trọn bảng report — vẫn nhỏ hơn nhiều so với cả danh sách ca.
+    if (!since) reports = await fetchAllReports();
+    else {
+      if (next.rCount < cur.reports.length) return false;
+      const { data, error } = await supabase.from("live_session_reports").select("*").gt("updated_at", since).limit(PAGE);
+      if (error) return false;
+      const changed = (data as DbSessionReport[]) ?? [];
+      if (changed.length >= PAGE) return false;
+      const byId = new Map(cur.reports.map((r) => [r.session_id, r]));
+      for (const r of changed) byId.set(r.session_id, r);
+      reports = [...byId.values()];
+    }
+    if (reports.length !== next.rCount) return false;
+  }
+  if (next.seg !== cur.stamp.seg) segments = await fetchAllSegments();
+  if (next.cp !== cur.stamp.cp) checkpoints = await fetchAllCheckpoints();
+  store = { stamp: next, rows, reports, segments, checkpoints, deltaOk: true, unapplied: cur.unapplied };
+  return true;
+}
+
+/** Danh sách ca mới nhất (đường "tải lại sau khi ghi" của App). Đã có kho ⇒ chỉ tải phần đã đổi; chưa có ⇒ nạp trọn. */
+export async function fetchSessions(): Promise<LiveSession[]> {
+  const fresh = await refreshSessions();
+  if (fresh) return fresh;
+  const s = store!; // refreshSessions trả null chỉ khi có kho và dấu không đổi
+  return assembleSessions(s.rows, s.reports, s.segments, s.checkpoints);
+}
+
+/** Lượt làm mới nền. null = không gì đổi kể từ lượt nạp trước (không tải gì). */
+export async function refreshSessions(): Promise<LiveSession[] | null> {
+  const raw = await fetchSessionsChangeStamp().catch(() => null);
+  const next = parseStamp(raw);
+  const cur = store;
+  if (!next || !cur) return loadSessionsFull(raw);
+  if (next.raw !== cur.stamp.raw) {
+    const ok = cur.deltaOk && (await applyDelta(cur, next).catch(() => false));
+    if (!ok) return loadSessionsFull(raw);
+  } else if (!cur.unapplied) return null;
+  const s = store!;
+  s.unapplied = false;
+  return assembleSessions(s.rows, s.reports, s.segments, s.checkpoints);
 }
 
 // Chốt người cho ca chờ đăng ký (0133): tạo ca + đánh dấu slot "finalized" trong MỘT transaction, khoá dòng
@@ -640,16 +764,6 @@ export async function deleteSession(id: string): Promise<void> {
   assertAffected(data, "xoá ca");
 }
 
-// Đổi người giữa ca (0138): thay TOÀN BỘ đoạn giờ của ca trong một transaction; mảng rỗng = về cách tính cũ (host/trợ
-// làm cả ca). RPC tự đồng bộ host_id/co_host_id về người chính của vai có đoạn nên trả lại ca đã nạp lại đầy đủ.
-export async function setSessionStaffSegments(sessionId: string, segments: Pick<StaffSegment, "talentId" | "role" | "fromMin" | "toMin">[]): Promise<LiveSession> {
-  const { error } = await supabase.rpc("set_session_staff_segments", {
-    p_session_id: sessionId,
-    p_segments: segments.map((g) => ({ talent_id: g.talentId, role: g.role, from_min: g.fromMin, to_min: g.toMin }))
-  });
-  if (error) throw error;
-  return fetchSessionById(sessionId);
-}
 /** Tách ca đổi host giữa ca thành các ca nối tiếp thật, mỗi host một ca (0216). Chỉ ca chưa có số liệu; DB từ chối nếu đã có. Trả các ca sau khi tách (ca gốc đứng đầu). */
 export async function splitSessionAtHostChange(sessionId: string): Promise<LiveSession[]> {
   const { data, error } = await supabase.rpc("split_session_at_host_change", { p_session_id: sessionId });
@@ -661,3 +775,13 @@ export async function splitSessionAtHostChange(sessionId: string): Promise<LiveS
   return Promise.all(ids.map((id) => fetchSessionById(id)));
 }
 
+// Đổi người giữa ca (0138): thay TOÀN BỘ đoạn giờ của ca trong một transaction; mảng rỗng = về cách tính cũ (host/trợ
+// làm cả ca). RPC tự đồng bộ host_id/co_host_id về người chính của vai có đoạn nên trả lại ca đã nạp lại đầy đủ.
+export async function setSessionStaffSegments(sessionId: string, segments: Pick<StaffSegment, "talentId" | "role" | "fromMin" | "toMin">[]): Promise<LiveSession> {
+  const { error } = await supabase.rpc("set_session_staff_segments", {
+    p_session_id: sessionId,
+    p_segments: segments.map((g) => ({ talent_id: g.talentId, role: g.role, from_min: g.fromMin, to_min: g.toMin }))
+  });
+  if (error) throw error;
+  return fetchSessionById(sessionId);
+}

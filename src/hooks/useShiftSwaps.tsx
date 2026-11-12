@@ -5,7 +5,7 @@ import type { ShiftSwapRequest } from "../lib/shiftSwap/swap";
 // Yêu cầu nhường/đổi ca (migration 0212). Cùng cách nạp với chuông thông báo: poll 45 giây khi tab đang hiện + nạp lại
 // khi quay về tab — người nhận cần thấy yêu cầu ngay khi mở app, người xếp lịch cần thấy hàng đợi mới nhất.
 // Lỗi nạp (vd. DB chưa chạy 0212) chỉ làm danh sách trống, không được làm hỏng app.
-const POLL_MS = 45_000;
+const POLL_MS = 120_000; // 11/11: 45 s → 2 phút (egress Supabase); quay lại tab vẫn nạp ngay
 
 export function useShiftSwaps(enabled: boolean) {
   const [items, setItems] = useState<ShiftSwapRequest[]>([]);

@@ -28,7 +28,7 @@ import {
 import { fetchTalents } from "../lib/db/talents";
 import { fetchStudios } from "../lib/db/studios";
 import { fetchEquipments } from "../lib/db/equipments";
-import { fetchSessions, completePastSessions } from "../lib/db/sessions";
+import { completePastSessions, loadSessionsFull, markSessionsUnapplied, refreshSessions, __resetSessionStore } from "../lib/db/sessions";
 import { fetchBrands } from "../lib/db/brands";
 import { fetchUsers } from "../lib/db/users";
 import { fetchAuditLogs } from "../lib/db/auditLogs";
@@ -312,18 +312,24 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
     // suy "Đã xong" theo giờ. RPC có đóng ca nào (n > 0) thì nạp lại để khớp DB. `seq` chặn lượt nạp
     // cũ về sau ghi đè lượt mới.
     let latestApplied = 0;
-    const load = (seq: number) => {
+    // `full` = nạp trọn (mở app); còn lại = làm mới theo phần đã đổi (0214, xem refreshSessions) — null là không gì đổi.
+    __resetSessionStore(); // người dùng khác đăng nhập ⇒ kho thô của người trước không dùng lại
+    const load = (seq: number, full = false) => {
       const startedAt = Date.now();
-      return fetchSessions().then((s) => {
+      return (full ? loadSessionsFull() : refreshSessions()).then((s) => {
+        if (s === null) return;
         if (cancelled || seq < latestApplied) return;
         // Một màn vừa ghi ca SAU lúc lượt nạp này bắt đầu ⇒ bản trong tay mới hơn, bỏ lượt này (lượt sau sẽ khớp).
-        if (seq > 2 && lastLocalSessionWrite.current > startedAt) return;
+        if (seq > 2 && lastLocalSessionWrite.current > startedAt) {
+          markSessionsUnapplied();
+          return;
+        }
         latestApplied = seq;
         setSessionsRaw(s);
         setSessionsError(null);
       });
     };
-    load(1)
+    load(1, true)
       .catch((err) => {
         if (cancelled) return;
         setSessionsError(err.message ?? "Không tải được dữ liệu ca live — thử tải lại trang.");

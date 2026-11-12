@@ -97,11 +97,27 @@ export async function fetchProductListAggWithPeriod(
     periodEnd: best.period_end! > monthEnd ? monthEnd : best.period_end!
   };
 
-  return { agg: await readProductAggOfBatch(best.id), ...period };
+  return { agg: await readProductAggOfBatch(best.id, best.imported_at), ...period };
 }
 
 // Bản tổng hợp của MỘT batch product_list (đọc `summary.productAgg`, thiếu/lệch version thì tính lại từ dòng gốc rồi ghi ngược).
-async function readProductAggOfBatch(batchId: string): Promise<ProductListAgg> {
+// Bản tổng hợp của một đợt chỉ đổi khi đợt bị ghi đè (imported_at đổi) ⇒ nhớ theo `id|imported_at` trong bộ nhớ tab. Đo 11/11
+// trên app thật: mở "Sản phẩm lên live" đọc 12 bản (~77 KB/bản, 922 KB) MỖI LẦN mở; Dashboard brand ~375 KB mỗi lần (egress).
+const aggMemo = new Map<string, Promise<ProductListAgg>>();
+const AGG_MEMO_MAX = 60;
+function readProductAggOfBatch(batchId: string, importedAt?: string | null): Promise<ProductListAgg> {
+  if (!importedAt) return loadProductAggOfBatch(batchId);
+  const key = `${batchId}|${importedAt}`;
+  const hit = aggMemo.get(key);
+  if (hit) return hit;
+  const p = loadProductAggOfBatch(batchId);
+  aggMemo.set(key, p);
+  p.catch(() => aggMemo.delete(key));
+  if (aggMemo.size > AGG_MEMO_MAX) aggMemo.delete(aggMemo.keys().next().value as string);
+  return p;
+}
+
+async function loadProductAggOfBatch(batchId: string): Promise<ProductListAgg> {
   const { data, error } = await supabase.from("brand_dataraw_imports").select("agg:summary->productAgg").eq("id", batchId).single();
   if (error) throw error;
   const stored = (data as { agg: unknown }).agg;
@@ -130,7 +146,7 @@ export async function fetchSkuHistoryInputs(brandId: string): Promise<{ tiktok: 
   };
   const [tt, sp] = await Promise.all([fetchImportsLite(brandId, "product_list"), fetchImportsLite(brandId, "shopee_product_list")]);
   const [tiktok, shopee] = await Promise.all([
-    Promise.all(pick(tt).map(async (i) => tiktokPeriodInput(periodKey(i.period_start!, i.period_end!), await readProductAggOfBatch(i.id)))),
+    Promise.all(pick(tt).map(async (i) => tiktokPeriodInput(periodKey(i.period_start!, i.period_end!), await readProductAggOfBatch(i.id, i.imported_at)))),
     Promise.all(pick(sp).map(async (i) => shopeePeriodInput(periodKey(i.period_start!, i.period_end!), (await readBatch(i.id)).rows)))
   ]);
   return { tiktok, shopee };

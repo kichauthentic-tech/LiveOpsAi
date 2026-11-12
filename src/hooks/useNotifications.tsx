@@ -7,7 +7,7 @@ import { errorMessage } from "../lib/errorMessage";
 // tối đa 45 giây là chấp nhận được với nghiệp vụ xếp ca theo ngày. Bật Realtime là thêm một cơ
 // chế mới cho một nhu cầu mà setInterval đã đủ. Nạp lại thêm khi tab được focus lại — người dùng
 // quay lại app sau khi rời đi là lúc họ cần thấy chuông đúng nhất.
-const POLL_MS = 45_000;
+const POLL_MS = 120_000; // 11/11: 45 s → 2 phút (egress Supabase); quay lại tab vẫn nạp ngay
 
 export function useNotifications(enabled: boolean) {
   const [items, setItems] = useState<AppNotification[]>([]);

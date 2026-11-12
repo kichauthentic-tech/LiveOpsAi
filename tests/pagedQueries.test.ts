@@ -203,7 +203,7 @@ test("Sổ Ca nạp report bằng MỘT truy vấn cuộn trang, không chia lô
   // Bỏ được bộ lọc vì policy của bảng gate THEO ROLE chứ không theo ca (0112), và fetchSessions vốn
   // nạp toàn bộ ca rồi ghép bằng Map theo id.
   const src = readFileSync(join(DB, "sessions.ts"), "utf8");
-  const listLoader = src.slice(src.indexOf("export async function fetchSessions("), src.indexOf("export async function createSession("));
+  const listLoader = src.slice(src.indexOf("export async function loadSessionsFull("), src.indexOf("export async function createSession("));
   expect(listLoader, "fetchSessions phải dùng fetchAllReports()").toContain("fetchAllReports()");
   expect(listLoader, "không được chia lô theo session_id ở đường nạp danh sách").not.toMatch(/\.in\(/);
   expect(listLoader, "hai lượt đọc độc lập phải chạy song song").toContain("Promise.all");
