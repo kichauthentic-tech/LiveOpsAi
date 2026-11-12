@@ -1,3 +1,4 @@
+import { hostSplitRows, hostSplitKey } from "../lib/hostSplit";
 import { platformText } from "../lib/metricGlossary";
 import SearchSelect from "./ui/SearchSelect";
 import React, { useEffect, useMemo, useState } from "react";
@@ -449,7 +450,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
                       </span>
                     </td>
                   </tr>
-                  {day.sessions.map((s) => {
+                  {day.sessions.flatMap(hostSplitRows).map((s) => {
                     const hours = sessionHours(s);
                     const gmvPerHour = hours > 0 ? (s.actualGmv ?? 0) / hours : 0;
                     // Brand + tháng chưa phát hành: số đã bị view che, ô phải nói rõ LÝ DO.
@@ -458,7 +459,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
                     const isOpen = openId === s.id;
                     return (
                       <tr
-                        key={s.id}
+                        key={hostSplitKey(s)}
                         onClick={() => setOpenId(s.id)}
                         data-open={isOpen}
                         className={`border-b border-[var(--border-muted)] cursor-pointer transition-colors ${
