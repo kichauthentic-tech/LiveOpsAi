@@ -10,7 +10,7 @@ import { ErrorBoundary } from "./lib/errorReporting";
 import { fetchTalents, updateTalent, updateMyTalentProfile, deleteTalent } from "./lib/db/talents";
 import { createStudio, updateStudio, deleteStudio } from "./lib/db/studios";
 import { createEquipment, updateEquipment, deleteEquipment } from "./lib/db/equipments";
-import { fetchSessions, finalizeShiftSlot, updateSession, switchSessionPlatform, deleteSession, cancelSession, setSessionExcluded, setSessionStaffSegments } from "./lib/db/sessions";
+import { fetchSessions, finalizeShiftSlot, updateSession, switchSessionPlatform, deleteSession, cancelSession, setSessionExcluded, setSessionStaffSegments, splitSessionAtHostChange } from "./lib/db/sessions";
 import { SessionActionsContext } from "./lib/sessionActionsContext";
 import { CLOSED_MONTH_NOTICE, isSessionMonthClosed } from "./lib/closedMonth";
 import { createBrand, updateBrand, deleteBrand } from "./lib/db/brands";
@@ -1203,8 +1203,21 @@ export default function App() {
       return false;
     }
     try {
-      const saved = await setSessionStaffSegments(session.id, segments);
+      let saved = await setSessionStaffSegments(session.id, segments);
       setSessions((prev) => prev.map((x) => (x.id === saved.id ? saved : x)));
+      // Đổi HOST giữa ca (0216): ca chưa có số liệu tự tách thành các ca nối tiếp, mỗi host một ca. Ca đã có số giữ nguyên (gõ GMV ở khối Report lúc đổi host).
+      const hostChanged = segments.filter((g) => g.role === "host").length >= 2;
+      const hasData = (saved.actualGmv ?? 0) > 0 || !!saved.report || (saved.staffCheckpoints ?? []).length > 0 || saved.dataSource !== "manual";
+      if (hostChanged && !hasData) {
+        try {
+          const parts = await splitSessionAtHostChange(session.id);
+          saved = parts[0];
+          setSessions((prev) => [...prev.map((x) => parts.find((q) => q.id === x.id) ?? x), ...parts.filter((q) => !prev.some((x) => x.id === q.id))]);
+          showToast(`Đã tách thành ${parts.length} ca nối tiếp, mỗi host một ca.`);
+        } catch (e) {
+          showToast(`Đã lưu đổi host nhưng chưa tách được ca: ${errorMessage(e)}`);
+        }
+      }
       await pushAuditLog({
         action: "Đổi người giữa ca",
         details: `Ca ${session.date} ${session.startTime}-${session.endTime} (${session.brandName}): ${segments.length === 0 ? "bỏ chia đoạn, host/trợ làm cả ca" : `${segments.length} đoạn giờ`}. Lý do: ${reason.trim() || "Không ghi lý do"}.`,

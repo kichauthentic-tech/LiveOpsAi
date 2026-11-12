@@ -650,3 +650,14 @@ export async function setSessionStaffSegments(sessionId: string, segments: Pick<
   if (error) throw error;
   return fetchSessionById(sessionId);
 }
+/** Tách ca đổi host giữa ca thành các ca nối tiếp thật, mỗi host một ca (0216). Chỉ ca chưa có số liệu; DB từ chối nếu đã có. Trả các ca sau khi tách (ca gốc đứng đầu). */
+export async function splitSessionAtHostChange(sessionId: string): Promise<LiveSession[]> {
+  const { data, error } = await supabase.rpc("split_session_at_host_change", { p_session_id: sessionId });
+  if (error) {
+    if (error.code === "PGRST202") throw new Error("Chưa chạy migration 0216 nên chưa tách được ca.");
+    throw error;
+  }
+  const ids = ((data as { session_ids?: string[] } | null)?.session_ids ?? [sessionId]);
+  return Promise.all(ids.map((id) => fetchSessionById(id)));
+}
+
