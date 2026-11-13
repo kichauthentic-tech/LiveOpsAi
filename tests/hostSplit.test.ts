@@ -35,3 +35,15 @@ describe("tách dòng ảo theo host", () => {
     expect(hostSplitRows(s)).toEqual([s]);
   });
 });
+
+describe("trợ theo dòng ảo", () => {
+  test("trợ đổi người giữa ca: mỗi dòng lấy trợ đúng khung giờ", () => {
+    const rows = hostSplitRows(ca({
+      startTime: "19:00", endTime: "00:00",
+      staffSegments: [seg("hung", "host", 0, 205), seg("toan", "host", 205, 300), seg("van", "co_host", 0, 205), seg("giang", "co_host", 205, 240), seg("vuong", "co_host", 240, 300)]
+    }));
+    expect(rows.map((r) => r.coHostId)).toEqual(["van", "vuong"]);
+    expect(rows[1].staffSegments?.map((g) => [g.talentId, g.fromMin, g.toMin])).toEqual([["giang", 0, 35], ["vuong", 35, 95]]);
+    expect(rows[0].staffSegments).toBeUndefined();
+  });
+});
