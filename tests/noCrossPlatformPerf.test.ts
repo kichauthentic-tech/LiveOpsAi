@@ -107,6 +107,7 @@ const SINGLE_PLATFORM_FILES: Record<string, string> = {
   "lib/performance/ceoBrief.ts": "CeoBrief truyền ca của một sàn",
   "lib/performance/channelHealth.ts": "targetFeasibility nhận ca + ca kế hoạch của MỘT kênh brand × sàn (assertOnePlatform trên lịch sử); gmvTree cộng qua metrics.ofSessions (đã assert)",
   "lib/performance/handlingPlan.ts": "nhận ca của MỘT kênh brand × sàn (CeoBrief lọc theo platformOf trước khi gọi)",
+  "lib/roster/monthPlanner.ts": "buildHostChannelGmv cộng GMV/giờ theo khoá `host|brand|platform` — chỉ ca của MỘT kênh brand × sàn, không có tổng gộp hai sàn",
   "lib/performance/hostSuggestion.ts": "lọc platformOf(s) === slot.platform trước khi cộng",
   "lib/performance/monthForecast.ts": "buildMonthForecaster có assertOnePlatform; dự báo của một kênh brand × sàn",
   "lib/performance/planRunRate.ts": "run-rate của một kế hoạch (brand × tháng × sàn)",

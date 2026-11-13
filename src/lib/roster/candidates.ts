@@ -3,6 +3,16 @@ import { addDays, dateTimeRangesOverlap } from "../dateUtils";
 import { effectiveSegments } from "../staffSegments";
 import { findTalentRateAsOf } from "../pnl";
 import type { HostPerf } from "./monthPlanner";
+
+/** GMV/giờ thật của một host Ở MỘT KÊNH (brand × sàn), 90 ngày: tổng GMV ÷ tổng giờ các ca host một người. Khoá: `${hostId}|${brandId}|${platform}`. */
+export interface HostChannelGmv {
+  gmvPerHour: number;
+  /** Số ca làm căn cứ. */
+  n: number;
+}
+export const CHANNEL_GMV_MIN_N = 3;
+export const hostChannelKey = (hostId: string, channelKey: string) => `${hostId}|${channelKey}`;
+
 import {
   absRange,
   analyzeRoster,
@@ -102,6 +112,8 @@ export interface RankContext {
   brandRules?: BrandRuleIndex;
   /** Chỉ số Performance host 90 ngày (`buildHostPerformance`) — dùng ở "balance" (nhẹ) và "gmv". */
   perf?: ReadonlyMap<string, HostPerf>;
+  /** GMV/giờ thật từng host theo kênh (`buildHostChannelGmv`) — cột "GMV/giờ" + cast % trong panel ca. */
+  chGmv?: ReadonlyMap<string, HostChannelGmv>;
 }
 
 export interface Candidate {
@@ -116,6 +128,10 @@ export interface Candidate {
   cost: PlannedCost;
   /** Chỉ số Performance (chỉ vai host). */
   perf?: HostPerf;
+  /** GMV/giờ thật của host này ở kênh của ca (chỉ vai host). */
+  chGmv?: HostChannelGmv;
+  /** Cast/giờ ÷ GMV/giờ ở kênh này; chỉ có khi rate theo giờ và đủ căn cứ (≥ 3 ca). */
+  castPct?: number;
   registered: boolean;
   /** Đủ điều kiện để xếp theo giá: quen kênh (host ≥ 3 ca host / trợ ≥ 3 ca), không cảnh báo, tuần ≤ 36 giờ sau khi xếp. */
   qualified: boolean;
@@ -198,7 +214,9 @@ export function rankCandidates(shift: RosterShift, role: RosterRole, ctx: RankCo
     const known = role === "host" ? f.host >= 3 : f.host + f.co >= 3;
     const qualified = known && w.issues.length === 0 && w.weekHours + h <= SOFT_WEEK_CAP && !cost.missing;
     const perf = role === "host" ? ctx.perf?.get(t.id) : undefined;
-    out.push({ talentId: t.id, score, famHost: f.host, famCo: f.co, weekHours: w.weekHours, issues: w.issues, cost, registered, qualified, perf });
+    const chGmv = role === "host" ? ctx.chGmv?.get(hostChannelKey(t.id, shift.channelKey)) : undefined;
+    const castPct = chGmv && chGmv.n >= CHANNEL_GMV_MIN_N && cost.hourly && !cost.missing && h > 0 ? cost.amount / h / chGmv.gmvPerHour : undefined;
+    out.push({ talentId: t.id, score, famHost: f.host, famCo: f.co, weekHours: w.weekHours, issues: w.issues, cost, registered, qualified, perf, chGmv, castPct });
   }
   // Cân bằng (09/11, demo user duyệt): thêm nhẹ hiệu suất (host) và chi phí tương đối trong danh sách — cùng tinh thần trọng số "Cân bằng"
   // của Xếp cả tháng. Không đủ rate thì phần chi phí = 0 (không phạt người thiếu rate ở chế độ này).

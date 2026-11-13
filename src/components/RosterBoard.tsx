@@ -44,7 +44,8 @@ import { OpenMonthWizard } from "./roster/OpenMonthWizard";
 import { BrandScheduleExportDialog } from "./roster/BrandScheduleExportDialog";
 import { MonthPlanPanel } from "./roster/MonthPlanPanel";
 import { WorkloadTable } from "./roster/WorkloadTable";
-import { DEFAULT_BOUNDS, GOALS, GOAL_HINT, GOAL_LABEL, applyPlanRows, buildHostPerformance, daysInMonth, planMonth, releaseAutoFilled, type AutoFill, type MonthBounds, type PlanGoal } from "../lib/roster/monthPlanner";
+import { MonthReviewPanel } from "./roster/MonthReviewPanel";
+import { DEFAULT_BOUNDS, GOALS, GOAL_HINT, GOAL_LABEL, applyPlanRows, buildHostChannelGmv, buildHostPerformance, daysInMonth, planMonth, releaseAutoFilled, type AutoFill, type MonthBounds, type PlanGoal } from "../lib/roster/monthPlanner";
 import { platformOf } from "../lib/reportPlatform";
 import type { EngineParams } from "../lib/scheduling/engineParams";
 import type { ReportPlatform } from "../lib/reportPlatform";
@@ -87,13 +88,14 @@ interface Props {
 // Tháng này / Tháng sau / Tuần và 6 tab con. Một màn: dải trạng thái theo tháng (MonthStrip) + "Việc cần làm" (mỗi việc một nút)
 // + lưới tuần có giờ tháng cạnh mỗi kênh. Các màn phụ (Kiểm lịch, Báo nghỉ theo người, Ma trận kênh, Giờ & chi phí, Luật & nhật
 // ký, giờ từng kênh tháng này, mở lịch tháng sau) mở dưới lưới từ menu "Thêm" hoặc từ nút của thẻ tháng.
-type Section = "plan" | "now" | "next" | "checks" | "absence" | "matrix" | "hours" | "rules";
+type Section = "plan" | "now" | "next" | "checks" | "absence" | "matrix" | "hours" | "review" | "rules";
 const MORE: { id: Section; label: string }[] = [
   { id: "plan", label: "Xếp cả tháng theo mục tiêu" },
   { id: "checks", label: "Kiểm lịch (mọi lỗi + cảnh báo)" },
   { id: "absence", label: "Báo nghỉ theo người" },
   { id: "matrix", label: "Ma trận kênh" },
   { id: "hours", label: "Giờ & chi phí" },
+  { id: "review", label: "Tổng kết tháng (cast & GMV từng người)" },
   { id: "rules", label: "Luật & nhật ký" },
   { id: "now", label: "Giờ từng kênh tháng này" },
   { id: "next", label: "Mở lịch tháng sau (từng kênh)" }
@@ -106,6 +108,7 @@ const SECTION_TITLE: Record<Section, string> = {
   absence: "Báo nghỉ theo người",
   matrix: "Ma trận kênh",
   hours: "Giờ & chi phí",
+  review: "Tổng kết tháng theo người",
   rules: "Luật & nhật ký"
 };
 
@@ -280,9 +283,10 @@ export const RosterBoard: React.FC<Props> = (p) => {
   const brandRules = useMemo(() => (p.talentRules && p.talentRules.length > 0 ? buildBrandRuleIndex(p.talentRules, (id) => p.brands.find((b) => b.id === id)?.name ?? "brand") : undefined), [p.talentRules, p.brands]);
   const analysis = useMemo(() => analyzeRoster(shifts, rules, weekStart, nameOf, familiar, brandRules), [shifts, rules, weekStart, nameOf, familiar, brandRules]);
   const hostPerf = useMemo(() => buildHostPerformance(p.sessions, getTodayDate()), [p.sessions]);
+  const hostChGmv = useMemo(() => buildHostChannelGmv(p.sessions, getTodayDate()), [p.sessions]);
   const ctx: RankContext = useMemo(
-    () => ({ shifts, rules, weekStart, fam, talents: p.talents, history: p.talentRateHistory, mode, nameOf, brandRules, perf: hostPerf }),
-    [shifts, rules, weekStart, fam, p.talents, p.talentRateHistory, mode, nameOf, brandRules, hostPerf]
+    () => ({ shifts, rules, weekStart, fam, talents: p.talents, history: p.talentRateHistory, mode, nameOf, brandRules, perf: hostPerf, chGmv: hostChGmv }),
+    [shifts, rules, weekStart, fam, p.talents, p.talentRateHistory, mode, nameOf, brandRules, hostPerf, hostChGmv]
   );
   const wk = useMemo(() => shifts.filter((s) => s.date >= weekStart && s.date <= weekEnd), [shifts, weekStart, weekEnd]);
 
@@ -1126,6 +1130,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
                 />
               </div>
             )}
+            {section === "review" && <MonthReviewPanel month={viewMonth} sessions={p.sessions} talents={p.talents} history={p.talentRateHistory} nameOf={nameOf} showCost={showCost} />}
             {section === "rules" && (
               <div className="space-y-5">
                 <RulesPanel key={JSON.stringify(rules)} rules={rules} readOnly={readOnly} busy={busy} onSave={saveRules} />

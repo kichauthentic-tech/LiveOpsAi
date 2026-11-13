@@ -234,6 +234,21 @@ describe("familiarity + candidates", () => {
     expect(co.every((c) => c.perf === undefined)).toBe(true);
   });
 
+  test("cột GMV/giờ + cast %: tính theo kênh của ca; dưới 3 ca thì không có %; trợ không có số GMV", () => {
+    const shifts = R.buildRosterShifts([], [slot("o1")], [], [], WEEK, "2026-10-18");
+    const target = shifts[0];
+    const an = R.analyzeRoster(shifts, rules, WEEK, name);
+    const chGmv = new Map([
+      [C.hostChannelKey("henry", "crocs|TikTok"), { gmvPerHour: 20_000_000, n: 5 }],
+      [C.hostChannelKey("khanh", "crocs|TikTok"), { gmvPerHour: 6_000_000, n: 2 }]
+    ]);
+    const list = C.rankCandidates(target, "host", { ...ctxOf(shifts, "balance"), chGmv }, an);
+    expect(list.find((c) => c.talentId === "henry")?.castPct).toBeCloseTo(0.015, 5); // 300K / 20M
+    expect(list.find((c) => c.talentId === "khanh")?.castPct).toBeUndefined(); // mới 2 ca
+    const co = C.rankCandidates(target, "co_host", { ...ctxOf(shifts, "balance"), chGmv }, an);
+    expect(co.every((c) => c.chGmv === undefined && c.castPct === undefined)).toBe(true);
+  });
+
   test("No Asst (0207): tự lấp bỏ qua vai trợ của ca đã gắn thẻ, ca không gắn vẫn được xếp trợ", () => {
     const slots = [slot("o1"), slot("o2", { startTime: "10:00", endTime: "13:00", studioId: "r-2" })];
     const shifts = R.buildRosterShifts([], slots, [{ slotId: "o1", hostId: "henry", noAssistant: true }, { slotId: "o2", hostId: "khanh" }], [], WEEK, "2026-10-18");

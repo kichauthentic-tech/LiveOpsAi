@@ -6,7 +6,7 @@ import { PlatformChip } from "../common/PlatformChip";
 import { fmtFixed, fmtVndShort } from "../../lib/format";
 import { talentShortName } from "../../lib/talentName";
 import { shiftHours, type RosterAnalysis, type RosterRole, type RosterShift } from "../../lib/roster/rules";
-import { plannedCost, rankCandidates, shiftCost, type Candidate, type RankContext, type RankMode } from "../../lib/roster/candidates";
+import { rankCandidates, shiftCost, type Candidate, type RankContext, type RankMode } from "../../lib/roster/candidates";
 import { getTodayDate } from "../../lib/dateUtils";
 import { extraSignupDeadline } from "../../lib/roster/milestones";
 
@@ -79,7 +79,6 @@ export const ShiftPanel: React.FC<Props> = ({ shift, analysis, ctx, talents, his
     const unregistered = full.length - full.filter((c) => c.registered).length;
     const ok = list.filter((c) => !c.blocked).slice(0, 8);
     const blocked = list.length - list.filter((c) => !c.blocked).length;
-    const curCost = cur ? plannedCost(talentById.get(cur), history, role, shift.date, shiftHours(shift)) : null;
     return (
       <section className="space-y-2" aria-label={role === "host" ? "Host" : "Trợ live"}>
         {/* Tên người đang xếp đã ở ô chạm vai phía trên (09/11) — dòng này chỉ còn thao tác với người đó. */}
@@ -128,11 +127,8 @@ export const ShiftPanel: React.FC<Props> = ({ shift, analysis, ctx, talents, his
                       Người <Info className="w-3 h-3" />
                     </span>
                   </th>
-                  <th className="py-1.5 px-1 font-semibold text-right" title="Số ca ở kênh trong 90 ngày (host · trợ)">Ca ở kênh</th>
-                  <th className="py-1.5 px-1 font-semibold">Giờ tuần</th>
-                  {showCost && <th className={`py-1.5 px-1 font-semibold text-right ${ctx.mode === "cost" ? "text-[var(--accent-text)]" : ""}`}>Rate/h</th>}
-                  {showCost && <th className={`py-1.5 px-1 font-semibold text-right ${ctx.mode === "cost" ? "text-[var(--accent-text)]" : ""}`}>Ca</th>}
-                  {role === "host" && <th className={`py-1.5 px-1 font-semibold text-right ${ctx.mode === "gmv" ? "text-[var(--accent-text)]" : ""}`} title="GMV/giờ ÷ kỳ vọng cùng kênh × khung giờ, 90 ngày, co về ×1,00 theo số ca; số nhỏ = số ca làm căn cứ">Hiệu suất</th>}
+                  {showCost && <th className={`py-1.5 px-1 font-semibold text-right ${ctx.mode === "cost" ? "text-[var(--accent-text)]" : ""}`} title="Chi phí cast của CẢ CA này = rate/giờ × số giờ.">Cast ca này</th>}
+                  {role === "host" && <th className={`py-1.5 px-1 font-semibold text-right ${ctx.mode === "gmv" ? "text-[var(--accent-text)]" : ""}`} title="GMV/giờ thật của host ở đúng kênh của ca này, 90 ngày. % = cast/giờ ÷ GMV/giờ (cần ≥ 3 ca). Số nhỏ = số ca làm căn cứ.">GMV/giờ</th>}
                   <th />
                 </tr>
               </thead>
@@ -149,7 +145,6 @@ export const ShiftPanel: React.FC<Props> = ({ shift, analysis, ctx, talents, his
                     warnWeek={ctx.rules.warnWeekHours}
                     busy={busy}
                     onPick={() => onAssign(shift, role, c.talentId, absent === role && cur ? `Báo nghỉ: ${nm(cur)}` : undefined)}
-                    currentCost={curCost && !curCost.missing ? curCost.amount : undefined}
                   />
                 ))}
               </tbody>
@@ -295,7 +290,7 @@ export const ShiftPanel: React.FC<Props> = ({ shift, analysis, ctx, talents, his
   );
 };
 
-const CandidateRow: React.FC<{ c: Candidate; role: RosterRole; name: string; showCost: boolean; hours: number; maxWeek: number; warnWeek: number; busy: boolean; onPick: () => void; currentCost?: number }> = ({
+const CandidateRow: React.FC<{ c: Candidate; role: RosterRole; name: string; showCost: boolean; hours: number; maxWeek: number; warnWeek: number; busy: boolean; onPick: () => void }> = ({
   c,
   role,
   name,
@@ -304,43 +299,39 @@ const CandidateRow: React.FC<{ c: Candidate; role: RosterRole; name: string; sho
   maxWeek,
   warnWeek,
   busy,
-  onPick,
-  currentCost
+  onPick
 }) => {
   const after = c.weekHours + hours;
-  const diff = !c.cost.missing && currentCost !== undefined ? c.cost.amount - currentCost : 0;
   return (
     <tr className="border-b border-[var(--border-muted)] align-middle">
       <td className="py-1.5 pr-2">
         <span className="font-bold text-[var(--text)]">{name}</span>
         {c.registered && <span className="ml-1.5 text-2xs font-bold text-emerald-300">báo rảnh</span>}
+        <span className="block text-2xs text-[var(--text-faint)] whitespace-nowrap" title="Số ca đã làm ở kênh này trong 90 ngày · giờ đã xếp trong tuần (sau ca này: giờ / mức tối đa)">
+          <span className={c.famHost + c.famCo > 0 ? "" : "text-red-300"}>{role === "host" ? c.famHost : c.famCo} ca ở kênh</span>
+          {(role === "host" ? c.famCo : c.famHost) > 0 && ` (+${role === "host" ? c.famCo : c.famHost} ${role === "host" ? "trợ" : "host"})`} · tuần{" "}
+          <span className={after > warnWeek ? "text-amber-300 font-bold" : ""} title={`Sau ca này: ${fmtH(after)}h / ${maxWeek}h`}>{fmtH(c.weekHours)}h</span>
+        </span>
         {c.issues.length > 0 && <span className="block text-2xs text-amber-300">{c.issues.join(" · ")}</span>}
       </td>
-      <td className={`py-1.5 px-1 text-right tabular-nums ${c.famHost + c.famCo > 0 ? "text-[var(--text)]" : "text-red-300"}`}>
-        {role === "host" ? c.famHost : c.famCo}
-        {(role === "host" ? c.famCo : c.famHost) > 0 && <span className="text-2xs text-[var(--text-faint)]"> · {role === "host" ? c.famCo : c.famHost} {role === "host" ? "trợ" : "host"}</span>}
-      </td>
-      <td className="py-1.5 px-1 whitespace-nowrap tabular-nums">
-        {fmtH(c.weekHours)}h
-        <span className="ml-1.5 inline-block w-12 h-1.5 rounded-full bg-[var(--surface-hover)] overflow-hidden align-middle" title={`Sau ca này: ${fmtH(after)}h / ${maxWeek}h`}>
-          <span className={`block h-full ${after > warnWeek ? "bg-[var(--warning)]" : "bg-[var(--accent)]/60"}`} style={{ width: `${Math.min(100, (c.weekHours / maxWeek) * 100)}%` }} />
-        </span>
-      </td>
       {showCost && (
-        <td className="py-1.5 px-1 text-right tabular-nums text-[var(--text-muted)]">
-          {c.cost.missing ? "—" : c.cost.hourly && hours > 0 ? fmtVndShort(c.cost.amount / hours) : "theo phiên"}
-        </td>
-      )}
-      {showCost && (
-        <td className="py-1.5 px-1 text-right tabular-nums whitespace-nowrap">
+        <td className="py-1.5 px-1 text-right tabular-nums whitespace-nowrap" title={c.cost.missing ? "Chưa có rate" : c.cost.hourly && hours > 0 ? `${fmtVndShort(c.cost.amount / hours)}/giờ × ${fmtH(hours)} giờ` : "Rate theo phiên"}>
           {c.cost.missing ? <span className="text-2xs text-[var(--text-faint)]">chưa có rate</span> : fmtVndShort(c.cost.amount)}
-          {Math.abs(diff) >= 1000 && <b className={`ml-1 text-2xs ${diff < 0 ? "text-emerald-300" : "text-red-300"}`}>{diff < 0 ? "−" : "+"}{fmtVndShort(Math.abs(diff))}</b>}
+          {!c.cost.missing && c.cost.hourly && hours > 0 && <span className="block text-2xs text-[var(--text-faint)]">{fmtVndShort(c.cost.amount / hours)}/giờ</span>}
         </td>
       )}
       {role === "host" && (
-        <td className="py-1.5 px-1 text-right tabular-nums whitespace-nowrap" title={c.perf ? `${c.perf.n} ca làm căn cứ` : "Chưa có ca host có GMV trong 90 ngày"}>
-          {c.perf ? `×${fmtFixed(c.perf.index, 2)}` : "—"}
-          {c.perf && <span className="text-2xs text-[var(--text-faint)]"> {c.perf.n}</span>}
+        <td
+          className="py-1.5 px-1 text-right tabular-nums whitespace-nowrap"
+          title={
+            c.chGmv
+              ? `${c.chGmv.n} ca host ở kênh này làm căn cứ${c.chGmv.n < 3 ? " — chưa đủ 3 ca nên chưa tính cast %" : ""}${c.perf ? ` · Hiệu suất ×${fmtFixed(c.perf.index, 2)} so với kỳ vọng kênh × khung giờ (${c.perf.n} ca)` : ""}`
+              : "Chưa có ca host có GMV ở kênh này trong 90 ngày"
+          }
+        >
+          {c.chGmv ? fmtVndShort(c.chGmv.gmvPerHour) : "—"}
+          {c.castPct !== undefined && showCost && <span className="block text-2xs text-[var(--text-muted)]">cast {fmtFixed(c.castPct * 100, 1)}%</span>}
+          {c.chGmv && c.chGmv.n < 3 && <span className="block text-2xs text-[var(--text-faint)]">mới {c.chGmv.n} ca</span>}
         </td>
       )}
       <td className="py-1.5 pl-1 text-right">

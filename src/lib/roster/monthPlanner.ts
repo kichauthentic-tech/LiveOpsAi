@@ -1,7 +1,7 @@
 import type { LiveSession, Talent, TalentRateHistoryEntry } from "../../types";
 import { addDays, isoWeekStart } from "../dateUtils";
 import { hasStaffSegments } from "../staffSegments";
-import { canHost, famOf, plannedCost, type FamiliarityMap } from "./candidates";
+import { canHost, famOf, hostChannelKey, plannedCost, type FamiliarityMap, type HostChannelGmv } from "./candidates";
 import { absRange, brandRuleViolation, personEntries, shiftHours, type BrandRuleIndex, type RosterRole, type RosterRules, type RosterShift } from "./rules";
 
 // Điều Phối Lịch Live — xếp CẢ THÁNG theo mục tiêu (Performance / Chi phí / Cân bằng). Hàm thuần.
@@ -111,6 +111,25 @@ export function buildHostPerformance(sessions: readonly LiveSession[], refDate: 
   }
   const out = new Map<string, HostPerf>();
   for (const [id, { sum, n }] of sums) out.set(id, { index: (sum + PERF_SHRINK_K) / (n + PERF_SHRINK_K), n });
+  return out;
+}
+
+export function buildHostChannelGmv(sessions: readonly LiveSession[], refDate: string, days = PERF_WINDOW_DAYS): Map<string, HostChannelGmv> {
+  const from = addDays(refDate, -days);
+  const acc = new Map<string, { gmv: number; hours: number; n: number }>();
+  for (const s of sessions) {
+    if (s.status === "Cancelled" || s.date < from || s.date >= refDate || !s.hostId || hasStaffSegments(s)) continue;
+    const h = shiftHours(s);
+    if (h <= 0 || !(s.actualGmv > 0)) continue;
+    const k = hostChannelKey(s.hostId, `${s.brandId}|${s.platform}`);
+    const o = acc.get(k) ?? { gmv: 0, hours: 0, n: 0 };
+    o.gmv += s.actualGmv;
+    o.hours += h;
+    o.n += 1;
+    acc.set(k, o);
+  }
+  const out = new Map<string, HostChannelGmv>();
+  for (const [k, o] of acc) out.set(k, { gmvPerHour: o.gmv / o.hours, n: o.n });
   return out;
 }
 
