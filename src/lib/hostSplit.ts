@@ -8,22 +8,19 @@ import { hostPortions } from "./performance/hostPerformance";
 // Chỉ tách khi mỗi host đứng đúng một đoạn (A→B). Kiểu A→B→A giữ một dòng (phần chia theo người, không theo đoạn).
 // Mọi dòng ảo giữ nguyên `id` của ca gốc: bấm vào mở đúng cửa sổ ca.
 
-// Trợ live của một dòng ảo: các đoạn trợ cắt theo khung [from,to) của dòng (offset về 0), người chính = nhiều phút nhất trong khung (hoà: vào trước).
-// Ca không chia đoạn trợ thì giữ trợ cả ca của ca gốc. Khung không có trợ nào = để trống.
+// Trợ live của một dòng ảo: một dòng = MỘT tên trợ (như host), không hiện chuỗi "A → B" — thẻ trên lịch
+// theo giờ hẹp theo đúng phút của dòng (có dòng chỉ ~1-2 tiếng), chữ dài dễ bị thẻ cắt mất. Trợ đổi người NGAY
+// TRONG một dòng (ví dụ Giang → Vương trong 1h35' của dòng host B) chỉ lấy người đứng NHIỀU PHÚT NHẤT trong khung
+// [from,to) của dòng (hoà: vào trước); xem chi tiết đổi người thật thì mở cửa sổ ca. Khung không có trợ nào = để trống.
 function coHostOfWindow(s: LiveSession, from: number, to: number): Partial<LiveSession> {
   const cs = segmentsOfRole(s, "co_host");
   if (cs.length === 0) return {};
   const inWin = cs.filter((c) => c.fromMin < to && c.toMin > from);
-  const clipped = inWin.map((c) => ({ ...c, fromMin: Math.max(c.fromMin, from) - from, toMin: Math.min(c.toMin, to) - from }));
+  if (inWin.length === 0) return { coHostId: undefined, coHostName: "" };
   const mins = new Map<string, number>();
-  for (const c of clipped) mins.set(c.talentId, (mins.get(c.talentId) ?? 0) + c.toMin - c.fromMin);
-  const main = [...mins.entries()].sort((a, b) => b[1] - a[1] || clipped.findIndex((c) => c.talentId === a[0]) - clipped.findIndex((c) => c.talentId === b[0]))[0];
-  const wholeByOne = mins.size === 1 && main[1] >= to - from;
-  return {
-    coHostId: main ? main[0] : undefined,
-    coHostName: main ? clipped.find((c) => c.talentId === main[0])!.talentName : "",
-    staffSegments: wholeByOne ? undefined : clipped
-  };
+  for (const c of inWin) mins.set(c.talentId, (mins.get(c.talentId) ?? 0) + Math.min(c.toMin, to) - Math.max(c.fromMin, from));
+  const main = [...mins.entries()].sort((a, b) => b[1] - a[1] || inWin.findIndex((c) => c.talentId === a[0]) - inWin.findIndex((c) => c.talentId === b[0]))[0];
+  return { coHostId: main[0], coHostName: inWin.find((c) => c.talentId === main[0])!.talentName, staffSegments: undefined };
 }
 
 export function hostSplitRows(s: LiveSession): LiveSession[] {
