@@ -48,8 +48,9 @@ describe("nhường ca — một luật: không phát sinh chồng giờ mới",
     expect(r.find((x) => x.talentId === "hung")).toBeUndefined();
   });
 
-  test("dưới 24 giờ ⇒ chặn, đổi sang 'Tôi không đi được ca này'", () => {
-    expect(swapProblems(all, pass("dung", whole(soon, 120)), opts)[0]).toMatch(/dưới 24 giờ/);
+  test("đoạn đã bắt đầu ⇒ chặn; còn dưới 24 giờ nhưng chưa bắt đầu ⇒ cho", () => {
+    expect(swapProblems(all, pass("dung", whole(soon, 120)), { ...opts, nowMs: Date.parse("2026-11-10T14:00:00Z") })[0]).toMatch(/đã bắt đầu/);
+    expect(swapProblems(all, pass("dung", whole(soon, 120)), opts)).toEqual([]);
   });
 
   test("người giao không giữ đoạn đó ⇒ chặn", () => {

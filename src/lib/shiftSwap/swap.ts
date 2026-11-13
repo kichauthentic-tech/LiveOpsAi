@@ -41,7 +41,7 @@ export interface ShiftSwapRequest {
 }
 
 /** Còn bao nhiêu phút đến giờ bắt đầu đoạn thì không đổi qua yêu cầu nữa (gấp hơn = "Tôi không đi được ca này"). */
-export const SWAP_LEAD_MINUTES = 24 * 60;
+export const SWAP_LEAD_MINUTES = 0;
 /** Tối đa số đoạn mỗi vai mỗi ca sau khi nhường (giữ ca còn đọc được). */
 export const SWAP_MAX_SEGMENTS_PER_ROLE = 3;
 
@@ -179,7 +179,7 @@ export interface SwapCheckOptions {
 
 /**
  * Lý do yêu cầu KHÔNG hợp lệ (rỗng = hợp lệ). Thứ tự = thứ tự hiện ra: câu đầu là câu quan trọng nhất.
- * Luật: ca chưa huỷ; còn ≥ 24 giờ; người giao đang giữ trọn đoạn; sau khi đổi không phát sinh chồng giờ mới.
+ * Luật: ca chưa huỷ; chưa bắt đầu; người giao đang giữ trọn đoạn; sau khi đổi không phát sinh chồng giờ mới.
  */
 export function swapProblems(sessions: LiveSession[], req: Pick<ShiftSwapRequest, "kind" | "fromTalent" | "toTalent" | "give" | "take">, opts: SwapCheckOptions): string[] {
   const parts = [req.give, ...(req.kind === "swap" && req.take ? [req.take] : [])];
@@ -188,7 +188,7 @@ export function swapProblems(sessions: LiveSession[], req: Pick<ShiftSwapRequest
   const list = involved as LiveSession[];
   if (list.some((s) => s.status === "Cancelled")) return ["Ca đã huỷ."];
   if (parts.some((p, i) => partStartMs(list[i], p.fromMin) < opts.nowMs + SWAP_LEAD_MINUTES * 60_000)) {
-    return ["Còn dưới 24 giờ — dùng “Tôi không đi được ca này”."];
+    return ["Đoạn này đã bắt đầu — không đổi/nhường được nữa."];
   }
   // Chỉ ca có mặt một trong hai người (hoặc chính các ca bị đụng) mới có thể tạo/mất chồng giờ cho họ ⇒ bỏ phần còn lại (~50 → ~6 ca mỗi lần kiểm).
   const pair = new Set([req.fromTalent, req.toTalent]);
