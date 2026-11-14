@@ -81,6 +81,7 @@ import { dataSourceTier } from "../../lib/dataSource";
 import type { TermsPeriod } from "../../lib/commercial/terms";
 import { monthEndIso } from "../../lib/refundStatus";
 import { reportScopeOf, type ReportScope } from "../../lib/report/reportScope";
+import { publishClosesMonthNotice } from "../../lib/closedMonth";
 
 // Report Tuần không còn là tab riêng ở menu (2026-08-23) — gộp làm chế độ xem "Tuần" ngay trong
 // Report Tháng qua toggle bên dưới, tái dùng nguyên BrandWeeklyReport.tsx (đã tự chặn quyền qua
@@ -343,7 +344,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
         : null
     ].filter(Boolean);
     const ok = await confirm(
-      `Phát hành Report ${platform} tháng ${Number(month.slice(5, 7))}/${month.slice(0, 4)} cho ${brandName}? Brand xem được ngay sau khi phát hành.${warnings.length ? `\n\n${warnings.join("\n")}` : ""}\n\nPhát hành = ĐÓNG SỔ ${platform} của tháng: sau đó không sửa/đối soát/loại/huỷ ca ${platform} của tháng này được nữa cho tới khi thu hồi report (ca của sàn kia không bị ảnh hưởng).`,
+      `Phát hành Report ${platform} tháng ${Number(month.slice(5, 7))}/${month.slice(0, 4)} cho ${brandName}? Brand xem được ngay sau khi phát hành.${warnings.length ? `\n\n${warnings.join("\n")}` : ""}\n\n${publishClosesMonthNotice(platform)}`,
       { confirmLabel: "Phát hành" }
     );
     if (!ok) return;

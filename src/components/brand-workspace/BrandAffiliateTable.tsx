@@ -27,7 +27,7 @@ import {
 } from "../../lib/affiliate/plan";
 import { matchPlanToSessions, sameCreator, sessionAlreadyHasColumn } from "../../lib/affiliate/planMatch";
 import { errorMessage } from "../../lib/errorMessage";
-import { downloadRowsAsXlsx } from "../../lib/exportXlsx";
+import { downloadRowsAsXlsx, xlsxFailText } from "../../lib/exportXlsx";
 import { useToast } from "../../hooks/useToast";
 import { BarChart3, CalendarDays, ClipboardPaste, Database, Download, Link2, Loader2, Lock, Plus, Save, Send, Trash2, Undo2, Users } from "lucide-react";
 import { metricHint } from "../../lib/metricGlossary";
@@ -36,6 +36,7 @@ import { fmtFixed, fmtMonth, fmtVndFull } from "../../lib/format";
 import { MonthPicker } from "../common/MonthPicker";
 import { PageHeader } from "../common/PageHeader";
 import { AffiliatePlanTable, CAMPAIGN_STYLE, CAMPAIGN_TYPES } from "./AffiliatePlanTable";
+import { featureOffText } from "../../lib/featureOff";
 // Trang Affiliate (2026-09-22) — tách RIÊNG khỏi form Report Tháng theo yêu cầu ops. Hai chế độ xem (0155, 2026-10-08):
 //   • KẾ HOẠCH — bảng dạng sheet ops vẫn lập hằng tháng (AffiliatePlanTable); dán thẳng từ Google Sheet; "Chốt, gửi brand"
 //     thì brand mới thấy (sau chốt vẫn sửa được, brand thấy ngay).
@@ -319,7 +320,7 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
         "Viewers": e.viewer ?? ""
       })),
       `Affiliate_${brandName}_${fromMonth}_${toMonth}.xlsx`.replace(/\s+/g, "_")
-    ).catch((e) => showToast(`Không tải được file Excel: ${errorMessage(e)}`));
+    ).catch((e) => showToast(xlsxFailText(e)));
   };
 
   // Xuất Excel (chế độ KẾ HOẠCH) — đúng cột sheet kế hoạch ops vẫn dùng, kèm dòng Total.
@@ -361,7 +362,7 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
         }
       ],
       `KeHoach_Affiliate_${brandName}_${planMonth}.xlsx`.replace(/\s+/g, "_")
-    ).catch((e) => showToast(`Không tải được file Excel: ${errorMessage(e)}`));
+    ).catch((e) => showToast(xlsxFailText(e)));
   };
 
   const update = (entry: Row, patch: Partial<AffiliateActualEntry>) => {
@@ -447,7 +448,7 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
   // Trả về true khi lưu xong hết (để "Chốt" chờ được kết quả lưu trước khi chốt).
   const handleSave = async (): Promise<boolean> => {
     if (metaMissing) {
-      setErrorMsg("Database chưa chạy migration 0155 nên chưa lưu được — chạy file supabase/migrations/0155_affiliate_plan_first.sql trên Supabase rồi lưu lại.");
+      setErrorMsg(featureOffText("lưu kế hoạch Affiliate"));
       return false;
     }
     setSaving(true);

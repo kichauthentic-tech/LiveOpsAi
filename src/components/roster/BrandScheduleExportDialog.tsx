@@ -5,6 +5,7 @@ import { PlatformChip } from "../common/PlatformChip";
 import { useToast } from "../../hooks/useToast";
 import { errorMessage } from "../../lib/errorMessage";
 import { collectScheduleChannels, exportBrandSchedules, type ExportMode } from "../../lib/roster/brandScheduleExport";
+import { InfoDot } from "../common/InfoDot";
 
 // Xuất lịch gửi brand xác nhận (09/11): sau khi chốt lịch + mở ca đăng ký, một nút tải mọi lịch của tháng ra file Excel dạng
 // lịch tháng. Mặc định mỗi brand một file (nén .zip) để gửi thẳng — file brand này không chứa lịch brand khác. Lịch lấy
@@ -107,7 +108,7 @@ export const BrandScheduleExportDialog: React.FC<{
               <input type="radio" name="brand-export-mode" className="mt-1" checked={mode === "per-brand"} onChange={() => setMode("per-brand")} />
               <span>
                 <span className="font-bold text-[var(--text)]">Mỗi brand một file (nén .zip)</span>
-                <span className="block text-xs text-[var(--text-muted)]">Giải nén rồi gửi từng file cho đúng brand. Brand có cả TikTok và Shopee thì hai sheet trong cùng file.</span>
+                <span className="block text-xs text-[var(--text-muted)]">Giải nén rồi gửi từng file cho đúng brand<InfoDot label="Brand chạy hai sàn">Brand có cả TikTok và Shopee thì hai sheet nằm trong cùng một file.</InfoDot></span>
               </span>
             </label>
             <label className="flex items-start gap-2 cursor-pointer">

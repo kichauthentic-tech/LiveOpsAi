@@ -4,15 +4,14 @@ import SearchSelect from "./ui/SearchSelect";
 import React, { useEffect, useMemo, useState } from "react";
 import { inChannelScope, platformOf, REPORT_PLATFORMS, type ChannelScope } from "../lib/reportPlatform";
 import { SESSION_STATUS_CLS, SESSION_STATUS_LABEL_VI } from "../lib/sessionStatusUi";
-import { BookOpen, CheckCircle2, ChevronRight, Circle, Download, EyeOff, Link2 } from "lucide-react";
+import { BookOpen, ChevronRight, Download, EyeOff, Link2 } from "lucide-react";
 import { Brand, LiveSession, ShiftSlot, Studio, Talent, UserRole, AuditLogEntry } from "../types";
 import { getTodayDate } from "../lib/dateUtils";
 import { fmtVndShort } from "../lib/format";
 import { profileOf } from "../lib/platforms/profiles";
 import { sessionHours } from "../lib/performance/hostPerformance";
-import { downloadRowsAsXlsx } from "../lib/exportXlsx";
+import { downloadRowsAsXlsx, xlsxFailText } from "../lib/exportXlsx";
 import { useToast } from "../hooks/useToast";
-import { errorMessage } from "../lib/errorMessage";
 import { LedgerFilter, MissingStep, brandTrustLabel, filterLedger, groupByDate, hasReport, hasSnapshot, isReconciled, needsClosing, metricsHiddenFor, ledgerHosts, ledgerMonths, linkedSessions, sessionIncidents, summarize } from "../lib/sessionLedger";
 
 import { BrandLogo } from "./ui/BrandLogo";
@@ -20,6 +19,7 @@ import { PlatformChip } from "./common/PlatformChip";
 import { SessionWindow } from "./SessionWindow";
 import { PageHeader } from "./common/PageHeader";
 import { StatTile } from "./common/StatTile";
+import { TrustBadge } from "./common/TrustBadge";
 
 // Sổ Ca — một component, hai biến thể (cùng cách SessionEventCard dùng chung cho 2 lịch):
 //  - agency: mọi brand, thấy target/studio/trợ live, 3 ô tiến trình dữ liệu, mọi sự cố, hành động.
@@ -263,7 +263,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
     });
     const monthLabel = filter.month || "moi-thang";
     const scopeLabel = isBrandView ? (brandsById.get(brandId ?? "")?.name ?? "brand") : (filter.brandId ? brandsById.get(filter.brandId)?.name ?? "brand" : "tat-ca-brand");
-    downloadRowsAsXlsx("So Ca", exportRows, `SoCa_${scopeLabel}_${monthLabel}.xlsx`.replace(/\s+/g, "_")).catch((e) => showToast(`Không tải được file Excel: ${errorMessage(e)}`));
+    downloadRowsAsXlsx("So Ca", exportRows, `SoCa_${scopeLabel}_${monthLabel}.xlsx`.replace(/\s+/g, "_")).catch((e) => showToast(xlsxFailText(e)));
   };
 
   return (
@@ -633,20 +633,6 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
   );
 };
 
-const TrustBadge: React.FC<{ session: LiveSession }> = ({ session }) => {
-  const label = brandTrustLabel(session);
-  const done = label === "Đã chốt";
-  return (
-    <span
-      className={`inline-flex items-center gap-1 text-2xs font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${
-        done ? "bg-emerald-950 text-emerald-300 border-emerald-800" : "bg-amber-950 text-amber-300 border-amber-800"
-      }`}
-      title={done ? "Số đã đối soát với báo cáo TikTok cuối kỳ" : "Số ghi nhận lúc giao ca / tự khai, TikTok còn cập nhật"}
-    >
-      {done ? <CheckCircle2 className="w-3 h-3" /> : <Circle className="w-3 h-3" />} {label}
-    </span>
-  );
-};
 
 // Ô tiến trình dữ liệu: (TikTok: file →) giao ca → đối soát. Ca không cần chốt (sắp tới/huỷ/nạp bù) KHÔNG vẽ 3 ô
 // mờ nữa mà nói thẳng lý do (audit người mới 2026-10-04: 229 ca nạp bù đều hiện "Snapshot ✓ · Report ○ · Đối soát

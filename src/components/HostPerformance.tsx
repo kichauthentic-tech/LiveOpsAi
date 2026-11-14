@@ -4,9 +4,8 @@ import { AlertTriangle, ChevronLeft, ChevronRight, Download, TrendingUp, Trophy 
 import { Brand, LiveSession } from "../types";
 import { WEEKDAY_LABELS, byWeekday, dataQuality, filterSessions, hostWeekdayGrid, isCountable } from "../lib/performance/hostPerformance";
 import { addDays, getTodayDate, isoWeekNumber, isoWeekStart } from "../lib/dateUtils";
-import { downloadSheetsAsXlsx } from "../lib/exportXlsx";
+import { downloadSheetsAsXlsx, xlsxFailText } from "../lib/exportXlsx";
 import { useToast } from "../hooks/useToast";
-import { errorMessage } from "../lib/errorMessage";
 import { PageHeader } from "./common/PageHeader";
 import { TeamBlocks } from "./dashboard/period/TeamBlocks";
 
@@ -14,6 +13,7 @@ import { fmtDateVn, fmtFixed, fmtVndShort } from "../lib/format";
 import { METRIC, metricHint } from "../lib/metricGlossary";
 import { profileOf } from "../lib/platforms/profiles";
 import { inPlatformScope, type PlatformScope } from "../lib/reportPlatform";
+import { InfoDot } from "./common/InfoDot";
 interface HostPerformanceProps {
   /** Sàn của workspace agency (07/10) — hai sàn không xếp hạng chung. */
   platform: PlatformScope;
@@ -147,7 +147,7 @@ export function HostPerformance({ platform, sessions, brands }: HostPerformanceP
         { name: "Hieu suat theo Thu", rows: wd }
       ],
       `HieuSuatHost_${scope}_${from}_${to}.xlsx`.replace(/\s+/g, "_")
-    ).catch((e) => showToast(`Không tải được file Excel: ${errorMessage(e)}`));
+    ).catch((e) => showToast(xlsxFailText(e)));
   };
 
   return (
@@ -247,10 +247,10 @@ export function HostPerformance({ platform, sessions, brands }: HostPerformanceP
           <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-5">
             <h3 className="text-xs font-black text-[var(--text)] flex items-center gap-1.5">
               <Trophy className="w-3.5 h-3.5" /> Xếp hạng host theo {platformText("GMV/giờ", platform)}
+              <InfoDot label="Vì sao xếp hạng theo số này">
+                {platformText("GMV/giờ", platform)} đo hiệu quả trên mỗi giờ nhân lực bỏ ra, không thiên vị host được xếp nhiều ca dài — nên dùng để phân bổ ca.
+              </InfoDot>
             </h3>
-            <p className="text-2xs text-[var(--text-faint)] mt-0.5">
-              {platformText("GMV/giờ", platform)} là thước đo dùng để phân bổ ca — đo hiệu quả trên mỗi giờ nhân lực bỏ ra, không thiên vị host được xếp nhiều ca dài.
-            </p>
             {unassignedHost && (
               <div className="mt-2 flex items-start gap-2 text-2xs rounded-xl p-2.5 bg-amber-500/10 border border-amber-500/30 text-amber-300">
                 <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
@@ -293,8 +293,11 @@ export function HostPerformance({ platform, sessions, brands }: HostPerformanceP
           <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-5">
             <h3 className="text-xs font-black text-[var(--text)]">Host hiệu quả nhất theo thứ trong tuần</h3>
             <p className="text-2xs text-[var(--text-faint)] mt-0.5">
-              Đậm hơn = {platformText("GMV/giờ", platform)} cao hơn. Ô trống nghĩa là host chưa từng live thứ đó trong khoảng đã chọn, không phải hiệu suất bằng 0.
-              Hàng cuối "Mọi host" = hiệu suất chung của thứ đó — dùng để quyết định nên mở nhiều ca vào thứ nào, tách khỏi chuyện host nào trực.
+              Đậm hơn = {platformText("GMV/giờ", platform)} cao hơn
+              <InfoDot label="Cách đọc bảng thứ trong tuần">
+                Ô trống nghĩa là host chưa từng live thứ đó trong khoảng đã chọn, không phải hiệu suất bằng 0. Hàng cuối
+                &quot;Mọi host&quot; là hiệu suất chung của thứ đó — dùng để quyết định mở nhiều ca vào thứ nào, tách khỏi chuyện host nào trực.
+              </InfoDot>
             </p>
             <div className="mt-3 overflow-x-auto">
               <table className="w-full text-xs min-w-[560px]">

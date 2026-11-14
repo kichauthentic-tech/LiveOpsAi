@@ -9,4 +9,11 @@ export function isSessionMonthClosed(reports: ReadonlyMap<string, BrandMonthlyRe
 }
 
 export const CLOSED_MONTH_NOTICE =
-  "Tháng này đã phát hành Report cho brand nên số, lịch và người đã đóng sổ. Muốn sửa: Toàn Cảnh Brand → cột Report Tháng → Thu hồi, sửa xong phát hành lại.";
+  "Tháng này đã phát hành Report nên số, lịch và người đã đóng sổ. Muốn sửa thì thu hồi report ở Toàn Cảnh Brand.";
+
+/**
+ * Hậu quả của việc phát hành, nói MỘT lần. Audit chữ 13/11: câu này trước đó viết riêng ở `BrandMonthlyReport` và
+ * `useReportPublish` với hai cách diễn đạt khác nhau (phát hiện "một việc nói hai lần").
+ */
+export const publishClosesMonthNotice = (platform: string): string =>
+  `Phát hành = đóng sổ ${platform} của tháng: không sửa/đối soát/huỷ ca ${platform} tháng này được nữa cho tới khi thu hồi report. Ca sàn kia không ảnh hưởng.`;

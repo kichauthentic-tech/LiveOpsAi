@@ -151,7 +151,7 @@ export const OpenSlotModal: React.FC<OpenSlotModalProps> = ({
       return;
     }
     if (studioClash && !(await confirm(`Phòng ${studio?.name ?? ""} đang trùng với ${studioClash}. Vẫn mở ca?`))) return;
-    if (pastDays > 0 && !(await confirm(`Ngày ${fmtDateVn(date)} đã qua ${pastDays} ngày. Ca mở ở quá khứ sẽ KHÔNG ai đăng ký được — chỉ dùng khi bạn đang nạp bù ca đã live (ops tự chốt người sau). Vẫn mở ca?`))) return;
+    if (pastDays > 0 && !(await confirm(`Ngày ${fmtDateVn(date)} đã qua ${pastDays} ngày — ca mở ở quá khứ không ai đăng ký được. Vẫn mở ca?`))) return;
     setSaving(true);
     const ok = await onCreateSlot({
       id: `slot-${Date.now()}`,

@@ -18,6 +18,7 @@ import { numLocale, byLang, t } from "../../../lib/displayLang";
 
 const BLUE = "#7fb0e0";
 import { W, ch, columns, fmtM, fmtP, heat, hbars, pill, stack100, tbl, waterfall } from "./demoCharts";
+import { featureOffText } from "../../../lib/featureOff";
 
 // Hai trang "Toàn shop & đóng góp của livestream YFB" và "Phân tích nguyên nhân" dựng theo demo Report Tháng đã chốt
 // (scratchpad/build/template.html, trang 3 và 4): cùng thứ tự khối, cùng class (demo.css, tiền tố .rt), số lấy từ dữ liệu app.
@@ -80,7 +81,7 @@ export const DemoInsight: React.FC<{
       setMsg(text == null ? "Đã khôi phục bản gốc" : "Đã lưu");
     } catch (e) {
       const m = errorMessage(e, "Lưu Insight thất bại");
-      setMsg(/section_notes/.test(m) ? "Chưa có cột section_notes — cần chạy migration 0121 trong SQL Editor." : m);
+      setMsg(/section_notes/.test(m) ? featureOffText("lưu ghi chú của mục") : m);
     } finally {
       setSaving(false);
     }

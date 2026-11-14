@@ -14,7 +14,7 @@ import type { TabPrefetchCtx } from "../lib/db/prefetch";
 import { CommitmentProgress, CommitmentStatus, computeAllProgress, todayVn } from "../lib/performance/brandCommitment";
 import { filterLedger, summarize } from "../lib/sessionLedger";
 import { fmtVndShort } from "../lib/format";
-import { downloadRowsAsXlsx } from "../lib/exportXlsx";
+import { downloadRowsAsXlsx, xlsxFailText } from "../lib/exportXlsx";
 import { useToast } from "../hooks/useToast";
 import { errorMessage } from "../lib/errorMessage";
 import { BrandLogo } from "./ui/BrandLogo";
@@ -23,6 +23,7 @@ import { MonthPicker } from "./common/MonthPicker";
 import { useReportPublish } from "../hooks/useReportPublish";
 import { MonthClosePanel } from "./MonthClosePanel";
 import { closeMonthFor } from "../lib/report/monthClose";
+import { GoLink as SharedGoLink } from "./common/GoLink";
 
 // Màn toàn cảnh 4 brand cho agency (Đợt C/6, 2026-09-23) — BẢNG trạng thái từng brand cho MỘT
 // tháng đang xem, không phải widget KPI kiểu Dashboard cũ (xoá 2026-09-13 vì số tính live/dự phóng
@@ -61,14 +62,8 @@ interface BrandsOverviewProps {
   onNavigate?: (tab: string, brandId?: string, platform?: ReportPlatform) => void;
 }
 
-// Ô trạng thái "chưa có" là một NÚT tới đúng chỗ phải nhập (audit người mới 2026-10-04: bảng toàn chữ
-// "Chưa lập / Chưa có cam kết / Chưa tạo / Chưa set" mà không nói đi đâu để làm).
-const GoLink: React.FC<{ label: string; onClick?: () => void }> = ({ label, onClick }) =>
-  onClick ? (
-    <button onClick={onClick} className="block mt-1 text-2xs font-bold text-[var(--accent-text)] hover:underline min-h-6">
-      {label} →
-    </button>
-  ) : null;
+// Ô trạng thái "chưa có" là một NÚT tới đúng chỗ phải nhập — `common/GoLink` (dùng chung từ 13/11).
+const GoLink: React.FC<{ label: string; onClick?: () => void }> = ({ label, onClick }) => <SharedGoLink label={label} onClick={onClick} className="block mt-1" />;
 
 const PLAN_STATUS_LABEL: Record<BrandMonthPlan["status"] | "none", string> = {
   none: "Chưa lập",
@@ -219,7 +214,7 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ platform, brands
       "Giá": r.price ?? "Chưa nhập"
     }));
     downloadRowsAsXlsx("Toan Canh Brand", out, `ToanCanhBrand_${month}.xlsx`).catch((e) =>
-      showToast(`Không tải được file Excel: ${errorMessage(e)}`)
+      showToast(xlsxFailText(e))
     );
   };
 

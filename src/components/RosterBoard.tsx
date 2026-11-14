@@ -49,6 +49,8 @@ import { DEFAULT_BOUNDS, GOALS, GOAL_HINT, GOAL_LABEL, applyPlanRows, buildHostC
 import { platformOf } from "../lib/reportPlatform";
 import type { EngineParams } from "../lib/scheduling/engineParams";
 import type { ReportPlatform } from "../lib/reportPlatform";
+import { FeatureOffNote } from "./common/FeatureOffNote";
+import { InfoDot } from "./common/InfoDot";
 
 // Điều Phối Lịch Live (0175/0176, 13/10). Quy trình tuần user chốt: Kế Hoạch Tháng chốt ⇒ ca mở → trainer đặt HẠN ĐĂNG KÝ → host/trợ báo rảnh
 // (tab Đăng Ký Ca) → trainer xếp NHÁP ở đây (talent/brand không thấy) → "Công bố tuần": chốt cả tuần trong một transaction, mỗi người
@@ -469,7 +471,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
       }
       const slot = shift.finalSlotId ? p.shiftSlots.find((sl) => sl.id === shift.finalSlotId) : undefined;
       if (!slot) {
-        showToast("Ca này nhập từ Sheet / ca nối, không có ca chờ đăng ký gốc nên không gắn được No Asst.");
+        showToast("Ca nhập từ Sheet hoặc ca nối không gắn được No Asst.");
         return;
       }
       await setSlotNoAssistant(slot.id, value);
@@ -645,7 +647,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
       const msg = [
         `Công bố ${rangeWeeks.length} tuần (${rangeWeeks.map(([w]) => `${dayLabel(w)}–${dayLabel(weekEndOf(w))}`).join("; ")})?`,
         `${total}+ ca nháp thành ca thật; khoảng ${people.size} host/trợ nhận tin (mỗi người một tin cho mỗi tuần).`,
-        "Tuần vắt qua ngày cuối của phạm vi được công bố trọn tuần, gồm cả nháp ngoài phạm vi.",
+        "Tuần vắt qua cuối phạm vi vẫn được công bố trọn tuần.",
         overLines.length > 0 ? `⚠ Quá ${rules.maxWeekHours} giờ/tuần (không chặn): ${overLines.join("; ")}.` : ""
       ]
         .filter(Boolean)
@@ -699,7 +701,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
       const msg = [
         `Công bố lịch tuần ${dayLabel(weekStart)} – ${dayLabel(weekEnd)}?`,
         `${draftedCount} ca nháp sẽ thành ca thật, mỗi host/trợ nhận MỘT tin liệt kê ca của mình.`,
-        outsideDrafts > 0 ? `Công bố theo tuần nên gồm cả ${outsideDrafts} ca nháp ngoài tháng ${Number(viewMonth.slice(5))} (ngày đang ẩn trên lưới).` : "",
+        outsideDrafts > 0 ? `Gồm cả ${outsideDrafts} ca nháp ngoài tháng ${Number(viewMonth.slice(5))}.` : "",
         holes > 0 ? `${holes} ca mở chưa có host sẽ vẫn mở (không công bố).` : "",
         holdCoShifts.length > 0 ? `${holdCoShifts.length} ca đã có host nhưng chưa có trợ / No Asst sẽ chưa công bố, vẫn mở cho talent đăng ký trợ: ${holdCoShifts.slice(0, 4).map((s) => `${s.brandName} ${dayLabel(s.date)} ${s.startTime}`).join(", ")}${holdCoShifts.length > 4 ? "…" : ""}.` : "",
         // 0206: quá giờ tuần chỉ cảnh báo — nêu đích danh để người công bố nhìn thấy trước khi bấm.
@@ -814,7 +816,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
   if (st1.phase === "none" && !desk.loading)
     todos.push({ key: "next", tone: "bad", text: `${mNext[0].toUpperCase()}${mNext.slice(1)} bắt đầu sau ${daysToNext} ngày, chưa mở ca nào.`, sub: `${noCommitNext}/${desk.nextRows.length} kênh chưa có giờ cam kết.`, action: { label: `Mở lịch ${mNext}`, run: openWizard } });
   else if (st1.phase === "no_deadline")
-    todos.push({ key: "next", tone: "warn", text: `${mNext[0].toUpperCase()}${mNext.slice(1)} đang nhận đăng ký (chưa đặt hạn): ${st1.slotsWithSignup}/${st1.openSlots} ca có người báo rảnh.`, sub: `${st1.noHost} ca chưa có host. Đặt hạn là tuỳ chọn — chốt miệng với talent cũng được.`, action: { label: "Đặt hạn (không bắt buộc)", run: openWizard } });
+    todos.push({ key: "next", tone: "warn", text: `${mNext[0].toUpperCase()}${mNext.slice(1)} đang nhận đăng ký (chưa đặt hạn): ${st1.slotsWithSignup}/${st1.openSlots} ca có người báo rảnh.`, sub: `${st1.noHost} ca chưa có host.`, action: { label: "Đặt hạn (không bắt buộc)", run: openWizard } });
   else if (st1.phase === "signup")
     todos.push({ key: "next", tone: "warn", text: `${mNext[0].toUpperCase()}${mNext.slice(1)} đang nhận đăng ký tới ${fmtWhen(st1.deadline!)}: ${st1.slotsWithSignup}/${st1.openSlots} ca có người báo rảnh.`, action: { label: "Chép tin nhắc người chưa đăng ký", run: () => nudge(m1) } });
   else if (st1.phase === "staff")
@@ -861,7 +863,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
   if (draftedCount > 0 && blocks.length === 0)
     todos.push({ key: "pub", tone: "warn", text: `${draftedCount} ca nháp tuần này chưa công bố.`, sub: "Công bố xong mỗi host/trợ nhận một tin.", action: readOnly ? undefined : { label: "Công bố", run: publish } });
   if (holdCoShifts.length > 0)
-    todos.push({ key: "co-hold", tone: "warn", text: `${holdCoShifts.length} ca đã có host nhưng chưa có trợ / No Asst — chưa được công bố.`, sub: "Chọn trợ, hoặc gắn No Asst nếu ca chủ ý không trợ. Ca vẫn mở cho talent đăng ký trợ.", action: { label: "Xếp ca đầu tiên", run: () => setSelectedKey(holdCoShifts[0].key) } });
+    todos.push({ key: "co-hold", tone: "warn", text: `${holdCoShifts.length} ca đã có host nhưng chưa có trợ / No Asst — chưa được công bố.`, sub: "Chọn trợ live, hoặc gắn No Asst nếu ca chủ ý không trợ.", action: { label: "Xếp ca đầu tiên", run: () => setSelectedKey(holdCoShifts[0].key) } });
   // Ô tự fill có người đã rút đăng ký sau đó (talent bấm huỷ đăng ký): nháp còn giữ người không còn rảnh.
   const staleAuto = Object.entries(auto).filter(([slotId, a]) => {
     const d = drafts.find((x) => x.slotId === slotId);
@@ -904,7 +906,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>
-            <button type="button" disabled={readOnly || busy || blocks.length > 0 || draftedCount === 0} onClick={publish} title={blocks.length > 0 ? "Còn lỗi chặn — bấm ca viền đỏ để sửa" : draftedCount === 0 ? "Ca đã lên lịch không cần công bố; chỉ ca nháp mới cần" : undefined} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--accent)] text-[var(--accent-contrast)] text-xs font-black disabled:opacity-40">
+            <button type="button" disabled={readOnly || busy || blocks.length > 0 || draftedCount === 0} onClick={publish} title={blocks.length > 0 ? "Còn lỗi chặn — bấm ca viền đỏ để sửa" : draftedCount === 0 ? "Chỉ ca nháp mới cần công bố" : undefined} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--accent)] text-[var(--accent-contrast)] text-xs font-black disabled:opacity-40">
               <Send className="w-4 h-4" /> {publishLabel}
             </button>
             <button type="button" onClick={() => setExportOpen(true)} title="Tải lịch cả tháng ra Excel để gửi brand xác nhận" className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[var(--border)] text-xs font-bold text-[var(--text)] hover:bg-[var(--surface-hover)]">
@@ -926,7 +928,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
           </>
         }
       >
-        {backendMissing && <p className="text-xs rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-300 px-3 py-2">Chưa chạy migration 0175 + 0176 trên DB: màn chỉ xem được lịch đã có, chưa đặt hạn / xếp nháp / công bố được.</p>}
+        {backendMissing && <FeatureOffNote tone="band" what="đặt hạn, xếp nháp và công bố lịch (chỉ xem được lịch đã có)" />}
         {loadError && <p className="text-xs rounded-lg border border-red-500/30 bg-red-500/10 text-red-300 px-3 py-2">Không tải được dữ liệu Điều Phối Lịch Live: {loadError}</p>}
         {desk.commitError && <p className="text-xs text-amber-300">Không đọc được cam kết hợp đồng — giờ cam kết để trống.</p>}
       </PageHeader>
@@ -978,7 +980,9 @@ export const RosterBoard: React.FC<Props> = (p) => {
                 So sánh 3 mục tiêu
               </button>
             </div>
-            <p className="text-2xs text-[var(--text-muted)]">{planNote ?? "Chỉ lấy người đã đăng ký đúng ca, giữ giờ tối thiểu/tối đa và luật lịch. Bấm là ghi NHÁP ngay, talent chưa thấy; ô bạn tự xếp không bị ghi đè."}</p>
+            <p className="text-2xs text-[var(--text-muted)]">
+            {planNote ?? <>Bấm là ghi NHÁP ngay, talent chưa thấy.<InfoDot label="Tự xếp theo luật nào">Chỉ lấy người đã đăng ký đúng ca, giữ giờ tối thiểu/tối đa và luật lịch. Ô bạn tự xếp không bị ghi đè.</InfoDot></>}
+          </p>
           </div>
           <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs" aria-label="Tuần trong tháng">
             <span className="font-black text-[var(--text)]">Tháng {Number(viewMonth.slice(5))} · tuần</span>
@@ -1000,7 +1004,10 @@ export const RosterBoard: React.FC<Props> = (p) => {
               {workload.totals.below} dưới tối thiểu · {workload.totals.over} vượt tối đa · tính theo ca đã lên lịch + nháp hiện có
             </span>
           </div>
-          <p className="text-2xs text-[var(--text-muted)]">Thanh: đậm = ca đã lên lịch, nhạt = nháp chưa công bố; vạch đứng = giờ tối thiểu (đảm bảo thu nhập), cuối thanh = giờ tối đa.</p>
+          <p className="text-2xs text-[var(--text-muted)]">
+            Đậm = đã lên lịch · nhạt = nháp · vạch đứng = giờ tối thiểu
+            <InfoDot label="Chú giải thanh giờ">Nháp là ca chưa công bố. Vạch đứng là giờ tối thiểu (đảm bảo thu nhập), cuối thanh là giờ tối đa.</InfoDot>
+          </p>
           <div className="grid gap-3 xl:grid-cols-2">
             {(["host", "assistant"] as const).map((role) => {
               const rows = workload.load.filter((l) => (role === "host" ? l.role === "host" : l.role !== "host"));

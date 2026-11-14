@@ -5,6 +5,7 @@ import { BrandDataRawImport, BrandDataRawRow, DataRawReportType } from "../../ty
 import { ParsedDataRawImport } from "../dataraw/parseDataRawExcel";
 import { prefetchable } from "./prefetch";
 import { invalidateRawRowsCache } from "../dataraw/fetchRowsPaged";
+import { featureOffError } from "../featureOff";
 
 // Module Dataraw Brand Workspace (migration 0052) — xem lib/dataraw/parseDataRawExcel.ts cho
 // cách tách bảng dữ liệu từ 4 loại file Excel TikTok Shop. File chỉ lo CRUD import batch + rows.
@@ -174,7 +175,7 @@ export async function createOrReplaceDataRawImport(
     }
     // check_violation trên report_type: loại file mới (vd ads_campaign_overview, 0137) mà DB chưa chạy migration mở loại đó.
     if (batchError.code === "23514" && /report_type/.test(batchError.message ?? "")) {
-      throw new Error("Hệ thống chưa nhận loại file này — cần chạy bản cập nhật cơ sở dữ liệu mới nhất (migration 0137 cho file Ads TikTok, 0139 cho file Shopee, 0142 cho file Ads Shopee, 0192 cho Shop+/Product Ads, 0193 cho file cả shop Shopee). Báo admin rồi tải lại sau.");
+      throw featureOffError("nhận loại file này", "DB chưa mở report_type — migration 0137 Ads TikTok, 0139 Shopee, 0142 Ads Shopee, 0192 Shop+/Product Ads, 0193 file cả shop Shopee");
     }
     throw batchError;
   }

@@ -4,6 +4,7 @@ import { applyWhatIf, type HandlingPlan, type Lever, type PlanMode } from "../..
 import { CHECKPOINT_LABEL } from "../../lib/performance/monthForecast";
 import type { MonthOutlook } from "../../lib/performance/ceoBrief";
 import { Card, hrs, money, pct } from "./shared";
+import { InfoDot } from "../common/InfoDot";
 
 // Phương án của MỘT kênh (đòn bẩy, mốc điều chỉnh giờ, thử kịch bản) — 21/10 nằm ở Chi tiết kênh (Dashboard brand của ops), dưới thẻ kênh. Mọi đòn bẩy ra số từ dữ liệu của chính kênh (lib/performance/handlingPlan.ts), căn cứ ghi ngay bên dưới.
 
@@ -77,7 +78,12 @@ const CheckpointStrip: React.FC<{ o: MonthOutlook; p: HandlingPlan; today: strin
             : <>Thiếu <b className="text-[var(--text)]">{money(c.gap)}</b> ⇒ cần <b className="text-[var(--text)]">+{Math.round(c.needPct * 100)}%</b> giờ của phần còn lại{c.capped ? <> (vượt giới hạn, đề xuất <b className="text-[var(--text)]">+{Math.round(c.pct * 100)}%</b> ≈ {hrs(c.extraHours)} và báo brand sớm)</> : <> ≈ <b className="text-[var(--text)]">{hrs(c.extraHours)}</b></>}; thêm đủ thì dự báo ≈ {money(c.projectedAfter)}.</>}
         </p>
       )}
-      <p className="text-2xs text-[var(--text-faint)] leading-snug">Mô phỏng T7–T9 trên số liệu thực tế: làm đủ 3 mốc (bù tối đa +30% giờ còn lại) thì 9/9 tháng CROCS + VERA đạt ≥ 95% target; không điều chỉnh chỉ 3/9.</p>
+      <p className="text-2xs text-[var(--text-faint)] leading-snug">
+          Làm đủ 3 mốc thì 9/9 tháng đạt ≥ 95% target.
+          <InfoDot label="Số này đo ở đâu">
+            Mô phỏng T7–T9 trên số liệu thực tế của CROCS + VERA, mỗi mốc bù tối đa +30% giờ còn lại. Không điều chỉnh thì chỉ 3/9 tháng đạt.
+          </InfoDot>
+        </p>
     </div>
   );
 };

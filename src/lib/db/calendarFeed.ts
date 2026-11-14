@@ -1,4 +1,5 @@
 import { authedFetch } from "../authedFetch";
+import { featureOffText } from "../featureOff";
 
 // Link lịch riêng (.ics) của host/trợ đang đăng nhập — server giữ mã (bảng talent_calendar_feeds, 0177), client chỉ ghép URL.
 
@@ -6,7 +7,7 @@ export class CalendarFeedNotReady extends Error {}
 
 async function read(res: Response): Promise<string> {
   const body = (await res.json().catch(() => ({}))) as { token?: string; error?: string };
-  if (res.status === 501) throw new CalendarFeedNotReady(body.error ?? "Chưa chạy migration 0177");
+  if (res.status === 501) throw new CalendarFeedNotReady(body.error ?? featureOffText("lịch .ics cho talent"));
   if (!res.ok || !body.token) throw new Error(body.error ?? `Lỗi ${res.status}`);
   return body.token;
 }

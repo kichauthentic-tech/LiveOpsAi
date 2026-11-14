@@ -1,12 +1,13 @@
 import { supabase } from "../supabaseClient";
 import type { ReportPlatform } from "../reportPlatform";
 import type { Bulletin, BulletinPayload } from "../brand/bulletin";
+import { featureOffText } from "../featureOff";
 
 // Bản tin cho brand (0179). Ghi qua RPC publish_brand_bulletin (ceo/operations/admin); đọc thẳng bảng — RLS: ops mọi kênh, brand chỉ
 // kênh của mình. DB chưa chạy 0179 ⇒ đọc trả `missing`, gửi ném lỗi nói rõ phải chạy migration nào.
 
 const MISSING = new Set(["PGRST202", "PGRST205", "42P01", "42883"]);
-export const BULLETIN_MISSING_TEXT = "Chưa chạy migration 0179 nên chưa gửi được bản tin cho brand.";
+export const BULLETIN_MISSING_TEXT = featureOffText("gửi bản tin cho brand");
 
 export async function publishBrandBulletin(x: { brandId: string; platform: ReportPlatform; month: string; asOf: string | null; payload: BulletinPayload; note: string }): Promise<string> {
   const { data, error } = await supabase.rpc("publish_brand_bulletin", {

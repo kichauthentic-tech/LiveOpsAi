@@ -5,6 +5,7 @@ import { TALENT_RULE_LABEL, type BrandTalentRule, type TalentRuleKind } from "..
 import { deleteTalentRule, upsertTalentRule } from "../../lib/db/brandTerms";
 import { errorMessage } from "../../lib/errorMessage";
 import { Field, btnCls, inputCls } from "./fields";
+import { FeatureOffNote } from "../common/FeatureOffNote";
 
 // Điều khoản về HOST giữa YFB và brand: host brand muốn ưu tiên, host brand không nhận, host chỉ làm riêng cho brand này.
 // Điều Phối Lịch Live đọc để cảnh báo khi xếp (lib/roster/rules.ts) và loại khỏi gợi ý.
@@ -56,7 +57,7 @@ export const TalentRulesPanel: React.FC<Props> = ({ brand, talents, rules, avail
     }
   }
 
-  if (!available) return <p className="text-2xs text-amber-300">Chưa dùng được: migration 0191 chưa chạy.</p>;
+  if (!available) return <FeatureOffNote what="luật rate talent" />;
   return (
     <div className="space-y-3">
       {mine.length === 0 ? (

@@ -109,7 +109,7 @@ export const TabUsagePanel: React.FC = () => {
           <div className="h-40 rounded-xl bg-[var(--surface-elevated)]/60 animate-pulse" aria-busy="true" />
         ) : error ? (
           <p className="text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-2">
-            Chưa đọc được số liệu: {error}. Nếu báo không tìm thấy hàm <code>tab_usage_summary</code> thì migration 0123 chưa chạy.
+            Chưa đọc được số liệu: {error}
           </p>
         ) : grouped.length === 0 ? (
           <p className="text-xs text-[var(--text-muted)]">Chưa có lượt mở nào trong {days} ngày.</p>

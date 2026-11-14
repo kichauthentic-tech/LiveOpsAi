@@ -10,6 +10,7 @@ import { BoostSlot, BrandMonthPlan, BrandMonthPlanSlot, CalendarEventRow, PlanCa
 import { platformOf, brandPlatformKey, type ReportPlatform } from "../reportPlatform";
 import { cleanReserve } from "../scheduling/reservePlan";
 import { cleanScenario } from "../scheduling/brandScenario";
+import { featureOffError } from "../featureOff";
 
 // Kế Hoạch Tháng (0090). Bảng nhỏ (1 dòng plan + ≤ ~100 ca/brand/tháng) — đọc theo brand+tháng,
 // ghi ca kế hoạch bằng cách thay cả lô (xoá dòng không còn, upsert dòng còn) để UI lưới không phải
@@ -381,7 +382,7 @@ export async function openExtraPlanSlots(planId: string, slots: { date: string; 
     p_deadline: deadlineIso
   });
   if (error) {
-    if (error.code === "PGRST202") throw new Error("DB chưa chạy migration 0200 (ca bổ sung) — chạy SQL trong Supabase rồi thử lại.");
+    if (error.code === "PGRST202") throw featureOffError("mở thêm ca bổ sung", "migration 0200 — rpc open_extra_plan_slots");
     throw error;
   }
   const d = (data ?? {}) as { added?: number; opened?: number; skipped?: number; notified?: number };
@@ -391,7 +392,7 @@ export async function openExtraPlanSlots(planId: string, slots: { date: string; 
 export async function rebaseMonthPlan(planId: string, items: RebaseItem[], note = ""): Promise<RebaseResult> {
   const { data, error } = await supabase.rpc("rebase_month_plan", { p_plan_id: planId, p_items: items, p_note: note });
   if (error) {
-    if (error.code === "PGRST202") throw new Error("DB chưa chạy migration 0164 (rebase_month_plan) — chạy SQL trong Supabase rồi thử lại.");
+    if (error.code === "PGRST202") throw featureOffError("chia lại target theo lịch hiện có", "migration 0164 — rpc rebase_month_plan");
     throw error;
   }
   return data as RebaseResult;
@@ -473,7 +474,7 @@ export async function setBoostTargets(planId: string, items: BoostFillItem[]): P
   if (items.length === 0) return 0;
   const { data, error } = await supabase.rpc("set_boost_targets", { p_plan_id: planId, p_items: items });
   if (error) {
-    if (error.code === "PGRST202") throw new Error("DB chưa chạy migration 0165 (set_boost_targets) — chạy SQL trong Supabase rồi thử lại.");
+    if (error.code === "PGRST202") throw featureOffError("điền target ca tăng cường", "migration 0165 — rpc set_boost_targets");
     throw error;
   }
   return data as number;
@@ -527,7 +528,7 @@ export async function saveBrandScenario(planId: string, lines: ScenarioLine[]): 
   const clean = cleanScenario(lines);
   const { error } = await supabase.from("brand_month_plans").update({ brand_scenario: clean }).eq("id", planId);
   if (error) {
-    if (error.code === "42703" || error.code === "PGRST204") throw new Error("DB chưa chạy migration 0201 (Kịch bản brand).");
+    if (error.code === "42703" || error.code === "PGRST204") throw featureOffError("lưu Kịch bản brand", "migration 0201 — cột brand_month_plans.brand_scenario");
     throw error;
   }
   return clean;

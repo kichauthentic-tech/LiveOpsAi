@@ -255,7 +255,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
       }
       if (!(await confirm(
         `Phòng ${targetStudio.name} là phòng ${targetPlatform} của ${session.brandName}. Đổi ca ${session.startTime}–${session.endTime} từ ${session.platform} sang ${targetPlatform}?\n\n` +
-        `Ca rời Kế Hoạch Tháng ${session.platform} (ca kế hoạch đó thành "chưa có ca"); nếu Kế Hoạch Tháng ${targetPlatform} có ca đúng giờ còn trống thì ca nhận target của ca đó, không thì thành ca tăng cường (target đề xuất, không cộng vào target tháng).`,
+        `Ca rời kế hoạch ${session.platform}; sang ${targetPlatform} nhận target của ca trống đúng giờ, không có thì thành ca tăng cường.`,
         { confirmLabel: `Đổi sang ${targetPlatform}` }
       ))) return;
       const ok = await onSwitchSessionPlatform(session, targetPlatform, targetStudio.id);
@@ -1332,7 +1332,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                 <Building2 className="w-5 h-5 text-[var(--accent-text)] shrink-0" /> Phòng Studio theo giờ — {fmtDateVn(selectedDate)} ({getDayOfWeekName(selectedDate)})
               </h3>
               <p className="text-xs text-[var(--text-muted)]">
-                {daySessions.length} ca đã chốt · {daySlots.length} ca chờ đăng ký · {totalHours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h live.{canEdit ? " Kéo thẻ ca sang hàng phòng khác để đổi phòng (giữ giờ) — phòng sàn kia của cùng brand thì đổi luôn sàn." : ""}
+                {daySessions.length} ca đã chốt · {daySlots.length} ca chờ đăng ký · {totalHours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h live.{canEdit ? " Kéo thẻ ca sang hàng phòng khác để đổi phòng, giữ giờ." : ""}
               </p>
             </div>
           </div>

@@ -24,6 +24,7 @@ import { LiveSession } from "../../types";
 import { suggestMergeGroups } from "../../lib/reconciliation/mergeRestarts";
 import { checkReconGroups, type CheckKind } from "../../lib/reconciliation/groupCheck";
 import { GmvEditor } from "../GmvEditor";
+import { InfoDot } from "../common/InfoDot";
 
 // Đối soát số liệu của MỘT brand + MỘT sàn, nằm ngay trong Dữ Liệu Gốc (gộp 07/10 — trước đây là màn riêng
 // "Đối Soát Số Liệu" bắt up file lần hai). Lô đối soát được tạo từ chính lần up ở Dữ Liệu Gốc (hoặc từ một lần tải đã lưu);
@@ -327,7 +328,7 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
       {!active && !busy && (
         <div className="bg-[var(--surface)] border border-dashed border-[var(--border)] rounded-2xl p-8 text-center">
           <FileSpreadsheet className="w-6 h-6 text-[var(--text-faint)] mx-auto mb-2" />
-          <p className="text-xs text-[var(--text-muted)]">Chưa có lần đối soát nào của brand này. Tải lên file ở trên (hoặc bấm "Đối soát" ở một lần tải trong Lịch Sử Import) để bắt đầu.</p>
+          <p className="text-xs text-[var(--text-muted)]">Chưa có lần đối soát nào — tải lên file ở trên để bắt đầu.</p>
         </div>
       )}
 
@@ -407,7 +408,10 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
                   </div>
                 </div>
                 {listed.length > 0 ? roomTable(listed, true) : <p className="text-2xs text-[var(--text-faint)]">Không phiên nào khớp ca.</p>}
-                <p className="text-2xs text-[var(--text-faint)] mt-2">Biết số đúng của một ca trong phiên nhiều ca? Bấm vào ô ca để gõ (✎): phần còn lại tự chia cho các ca kia.</p>
+                <p className="text-2xs text-[var(--text-faint)] mt-2">
+            Bấm ô ca (✎) để gõ số đúng.
+            <InfoDot label="Gõ số đúng cho một ca">Biết số đúng của một ca trong phiên nhiều ca thì gõ vào ô ca đó — phần còn lại tự chia cho các ca kia.</InfoDot>
+          </p>
               </div>
 
               {(unassignedRows.length > 0 || inhouseRows.length > 0) && (
@@ -463,7 +467,10 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
             <div className="space-y-3">
               <div className={`border rounded-2xl p-4 ${check.counts.canCheck > 0 ? "border-rose-800 bg-rose-950/20" : "border-emerald-800 bg-emerald-950/20"}`}>
                 <p className="text-xs font-black text-[var(--text)]">Kiểm tra theo nhóm ca–phiên · {check.groups.length} nhóm</p>
-                <p className="text-2xs text-[var(--text-muted)] mt-0.5 max-w-2xl">Ca nối, restart, ngắt giữa chừng dùng chung một phép kiểm: tổng các ca của nhóm phải bằng tổng phiên trong file.</p>
+                <p className="text-2xs text-[var(--text-muted)] mt-0.5 max-w-2xl">
+            Tổng các ca của nhóm phải bằng tổng phiên trong file.
+            <InfoDot label="Nhóm liên thông là gì">Ca nối, restart và ngắt giữa chừng dùng chung một phép kiểm này.</InfoDot>
+          </p>
                 {check.issues.length === 0 ? (
                   <p className="text-2xs text-emerald-300 mt-2 flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5" /> Tổng các ca khớp file ở mọi nhóm, không ca nào lệch hay thiếu phiên.</p>
                 ) : (

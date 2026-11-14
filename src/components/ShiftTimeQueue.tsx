@@ -51,7 +51,7 @@ export const ShiftTimeQueue: React.FC<{ sessions: LiveSession[]; today: string; 
           );
         })}
       </ul>
-      <p className="text-2xs text-[var(--text-faint)]">Sửa khai báo ở Giao ca của ca đó, hoặc ghi lý do vào ghi chú giao ca để tắt dòng này.</p>
+      <p className="text-2xs text-[var(--text-faint)]">Sửa khai báo ở Giao ca, hoặc ghi lý do để tắt dòng này.</p>
     </section>
   );
 };

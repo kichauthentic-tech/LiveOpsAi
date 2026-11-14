@@ -3,6 +3,7 @@ import { assertAffected } from "./assertAffected";
 import { snapshotRowsFromParsed } from "../liveSnapshot/extractRooms";
 import type { ParsedDataRawImport } from "../dataraw/parseDataRawExcel";
 import { platformOf, type ReportPlatform } from "../reportPlatform";
+import { featureOffError } from "../featureOff";
 
 export type ReconciliationBucket = "agency" | "review" | "unassigned" | "inhouse";
 
@@ -129,7 +130,7 @@ export async function setReconciliationRowsExcluded(batchId: string, rowIds: str
     .in("id", rowIds)
     .select("id");
   if (error) {
-    if (error.code === "42703" || error.code === "PGRST204") throw new Error("Chưa chạy migration 0166 nên chưa chọn được phiên đối soát.");
+    if (error.code === "42703" || error.code === "PGRST204") throw featureOffError("chọn phiên đối soát", "migration 0166 — cột live_reconciliation_rows.excluded");
     throw error;
   }
   assertAffected(data, "chọn phiên đối soát");
@@ -178,7 +179,7 @@ export async function setReconciliationBucket(
 export async function mergeReconciliationRows(batchId: string, groups: string[][]): Promise<number> {
   const { data, error } = await supabase.rpc("merge_reconciliation_rows", { p_batch_id: batchId, p_groups: groups });
   if (error) {
-    if (error.code === "PGRST202") throw new Error("Chưa chạy migration 0167 nên chưa gộp được dòng đối soát.");
+    if (error.code === "PGRST202") throw featureOffError("gộp dòng đối soát", "migration 0167");
     throw error;
   }
   return (data as number) ?? 0;
@@ -222,7 +223,7 @@ export async function fetchReconciliationPreview(batchId: string): Promise<Recon
 export async function setReconGmvOverride(rowId: string, sessionId: string, gmv: number | null): Promise<void> {
   const { error } = await supabase.rpc("set_recon_gmv_override", { p_row_id: rowId, p_session_id: sessionId, p_gmv: gmv });
   if (error) {
-    if (error.code === "PGRST202") throw new Error("Chưa chạy migration 0174 nên chưa sửa được GMV ở đối soát.");
+    if (error.code === "PGRST202") throw featureOffError("sửa GMV ở đối soát", "migration 0174");
     throw error;
   }
 }

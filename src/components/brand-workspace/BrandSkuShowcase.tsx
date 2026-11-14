@@ -11,6 +11,7 @@ import { fmtNum, fmtVndShort, fmtVndFull } from "../../lib/format";
 import { platformOf } from "../../lib/reportPlatform";
 import { salesTerm } from "../../lib/metricGlossary";
 import { errorMessage } from "../../lib/errorMessage";
+import { featureOffText } from "../../lib/featureOff";
 
 interface BrandSkuShowcaseProps {
   brandId: string;
@@ -152,7 +153,7 @@ export const BrandSkuShowcase: React.FC<BrandSkuShowcaseProps> = ({ brandId, cur
       const n = await onImportSkus(toImport.map((r) => ({ brandId, platform: active, name: r.name, flashPrice: r.avgPrice })));
       setImportNote(`Đã thêm ${n.toLocaleString("vi-VN")} sản phẩm ${active} vào danh mục.`);
     } catch (e) {
-      setImportNote(errorMessage(e, "Không nhập được — đã chạy migration 0196 chưa?"));
+      setImportNote(errorMessage(e, featureOffText("nhập SKU từ file")));
     } finally {
       setBusy(false);
     }

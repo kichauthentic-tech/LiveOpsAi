@@ -1,3 +1,5 @@
+import { errorMessage } from "./errorMessage";
+
 // xlsx (~1 MB mã nguồn, lớn nhất bundle) chỉ cần lúc bấm "Tải Excel" → tải động khi gọi, không nằm trong chunk
 // của màn (audit UX 2026-09-26, P2). Vì vậy 2 hàm dưới là async; lỗi (mất mạng lúc tải thư viện) do caller báo.
 
@@ -37,3 +39,9 @@ export async function downloadSheetsAsXlsx(sheets: { name: string; rows: Record<
   }
   XLSX.writeFile(wb, filename);
 }
+
+/**
+ * Câu báo lỗi khi xuất Excel — nói MỘT lần ở đây. Audit chữ 14/11: 11 màn tự viết lại cùng một câu
+ * (`Không tải được file Excel: …`), sửa chữ phải sửa 11 chỗ.
+ */
+export const xlsxFailText = (e: unknown) => `Không tải được file Excel: ${errorMessage(e)}`;

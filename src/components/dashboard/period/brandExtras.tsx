@@ -115,7 +115,12 @@ const Suggestions: React.FC<{ sessions: LiveSession[]; bucketOf: (d: string) => 
   const pill = (ok: boolean) => <span className={`px-2 py-0.5 rounded-full text-2xs ${ok ? "bg-emerald-500/15 text-emerald-400" : "bg-[var(--surface-elevated)] text-[var(--text-faint)]"}`}>{ok ? "Đủ tin cậy" : "Chưa đủ tin cậy"}</span>;
   return (
     <Card>
-      <BlockHead nav="Đề xuất" title="Đề xuất tối ưu" sub="Chỉ giữ quy tắc đã được thử lại: lấy các tháng trước để đoán tháng sau, quy tắc nào đoán đúng hơn mới được đưa ra. Mức tăng là mức tối đa — giả định giờ dời sang khung khác vẫn đạt GMV/giờ như trung bình khung đó." />
+      <BlockHead
+        nav="Đề xuất"
+        title="Đề xuất tối ưu"
+        sub="mức tăng là mức tối đa"
+        info="Chỉ giữ quy tắc đã được thử lại: lấy các tháng trước để đoán tháng sau, quy tắc nào đoán đúng hơn mới được đưa ra. Mức tăng giả định giờ dời sang khung khác vẫn đạt GMV/giờ như trung bình khung đó."
+      />
       <div className="space-y-4 text-xs">
         <div className={`border-l-2 pl-3 space-y-1.5 ${slotOk ? "border-emerald-500" : "border-[var(--border)] opacity-80"}`}>
           <p className="font-bold text-[var(--text)] flex items-center gap-2">{pill(slotOk)}Khung giờ ngày Daily</p>

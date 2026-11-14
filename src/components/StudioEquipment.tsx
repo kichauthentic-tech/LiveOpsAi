@@ -7,6 +7,7 @@ import { useConfirm } from "../hooks/useConfirm";
 import { statusLabel } from "../lib/statusLabels";
 import { SESSION_STATUS_LABEL_VI } from "../lib/sessionStatusUi";
 import { PageHeader } from "./common/PageHeader";
+import { InfoDot } from "./common/InfoDot";
 
 interface StudioEquipmentProps {
   studios: Studio[];
@@ -267,7 +268,10 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
                   {todaysBookings.length} ca hôm nay
                 </span>
               </h3>
-              <p className="text-xs text-[var(--text-muted)]">Phòng mặc định của từng kênh brand đặt ở CRM → "Hợp đồng & giá"; ca chốt ra sẽ dùng phòng đó. Dưới mỗi phòng là các ca hôm nay.</p>
+              <p className="text-xs text-[var(--text-muted)]">
+        Dưới mỗi phòng là các ca hôm nay.
+        <InfoDot label="Phòng mặc định đặt ở đâu">Phòng mặc định của từng kênh đặt ở CRM, mục Hợp đồng &amp; giá; ca chốt ra sẽ dùng phòng đó.</InfoDot>
+      </p>
             </div>
             <button
               onClick={openAddStudioModal}

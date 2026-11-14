@@ -14,6 +14,7 @@ import { brandPlatformKey, type ReportPlatform } from "../../lib/reportPlatform"
 import { hoursToSchedule } from "../../lib/roster/monthDesk";
 import { widenWindow } from "../../lib/scheduling/monthPlanGrid";
 import { expandPattern, fitToHours, parsePastedSchedule, totalHours, weekPattern, type TimeFrame } from "../../lib/roster/openMonth";
+import { InfoDot } from "../common/InfoDot";
 
 // "Mở lịch tháng sau" 3 bước (Điều Phối Lịch Live bản gọn — đợt 2, 25/10; user chốt: tháng 11 lập lịch TRONG APP, giờ cam kết
 // nhập tại chỗ, target vẫn ở Kế Hoạch Tháng). Ghi qua ĐÚNG đường của Kế Hoạch Tháng để Dashboard / dự báo / chia target sau
@@ -412,7 +413,7 @@ export const OpenMonthWizard: React.FC<{
               <MilestonesEditor month={month} value={ms} onChange={setMs} disabled={running || !!results} />
               <ul className="text-xs text-[var(--text-muted)] space-y-1 list-disc pl-4">
                 <li>Mỗi kênh: lưu giờ cam kết, lưu lưới ca vào Kế Hoạch Tháng rồi chốt — ca mở hiện ở app talent (Đăng ký ca).</li>
-                <li>Lịch mở cả tháng một lần; mỗi host/trợ nhận MỘT tin ghi cả hai hạn. Qua hạn của đợt nào thì talent không đăng ký thêm ca đợt đó; bạn vẫn xếp hộ.</li>
+                <li>Lịch mở cả tháng một lần; mỗi host/trợ nhận MỘT tin ghi cả hai hạn.<InfoDot label="Qua hạn thì sao">Qua hạn của đợt nào thì talent không đăng ký thêm ca đợt đó, nhưng bạn vẫn xếp hộ được.</InfoDot></li>
                 <li>Ngày chốt lịch: Việc cần làm nhắc công bố ca của đợt đó trước ngày này.</li>
                 <li>{platformText("Target GMV", "all")}: có sau buổi họp monthly với brand — CEO/admin vào Kế Hoạch Tháng, thẻ "Nhận target brand" so target với dự báo của lịch rồi chia xuống từng ca (ca mới có target 0 tới lúc đó).</li>
               </ul>

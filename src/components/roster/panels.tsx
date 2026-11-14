@@ -11,6 +11,7 @@ import { famOf, plannedCost, rankCandidates, shiftCost, type CostMove, type Fami
 import { dayLabel } from "./ShiftPanel";
 import type { RosterChange } from "../../lib/db/roster";
 import type { LiveSession } from "../../types";
+import { InfoDot } from "../common/InfoDot";
 
 // Các tab con của Điều Phối Lịch Live. Chỉ vẽ + gọi callback; ghi DB ở RosterBoard.
 
@@ -107,10 +108,14 @@ export const WeekGrid: React.FC<{
           ))}
         </div>
       </div>
-      <p className="flex flex-wrap gap-x-4 gap-y-1 text-2xs text-[var(--text-muted)]">
-        <span>Viền đỏ = lỗi chặn công bố hoặc ca thiếu host · "cần trợ" = chưa công bố tới khi có trợ hoặc No Asst</span>
-        <span>Viền vàng = cảnh báo</span>
-        <span>Viền đứt = ca mở (nháp / chưa xếp), talent chưa thấy người</span>
+      <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-2xs text-[var(--text-muted)]">
+        <span>Viền đỏ = chặn công bố</span>
+        <span>vàng = cảnh báo</span>
+        <span>đứt = ca mở</span>
+        <InfoDot label="Chú giải viền ca">
+          Viền đỏ: lỗi chặn công bố hoặc ca thiếu host. Chip &quot;cần trợ&quot;: chưa công bố tới khi có trợ live hoặc gắn No Asst.
+          Viền đứt: ca mở (nháp / chưa xếp), talent chưa thấy tên người.
+        </InfoDot>
       </p>
     </div>
   );
@@ -136,7 +141,13 @@ export const ChecksPanel: React.FC<{ analysis: RosterAnalysis; shifts: RosterShi
   const byKey = new Map(shifts.map((s) => [s.key, s]));
   return (
     <div className="space-y-2">
-      <p className="text-xs text-[var(--text-muted)]">Chạy lại sau mỗi lần đổi người. Lỗi đỏ chặn "Công bố tuần"; ca thiếu host không chặn (ca vẫn mở sau công bố); mục vàng là cảnh báo, trainer tự quyết. Luật nghỉ / ngày liền tính cả tuần trước.</p>
+      <p className="text-xs text-[var(--text-muted)]">
+        Lỗi đỏ chặn công bố tuần, vàng là cảnh báo.
+        <InfoDot label="Cách đọc kiểm lịch">
+          Chạy lại sau mỗi lần đổi người. Ca thiếu host không chặn — ca vẫn mở sau công bố. Mục vàng trainer tự quyết.
+          Luật nghỉ và ngày làm liền tính cả tuần trước.
+        </InfoDot>
+      </p>
       {RULE_ORDER.map(([code, label]) => {
         const items = analysis.issues.filter((i) => i.code === code);
         // Màu theo mục thật sự có (trùng người giữa hai ca đã lên lịch chỉ là cảnh báo), không theo mức mặc định của luật.
@@ -195,7 +206,13 @@ export const AbsencePanel: React.FC<{
   const nm = (id: string) => talentShortName(talents.find((t) => t.id === id));
   return (
     <div className="space-y-3">
-      <p className="text-xs text-[var(--text-muted)]">Một người báo không đi được một ngày: các ca của họ hiện ra, mỗi vai kèm 3 người thay hợp nhất (rảnh giờ đó, quen kênh, giờ tuần còn thấp, không phạm luật nghỉ). Ca đã lên lịch thì đổi người có ghi lý do "Báo nghỉ" và DB báo cho người mới + người bị rút.</p>
+      <p className="text-xs text-[var(--text-muted)]">
+        Chọn người và ngày: mỗi ca hiện 3 người thay phù hợp nhất.
+        <InfoDot label="Cách chọn người thay">
+          Xếp theo: đã báo rảnh giờ đó, quen kênh, giờ tuần còn thấp, không phạm luật nghỉ. Ca đã lên lịch thì đổi người ghi lý do
+          &quot;Báo nghỉ&quot; vào nhật ký, và người mới cùng người bị rút đều được báo.
+        </InfoDot>
+      </p>
       <div className="flex flex-wrap items-end gap-3 text-xs">
         <label className="flex flex-col gap-1">
           Người báo nghỉ
@@ -277,7 +294,7 @@ export const MatrixPanel: React.FC<{ channels: ChannelRow[]; fam: FamiliarityMap
     .filter((x): x is NonNullable<typeof x> => !!x && x.pool.length > 0);
   return (
     <div className="space-y-4">
-      <p className="text-xs text-[var(--text-muted)]">Số ca 90 ngày (trước tuần đang xem) của từng người ở từng kênh, dạng "host / trợ". Dòng cuối: số host đã đứng ≥ 3 ca. Kênh dưới 3 là kênh mỏng: một người nghỉ là thiếu.</p>
+      <p className="text-xs text-[var(--text-muted)]">Số ca 90 ngày của từng người ở từng kênh, dạng &quot;host / trợ&quot;.<InfoDot label="Cách đọc bảng kênh mỏng">Tính 90 ngày trước tuần đang xem. Dòng cuối: số host đã đứng ≥ 3 ca ở kênh đó. Kênh dưới 3 là kênh mỏng — một người nghỉ là thiếu.</InfoDot></p>
       <div className="overflow-x-auto rounded-xl border border-[var(--border)]">
         <table className="w-full text-xs">
           <thead>
@@ -335,7 +352,7 @@ export const MatrixPanel: React.FC<{ channels: ChannelRow[]; fam: FamiliarityMap
               </li>
             ))}
           </ul>
-          <p className="text-2xs text-[var(--text-muted)]">Ưu tiên người đã quen cùng brand ở sàn còn lại (cùng sản phẩm, khác sàn) — mỗi người một kênh chính + một kênh phụ là đủ để kênh nào cũng có người thay.</p>
+          <p className="text-2xs text-[var(--text-muted)]">Ưu tiên người đã quen cùng brand ở sàn còn lại.<InfoDot label="Vì sao gợi ý vậy">Cùng sản phẩm, khác sàn nên học nhanh. Mỗi người một kênh chính + một kênh phụ là đủ để kênh nào cũng có người thay.</InfoDot></p>
         </div>
       )}
     </div>
@@ -438,7 +455,13 @@ export const HoursCostPanel: React.FC<{
       )}
       <section className="space-y-2">
         <h4 className="text-sm font-black text-[var(--text)]">Giờ từng người tuần này</h4>
-        <p className="text-xs text-[var(--text-muted)]">Giờ theo lịch, cả vai host và trợ (ca đổi người giữa ca chỉ tính phần người đó đứng). Vạch đỏ = {rules.maxWeekHours} giờ (chặn công bố), vạch mờ = {rules.warnWeekHours} giờ.{showCost ? " Tiền công = rate × giờ theo lịch, chưa tính live quá giờ (OT) / kết thúc sớm." : ""}</p>
+        <p className="text-xs text-[var(--text-muted)]">
+          Vạch đỏ = {rules.maxWeekHours} giờ (chặn công bố), vạch mờ = {rules.warnWeekHours} giờ.
+          <InfoDot label="Giờ và tiền tính thế nào">
+            Giờ theo lịch, cả vai host và trợ live; ca đổi người giữa ca chỉ tính phần người đó đứng.
+            {showCost ? " Tiền công = rate × giờ theo lịch, chưa tính live quá giờ (OT) hay kết thúc sớm." : ""}
+          </InfoDot>
+        </p>
         <div className="overflow-x-auto rounded-xl border border-[var(--border)]">
           <table className="w-full text-xs">
             <thead>
@@ -529,7 +552,7 @@ export const RulesPanel: React.FC<{ rules: RosterRules; readOnly: boolean; busy:
   );
   return (
     <div className="space-y-4">
-      <p className="text-xs text-[var(--text-muted)]">Ngưỡng dùng chung cho cả agency. Giờ tối đa/tuần là luật CHẶN (không công bố, không đổi người được nếu vượt — Bộ luật Lao động 2019: giờ làm bình thường ≤ 48 giờ/tuần). Các ngưỡng còn lại chỉ cảnh báo.</p>
+      <p className="text-xs text-[var(--text-muted)]">Ngưỡng dùng chung cho cả agency: giờ tối đa/tuần CHẶN, còn lại chỉ cảnh báo.<InfoDot label="Vì sao chặn ở giờ tuần">Bộ luật Lao động 2019: giờ làm bình thường ≤ 48 giờ/tuần. Vượt thì không công bố và không đổi người được.</InfoDot></p>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {num("maxWeekHours", "Giờ tối đa / tuần (chặn)", "Quá ngưỡng thì không công bố được.", 0.5)}
         {num("warnWeekHours", "Giờ cảnh báo / tuần", "Vượt thì tô vàng.", 0.5)}
@@ -561,7 +584,7 @@ export const ChangeLogPanel: React.FC<{ changes: RosterChange[] | null; sessions
   return (
     <section className="space-y-2 border-t border-[var(--border)] pt-4">
       <h4 className="text-sm font-black text-[var(--text)]">Nhật ký đổi lịch (30 ngày)</h4>
-      <p className="text-xs text-[var(--text-muted)]">Mỗi lần đổi người / dời giờ một ca đã lên lịch từ Điều Phối Lịch Live, kèm lý do. Đổi ở màn khác (Lịch & Studio, Cửa sổ Ca Live) không ghi vào đây.</p>
+      <p className="text-xs text-[var(--text-muted)]">Mỗi lần đổi người hoặc dời giờ một ca đã lên lịch, kèm lý do.<InfoDot label="Nhật ký ghi những gì">Chỉ ghi thao tác làm từ Điều Phối Lịch Live. Đổi ở Lịch &amp; Studio hay Cửa sổ Ca Live không vào đây.</InfoDot></p>
       {changes === null && <p className="text-xs text-[var(--text-muted)]">Đang tải…</p>}
       {changes && changes.length === 0 && <p className="text-xs text-[var(--text-muted)]">Chưa có lần đổi nào.</p>}
       {changes && changes.length > 0 && (

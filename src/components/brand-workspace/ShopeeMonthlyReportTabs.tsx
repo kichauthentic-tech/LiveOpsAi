@@ -20,9 +20,8 @@ import { NextLivePlanPanel, LIVE_TARGET_MANUAL_KEY, decodeLiveTarget, encodeLive
 import { fmtM, fmtP, hbars, heat, pill, tbl, W, waterfall } from "./report/demoCharts";
 import { saveMonthlyReportSectionNote } from "../../lib/db/monthlyReports";
 import { fetchMonthPlan } from "../../lib/db/monthPlans";
-import { downloadSheetsAsXlsx } from "../../lib/exportXlsx";
+import { downloadSheetsAsXlsx, xlsxFailText } from "../../lib/exportXlsx";
 import { useToast } from "../../hooks/useToast";
-import { errorMessage } from "../../lib/errorMessage";
 import { effectiveCamp, resolveCampBucketType, type CampDayBucket } from "../../lib/campaignDays";
 import { planCampAllocation } from "../../lib/report/monthlyReportInsights";
 import { changeTone, noiseBand } from "../../lib/report/brandReport";
@@ -641,7 +640,7 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
         { name: "6 Khung gio", rows: slots.map((x) => ({ "Khung giờ": x.label, [`Phiên ${monthShortLabel(prevMonth)}`]: x.prev.n, [`Sales/giờ ${monthShortLabel(prevMonth)}`]: n(x.prev.gmvPerHour), [`Phiên ${monthShortLabel(month)}`]: x.cur.n, [`Sales/giờ ${monthShortLabel(month)}`]: n(x.cur.gmvPerHour) })) }
       ],
       `ReportThang_Shopee_${brandName}_${month}.xlsx`.replace(/\s+/g, "_")
-    ).catch((e) => showToast(`Không tải được file Excel: ${errorMessage(e)}`));
+    ).catch((e) => showToast(xlsxFailText(e)));
   };
 
   return (

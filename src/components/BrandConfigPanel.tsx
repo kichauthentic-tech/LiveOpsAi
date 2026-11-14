@@ -19,6 +19,7 @@ import { NumberField, btnCls, inputCls } from "./crm/fields";
 import { TermsPanel } from "./crm/TermsPanel";
 import { MonthSettlementPanel } from "./crm/MonthSettlementPanel";
 import { TalentRulesPanel } from "./crm/TalentRulesPanel";
+import { FeatureOffNote } from "./common/FeatureOffNote";
 
 // "Hợp đồng & giá" của MỘT brand — chỗ nhập DUY NHẤT cho mọi điều khoản thương mại (gộp cấu hình 06/10, user: "đưa
 // vào cấu hình đúng 1 chỗ ở CRM"). Trước đó: đơn giá/hoa hồng/hoàn huỷ ở nút Rate Card trong CRM, hợp đồng + giờ cam
@@ -128,7 +129,7 @@ function ChannelInfo({ channel, platform, canEdit, onSave }: { channel?: BrandCh
         {real && channel!.status === "paused" && <span className="ml-1.5 text-2xs font-bold text-amber-300">tạm dừng</span>}
       </div>
       {!real ? (
-        <p className="text-2xs text-[var(--text-faint)]">Chưa có bảng kênh trên DB (migration 0149) — tên gian hàng, mã shop sẽ nhập được sau khi chạy.</p>
+        <FeatureOffNote what="nhập tên gian hàng và mã shop" />
       ) : (
         <>
           <label className="flex-1 min-w-[10rem] text-2xs text-[var(--text-muted)] space-y-1">

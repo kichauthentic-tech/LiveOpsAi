@@ -11,6 +11,7 @@ import { errorMessage } from "../lib/errorMessage";
 import { useConfirm } from "./useConfirm";
 import { publishBlocker } from "../lib/report/monthClose";
 import { todayVn } from "../lib/performance/brandCommitment";
+import { publishClosesMonthNotice } from "../lib/closedMonth";
 
 // Phát hành / thu hồi Report Tháng của một brand × sàn × tháng. Trước 23/10 nằm trong màn "Điều Phối Phát Hành" riêng; audit trùng màn
 // 23/10 gộp màn đó vào Toàn Cảnh Brand (cột Report Tháng) — logic giữ nguyên, chỉ chuyển chỗ.
@@ -75,7 +76,7 @@ export function useReportPublish({ platform, brands, sessions, brandPlatformRate
         const f = engine.freshness(stored.snapshot as AnySnapshot, { sessions, planMonthTotals, brandPlatformRates, stamps, month });
         if (!f.upToDate) {
           const why = f.changes.join(" · ");
-          if (!(await confirm(`Bản chụp số ${platform} của ${fmtMonthLabel(month)} (${brandName}) đã cũ so với dữ liệu hiện tại${why ? `: ${why}` : ""}.\n\nĐồng ý = cập nhật bản chụp theo số mới rồi phát hành. Muốn xem lại số trước thì Huỷ và mở Report Tháng.`))) return;
+          if (!(await confirm(`Bản chụp số ${platform} của ${fmtMonthLabel(month)} (${brandName}) đã cũ so với dữ liệu hiện tại${why ? `: ${why}` : ""}.\n\nĐồng ý = cập nhật bản chụp theo số mới rồi phát hành.`))) return;
           refresh = true;
         }
       }
@@ -87,7 +88,7 @@ export function useReportPublish({ platform, brands, sessions, brandPlatformRate
       (unreconciled > 0
         ? `Còn ${unreconciled} ca ${platform} đã xong trong ${fmtMonthLabel(month)} chưa đối soát với ${platform} — số trong report có thể còn đổi.\n\nVẫn phát hành ${fmtMonthLabel(month)} cho ${brandName}?`
         : `Phát hành report ${platform} ${fmtMonthLabel(month)} cho ${brandName}? Brand sẽ thấy report này ngay.`) +
-        `\n\nPhát hành = ĐÓNG SỔ ${platform} của tháng: sau đó không sửa/đối soát/loại/huỷ ca ${platform} của ${brandName} trong tháng này được nữa cho tới khi thu hồi report (ca sàn kia không bị ảnh hưởng).`
+        `\n\n${publishClosesMonthNotice(platform)}`
     );
     if (!ok) return;
     const force = unreconciled > 0;

@@ -13,6 +13,7 @@ import {
   type ActionStatus
 } from "../../../lib/report/actionPlan";
 import { errorMessage } from "../../../lib/errorMessage";
+import { featureOffText } from "../../../lib/featureOff";
 
 // Hai bảng cuối trang "Kế hoạch tháng sau" theo bản demo Report Tháng (#p9), cùng một khuôn cột:
 // Action · Căn cứ · Chỉ tiêu · (Kết quả) · Deadline · Status · PIC · Note. Bấm vào ô để sửa, tự lưu vào cột action_plan (0182)
@@ -73,7 +74,7 @@ const ActionEditor: React.FC<{
       setStatus("Đã lưu");
     } catch (e) {
       const msg = errorMessage(e, "Lưu action plan thất bại");
-      setStatus(/action_plan/.test(msg) ? "Chưa có cột action_plan — cần chạy migration 0182 trong SQL Editor." : msg);
+      setStatus(/action_plan/.test(msg) ? featureOffText("lưu kế hoạch hành động") : msg);
     }
   };
   const queue = (list: ActionItem[], now = false) => {

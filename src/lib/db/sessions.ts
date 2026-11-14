@@ -3,6 +3,7 @@ import { assertAffected } from "./assertAffected";
 import { fetchAllPages } from "./fetchAllPages";
 import { EarlyLeaveReason, LiveSession, LiveSessionReport, StaffCheckpoint, StaffSegment, UserRole } from "../../types";
 import { platformOf } from "../reportPlatform";
+import { featureOffError } from "../featureOff";
 
 // brands/studios/talents are all real Supabase tables now (Phases 1/3) and every
 // UI form selects these IDs from the real lists — no more free-text fallback, so
@@ -713,7 +714,7 @@ export async function setSessionActuals(sessionId: string, v: { gmv: number; liv
 export async function confirmZeroSales(sessionId: string): Promise<LiveSession> {
   const { error } = await supabase.rpc("confirm_zero_sales", { p_session_id: sessionId });
   if (error) {
-    if (error.code === "PGRST202" || error.code === "42883") throw new Error("DB chưa chạy migration 0201 (xác nhận ca bán 0).");
+    if (error.code === "PGRST202" || error.code === "42883") throw featureOffError("xác nhận ca bán 0", "migration 0201 — rpc confirm_zero_sales");
     throw error;
   }
   return fetchSessionById(sessionId);
@@ -768,7 +769,7 @@ export async function deleteSession(id: string): Promise<void> {
 export async function splitSessionAtHostChange(sessionId: string): Promise<LiveSession[]> {
   const { data, error } = await supabase.rpc("split_session_at_host_change", { p_session_id: sessionId });
   if (error) {
-    if (error.code === "PGRST202") throw new Error("Chưa chạy migration 0216 nên chưa tách được ca.");
+    if (error.code === "PGRST202") throw featureOffError("tách ca đổi host", "migration 0216 — rpc split_session_at_host_change");
     throw error;
   }
   const ids = ((data as { session_ids?: string[] } | null)?.session_ids ?? [sessionId]);

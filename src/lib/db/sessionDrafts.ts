@@ -1,6 +1,7 @@
 import { supabase } from "../supabaseClient";
 import { assertAffected } from "./assertAffected";
 import type { ReportPlatform } from "../reportPlatform";
+import { featureOffText } from "../featureOff";
 
 // Ca nháp của Phòng Điều Hành (migration 0170). Sa bàn "Tự xếp" chỉ tạo NHÁP — OP xác nhận (có thể sửa giờ, người, phòng) thì
 // RPC accept_session_draft mới tạo ca chờ đăng ký + chốt người trong MỘT transaction (đường của ca OP mở tay ⇒ chặn trùng người,
@@ -28,7 +29,7 @@ export interface SessionDraft {
 export type SessionDraftInput = Pick<SessionDraft, "brandId" | "platform" | "date" | "startTime" | "endTime" | "hostId" | "coHostId" | "studioId" | "expectedGmv" | "reason">;
 
 const MISSING = new Set(["PGRST202", "PGRST205", "42P01", "42883"]);
-export const DRAFTS_MISSING_TEXT = "DB chưa chạy migration 0170 (ca nháp Phòng Điều Hành) — chạy SQL trong Supabase rồi thử lại.";
+export const DRAFTS_MISSING_TEXT = featureOffText("ca nháp ở Phòng Điều Hành");
 
 interface Row {
   id: string;

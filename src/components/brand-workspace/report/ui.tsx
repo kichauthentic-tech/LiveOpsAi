@@ -12,6 +12,7 @@ import { LINK_BTN, PAL, alpha, DRIVER_SHORT, chartTooltipStyle, usePal } from ".
 import { chartNum } from "./format";
 import { STAT_LABEL_SHAPE } from "../../common/StatTile";
 import { t, monthLong } from "../../../lib/displayLang";
+import { featureOffText } from "../../../lib/featureOff";
 
 // Bộ component trình bày của Report Tháng — khung panel, bảng, thẻ KPI, hộp Insight, biểu đồ thác,
 // ô sửa nhận xét. Tách khỏi MonthlyReportTabs.tsx 2026-10-01: toàn bộ chỗ này đã tự chứa sẵn (không
@@ -311,7 +312,7 @@ export const InsightBox: React.FC<{
       setEditing(false);
     } catch (e) {
       const msg = errorMessage(e, "Lưu Insight thất bại");
-      setError(/section_notes/.test(msg) ? "Chưa có cột section_notes — cần chạy migration 0121 trong SQL Editor." : msg);
+      setError(/section_notes/.test(msg) ? featureOffText("lưu ghi chú của mục") : msg);
     } finally {
       setSaving(false);
     }

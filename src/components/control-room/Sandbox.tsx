@@ -5,6 +5,7 @@ import { eachDay } from "../../lib/dateUtils";
 import { pWithAdds, type Candidate, type PlanObjective, type PlannedSession } from "../../lib/performance/controlRoom";
 import { ddmm, money, pct } from "../dashboard/shared";
 import type { RoomChannel } from "./types";
+import { InfoDot } from "../common/InfoDot";
 
 // Sa bàn: lưới ô ca 3 giờ còn trống (phòng của kênh rảnh + có host và trợ quen kênh rảnh) từ ngày mai tới cuối tháng. Bấm để thử,
 // "Tự xếp" chọn N ca tăng nhiều nhất, xác suất từng kênh đổi ngay. "Tạo ca nháp" ghi NHÁP (0170) — OP xác nhận mới thành ca thật.
@@ -84,7 +85,13 @@ export const Sandbox: React.FC<{
           ))}
         </div>
       </div>
-      <p className="text-2xs text-[var(--text-faint)]">Mỗi ngày 3 ô: 10h · 14h · 20h (ca 3 giờ). Ô trống: phòng đã có ca, hoặc không còn host/trợ quen kênh rảnh. Ca thêm tính 0,8 lần kỳ vọng vì giờ thêm thường có hiệu suất thấp hơn giờ sẵn có; khung 14h ít lịch sử nên cân nhắc trước khi tin.</p>
+      <p className="text-2xs text-[var(--text-faint)]">
+        Mỗi ngày 3 ô: 10h · 14h · 20h (ca 3 giờ).
+        <InfoDot label="Ô trống và mức kỳ vọng">
+          Ô trống: phòng đã có ca, hoặc không còn host/trợ live quen kênh đang rảnh. Ca thêm tính 0,8 lần kỳ vọng vì giờ thêm
+          thường có hiệu suất thấp hơn giờ sẵn có; khung 14h ít lịch sử nên cân nhắc trước khi tin.
+        </InfoDot>
+      </p>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="overflow-x-auto">
@@ -109,7 +116,7 @@ export const Sandbox: React.FC<{
         </div>
         <div className="space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="text-xs text-[var(--text-faint)]">Ca đề xuất · host hiệu suất cao nhất đang rảnh, trợ ít giờ nhất tháng</span>
+            <span className="text-xs text-[var(--text-faint)]">Ca đề xuất<InfoDot label="Chọn người thế nào">Host hiệu suất cao nhất đang rảnh, trợ live ít giờ nhất tháng.</InfoDot></span>
             <button type="button" onClick={onCreateDrafts} disabled={plan.length === 0 || creating} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-bold bg-[var(--accent)] text-[var(--accent-contrast)] disabled:opacity-40 min-h-[34px]">
               {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}Tạo {plan.length} ca nháp cho OP
             </button>
@@ -130,7 +137,13 @@ export const Sandbox: React.FC<{
               ))
             )}
           </div>
-          <p className="text-2xs text-[var(--text-faint)]">Ca thêm là giờ brand mua thêm (hoặc agency tặng) — bàn với brand trước. Ca nháp chưa giữ phòng, chưa báo ai; OP xác nhận ở khối "Ca nháp chờ xác nhận" mới thành ca thật và tự thành ca tăng cường (không cộng vào target tháng).</p>
+          <p className="text-2xs text-[var(--text-faint)]">
+            Ca nháp chưa giữ phòng, chưa báo ai.
+            <InfoDot label="Ca thêm hoạt động thế nào">
+              Ca thêm là giờ brand mua thêm (hoặc agency tặng) — bàn với brand trước. OP xác nhận ở khối &quot;Ca nháp chờ xác nhận&quot;
+              thì ca mới thành ca thật, và tự thành ca tăng cường (không cộng vào target tháng).
+            </InfoDot>
+          </p>
         </div>
       </div>
     </div>

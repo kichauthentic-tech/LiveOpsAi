@@ -15,6 +15,7 @@ import { Explain } from "./common/Explain";
 import { LEGACY_PLATFORM, REPORT_PLATFORMS, platformOf, type ReportPlatform } from "../lib/reportPlatform";
 
 import { fmtDateVn, fmtFixed, fmtVndShort } from "../lib/format";
+import { InfoDot } from "./common/InfoDot";
 // AI Training Center — mục "Engine Kế Hoạch Tháng". Engine là thuật toán thuần, không phải LLM: không
 // có prompt để sửa, chỉ có tham số để vặn và kết quả học để nhìn. Hai nửa của panel đi cùng nhau: đổi
 // tham số bên trái → nửa "engine đã học gì" tính lại ngay (chưa cần lưu), để admin thấy nút vặn ảnh
@@ -111,7 +112,7 @@ export const EngineTrainingPanel: React.FC<Props> = ({ brands, sessions, shiftSl
             Engine Kế Hoạch Tháng
             <span className="text-xs font-semibold text-sky-400 inline-flex items-center gap-1"><Sparkles className="w-3.5 h-3.5" /> không phải LLM — thuật toán thuần</span>
           </h2>
-          <p className="text-xs text-[var(--text-muted)] mt-0.5">Engine gợi ý lịch học từ ca đã đối soát rồi xếp ca theo tham số bên dưới.</p>
+          <p className="text-xs text-[var(--text-muted)] mt-0.5">Engine học từ ca đã đối soát rồi xếp ca theo tham số.</p>
           <Explain summary="Vì sao không có prompt để sửa" className="mt-0.5 max-w-2xl">
             <p>"Huấn luyện" = xem engine học được gì theo brand, vặn tham số, thấy kết quả đổi ngay, rồi lưu. Kết quả lặp lại được và giải thích được — cần thế khi chốt lịch cho host.</p>
           </Explain>
@@ -144,7 +145,10 @@ export const EngineTrainingPanel: React.FC<Props> = ({ brands, sessions, shiftSl
               </div>
             </div>
             {!history || history.sessions === 0 ? (
-              <p className="text-xs text-[var(--text-muted)]">Brand chưa có ca đối soát nào — không có gì để học. Tải lên file ở Dữ Liệu Gốc của brand rồi Áp dụng đối soát, hoặc nạp bù từ file.</p>
+              <p className="text-xs text-[var(--text-muted)]">
+            Brand chưa có ca đối soát nào — không có gì để học.
+            <InfoDot label="Làm sao có ca đối soát">Tải lên file ở Dữ Liệu Gốc của brand rồi Áp dụng đối soát, hoặc nạp bù ca từ file.</InfoDot>
+          </p>
             ) : (
               <div className="text-xs space-y-3">
                 <div className="grid grid-cols-2 gap-x-3 gap-y-1">

@@ -11,8 +11,7 @@ import { runRateExportSheets, type ExportAccount } from "../lib/performance/runR
 import { dataCoverage } from "../lib/performance/channelHealth";
 import { aggregate, ranIn, resolvePeriod, spanDays, type CompareMode, type PeriodKey } from "../lib/performance/periodCompare";
 import { brandPlatformKey, platformOf, type ReportPlatform } from "../lib/reportPlatform";
-import { downloadSheetsAsXlsx } from "../lib/exportXlsx";
-import { errorMessage } from "../lib/errorMessage";
+import { downloadSheetsAsXlsx, xlsxFailText } from "../lib/exportXlsx";
 import { planStatusesRead } from "../lib/db/monthPlans";
 import { commitmentsRead, contractsRead } from "../lib/db/brandContracts";
 import { todayVn } from "../lib/performance/brandCommitment";
@@ -183,7 +182,7 @@ export const AgencyDashboard: React.FC<AgencyDashboardProps> = (props) => {
             return { Brand: b.name, "Sàn": platform, "Kỳ": label, "Kỳ so sánh": prevLabel, [platformText("GMV", platform)]: r(c.gmv), [`${platformText("GMV", platform)} kỳ so sánh`]: r(p?.gmv), [`${platformText("GMV/giờ", platform)}`]: r(c.gph), [`${platformText("GMV/giờ", platform)} kỳ so sánh`]: r(p?.gph), "Giờ live": Math.round(c.hours * 10) / 10, "Giờ live kỳ so sánh": p ? Math.round(p.hours * 10) / 10 : "", Sessions: c.n, Orders: c.orders };
           })
         }];
-    downloadSheetsAsXlsx(sheets, `Dashboard_${platform}_${period.start}_${period.end}.xlsx`).catch((e) => showToast(`Không tải được file Excel: ${errorMessage(e)}`));
+    downloadSheetsAsXlsx(sheets, `Dashboard_${platform}_${period.start}_${period.end}.xlsx`).catch((e) => showToast(xlsxFailText(e)));
   };
 
   const seg = (on: boolean) => `px-3 py-1.5 rounded-lg text-xs font-bold min-h-[30px] transition-colors whitespace-nowrap ${on ? "seg-on" : "text-[var(--text-muted)] hover:text-[var(--text)]"}`;

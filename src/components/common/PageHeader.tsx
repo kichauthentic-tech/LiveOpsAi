@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useEffect, useId, useRef, useState } from "react";
-import { Info } from "lucide-react";
+import React, { createContext, useContext } from "react";
+import { InfoDot } from "./InfoDot";
 import { PlatformChip } from "./PlatformChip";
 import type { ReportPlatform } from "../../lib/reportPlatform";
 
@@ -12,54 +12,14 @@ import type { ReportPlatform } from "../../lib/reportPlatform";
 export const PlatformBlockContext = createContext<{ platform: ReportPlatform; first: boolean } | null>(null);
 
 /**
- * Nút ⓘ cạnh tiêu đề: bấm mở đoạn giải thích của trang, bấm ra ngoài hoặc Esc thì đóng. Đầu trang một hàng (05/11) — trước
- * đó mô tả là một dòng riêng dưới tiêu đề (PageIntro), cộng với hàng tab là 2 hàng chữ trước khi tới số đầu tiên.
+ * Nút ⓘ cạnh tiêu đề trang: bấm mở mô tả trang. Đầu trang một hàng (05/11) — trước đó mô tả là một dòng riêng dưới
+ * tiêu đề (PageIntro), cộng với hàng tab là 2 hàng chữ trước khi tới số đầu tiên.
+ *
+ * Phần popover dùng chung với tiêu đề khối từ 13/11 (`common/InfoDot.tsx`); ở đây chỉ đặt nhãn của trang.
  */
-const PageInfo: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLSpanElement>(null);
-  const id = useId();
-
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
-  return (
-    <span ref={ref} className="relative inline-flex">
-      {/* -m-1 p-1: vùng bấm 24px (WCAG 2.5.8) mà không đẩy chữ tiêu đề. */}
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        aria-controls={id}
-        aria-label="Trang này để làm gì"
-        title="Trang này để làm gì"
-        className={`-m-1 p-1 rounded-full transition-colors ${open ? "text-[var(--accent-text)]" : "text-[var(--text-faint)] hover:text-[var(--text)]"}`}
-      >
-        <Info className="w-4 h-4" />
-      </button>
-      {open && (
-        <span
-          id={id}
-          role="note"
-          className="absolute left-0 top-full mt-2 z-30 w-[min(28rem,calc(100vw-2rem))] rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3 text-xs font-normal leading-relaxed tracking-normal text-[var(--text-muted)] shadow-2xl"
-        >
-          {children}
-        </span>
-      )}
-    </span>
-  );
-};
+const PageInfo: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <InfoDot label="Trang này để làm gì" size="md">{children}</InfoDot>
+);
 
 /**
  * Đầu trang dùng chung, MỘT hàng: tiêu đề + ⓘ (mô tả) · `tabs` (thanh tab / chọn kỳ của trang) · `actions` (bộ lọc, nút)

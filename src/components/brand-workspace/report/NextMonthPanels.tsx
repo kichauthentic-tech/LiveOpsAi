@@ -8,6 +8,7 @@ import { salesTerm } from "../../../lib/metricGlossary";
 import { monthLong, monthShort, t as tr } from "../../../lib/displayLang";
 import { noiseBand } from "../../../lib/report/brandReport";
 import { parseRatePct, type RefundTrackRow } from "../../../lib/report/nextMonthPlan";
+import { featureOffText } from "../../../lib/featureOff";
 
 // Các khối của trang "Kế hoạch tháng sau" theo bản demo Report Tháng (#p9) — markup/class nguyên từ demo.css (tiền tố .rt):
 // 1 · Target Live theo loại ngày, 2 · Booking Creator + Target Creator (đọc từ tab Affiliate → Kế hoạch). Chưa có kế hoạch thì vẫn hiện khung
@@ -325,7 +326,7 @@ export const RefundTrackPanel: React.FC<{
       setText((t) => ({ ...t, [month]: "" }));
     } catch (e) {
       const msg = errorMessage(e, "Lưu tỷ lệ chốt thất bại");
-      setError(/section_notes/.test(msg) ? "Chưa có cột section_notes — cần chạy migration 0121 trong SQL Editor." : msg);
+      setError(/section_notes/.test(msg) ? featureOffText("lưu ghi chú của mục") : msg);
     } finally {
       setBusy(null);
     }

@@ -314,10 +314,8 @@ test("Phát hành report (Toàn Cảnh Brand, gộp 23/10): không mời phát h
   expect(src).toMatch(/Không có gì để phát hành/);
 });
 
-test("PageIntro: nút Chi tiết đạt sàn 24px (dùng chung 11 màn)", () => {
-  const src = readFileSync(join(SRC, "components/common/PageIntro.tsx"), "utf8");
-  expect(src).toMatch(/shrink-0 -m-1\.5 p-1\.5 text-2xs/);
-});
+// `PageIntro` bị xoá 14/11 (đợt cắt chữ): mô tả trang đã vào ⓘ của `PageHeader` từ 05/11, chỗ dùng cuối cùng
+// (Finance & P&L) chuyển sang `InfoDot` nên component không còn ai gọi. Ca test cũ canh vùng bấm của nó bỏ theo.
 
 test("Vùng bấm ≥ 24px ở nhóm màn M7", () => {
   const affiliate = readFileSync(join(SRC, "components/brand-workspace/BrandAffiliateTable.tsx"), "utf8");

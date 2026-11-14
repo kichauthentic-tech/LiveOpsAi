@@ -24,7 +24,9 @@ const html = (over: Record<string, unknown>) =>
 describe("CRM Hợp đồng & giá", () => {
   test("chưa chạy 0191: giữ công tắc cách thu phí + ô giá cũ, nói rõ chưa lưu được điều khoản", () => {
     const h = html({ termsAvailable: false });
-    expect(h).toContain("migration 0191");
+    // Audit chữ 13/11: màn nói việc chưa làm được, không nói số migration (lib/featureOff.ts).
+    expect(h).toContain("Chưa bật lưu điều khoản thương mại");
+    expect(h).not.toContain("migration");
     expect(h).toContain("Cách thu phí:");
     expect(h).toContain("Đơn giá / giờ live");
     expect(h).not.toContain("Tính phí tháng");

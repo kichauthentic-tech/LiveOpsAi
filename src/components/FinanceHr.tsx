@@ -20,7 +20,6 @@ import { dataQuality } from "../lib/performance/hostPerformance";
 import { errorMessage } from "../lib/errorMessage";
 import { todayVn } from "../lib/performance/brandCommitment";
 import { useToast } from "../hooks/useToast";
-import { PageIntro } from "./common/PageIntro";
 import { isUnconfirmedPast } from "../lib/sessionStatus";
 
 import { fmtDateVn, fmtMonth, fmtFixed } from "../lib/format";
@@ -28,6 +27,7 @@ import { MonthPicker } from "./common/MonthPicker";
 import { PageHeader } from "./common/PageHeader";
 import { PlatformChip } from "./common/PlatformChip";
 import { platformOf, REPORT_PLATFORMS, type ReportPlatform } from "../lib/reportPlatform";
+import { InfoDot } from "./common/InfoDot";
 interface FinanceHrProps {
   sessions: LiveSession[];
   talents: Talent[];
@@ -254,9 +254,10 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
             <h3 className="font-bold text-[var(--text)] text-base flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-[var(--accent-text)]" /> P&amp;L từng ca
             </h3>
-            <PageIntro>
-              {platformText("GMV", "all")} lấy từ số của ca, tiền trả host/trợ live tính theo rate ở Talent Pool, doanh thu agency theo giá của brand (CRM → Hợp đồng & giá). Chi phí studio nhập ở đây, Ads theo ca lấy từ report ca. Chỉ CEO duyệt.
-            </PageIntro>
+            <InfoDot label="Số ở đây lấy từ đâu">
+              {platformText("GMV", "all")} lấy từ số của ca; tiền trả host/trợ live theo rate ở Talent Pool; doanh thu agency theo giá của brand trong CRM.
+              Chi phí studio nhập ngay màn này, Ads theo ca lấy từ report ca. Chỉ CEO duyệt.
+            </InfoDot>
           </div>
           <div className="text-right text-xs bg-[var(--surface-elevated)]/50 border border-[var(--border)] rounded-xl px-4 py-2">
             <div className="text-[var(--text-muted)]">
@@ -288,8 +289,8 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                 <span className="mt-1 w-2 h-2 rounded-full bg-rose-500 shrink-0" aria-hidden />
                 <div className="space-y-0.5 min-w-0">
                   <p className="text-rose-200">
-                    <b>{missingSummary.rowsAffected}/{rows.length} ca thiếu rate/giá</b> — không cộng vào tổng ở trên. Số từng ca bên dưới
-                    đang tính phần chưa nhập là 0 (hoặc dùng % mặc định trong code) nên chỉ để tham khảo.
+                    <b>{missingSummary.rowsAffected}/{rows.length} ca thiếu rate/giá</b> — không cộng vào tổng
+                    <InfoDot label="Số từng ca tính thế nào">Số từng ca bên dưới tính phần chưa nhập là 0 nên chỉ để tham khảo.</InfoDot>
                   </p>
                   <p className="text-[var(--text-muted)]">
                     {missingSummary.byKind.map(([kind, n], i) => (
@@ -298,7 +299,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                         {PNL_MISSING_LABEL[kind]}: {n} phiên
                       </span>
                     ))}
-                    . Nhập rate talent ở "Talent Pool", giá + tỷ lệ hoàn huỷ của brand ở "CRM → Hợp đồng & giá".
+                    . Nhập rate ở Talent Pool, giá brand ở CRM.
                   </p>
                 </div>
               </div>
@@ -308,8 +309,8 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                 <span className="mt-1 w-2 h-2 rounded-full bg-amber-500 shrink-0" aria-hidden />
                 <div className="space-y-0.5 min-w-0">
                   <p className="text-amber-200">
-                    <b>{unconfirmed.length} ca đã qua giờ nhưng chưa có bằng chứng diễn ra</b> (không số, không report, không giờ live) — CHƯA tính
-                    lương/doanh thu. Ca có chạy: giao ca ở Cửa sổ Ca Live. Ca không diễn ra: huỷ ca để khỏi tính vào giờ cam kết.
+                    <b>{unconfirmed.length} ca đã qua giờ nhưng chưa có bằng chứng diễn ra</b> — chưa tính lương và doanh thu
+                    <InfoDot label="Ca nào vào nhóm này">Ca không có số, không report, không giờ live. Ca có chạy thì giao ca; ca không diễn ra thì huỷ ca.</InfoDot>
                   </p>
                   <p className="text-[var(--text-muted)]">
                     {unconfirmed.slice(0, 8).map((s) => `${s.brandName} ${s.date.slice(8)}/${s.date.slice(5, 7)} ${s.startTime} (${s.hostName || "chưa gán"})`).join(" · ")}
@@ -325,7 +326,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                   Nguồn {platformText("GMV", "all")} của {quality.total} phiên: <b>{quality.reconciled}</b> đã đối soát
                   {quality.snapshot > 0 && <>, <b>{quality.snapshot}</b> số lúc giao ca (sàn còn cập nhật đơn/hoàn/huỷ sau đó)</>}
                   {quality.manual > 0 && <>, <b>{quality.manual}</b> talent tự khai (chưa được xác thực)</>}.
-                  <span className="text-[var(--text-muted)]"> Số tiền của các phiên chưa đối soát là tạm tính — duyệt sau khi đối soát ở Dữ Liệu Gốc của brand (mục Đối soát số liệu).</span>
+                  <span className="text-[var(--text-muted)]"> Tiền của phiên chưa đối soát là tạm tính.</span>
                 </p>
               </div>
             )}
@@ -372,7 +373,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
         {rows.length === 0 ? (
           <p className="text-xs text-[var(--text-muted)] italic py-6 text-center">
             {backfillCount > 0
-              ? `Tháng ${fmtMonth(month)} chỉ có ${backfillCount} ca nạp bù từ file — Finance & P&L không tính ca nạp bù (lương và giá các tháng đó chưa nhập chuẩn). Xem ${platformText("GMV", "all")} và giờ của các ca này ở Dashboard.`
+              ? `Tháng ${fmtMonth(month)} chỉ có ${backfillCount} ca nạp bù từ file — Finance & P&L không tính ca nạp bù.`
               : `Không có ca nào đã xong trong tháng ${fmtMonth(month)} để tính P&L.`}
           </p>
         ) : (

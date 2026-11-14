@@ -350,7 +350,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
   // "Bán 0" (07/11, đề xuất dự báo): ca qua giờ không có số mà ops biết là có live, không đơn nào. Trước đó ca nằm mãi ở "chưa có số" và
   // dự báo vẫn chiếu doanh số cho nó (JOCKEY T10: 6 ca ⇒ dự báo cuối tháng cao hơn thực tế 19%).
   const zeroSales = async (s: LiveSession) => {
-    if (!(await confirm(`Xác nhận ca ${s.brandName} ${s.startTime}–${s.endTime} ngày ${s.date.slice(8)}/${s.date.slice(5, 7)} CÓ live nhưng bán 0 đồng?\n\nGMV ghi 0, giờ live = giờ kế hoạch. Ca có file số liệu thì bấm Huỷ rồi mở ca → Giao ca. Ca không diễn ra thì huỷ ca.`))) return;
+    if (!(await confirm(`Xác nhận ca ${s.brandName} ${s.startTime}–${s.endTime} ngày ${s.date.slice(8)}/${s.date.slice(5, 7)} CÓ live nhưng bán 0 đồng?\n\nGMV ghi 0, giờ live = giờ kế hoạch.`))) return;
     try {
       const fresh = await confirmZeroSales(s.id);
       onSessionsUpdated(sessions.map((x) => (x.id === s.id ? fresh : x)));
@@ -561,7 +561,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
       <PageHeader
         icon={Radio}
         title="Bảng Vận Hành"
-        description={view === "month" ? `Tháng ${Number(today.slice(5, 7))}: lập kế hoạch, cam kết giờ, thêm ca để kịp target, ai đang nhận nhiều giờ nhất.` : "Việc cần xử lý trước, rồi lịch. Bấm vào ca để mở cửa sổ ca, mũi tên bên phải để xem kỳ vọng."}
+        description={view === "month" ? `Tháng ${Number(today.slice(5, 7))}: lập kế hoạch, cam kết giờ, thêm ca để kịp target, ai đang nhận nhiều giờ nhất.` : "Việc cần xử lý trước, rồi lịch."}
         actions={
           <>
             {monthView && onViewChange && (

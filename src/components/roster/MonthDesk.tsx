@@ -20,6 +20,7 @@ import { money, pct } from "../dashboard/shared";
 import { StatTile } from "../common/StatTile";
 import { PlatformChip } from "../common/PlatformChip";
 import { EARLY_REASON_LABEL } from "../../lib/handover";
+import { featureOffText } from "../../lib/featureOff";
 
 // Điều Phối Lịch Live — hai tab theo tháng (đợt 1, 24/10). "Tháng này": giờ live thật so cam kết, hao hụt kênh, việc nên làm
 // (đọc "Khả năng bù thiếu hụt" của Dashboard qua accountRow — không có dự báo riêng). "Tháng sau": mọi kênh × 6 bước mở lịch,
@@ -508,7 +509,7 @@ const MonthDeadline: React.FC<{ month: string; today: string; openSlots: number;
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <b className="text-sm text-[var(--text)]">Mốc đăng ký & chốt lịch {monthLabel(month)}</b>
         <span className={missing ? "text-amber-300" : "text-[var(--text-muted)]"}>
-          {!loaded ? "Đang tải mốc…" : missing ? "Chưa chạy migration 0180 — chưa đặt được hạn theo tháng" : `Đợt 1 ${status(saved?.signupDeadline)} · đợt 2 ${status(saved?.signupDeadline2 ?? saved?.signupDeadline)}`}
+          {!loaded ? "Đang tải mốc…" : missing ? featureOffText("đặt hạn đăng ký theo tháng") : `Đợt 1 ${status(saved?.signupDeadline)} · đợt 2 ${status(saved?.signupDeadline2 ?? saved?.signupDeadline)}`}
           {" · "}
           {openSlots > 0 ? `${openSlots} ca mở chờ đăng ký` : "chưa có ca mở — chốt Kế Hoạch Tháng để có ca cho talent đăng ký"}
         </span>

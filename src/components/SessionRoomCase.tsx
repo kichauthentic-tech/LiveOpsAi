@@ -188,7 +188,7 @@ export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSes
   };
 
   const doEstimate = async (prevId: string, nextId: string, label: string) => {
-    if (!(await confirm(`Chia ƯỚC LƯỢNG theo thời gian cho ca ${label} (vì không có file lúc giao ca)? Số của cả hai ca sẽ gắn nhãn ước lượng, tới khi trợ tải lên file thật.`, { danger: true }))) return;
+    if (!(await confirm(`Chia ƯỚC LƯỢNG theo thời gian cho ca ${label}? Số của cả hai ca gắn nhãn ước lượng tới khi có file thật.`, { danger: true }))) return;
     await run(() => estimateHandoverSplit(prevId, nextId));
   };
 

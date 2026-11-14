@@ -9,6 +9,7 @@ import { chartColor } from "./dashboard/shared";
 import { getTodayDate, getTodayMonth } from "../lib/dateUtils";
 import { fmtDateVn, fmtFixed, fmtMonth, fmtNum, fmtVndShort } from "../lib/format";
 import { brandPlatformKey, channelTitle } from "../lib/reportPlatform";
+import { InfoDot } from "./common/InfoDot";
 import {
   MIN_AWARD_SHIFTS,
   TARGET_TIER_MIN,
@@ -284,7 +285,7 @@ const CampaignView: React.FC<{ events: CampaignEvent[]; payouts: TargetPayout[];
           ))}
         </div>
         <span className="text-2xs text-[var(--text-faint)]">
-          {scoring === "event" ? "Cả đợt đạt ≥ 100% target ⇒ mọi ca có target của đợt Mức 1, ≥ 120% ⇒ Mức 2. Một ca chỉ ~20 đơn nên ca lẻ đạt/hụt phần lớn là may rủi." : "Từng ca tự đạt ≥ 100% / ≥ 120% target ca."}
+          {scoring === "event" ? <>Cả đợt đạt ≥ 100% target ⇒ Mức 1, ≥ 120% ⇒ Mức 2.<InfoDot label="Vì sao chấm theo đợt">Một ca chỉ khoảng 20 đơn nên ca lẻ đạt hay hụt phần lớn là may rủi — chấm cả đợt công bằng hơn.</InfoDot></> : "Từng ca tự đạt ≥ 100% / ≥ 120% target ca."}
         </span>
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">

@@ -111,22 +111,27 @@ export const BrandTab: React.FC<{
           </div>
           {lens === "month" && (
             <Card>
-              <BlockHead nav="Luỹ kế" title="Đã đạt so với target, luỹ kế theo ngày" sub={`Nét liền dừng ở ngày có dữ liệu cuối (${ddmm(r.asOf!)})`} />
+              <BlockHead
+                nav="Luỹ kế"
+                title="Đã đạt so với target, luỹ kế theo ngày"
+                sub={`Nét liền dừng ở ngày có dữ liệu cuối (${ddmm(r.asOf!)})`}
+                info="Target tuần = target các ca đã xếp, cộng phần target tháng chưa xếp vào ca (chia theo tỷ lệ), nên các tuần cộng lại đúng bằng dòng cả tháng. Key Metrics của một tuần so với cùng ngày tháng trước."
+              />
               <CumulativeChart r={r} color={chartColor(brand.name)} showPace={false} forecastEnd={card?.forecast?.p50 ?? null} />
               <CumulativeLegend color={chartColor(brand.name)} showPace={false} forecast={card?.forecast != null} />
               <RowsTable kind="Tuần" rows={weeks.rows} total={weeks.total} selected={pick.week ?? ""} onPick={(id) => set({ week: id && id !== pick.week ? id : null })} card={card} lastHead="Target cả kỳ"
-                foot="Bấm một tuần: Key Metrics bên dưới đổi theo tuần đó, so với cùng ngày tháng trước; bấm “Cả tháng tới nay” để quay lại. Target tuần = target các ca đã xếp, cộng phần target tháng chưa xếp vào ca (chia theo tỷ lệ), nên các tuần cộng lại đúng bằng dòng cả tháng." />
+                foot="Bấm một tuần để xem Key Metrics của tuần đó." />
             </Card>
           )}
           {lens === "wave" && (
             <Card>
-              <BlockHead title="Theo loại ngày Campaign" sub={`Tính đến ngày có dữ liệu cuối (${ddmm(r.asOf!)}) · bấm một dòng: Key Metrics và nhân sự live bên dưới đổi theo loại ngày đó`} />
+              <BlockHead title="Theo loại ngày Campaign" sub={`Tính đến ngày có dữ liệu cuối (${ddmm(r.asOf!)})`} info="Bấm một dòng: Key Metrics và nhân sự live bên dưới đổi theo loại ngày đó." />
               <RowsTable kind="Loại ngày" rows={waves.rows} total={waves.total} selected={scope.wave ?? ""} onPick={(id) => id && set({ wave: id as CampDayBucket })} card={card} lastHead="Target còn lại" remaining totalClickable={false} wholePeriod />
             </Card>
           )}
           {lens === "day" && (
             <Card>
-              <BlockHead title="Từng ngày" sub="Cột = đã đạt · vạch = target ngày · bấm một ngày: Key Metrics bên dưới đổi theo ngày đó"
+              <BlockHead title="Từng ngày" sub="Cột = đã đạt · vạch = target ngày" info="Bấm một ngày: Key Metrics bên dưới đổi theo ngày đó."
                 right={<button type="button" onClick={() => set({ lens: "shift" })} className="text-xs font-bold px-3 py-1.5 rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] min-h-[30px]">Xem các ca ngày {ddmm(pick.day ?? r.asOf!)} →</button>} />
               <DayBars r={r} color={chartColor(brand.name)} pickDay={pick.day ?? r.asOf} onPick={(d) => set({ day: d, shiftId: null })} />
               <DayBarsLegend />
@@ -297,7 +302,7 @@ const ShiftPicker: React.FC<{ r: NonNullable<AccountVM["report"]>; day: string; 
   const selId = shiftId ?? ranToday.find(isCountable)?.id ?? null;
   return (
     <Card>
-      <BlockHead title="Từng ca" sub="Chọn ngày, rồi bấm một ca: Key Metrics bên dưới đổi theo ca đó" />
+      <BlockHead title="Từng ca" sub="chọn ngày rồi bấm một ca" info="Key Metrics bên dưới đổi theo ca đang chọn." />
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
         {days.map((x) => (
           <button key={x.date} type="button" aria-pressed={x.date === d?.date} onClick={() => onDay(x.date)}

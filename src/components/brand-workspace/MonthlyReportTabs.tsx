@@ -4,7 +4,7 @@ import { Megaphone, AlertTriangle } from "lucide-react";
 import { LiveSession, BrandMonthlyReport as BrandMonthlyReportType, BrandPlatformRate, ShiftSlot } from "../../types";
 import { planTargetOf } from "../../lib/performance/targetAllocation";
 import { METRIC } from "../../lib/metricGlossary";
-import { downloadSheetsAsXlsx } from "../../lib/exportXlsx";
+import { downloadSheetsAsXlsx, xlsxFailText } from "../../lib/exportXlsx";
 import { useToast } from "../../hooks/useToast";
 import { pickLivePerfSource } from "../../lib/report/sessionsLivePerf";
 import { planRunRate } from "../../lib/performance/planRunRate";
@@ -25,7 +25,6 @@ import { contextInsight, HostInsightRow, hostVsPeer, InsightSection, peopleInsig
 import { CAMP_DAY_BUCKET_LABEL, CAMP_DAY_BUCKET_ORDER, effectiveCamp, resolveCampBucketType, type CampDayBucket, type CampOverrides } from "../../lib/campaignDays";
 import { liveFunnel, sessionSpread } from "../../lib/report/rhythm";
 import { adsMonthStats, adsPrevSameCut } from "../../lib/dataraw/adsCampaignOverview";
-import { errorMessage } from "../../lib/errorMessage";
 import { fmtKeyMetric, KEY_METRICS, keyMetricSheetColumns, keyMetricSheetLabel, keyMetricSheetValue, keyMetricValue, type KeyMetrics } from "../../lib/report/keyMetrics";
 import { byHost, byHostDayType, dayTypeTeamTotals, dayTypeMetrics, HOST_DAY_TYPE_ORDER, dataQuality, filterSessions, hostKey, splitUnassignedHost, DataQuality } from "../../lib/performance/hostPerformance";
 
@@ -1352,7 +1351,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
         }
       ],
       `ReportThang_${brandName}_${month}.xlsx`.replace(/\s+/g, "_")
-    ).catch((e) => showToast(`Không tải được file Excel: ${errorMessage(e)}`));
+    ).catch((e) => showToast(xlsxFailText(e)));
   };
 
   // Dấu trừ chuẩn "−" và làm tròn nghìn đồng cho số tiền nhỏ trong câu (fmtVndShort in "-").

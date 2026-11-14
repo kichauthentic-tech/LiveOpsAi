@@ -2,6 +2,7 @@ import { supabase } from "../supabaseClient";
 import { EarlyLeaveReason, LiveSession } from "../../types";
 import { fetchSessionById } from "./sessions";
 import type { SnapshotRoomRow } from "../liveSnapshot/extractRooms";
+import { featureOffError } from "../featureOff";
 
 // Giao ca + số lúc đổi host: CẢ HAI SÀN bằng file (TikTok Creator-Live-Performance, Shopee Live List — migration 0154). Phần gõ tay
 // (0144/0147: submit_session_handover, submit_segment_checkpoint, handover_previous) còn trong DB nhưng client không gọi nữa.
@@ -44,7 +45,7 @@ export async function applySegmentCheckpointFile(sessionId: string, atMin: numbe
 export async function setSegmentCheckpointGmv(sessionId: string, atMin: number, gmv: number): Promise<LiveSession> {
   const { error } = await supabase.rpc("set_segment_checkpoint_gmv", { p_session_id: sessionId, p_at_min: atMin, p_gmv: gmv });
   if (error) {
-    if (error.code === "PGRST202") throw new Error("Chưa chạy migration 0215 nên chưa gõ tay được GMV lúc đổi host.");
+    if (error.code === "PGRST202") throw featureOffError("gõ tay GMV lúc đổi host", "migration 0215 — rpc set_segment_checkpoint_gmv");
     throw error;
   }
   return fetchSessionById(sessionId);

@@ -9,6 +9,7 @@ import { fmtDateVn, fmtFixed, fmtMonth, fmtVndFull, fmtVndShort } from "../../li
 import { errorMessage } from "../../lib/errorMessage";
 import { useConfirm } from "../../hooks/useConfirm";
 import type { ReportPlatform } from "../../lib/reportPlatform";
+import { featureOffText } from "../../lib/featureOff";
 
 // Target + thực tế Ads theo ngày dán từ file tracking của brand (CROCS "Performance Tracking", sheet "Daily Ads Report";
 // migration 0184). Khác file TikTok Ads phía trên: file đó là chi phí cả cửa hàng do TikTok xuất, không có target và không tách
@@ -42,7 +43,7 @@ export const AdsTrackingPanel: React.FC<Props> = ({ brandId, brandName, platform
           key: loadKey,
           rows: [],
           camp: {},
-          error: /brand_ads_daily/.test(errorMessage(e)) ? "Chưa có bảng Ads theo ngày — cần chạy migration 0184 trong SQL Editor." : errorMessage(e, "Không đọc được Ads theo ngày")
+          error: /brand_ads_daily/.test(errorMessage(e)) ? featureOffText("nhập Ads theo ngày") : errorMessage(e, "Không đọc được Ads theo ngày")
         })
       );
     return () => {
@@ -83,7 +84,7 @@ export const AdsTrackingPanel: React.FC<Props> = ({ brandId, brandName, platform
       setVersion((v) => v + 1);
     } catch (e) {
       const t = errorMessage(e, "Không lưu được");
-      setMsg({ tone: "err", text: /brand_ads_daily/.test(t) ? "Chưa có bảng Ads theo ngày — cần chạy migration 0184 trong SQL Editor." : t });
+      setMsg({ tone: "err", text: /brand_ads_daily/.test(t) ? featureOffText("nhập Ads theo ngày") : t });
     } finally {
       setSaving(false);
     }

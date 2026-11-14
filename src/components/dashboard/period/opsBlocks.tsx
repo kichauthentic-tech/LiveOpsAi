@@ -22,7 +22,7 @@ import {
   type HostRow
 } from "../../../lib/performance/periodCompare";
 import { Card, money, pct } from "../shared";
-import { BlockHead, Chg, IdxCell, IdxDelta, TD, Table } from "./ui";
+import { BlockHead, Chg, IDX_NOTE, IdxCell, IdxDelta, TD, Table } from "./ui";
 
 // Khối "Vận hành" + "Đội live" của Dashboard so cùng kỳ (22/10/2026). Mỗi khối nhận ca ĐÃ CHẠY của kỳ này (`cur`) và kỳ so sánh
 // (`prev`, null = không so) cùng nhãn kỳ — tự tính bằng lib/performance/periodCompare.ts, không tự đặt luật.
@@ -112,7 +112,7 @@ export const ShiftLenCard: React.FC<{ s: Scope }> = ({ s }) => {
   const max = Math.max(130, ...[...ic.values()].map((x) => x.index));
   return (
     <Card>
-      <BlockHead title="GMV/giờ theo độ dài ca" sub={`${s.label} · mỗi ca so với GMV/giờ trung bình của chính kênh đó (100 = bằng kênh), nên quy mô brand không làm lệch so sánh`} />
+      <BlockHead title="GMV/giờ theo độ dài ca" sub={s.label} info={IDX_NOTE} />
       <div className="space-y-2">
         {SHIFT_LEN_LABELS.map((lab, i) => {
           const x = ic.get(i);
@@ -143,7 +143,7 @@ export const HeatCard: React.FC<{ s: Scope }> = ({ s }) => {
   const mc = indexBy(s.cur, heatKeyOf), mb = s.prev ? indexBy(s.prev, heatKeyOf) : new Map();
   return (
     <Card>
-      <BlockHead title="GMV/giờ theo khung giờ" sub={`${s.label} · mỗi ca so với chính kênh của nó (100 = bằng kênh) · rê chuột để xem chỉ số ${s.prevLabel}`} />
+      <BlockHead title="GMV/giờ theo khung giờ" sub={s.label} info={<>{IDX_NOTE} Rê chuột để xem chỉ số {s.prevLabel}.</>} />
       <div className="overflow-x-auto">
         <div className="grid gap-1 min-w-[420px]" style={{ gridTemplateColumns: `28px repeat(${HEAT_BLOCKS.length}, minmax(0,1fr))` }}>
           <span />
@@ -181,7 +181,11 @@ export const HostTable: React.FC<{ s: Scope; brands: Brand[]; showBrand: boolean
   const prev = new Map((s.prev ? hostRows(s.prev) : []).map((r): [string, HostRow] => [r.id, r]));
   return (
     <Card>
-      <BlockHead title={title} sub={`${s.label} · ${minSessions > 1 ? `host từ ${minSessions} ca` : "mọi host có ca"}${weakBelow > minSessions ? `, dưới ${weakBelow} ca hiển thị mờ` : ""} · GMV = các ca người đó làm host · chỉ số 100 = GMV/giờ trung bình của chính kênh đó · so với ${s.prevLabel}`} />
+      <BlockHead
+        title={title}
+        sub={`${s.label} · ${minSessions > 1 ? `host từ ${minSessions} ca` : "mọi host có ca"} · so với ${s.prevLabel}`}
+        info={<>GMV = các ca người đó làm host. {IDX_NOTE}{weakBelow > minSessions ? ` Dưới ${weakBelow} ca hiển thị mờ.` : ""}</>}
+      />
       <Table head={["Host", "Sessions", "Giờ live", "GMV", "Chỉ số", "vs kỳ trước"]} empty={rows.length ? undefined : minSessions > 1 ? `Chưa host nào có từ ${minSessions} ca trong kỳ này.` : `Chưa có ca có số liệu trong ${s.label}.`}>
         {rows.map((r) => (
           <tr key={r.id}>
@@ -204,7 +208,11 @@ export const CoTable: React.FC<{ s: Scope; brands: Brand[]; showBrand: boolean }
   const tot = rows.reduce((a, r) => a + r.hours, 0), totB = s.prev ? [...prev.values()].reduce((a, r) => a + r.hours, 0) : null;
   return (
     <Card>
-      <BlockHead title="Trợ live" sub={<>{s.label} · chỉ tính ca và giờ (trợ không tính GMV) · tổng <b className="text-[var(--text-muted)]">{hrs(tot)} giờ</b> {totB != null && <Chg cur={tot} prev={totB} weak />}</>} />
+      <BlockHead
+        title="Trợ live"
+        sub={<>{s.label} · tổng <b className="text-[var(--text-muted)]">{hrs(tot)} giờ</b> {totB != null && <Chg cur={tot} prev={totB} weak />}</>}
+        info="Chỉ tính ca và giờ — trợ live không chịu trách nhiệm GMV."
+      />
       <Table head={["Trợ live", "Sessions", "Giờ live", "vs kỳ trước"]} empty={rows.length ? undefined : "Không có ca nào có trợ live trong kỳ này."}>
         {rows.map((r) => {
           const o = prev.get(r.id);
@@ -228,7 +236,11 @@ export const PairTable: React.FC<{ s: Scope; brands: Brand[]; weakBelow?: number
   const prev = new Map((s.prev ? pairRows(s.prev) : []).map((r) => [r.id, r]));
   return (
     <Card>
-      <BlockHead title="Cặp host + trợ live" sub={`${s.label} · cặp live chung từ 2 ca, dưới ${weakBelow} ca hiển thị mờ · chỉ số 100 = GMV/giờ trung bình của kênh · so với ${s.prevLabel} · chỉ để xem cách ghép, trợ live không chịu trách nhiệm GMV`} />
+      <BlockHead
+        title="Cặp host + trợ live"
+        sub={`${s.label} · cặp live chung từ 2 ca · so với ${s.prevLabel}`}
+        info={<>{IDX_NOTE} Dưới {weakBelow} ca hiển thị mờ. Chỉ để xem cách ghép — trợ live không chịu trách nhiệm GMV.</>}
+      />
       <Table head={["Cặp", "Brand", "Sessions", "Giờ live", "GMV", "Chỉ số", "vs kỳ trước"]} empty={rows.length ? undefined : "Chưa cặp nào có từ 2 ca live chung trong kỳ này."}>
         {rows.map((r) => (
           <tr key={r.id}>
@@ -259,7 +271,12 @@ export const SlotTable: React.FC<{ s: Scope; within?: string }> = ({ s, within =
   const best = [...ok].sort((p, q) => q.x!.index - p.x!.index)[0], worst = [...ok].sort((p, q) => p.x!.index - q.x!.index)[0];
   return (
     <Card>
-      <BlockHead nav="Khung giờ" title="Khung giờ của kênh" sub={`${s.label} so với ${s.prevLabel} · theo giờ bắt đầu ca · chỉ số 100 = GMV/giờ trung bình của kênh trong ${within} · dưới 5 ca hiển thị mờ`} />
+      <BlockHead
+        nav="Khung giờ"
+        title="Khung giờ của kênh"
+        sub={`${s.label} so với ${s.prevLabel} · theo giờ bắt đầu ca`}
+        info={<>Chỉ số 100 = GMV/giờ trung bình của kênh trong {within}. Dưới 5 ca hiển thị mờ.</>}
+      />
       <Table head={["Khung giờ", "Sessions", "Giờ live", "GMV/giờ", "Chỉ số", "vs kỳ trước"]} empty={rows.length ? undefined : `Không có ca có số liệu trong ${s.label}.`}>
         {rows.map((r) => {
           const weak = r.x!.n < WEAK_SESSIONS || !r.y || r.y.n < WEAK_SESSIONS;
@@ -307,7 +324,11 @@ export const ProfitCard: React.FC<{ s: Scope; pnl: PnlFn }> = ({ s, pnl }) => {
   ];
   return (
     <Card>
-      <BlockHead title="Lãi gộp mỗi giờ" sub={`${s.label} · doanh thu agency/giờ − chi phí/giờ · tính được ${c.priced}/${c.n} ca (ca thiếu giá hoặc rate không tính) · so với ${s.prevLabel}`} />
+      <BlockHead
+        title="Lãi gộp mỗi giờ"
+        sub={`${s.label} · ${c.priced}/${c.n} ca tính được · so với ${s.prevLabel}`}
+        info="Doanh thu agency mỗi giờ trừ chi phí mỗi giờ. Ca thiếu giá hợp đồng hoặc thiếu rate talent không tính."
+      />
       <div className="grid grid-cols-3 gap-3">
         {rows.map(([l, v, p, inv]) => (
           <div key={l} className="min-w-0">

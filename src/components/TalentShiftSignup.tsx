@@ -197,8 +197,8 @@ export default function TalentShiftSignup({ mode, onOpenTab, brands, shiftSlots,
         <h2 className="text-lg font-black text-[var(--text)]">{mode === "open" ? "Ca đang mở" : "Ca đã đăng ký"}</h2>
         <p className="text-sm text-[var(--text-muted)]">
           {mode === "open"
-            ? 'Chạm vào mọi ca bạn làm được để đăng ký — đăng ký càng nhiều càng dễ được xếp. Trainer / OP sẽ chốt người, ca chốt hiện ở "Ca của tôi".'
-            : 'Các ca bạn đã đăng ký và đang chờ trainer / OP chốt — chưa phải lịch chắc chắn. Chạm vào ca để huỷ trước hạn. Ca được chốt sẽ chuyển sang "Ca của tôi".'}
+            ? "Chạm vào mọi ca bạn làm được — đăng ký càng nhiều càng dễ được xếp."
+            : "Đang chờ trainer chốt, chưa phải lịch chắc chắn. Chạm vào ca để huỷ."}
         </p>
       </div>
 

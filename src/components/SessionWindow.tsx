@@ -5,7 +5,7 @@ import SearchSelect from "./ui/SearchSelect";
 import React, { useContext, useEffect, useMemo, useState } from "react";
 import { SESSION_STATUS_CLS, SESSION_STATUS_LABEL_VI } from "../lib/sessionStatusUi";
 import { hasSessionData, isUnconfirmedPast } from "../lib/sessionStatus";
-import { AlertTriangle, CheckCircle2, Circle, EyeOff, Hand, Link2, Pencil, X } from "lucide-react";
+import { AlertTriangle, CheckCircle2, EyeOff, Hand, Link2, Pencil, X } from "lucide-react";
 import { AuditLogEntry, Brand, LiveSession, ShiftSlot, Studio, Talent, UserRole } from "../types";
 import { findPersonClashes, personClash, studioClash, studioClashLabel } from "../lib/scheduling/conflicts";
 import { PlatformChip } from "./common/PlatformChip";
@@ -15,7 +15,6 @@ import { platformOf } from "../lib/reportPlatform";
 import { sessionHours } from "../lib/performance/hostPerformance";
 import {
   MissingStep,
-  brandTrustLabel,
   hasSnapshot,
   linkedSessions,
   missingSteps,
@@ -41,6 +40,8 @@ import { HostChangeReports } from "./HostChangeReports";
 import { StaffSegmentsEditor } from "./StaffSegmentsEditor";
 import { METRIC, metricHint } from "../lib/metricGlossary";
 import { dataSourceTier } from "../lib/dataSource";
+import { InfoDot } from "./common/InfoDot";
+import { TrustBadge } from "./common/TrustBadge";
 
 // Cửa sổ Ca Live — MỘT cửa sổ chi tiết cho một ca, dùng chung cho mọi nơi click vào ca (Sổ Ca,
 // Lịch Vận Hành, Đăng Ký & Chốt Lịch, Sessions bên brand). Thay cho 3 "chi tiết ca" khác nhau
@@ -279,7 +280,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
 
   const handleDelete = async () => {
     if (!onDeleteSession) return;
-    if (!(await confirm(`Xoá ca ${fmtDate(s.date)} ${s.startTime}–${s.endTime} (${s.brandName})? Không hoàn tác được. Ca mở đang gắn sẽ về "mở" để chốt người khác.`, { danger: true }))) return;
+    if (!(await confirm(`Xoá ca ${fmtDate(s.date)} ${s.startTime}–${s.endTime} (${s.brandName})? Không hoàn tác được.`, { danger: true }))) return;
     setDeleting(true);
     try {
       await onDeleteSession(s.id);
@@ -447,7 +448,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
           {isOps && isUnconfirmedPast(s) && s.status !== "Cancelled" && !s.excludedFromReports && (
             <div className="rounded-xl border border-amber-800 bg-amber-950/50 p-3 text-xs text-amber-200 flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>Ca đã qua giờ mà chưa có file — chưa tính vào giờ cam kết và lương. Có live: giao ca bên dưới. Không live: ⋯ → Huỷ ca.</span>
+              <span>Ca đã qua giờ mà chưa có file — chưa tính giờ cam kết và lương.</span>
             </div>
           )}
 
@@ -488,8 +489,8 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
               {scheduleLocked && (
                 <p className="text-2xs text-[var(--text-muted)]">
                   {hasSessionData(s)
-                    ? "Ca đã có số liệu nên không dời ngày/giờ được — ranh giới snapshot và đối soát tính theo giờ ca. Vẫn đổi được phòng, Host, Trợ live."
-                    : "Ca đang chia người theo đoạn giờ nên không dời giờ được — bỏ chia đoạn (Đổi người giữa ca) trước."}
+                    ? "Ca đã có số liệu nên không dời ngày/giờ được; vẫn đổi được phòng và người."
+                    : "Ca đang chia người theo đoạn giờ nên không dời giờ được."}
                 </p>
               )}
               <label className="block"><span className="font-bold text-[var(--text-muted)] block mb-1">Phòng Studio</span>
@@ -641,7 +642,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                         </>
                       )}
                     </div>
-                    <p className="text-2xs text-[var(--text-faint)]">Tỷ lệ tính lại từ số đã tách theo ca, không lấy cột tỷ lệ cộng dồn của file.</p>
+                    <p className="text-2xs text-[var(--text-faint)]">Tỷ lệ tính lại từ số đã tách theo ca<InfoDot label="Vì sao không lấy cột của file">Cột tỷ lệ trong file là số cộng dồn của cả phiên, không phải của riêng ca này.</InfoDot></p>
                   </>
                 )}
                 <button type="button" onClick={() => setShowAllMetrics((v) => !v)} className="text-xs font-bold text-[var(--accent-text)] hover:underline">
@@ -789,15 +790,6 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
 };
 
 
-const TrustBadge: React.FC<{ session: LiveSession }> = ({ session }) => {
-  const label = brandTrustLabel(session);
-  const done = label === "Đã chốt";
-  return (
-    <span className={`inline-flex items-center gap-1 text-2xs font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${done ? "bg-emerald-950 text-emerald-300 border-emerald-800" : "bg-amber-950 text-amber-300 border-amber-800"}`} title={done ? "Số đã đối soát với báo cáo TikTok cuối kỳ" : "Số ghi nhận lúc giao ca / tự khai, TikTok còn cập nhật"}>
-      {done ? <CheckCircle2 className="w-3 h-3" /> : <Circle className="w-3 h-3" />} {label}
-    </span>
-  );
-};
 
 // Bố cục 19/10: chỉ số nằm trong MỘT khung (`KV_GRID`), mỗi chỉ số chỉ là nhãn + số — trước 27 hộp bo góc cách nhau
 // (19 chỉ số + 8 "Số khác"), cửa sổ ca lốm đốm khung.

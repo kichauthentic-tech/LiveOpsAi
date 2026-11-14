@@ -18,6 +18,7 @@ import {
   type PlanGoal
 } from "../../lib/roster/monthPlanner";
 import { dayLabel } from "./ShiftPanel";
+import { InfoDot } from "../common/InfoDot";
 
 // Xếp cả tháng theo mục tiêu (01/11): ba nút Performance / Chi phí / Cân bằng, lịch cả tháng của agency với host + trợ gợi ý (chỉ từ
 // pool đã đăng ký đúng ca), và khối khối lượng từng người so với giờ tối thiểu / tối đa. Kết quả tính sống, chỉ ghi DB khi bấm
@@ -140,7 +141,10 @@ export const MonthPlanPanel: React.FC<Props> = (p) => {
         <label className="flex items-center gap-1.5 text-[var(--text-muted)]" title="Người đã đăng ký mà dưới giờ tối thiểu sẽ nhận thêm ca từ người đang nhiều giờ hơn">
           <input type="checkbox" checked={guaranteeMin} onChange={(e) => setGuaranteeMin(e.target.checked)} /> Đảm bảo giờ tối thiểu
         </label>
-        <span className="text-2xs text-[var(--text-faint)]">Mặc định đo giờ live thật T8–T10: tối thiểu ≈ P25, tối đa ≈ P90 của người có ca. Tối đa còn bị chặn bởi luật giờ tuần/ngày.</span>
+        <span className="text-2xs text-[var(--text-faint)]">
+                Tối đa còn bị chặn bởi luật giờ tuần/ngày.
+                <InfoDot label="Mặc định lấy từ đâu">Đo giờ live thật T8–T10: tối thiểu ≈ phân vị 25, tối đa ≈ phân vị 90 của người có ca.</InfoDot>
+              </span>
       </div>
 
       {noOpen ? (
@@ -250,7 +254,7 @@ export const MonthPlanPanel: React.FC<Props> = (p) => {
               ))}
               {days.length === 0 && <p className="px-3 py-3 text-xs text-[var(--text-muted)]">Không có ca nào trong bộ lọc.</p>}
             </div>
-            <p className="text-2xs text-[var(--text-faint)]">Chữ màu nhấn = người do gợi ý này chọn. Chữ thường = ca đã lên lịch hoặc nháp có sẵn.</p>
+            <p className="text-2xs text-[var(--text-faint)]">Chữ màu nhấn = người do gợi ý này chọn<InfoDot label="Chú giải màu chữ">Chữ thường là ca đã lên lịch hoặc nháp có sẵn.</InfoDot></p>
           </section>
         </>
       )}

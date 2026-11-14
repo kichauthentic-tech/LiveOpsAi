@@ -2,6 +2,7 @@ import { supabase } from "../supabaseClient";
 import { LiveSession } from "../../types";
 import type { SnapshotRoomRow } from "../liveSnapshot/extractRooms";
 import { fetchSessionById } from "./sessions";
+import { featureOffError } from "../featureOff";
 
 export interface SessionSnapshotRoom {
   roomId: string;
@@ -146,7 +147,7 @@ export async function fetchSnapshotAutoSplit(sessionId: string): Promise<boolean
 export async function setSessionSnapshotGmv(sessionId: string, gmv: number | null): Promise<LiveSession> {
   const { error } = await supabase.rpc("set_session_snapshot_gmv", { p_session_id: sessionId, p_gmv: gmv });
   if (error) {
-    if (error.code === "PGRST202") throw new Error("Chưa chạy migration 0174 nên chưa sửa được GMV của ca.");
+    if (error.code === "PGRST202") throw featureOffError("sửa GMV của ca", "migration 0174");
     throw error;
   }
   return fetchSessionById(sessionId);
@@ -159,7 +160,7 @@ export async function setSessionSnapshotGmv(sessionId: string, gmv: number | nul
 export async function setSessionHandoverTime(sessionId: string, at: string | null): Promise<LiveSession> {
   const { error } = await supabase.rpc("set_session_handover_time", { p_session_id: sessionId, p_at: at });
   if (error) {
-    if (error.code === "PGRST202") throw new Error("Chưa chạy migration 0205 nên chưa nhập được giờ giao ca.");
+    if (error.code === "PGRST202") throw featureOffError("nhập giờ giao ca", "migration 0205");
     throw error;
   }
   return fetchSessionById(sessionId);

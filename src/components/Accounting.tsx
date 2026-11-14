@@ -20,7 +20,7 @@ import { shiftMonth } from "../lib/report/monthlySnapshot";
 import { HOUR_TOLERANCE, buildMonthClose, latestSettledReturnRates, monthEndOf, type ContractRevenueRow, type RevenueBasis, type ShopRefundMonth, type TalentPayRow } from "../lib/accounting/monthClose";
 import { fetchBrandContracts, fetchBrandMonthlyCommitments } from "../lib/db/brandContracts";
 import { fetchShopDaysMonthSlice } from "../lib/dataraw/monthlyProductSlice";
-import { downloadSheetsAsXlsx } from "../lib/exportXlsx";
+import { downloadSheetsAsXlsx, xlsxFailText } from "../lib/exportXlsx";
 import { defaultViewMonth } from "../lib/defaultMonth";
 import { todayVn } from "../lib/performance/brandCommitment";
 import { errorMessage } from "../lib/errorMessage";
@@ -315,7 +315,7 @@ export const Accounting: React.FC<AccountingProps> = ({
         { name: "Giờ theo brand", rows: brandHourRows }
       ],
       `KeToan_${month}.xlsx`
-    ).catch((e) => showToast(`Không tải được file Excel: ${errorMessage(e)}`));
+    ).catch((e) => showToast(xlsxFailText(e)));
   }
 
   const s = close?.summary;

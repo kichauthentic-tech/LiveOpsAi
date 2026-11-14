@@ -4,6 +4,8 @@ import type { ScenarioLine } from "../../types";
 import { SCENARIO_PRESETS, scenarioFactor, scenarioLineError, scoreScenario } from "../../lib/scheduling/brandScenario";
 import { saveBrandScenario } from "../../lib/db/monthPlans";
 import { fmtFixed, fmtVndShort } from "../../lib/format";
+import { FeatureOffNote } from "../common/FeatureOffNote";
+import { InfoDot } from "../common/InfoDot";
 
 // Kịch bản brand (07/11, thay đổi 2 của đề xuất dự báo, 0201) — CEO ghi sau buổi họp monthly những gì brand nói mà lịch sử ca không có.
 // Dự báo cuối của Kế Hoạch Tháng = engine × Π(1 + %). Hết tháng khối này chấm lại từng dòng: bỏ dòng đó thì dự báo đúng hơn hay sai hơn.
@@ -74,10 +76,16 @@ export const BrandScenarioPanel: React.FC<Props> = ({ planId, lines, engineP50, 
           </span>
         ) : null}
       </div>
-      <p className="text-2xs text-[var(--text-faint)]">Ghi sau buổi họp monthly những gì brand nói mà lịch sử ca không có: Ads, voucher, hàng mới, hết hàng, mức tham gia campaign sàn, mùa vụ. Mỗi dòng một % và lý do; hết tháng app chấm lại từng dòng.</p>
+      <p className="text-2xs text-[var(--text-faint)]">
+          Mỗi dòng một % và một lý do; hết tháng app chấm lại từng dòng.
+          <InfoDot label="Ghi gì vào đây">
+            Sau buổi họp monthly, ghi những gì brand nói mà lịch sử ca không có: Ads, voucher, hàng mới, hết hàng,
+            mức tham gia campaign sàn, mùa vụ.
+          </InfoDot>
+        </p>
 
       {lines === undefined ? (
-        <p className="text-2xs text-amber-300">DB chưa chạy migration 0201 — chưa ghi được kịch bản.</p>
+        <FeatureOffNote what="lưu Kịch bản brand" />
       ) : (
         <>
           {list.length > 0 && (

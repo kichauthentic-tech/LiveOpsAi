@@ -13,7 +13,7 @@ import {
 import { errorMessage } from "../../lib/errorMessage";
 import { fmtVndShort } from "../../lib/format";
 import { metricsHiddenFor } from "../../lib/sessionLedger";
-import { downloadRowsAsXlsx } from "../../lib/exportXlsx";
+import { downloadRowsAsXlsx, xlsxFailText } from "../../lib/exportXlsx";
 import { useToast } from "../../hooks/useToast";
 import { PageHeader } from "../common/PageHeader";
 import { StatTile } from "../common/StatTile";
@@ -198,7 +198,7 @@ export const BrandCommitmentView: React.FC<BrandCommitmentViewProps> = ({
         };
       }),
       `CamKetHopDong_${brandName}.xlsx`.replace(/\s+/g, "_")
-    ).catch((e) => showToast(`Không tải được file Excel: ${errorMessage(e)}`));
+    ).catch((e) => showToast(xlsxFailText(e)));
   };
 
   if (loading) {

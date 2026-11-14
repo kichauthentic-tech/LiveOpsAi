@@ -1,5 +1,6 @@
 import React from "react";
 import { relChange } from "../../../lib/performance/periodCompare";
+import { InfoDot } from "../../common/InfoDot";
 
 // Phần trình bày dùng chung của Dashboard so cùng kỳ (22/10/2026). Không có luật số — luật ở lib/performance/periodCompare.ts.
 
@@ -52,6 +53,12 @@ export const IdxDelta: React.FC<{ cur: { index: number; n: number }; prev: { ind
   );
 };
 
+/**
+ * Chú giải "chỉ số 100" — audit chữ 13/11: câu này lặp ở 6 khối (host, cặp, khung giờ, độ dài ca, toàn sàn). Nói MỘT
+ * lần ở đây, các khối gắn vào `info` của tiêu đề thay vì viết lại dưới mỗi khối.
+ */
+export const IDX_NOTE = "Chỉ số 100 = GMV/giờ trung bình của chính kênh đó, nên quy mô brand không làm lệch so sánh.";
+
 export const TH = "px-3 py-2 text-2xs font-semibold text-[var(--text-faint)] whitespace-nowrap text-right first:text-left";
 export const TD = "px-3 py-2 text-right tabular-nums whitespace-nowrap first:text-left";
 
@@ -66,12 +73,26 @@ export const Table: React.FC<{ head: React.ReactNode[]; children: React.ReactNod
   </div>
 );
 
-/** Tiêu đề khối trong thẻ: tên + dòng phụ (kỳ, cách đếm). */
+/**
+ * Tiêu đề khối trong thẻ: tên + dòng phụ (kỳ, cách đếm) + ⓘ.
+ *
+ * `sub` là MỘT dòng ngắn hiện thẳng — kỳ và cách đếm của số bên dưới (§5.2 luật người mới số 4). Phần nói phương pháp,
+ * cách đọc, vì sao đi vào `info` (ⓘ) — audit chữ 13/11, xem `common/InfoDot.tsx`.
+ */
 // `nav`: tên ngắn của phần trên mục lục dính (SectionNav) — chỉ khối cấp trang mới đặt.
-export const BlockHead: React.FC<{ title: React.ReactNode; sub?: React.ReactNode; right?: React.ReactNode; nav?: string }> = ({ title, sub, right, nav }) => (
+/**
+ * Nhãn của nút ⓘ trên tiêu đề khối — lấy đúng tên khối để trình đọc màn hình không đọc 7 nút giống hệt nhau
+ * ("Khối này là gì" ×7 ở Hiệu Suất Host, phát hiện khi rà 14/11). Tiêu đề không phải chuỗi thì giữ nhãn mặc định.
+ */
+const infoLabel = (title: React.ReactNode) => (typeof title === "string" ? `${title} — khối này là gì` : undefined);
+
+export const BlockHead: React.FC<{ title: React.ReactNode; sub?: React.ReactNode; info?: React.ReactNode; right?: React.ReactNode; nav?: string }> = ({ title, sub, info, right, nav }) => (
   <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1 mb-3" data-section={nav}>
     <div className="min-w-0">
-      <h3 className="text-sm font-bold text-[var(--text)]">{title}</h3>
+      <h3 className="text-sm font-bold text-[var(--text)] flex items-center gap-1.5">
+        {title}
+        {info && <InfoDot label={infoLabel(title)}>{info}</InfoDot>}
+      </h3>
       {sub && <p className="text-xs text-[var(--text-faint)] mt-0.5 leading-snug">{sub}</p>}
     </div>
     {right}
@@ -79,9 +100,12 @@ export const BlockHead: React.FC<{ title: React.ReactNode; sub?: React.ReactNode
 );
 
 /** Tiêu đề một mục lớn của trang (Shop, Đội live…). */
-export const Sect: React.FC<{ title: string; sub?: React.ReactNode; nav?: string }> = ({ title, sub, nav }) => (
+export const Sect: React.FC<{ title: string; sub?: React.ReactNode; info?: React.ReactNode; nav?: string }> = ({ title, sub, info, nav }) => (
   <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 px-1 pt-2" data-section={nav}>
-    <h3 className="text-sm font-black text-[var(--text)]">{title}</h3>
+    <h3 className="text-sm font-black text-[var(--text)] flex items-center gap-1.5">
+      {title}
+      {info && <InfoDot label={infoLabel(title)}>{info}</InfoDot>}
+    </h3>
     {sub && <span className="text-xs text-[var(--text-faint)]">{sub}</span>}
   </div>
 );

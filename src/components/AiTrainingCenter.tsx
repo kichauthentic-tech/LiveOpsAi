@@ -90,7 +90,7 @@ export const AiTrainingCenter: React.FC<AiTrainingCenterProps> = ({ prompts, loa
             <p className="font-bold">Không tải được AI Training Center.</p>
             <p className="text-xs mt-1">{error}</p>
             <p className="text-xs mt-1 text-red-400">
-              Có thể migration <code>0011_admin_role.sql</code>/<code>0012_admin_ai_training_setup.sql</code> chưa được áp dụng lên Supabase, hoặc tài khoản này chưa có role <code>admin</code>.
+              Tài khoản này có thể chưa có quyền admin, hoặc hệ thống chưa cập nhật — nhắn admin.
             </p>
           </div>
         </div>

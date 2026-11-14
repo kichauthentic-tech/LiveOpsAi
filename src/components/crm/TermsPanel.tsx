@@ -21,6 +21,7 @@ import { fmtDateVn } from "../../lib/format";
 import { useConfirm } from "../../hooks/useConfirm";
 import { Field, NumberField, btnCls, btnGhostCls, cardCls, inputCls } from "./fields";
 import { TermsEditor } from "./TermsEditor";
+import { FeatureOffNote } from "../common/FeatureOffNote";
 
 // Khối “Điều khoản hợp tác” của một brand × sàn: điều khoản chính đang chạy, các giai đoạn đặc biệt (chiến dịch / gói thử)
 // và trình sửa. Một lần lưu = một giai đoạn có NGÀY BẮT ĐẦU: ca trước ngày đó giữ điều khoản cũ, lịch sử không bị viết lại.
@@ -153,7 +154,7 @@ export const TermsPanel: React.FC<Props> = ({ brand, platform, canEdit, today, a
         {canEdit && available && !draft && cur && <button type="button" onClick={() => startEdit(cur)} className={`${btnGhostCls} flex items-center gap-1`}><Pencil className="w-3 h-3" /> Sửa</button>}
       </div>
 
-      {!available && <p className="text-2xs text-amber-300">Chưa lưu được điều khoản: database chưa chạy migration 0191. Tiền đang tính theo cách cũ ({brand.billingModel === "hourly" ? "theo giờ" : "theo %"}).</p>}
+      {!available && <FeatureOffNote what={`lưu điều khoản thương mại (tiền đang tính ${brand.billingModel === "hourly" ? "theo giờ" : "theo %"})`} />}
       {error && <p className="text-xs text-rose-300">{error}</p>}
       {note && <p className="text-xs text-emerald-300">{note}</p>}
 

@@ -4,9 +4,8 @@ import { planTargetOf } from "../../lib/performance/targetAllocation";
 import { AlertTriangle, CalendarRange, ChevronLeft, ChevronRight, ClipboardList, Database, Download, Loader2, Radio, TrendingDown, TrendingUp, Users } from "lucide-react";
 import { fmtVndShort } from "../../lib/format";
 import { metricHint } from "../../lib/metricGlossary";
-import { downloadSheetsAsXlsx } from "../../lib/exportXlsx";
+import { downloadSheetsAsXlsx, xlsxFailText } from "../../lib/exportXlsx";
 import { useToast } from "../../hooks/useToast";
-import { errorMessage } from "../../lib/errorMessage";
 import { DataRawWeekSlice, fetchDataRawWeekSlice } from "../../lib/dataraw/weeklySlice";
 import { addDays, eachDay, isoWeekNumber, isoWeekStart } from "../../lib/dateUtils";
 import { getTodayDate } from "../../lib/dateUtils";
@@ -258,7 +257,7 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
         }
       ],
       `ReportTuan_${brandName}_tuan${week}-${year}.xlsx`.replace(/\s+/g, "_")
-    ).catch((e) => showToast(`Không tải được file Excel: ${errorMessage(e)}`));
+    ).catch((e) => showToast(xlsxFailText(e)));
   };
 
   if (!CAN_VIEW_ROLES.includes(currentRole)) {

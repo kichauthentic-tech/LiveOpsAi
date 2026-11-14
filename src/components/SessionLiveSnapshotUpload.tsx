@@ -141,7 +141,7 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
   }
 
   async function handleDelete() {
-    if (!(await confirm("Xoá file số liệu của ca này? Ca sẽ quay về số liệu trước khi tải lên (kể cả bản host tự khai tay).", { danger: true }))) return;
+    if (!(await confirm("Xoá file số liệu của ca này? Ca quay về số trước khi tải lên.", { danger: true }))) return;
     setBusy(true);
     setError(null);
     try {
@@ -340,7 +340,7 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
       {snapshot && (
         <button
           onClick={async () => {
-            if (partCount > 0 && !(await confirm("Ca này đang có các mảnh room bị ngắt. Tải lại file khác sẽ XOÁ hết mảnh (số + lý do ngắt) và tính lại từ file mới. Tiếp tục?", { danger: true }))) return;
+            if (partCount > 0 && !(await confirm("Tải lại file khác sẽ XOÁ hết mảnh room đã ngắt và tính lại từ đầu. Tiếp tục?", { danger: true }))) return;
             fileRef.current?.click();
           }}
           disabled={busy}

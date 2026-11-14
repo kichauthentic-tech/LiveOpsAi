@@ -9,9 +9,11 @@ import { REPORT_PLATFORMS, platformOf, type ReportPlatform } from "../lib/report
 import { fetchForecastSnapshots, type ForecastSnapshot } from "../lib/db/forecastSnapshots";
 import { fetchChannelAdsBudgets } from "../lib/db/monthPlans";
 import { fmtFixed, fmtVndShort } from "../lib/format";
-import { modelScoreboard, switchAdvice, SWITCH_MIN_GAIN, SWITCH_MONTHS } from "../lib/performance/modelScoreboard";
+import { modelScoreboard, switchAdvice, SWITCH_MONTHS } from "../lib/performance/modelScoreboard";
 import { Explain } from "./common/Explain";
 import { StatTile } from "./common/StatTile";
+import { FeatureOffNote } from "./common/FeatureOffNote";
+import { InfoDot } from "./common/InfoDot";
 
 // AI Training Center — thẻ "Dự báo GMV tháng (engine target v3)". Phần tính ở lib/performance/monthForecast.ts; thẻ chỉ hiển thị:
 // engine đang nghĩ gì về tháng tới, 4 chỉ số theo dõi (backtest walk-forward tính ngay khi vặn tham số), sổ dự báo đã ghi (0163) và
@@ -188,7 +190,7 @@ export const ForecastTrainingCard: React.FC<Props> = ({ brandId, sessions, param
             {!ledger || ledger.key !== key ? (
               <p className="text-[var(--text-faint)]">Đang tải…</p>
             ) : ledger.missing ? (
-              <p className="text-amber-300">DB chưa chạy migration 0163 (forecast_snapshots) — chưa ghi được sổ. Chạy SQL trong Supabase; Dashboard và nút Chốt tự ghi từ đó.</p>
+              <FeatureOffNote what="ghi sổ dự báo" />
             ) : ledger.error ? (
               <p className="text-rose-300">Không đọc được sổ: {ledger.error}</p>
             ) : ledgerMonths.length === 0 ? (
@@ -215,7 +217,10 @@ export const ForecastTrainingCard: React.FC<Props> = ({ brandId, sessions, param
                     ))}
                   </tbody>
                 </table>
-                <p className="mt-1 text-2xs text-[var(--text-faint)] leading-snug">Tháng đang chạy chỉ hiện dự báo đã ghi; hết tháng mới chấm lệch so với {platformText("GMV", platform)} cuối tháng (lấy từ ca, nên đối soát lại vẫn đúng).</p>
+                <p className="mt-1 text-2xs text-[var(--text-faint)] leading-snug">
+                  Hết tháng mới chấm lệch.
+                  <InfoDot label="Chấm lệch thế nào">Tháng đang chạy chỉ hiện dự báo đã ghi. Hết tháng so với {platformText("GMV", platform)} cuối tháng, lấy từ ca nên đối soát lại vẫn đúng.</InfoDot>
+                </p>
               </div>
             )}
           </div>
@@ -256,8 +261,8 @@ export const ForecastTrainingCard: React.FC<Props> = ({ brandId, sessions, param
                 </table>
                 <p className={`mt-1 text-2xs leading-snug ${advice.switchToSched ? "text-amber-300 font-bold" : "text-[var(--text-faint)]"}`}>
                   {advice.switchToSched
-                    ? `Bộ xếp ca đúng hơn ≥ ${Math.round(SWITCH_MIN_GAIN * 100)} điểm ở ${SWITCH_MONTHS} tháng sổ gần nhất (TB ${fmtFixed(advice.avgGainPts ?? 0, 1)} điểm) — đủ điều kiện đổi mô hình chính (cần sửa code, app không tự đổi).`
-                    : `Luật đổi: bộ xếp ca đúng hơn ≥ ${Math.round(SWITCH_MIN_GAIN * 100)} điểm ở ${SWITCH_MONTHS} tháng có SỔ của cả hai mô hình (backtest không tính — bộ xếp ca đã chỉnh 06/11 trên chính các tháng đó). Hiện có ${advice.ledgerMonths} tháng sổ; sổ ghi cả hai từ lần Chốt kế hoạch sau khi chạy 0201.`}
+                    ? `Đủ điều kiện đổi mô hình chính: hơn ${fmtFixed(advice.avgGainPts ?? 0, 1)} điểm ở ${SWITCH_MONTHS} tháng sổ gần nhất.`
+                    : `Hiện có ${advice.ledgerMonths} tháng sổ.`}
                 </p>
               </div>
             )}
