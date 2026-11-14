@@ -12,6 +12,7 @@ import { TalentAccountGrants } from "./TalentAccountGrants";
 import { CredentialDialog, IssuedCredential } from "./CredentialDialog";
 import { isAliasEmail, loginLabel } from "../lib/loginName";
 import type { GrantResult } from "../lib/talentAccounts";
+import { roleLabel } from "../lib/roleLabel";
 
 export interface NewUserPayload {
   name: string;
@@ -342,7 +343,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
           ...editingUser,
           name: formData.name,
           role: formData.role,
-          customRoleTitle: formData.customRoleTitle || getRoleDefaultTitle(formData.role),
+          customRoleTitle: formData.customRoleTitle || roleLabel(formData.role),
           status: formData.status,
           assignedBrandId: formData.role === "brand" ? formData.assignedBrandId : undefined,
           assignedTalentId: formData.role === "talent" ? formData.assignedTalentId : undefined
@@ -354,7 +355,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
           name: formData.name,
           email: formData.email,
           role: formData.role,
-          customRoleTitle: formData.customRoleTitle || getRoleDefaultTitle(formData.role),
+          customRoleTitle: formData.customRoleTitle || roleLabel(formData.role),
           assignedBrandId: formData.role === "brand" ? formData.assignedBrandId : undefined,
           newTalentProfile: isNewTalent
             ? {
@@ -424,22 +425,6 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
     }
   };
 
-  const getRoleDefaultTitle = (role: UserRole) => {
-    switch (role) {
-      case "admin":
-        return "Quản trị hệ thống";
-      case "ceo":
-        return "CEO";
-      case "operations":
-        return "Vận hành";
-      case "brand":
-        return "Đại diện brand";
-      case "talent":
-        return "Host / Trợ live";
-      case "trainer":
-        return "Trainer";
-    }
-  };
 
   return (
     <div className="space-y-6">

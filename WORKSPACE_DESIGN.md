@@ -586,6 +586,14 @@ Chữ brand thấy trong Report Tháng (component `report/*`, `*MonthlyReportTab
 ### 5.2 Client (React / TS)
 - Nhãn vai trò talent qua `talentRoleLabel` (lib/talentName.ts) — DB lưu "Assistant", màn hình nói "Trợ live".
 - **App talent (11/10, bản 2 16/10):** màn talent đổi bố cục theo bề rộng (`useMediaQuery(TALENT_WIDE_QUERY)` / class `lg:`), KHÔNG theo user-agent (user-agent chỉ dùng để chọn nút Lịch iPhone hay Google Calendar). "ca của tôi / trùng giờ của tôi / giờ tháng" chỉ qua `lib/talent/myShifts.ts` (đi qua staffSegments); danh sách theo tuần, chấm đỏ, câu hiệu suất, tin Zalo chỉ qua `lib/talent/agenda.ts`. App talent KHÔNG nhắc giao ca (admin giao). Chấm đỏ chỉ đếm việc host làm được trên điện thoại. Mỗi ca hiện MỘT lần trên một màn (không lặp ở khối khác). File lịch .ics: luật đổi người giữa ca chép trong `server/calendarFeed.ts` (`personWindows`) — đổi `effectiveSegments` thì sửa cả hai; hiệu suất của talent chỉ `myChannelStanding` (so mặt bằng cùng kênh, không tên người khác). Thẻ ca của talent = `SessionEventCard` + `buildSessionMeta(..., meId)` (chip "Bạn"), không dựng thẻ riêng. Màn dùng chung với ops thì mở theo `currentRole === "talent"` + quyền ghi (`canEdit = canManageSlots && !!onUpdateSession`), không truyền callback ghi cho talent. "Đã nhận lịch" (0169) chỉ qua `lib/talent/acks.ts` (`ackState` so ngày/giờ đã nhận với giờ hiện tại của ca — không thêm cờ "đã nhận" vào `live_sessions`).
+- **Màn "không mở được trang" (App.tsx, sửa 14/11):** nói lý do THẬT, bằng tiếng Việt, không chữ Anh kỹ thuật
+  ("Access Restricted / Permission Required / Status: DENIED" đã bỏ — `tests/accessGuardWording.test.ts` canh).
+  Ba lý do tách riêng: (1) link `/brand/<slug>/…` của brand có hợp đồng "Đã xong" ⇒ `brandLinkIssue` + câu "đã kết
+  thúc hợp tác" (brand bị `hiddenBrandIds` ẩn, KHÔNG phải thiếu quyền); (2) slug không khớp brand nào ⇒ "không tìm
+  thấy brand"; (3) vai trò không có trang đó ⇒ màn chặn. Tên trang in bằng nhãn menu (`tabLabel`, tra cả menu của
+  vai trò khác), không bao giờ in id tab. Tên vai trò lấy từ `lib/roleLabel.ts` — MỘT chỗ, dùng chung với Phân Quyền.
+- **Link màn talent mở bằng tài khoản khác:** `/da-dang-ky` (`shift_registered`) hiện màn chặn như `/ca-cua-toi`;
+  chỉ chuyển ngầm về Bảng Vận Hành khi tab đến từ localStorage cũ, không phải từ link vừa mở (`initialRoute`).
 - `strict` + `noUnusedLocals` bật; `@types/react*` phải có trong devDependencies (thiếu là JSX thành `any`, CI xanh giả).
 - **Thuật ngữ chuẩn (audit 27/10, `tests/uiWording.test.ts` canh):** tải lên / tải lại file (không "up"); chọn / bỏ chọn (không "tick");
   số liệu (không "có số / chưa có số" trơn); Campaign / Daily (không "ngày camp", "ngày thường"); trung bình nhóm (không "mặt bằng", "TB");

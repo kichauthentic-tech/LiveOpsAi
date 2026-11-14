@@ -151,7 +151,7 @@ test("chữ viết hoa bằng CSS toàn app: chỉ còn chỗ nhận diện cố
     "components/Login.tsx": [1, "khẩu hiệu \"Agency Operating System\" dưới logo"],
     "components/AppSidebar.tsx": [2, "khẩu hiệu dưới logo + chữ cái đầu ở avatar"],
     "components/UserRoleSettings.tsx": [6, "mã role (ADMIN, CEO…) đọc như huy hiệu + chữ cái đầu ở avatar"],
-    "App.tsx": [1, "mã role trong thông báo thiếu quyền, cùng dáng huy hiệu role"],
+    // 14/11: màn thiếu quyền bỏ in mã role viết hoa ("ADMIN") — nay gọi tên vai trò bằng tiếng Việt (lib/roleLabel.ts).
     "components/ui/CampaignDayRibbon.tsx": [3, "dải camp D-Day / Mid-Month / Pay Day trên lịch"],
     "components/LiveCalendar.tsx": [1, "chú giải brand = nhãn brand trên thẻ ca (.sc-bname)"]
   };

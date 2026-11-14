@@ -82,6 +82,7 @@ import {
   brandNavGroups,
   getDefaultTabForRole
 } from "./lib/appNav";
+import { roleLabel } from "./lib/roleLabel";
 
 
 // Mỗi tab một chunk riêng, tải khi mở tab (xem src/lib/lazyNamed.ts). Chỉ dùng bên trong <Suspense> của khu nội dung tab.
@@ -331,6 +332,16 @@ export default function App() {
   const [pendingBrandSlug, setPendingBrandSlug] = useState<string | null>(() =>
     initialRoute?.type === "brand" ? initialRoute.brandSlug : null
   );
+  // Link /brand/<slug>/… không mở được workspace brand đó: giữ lại lý do để NÓI ĐÚNG.
+  //
+  // Kiểm 14/11: mở /brand/jockey/dashboard bằng tài khoản admin ra màn "Quyền Truy Cập Bị Hạn Chế … Status:
+  // DENIED". Admin không thiếu quyền nào — JOCKEY là brand CÓ THẬT nhưng hợp đồng đã "Đã xong", nên bị ẩn khỏi
+  // `visibleBrands`; workspace rơi về Agency trong khi tab vẫn là tab của Brand ⇒ ra màn thiếu quyền. Người đọc
+  // đi tìm người cấp quyền, trong khi việc cần làm là mở lại hợp đồng ở CRM.
+  //
+  // Hai lý do, hai câu khác nhau: brand đã kết thúc hợp tác, hoặc slug không khớp brand nào (đổi tên / gõ sai).
+  // Xoá cờ khi người dùng rời trang (navigateTo / bấm menu / Back) — ba lối ra duy nhất khi màn này đang hiện.
+  const [brandLinkIssue, setBrandLinkIssue] = useState<{ slug: string; name?: string } | null>(null);
   useEffect(() => saveStorage("workspace", workspace), [workspace]);
 
   // Dữ liệu nghiệp vụ + các đợt nạp: src/hooks/useWorkspaceData.ts. Trả về state KÈM setter vì các
@@ -796,11 +807,13 @@ export default function App() {
   if (pendingBrandSlug && brandsLoaded) {
     const b = findBrandBySlug(brands, pendingBrandSlug);
     setPendingBrandSlug(null);
-    if (b) setWorkspace({ type: "brand", brandId: b.id });
+    if (b && !hiddenBrandIds.has(b.id)) setWorkspace({ type: "brand", brandId: b.id });
     else {
-      // Link tới brand đã xoá/gõ sai: về trang mặc định thay vì kẹt ở màn "không có quyền".
+      // Brand đã kết thúc hợp tác, hoặc slug không khớp brand nào. Trước 14/11 chỗ này chỉ đẩy về trang mặc
+      // định, nhưng tab của link (vd `brand_dashboard`) vẫn còn trong state nên màn hiện ra là "không có
+      // quyền" — sai lý do. Nay vẽ thẳng màn nói đúng chuyện gì xảy ra.
       setWorkspace({ type: "agency" });
-      setActiveTab(getDefaultTabForRole(currentRole));
+      setBrandLinkIssue({ slug: pendingBrandSlug, name: b?.name });
     }
   }
 
@@ -829,6 +842,7 @@ export default function App() {
     const onPop = () => {
       const r = parsePath(window.location.pathname);
       if (!r) return;
+      setBrandLinkIssue(null);
       if (r.type === "agency") {
         const san = parsePlatformParam(window.location.search);
         if (san) pickAgencyScope(san);
@@ -837,7 +851,13 @@ export default function App() {
         return;
       }
       const b = findBrandBySlug(brands, r.brandSlug);
-      if (!b) return;
+      if (!b || hiddenBrandIds.has(b.id)) {
+        // Back/Forward về link của brand đã kết thúc / không còn: nói thẳng, không đứng im ở trang cũ trong
+        // khi URL đã đổi.
+        setWorkspace({ type: "agency" });
+        setBrandLinkIssue({ slug: r.brandSlug, name: b?.name });
+        return;
+      }
       setWorkspace({ type: "brand", brandId: b.id });
       setActiveTab(r.tab ?? "brand_calendar");
       const san = parsePlatformParam(window.location.search);
@@ -845,7 +865,7 @@ export default function App() {
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
-  }, [brands]);
+  }, [brands, hiddenBrandIds]);
 
   // Helper to check permission for a specific key under current role/user
   const checkPermission = (permKey: PermissionKey): boolean => {
@@ -1605,6 +1625,7 @@ export default function App() {
     else if (brandId && effectiveWorkspace.type === "agency" && agencyScope !== "all" && tabScope) pickBrandScope(brandId, agencyScope);
     setWorkspace(brandId ? { type: "brand", brandId } : { type: "agency" });
     setActiveTab(tab);
+    setBrandLinkIssue(null);
     setMobileMenuOpen(false);
   };
 
@@ -1637,6 +1658,17 @@ export default function App() {
   // Nay đảo lại mặc định: không tìm thấy nav item = không được phép. Cách này bảo vệ luôn mọi
   // nav item tạo-có-điều-kiện thêm về sau, không phải nhớ thêm guard ở chỗ render.
   const currentTabNavItem = navItems.find((n) => n.id === activeTab);
+  // Tên trang để NÓI với người dùng. Tab bị chặn không nằm trong menu của vai trò đang đăng nhập nên `navItems`
+  // không có nhãn — màn chặn và màn lỗi tab in thẳng id kỹ thuật ("brand_dashboard", "my_shifts"; kiểm 14/11).
+  // Tra thêm trong menu của các vai trò khác; hết cách mới in id. Không useMemo: nhánh tra chỉ chạy khi tab
+  // KHÔNG có trong menu của vai trò này — tức đúng lúc màn chặn đang hiện, màn tĩnh, không có gì để tiết kiệm.
+  const tabLabel =
+    currentTabNavItem?.label ??
+    (["admin", "operations", "trainer", "brand", "talent"] as UserRole[])
+      .flatMap((r) => [...agencyNavGroups(r), ...brandNavGroups(r)])
+      .flatMap((g) => g.items)
+      .find((n) => n.id === activeTab)?.label ??
+    activeTab;
   const isTabAllowed =
     TABS_WITHOUT_NAV_ITEM.has(activeTab) ||
     (!!currentTabNavItem && (!currentTabNavItem.perm || checkPermission(currentTabNavItem.perm)));
@@ -1654,8 +1686,16 @@ export default function App() {
   // "Nhân sự ca" (agency) đã bỏ 08/10 — chỉ còn "Đăng Ký Ca" của talent dùng id này. Link /nhan-su-ca và activeTab đã lưu của
   // ops/ceo/admin chuyển về Bảng Vận Hành (nơi chốt người), không rơi vào màn "Quyền Truy Cập Bị Hạn Chế".
   useEffect(() => {
-    if (profile && currentRole !== "talent" && (activeTab === "shift_scheduling" || activeTab === "shift_registered")) setActiveTab("calendar");
-  }, [profile, currentRole, activeTab]);
+    if (!profile || currentRole === "talent") return;
+    if (activeTab === "shift_scheduling") {
+      setActiveTab("calendar");
+      return;
+    }
+    // "Đã Đăng Ký" là màn của talent. Mở bằng LINK (/da-dang-ky) thì nói thẳng là không mở được, như
+    // /ca-cua-toi và /ho-so — kiểm 14/11: riêng link này im lặng nhảy sang Bảng Vận Hành, người nhận link
+    // không hiểu vì sao ra màn khác. Còn nếu chỉ là tab cũ còn lưu trong máy thì vẫn đưa về Bảng Vận Hành.
+    if (activeTab === "shift_registered" && initialRoute?.tab !== "shift_registered") setActiveTab("calendar");
+  }, [profile, currentRole, activeTab, initialRoute]);
 
   const firstAllowedTab = navItems.find((n) => !n.perm || checkPermission(n.perm))?.id;
 
@@ -1767,6 +1807,7 @@ export default function App() {
         activeTab={activeTab}
         onSelectTab={(tabId) => {
           setActiveTab(tabId);
+          setBrandLinkIssue(null);
           setMobileMenuOpen(false);
         }}
         checkPermission={checkPermission}
@@ -1873,7 +1914,45 @@ export default function App() {
           className={`flex-1 overflow-y-auto p-3 sm:p-6 scrollbar-thin ${currentRole === "talent" ? "pb-24 md:pb-6" : ""}`}
         >
           <div className={`mx-auto space-y-6 ${isCalendarModule ? "max-w-none" : "max-w-7xl"}`}>
-            {!isTabAllowed && (phase6Loading || pendingBrandSlug) ? (
+            {brandLinkIssue ? (
+              /* Link brand hỏng — KHÔNG phải chuyện quyền, nên đứng trước mọi nhánh phân quyền bên dưới. */
+              <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-8 text-center max-w-2xl mx-auto my-12 space-y-5 text-[var(--text)] shadow-2xl">
+                <div className="w-16 h-16 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-2xl flex items-center justify-center mx-auto">
+                  <ShieldAlert className="w-8 h-8" />
+                </div>
+                <div className="space-y-2">
+                  <h2 className="text-xl font-black text-[var(--text)]">
+                    {brandLinkIssue.name ? `${brandLinkIssue.name} đã kết thúc hợp tác` : "Không tìm thấy brand trong đường link"}
+                  </h2>
+                  <p className="text-xs text-[var(--text-muted)] max-w-md mx-auto">
+                    {brandLinkIssue.name ? (
+                      <>
+                        Hợp đồng của brand này ở CRM đang là <strong className="text-[var(--text)]">Đã xong</strong>, nên workspace
+                        của brand không còn mở. Số liệu cũ vẫn xem được ở Sổ Ca, Hiệu Suất Host và Finance. Muốn mở lại thì đổi
+                        trạng thái hợp đồng ở CRM. Đây không phải chuyện quyền truy cập.
+                      </>
+                    ) : (
+                      <>
+                        Đường link trỏ tới brand <strong className="text-[var(--text)]">&quot;{brandLinkIssue.slug}&quot;</strong>,
+                        nhưng danh sách brand không có brand nào như vậy — có thể brand đã đổi tên. Đây không phải chuyện quyền
+                        truy cập.
+                      </>
+                    )}
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                  <button
+                    onClick={() => {
+                      setBrandLinkIssue(null);
+                      setActiveTab(firstAllowedTab ?? getDefaultTabForRole(currentRole));
+                    }}
+                    className="px-5 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-xl text-xs font-black shadow-lg shadow-[var(--accent)]/30 transition-all"
+                  >
+                    Về trang chính
+                  </button>
+                </div>
+              </div>
+            ) : !isTabAllowed && (phase6Loading || pendingBrandSlug) ? (
               /* Mở bằng link /brand/<slug>/… mà brand chưa nạp: tab là của Brand Workspace nhưng workspace
                  chưa đổi — cũng là "chưa biết", chờ như dưới.
                  Ma Trận Phân Quyền CHƯA về — `rolePermissions` còn là {} nên checkPermission()
@@ -1923,27 +2002,23 @@ export default function App() {
               </div>
             ) : !isTabAllowed ? (
               /* Access Guard Fallback — tới đây thì Ma Trận ĐÃ nạp xong và đúng là role này
-                 không được cấp quyền. Chỉ lúc này mới được nói "DENIED". */
+                 không được cấp quyền. Chỉ lúc này mới được nói là không mở được. */
               <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-8 text-center max-w-2xl mx-auto my-12 space-y-5 text-[var(--text)] shadow-2xl">
                 <div className="w-16 h-16 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-2xl flex items-center justify-center mx-auto">
-                  <ShieldAlert className="w-8 h-8 animate-bounce" />
+                  <ShieldAlert className="w-8 h-8" />
                 </div>
 
+                {/* Audit 14/11: màn này in "Access Restricted … Permission Required … Status: DENIED" cho người
+                    vận hành đọc — chữ Anh kỹ thuật, trái §5.2(7). Nói bằng tiếng Việt: trang nào, vai trò nào, và
+                    ai mở được. Tab không có trong menu của vai trò này thì không có tên quyền để nêu — khi đó nói
+                    do vai trò, thay vì in "undefined". */}
                 <div className="space-y-2">
-                  <h2 className="text-xl font-black text-[var(--text)]">Quyền Truy Cập Bị Hạn Chế (Access Restricted)</h2>
+                  <h2 className="text-xl font-black text-[var(--text)]">Tài khoản của bạn không mở được trang này</h2>
                   <p className="text-xs text-[var(--text-muted)] max-w-md mx-auto">
-                    Role hiện tại của bạn (<span className="text-amber-400 font-bold uppercase">{currentRole}</span>) chưa được cấp quyền truy cập tính năng{" "}
-                    <strong className="text-[var(--text)]">&quot;{currentTabNavItem?.label ?? activeTab}&quot;</strong>.
+                    Trang <strong className="text-[var(--text)]">&quot;{tabLabel}&quot;</strong> không
+                    nằm trong phần việc của vai trò <strong className="text-[var(--text)]">{roleLabel(currentRole)}</strong>.
+                    {currentTabNavItem?.perm ? " Người quản trị mở quyền này ở Phân Quyền & Role." : " Trang này dành cho vai trò khác."}
                   </p>
-                </div>
-
-                <div className="p-4 bg-[var(--surface-base)] border border-[var(--border)] rounded-xl text-left text-xs font-mono space-y-1 text-[var(--text-muted)]">
-                  <div className="text-[var(--text-faint)] font-sans text-2xs font-bold">Chi tiết yêu cầu an ninh:</div>
-                  {/* Tab không có nav item cho role này thì không có perm key nào để in — nói thẳng là do role,
-                      thay vì in "undefined". */}
-                  <div>• Permission Required: <span className="text-blue-400">{currentTabNavItem?.perm ?? "không khả dụng cho role này"}</span></div>
-                  <div>• Current Role: <span className="text-amber-400">{currentRole}</span></div>
-                  <div>• Status: <span className="text-red-400">DENIED</span></div>
                 </div>
 
                 <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
@@ -1951,7 +2026,7 @@ export default function App() {
                     onClick={() => setActiveTab(firstAllowedTab ?? getDefaultTabForRole(currentRole))}
                     className="px-4 py-2 bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-[var(--text)] rounded-xl text-xs font-bold transition-all"
                   >
-                    Về Trang Mặc Định Cho Role
+                    Về trang chính
                   </button>
 
                   {currentRole === "ceo" || currentRole === "admin" ? (
@@ -1962,7 +2037,7 @@ export default function App() {
                       className="px-5 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-xl text-xs font-black shadow-lg shadow-[var(--accent)]/30 transition-all flex items-center gap-2"
                     >
                       <ShieldCheck className="w-4 h-4" />
-                      <span>Quản Lý Phân Quyền Hợp Lệ (Role Settings)</span>
+                      <span>Mở Phân Quyền &amp; Role</span>
                     </button>
                   ) : (
                     <div className="px-4 py-2 bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-xl text-2xs font-semibold flex items-center gap-2">
@@ -1981,7 +2056,7 @@ export default function App() {
                 key={activeTab}
                 fallback={({ resetError }) => (
                   <TabErrorFallback
-                    tabLabel={currentTabNavItem?.label ?? activeTab}
+                    tabLabel={tabLabel}
                     onRetry={resetError}
                     onGoHome={() => setActiveTab(firstAllowedTab ?? getDefaultTabForRole(currentRole))}
                   />
