@@ -69,6 +69,7 @@ import { deriveChannels, platformsOfBrand } from "./lib/channels";
 import { profileOf } from "./lib/platforms/profiles";
 import { createBrandChannel, updateBrandChannel } from "./lib/db/brandChannels";
 import { lazyNamed } from "./lib/lazyNamed";
+import { hasHandoverOrBetter } from "./lib/dataSource";
 import { dropPrefetched, type TabPrefetchCtx } from "./lib/db/prefetch";
 import { useWorkspaceData } from "./hooks/useWorkspaceData";
 import { setDisplayLang } from "./lib/displayLang";
@@ -1207,7 +1208,7 @@ export default function App() {
       setSessions((prev) => prev.map((x) => (x.id === saved.id ? saved : x)));
       // Đổi HOST giữa ca (0216): ca chưa có số liệu tự tách thành các ca nối tiếp, mỗi host một ca. Ca đã có số giữ nguyên (gõ GMV ở khối Report lúc đổi host).
       const hostChanged = segments.filter((g) => g.role === "host").length >= 2;
-      const hasData = (saved.actualGmv ?? 0) > 0 || !!saved.report || (saved.staffCheckpoints ?? []).length > 0 || saved.dataSource !== "manual";
+      const hasData = (saved.actualGmv ?? 0) > 0 || !!saved.report || (saved.staffCheckpoints ?? []).length > 0 || hasHandoverOrBetter(saved);
       if (hostChanged && !hasData) {
         try {
           const parts = await splitSessionAtHostChange(session.id);

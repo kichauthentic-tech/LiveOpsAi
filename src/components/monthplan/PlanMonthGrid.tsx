@@ -218,7 +218,7 @@ function SlotChip({ d, p, active, onEdit }: { d: PlanDraftSlot; p: Props; active
       <span className="flex flex-col items-end leading-tight">
         {right}
         {showForecast && (
-          <span className={`text-[10px] font-medium ${d.highExpectation ? "text-orange-400" : "text-[var(--text-faint)] opacity-70"}`} title={`Dự báo ${fmtVndShort(d.expectedGmv!)}${d.highExpectation ? " — thấp hơn target" : ""}`}>
+          <span className={`text-2xs font-medium ${d.highExpectation ? "text-orange-400" : "text-[var(--text-faint)] opacity-70"}`} title={`Dự báo ${fmtVndShort(d.expectedGmv!)}${d.highExpectation ? " — thấp hơn target" : ""}`}>
             {fmtVndShort(d.expectedGmv!)}
           </span>
         )}

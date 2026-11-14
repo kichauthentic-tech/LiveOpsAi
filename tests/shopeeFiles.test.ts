@@ -74,7 +74,9 @@ describe("Live List → phiên", () => {
     expect(() => parseShopeeLiveList([["a", "b"], [1, 2]])).toThrow(/Live List/);
     expect(() => parseShopeeLiveList([LIVE_HEAD.filter((h) => h !== "Viewers"), [PERIOD, 1, 1, "x", "30-09-2026 22:00", "01:00:00"]])).toThrow(/Thiếu cột/);
     const cross = parseShopeeLiveList(live([s1, [...s2.slice(0, 4), "29-08-2026 11:02", ...s2.slice(5)]]));
-    expect(cross.periodStart.slice(0, 7)).not.toBe(cross.periodEnd.slice(0, 7));
+    expect(cross.periodStart).toBeTruthy();
+    expect(cross.periodEnd).toBeTruthy();
+    expect(String(cross.periodStart).slice(0, 7)).not.toBe(String(cross.periodEnd).slice(0, 7));
     expect(() => parseShopeeLiveList(live([[...s1.slice(0, 4), "hôm qua", ...s1.slice(5)]]))).toThrow(/giờ bắt đầu/);
     expect(() => parseShopeeLiveList(live([]))).toThrow(/không có phiên/);
   });

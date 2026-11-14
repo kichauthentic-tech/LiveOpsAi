@@ -16,16 +16,16 @@ export async function exportMonthReview(review: MonthReview, month: string, role
   const cols: { header: string; width: number }[] = [
     { header: "STT", width: 5 },
     { header: isHost ? "HOST" : "TRỢ LIVE", width: 24 },
-    { header: "MỨC CAST (đ/giờ)", width: 16 },
+    { header: "MỨC CAST MỖI GIỜ", width: 16 },
     { header: "GIỜ PLAN", width: 11 },
     { header: "GIỜ NGHIỆM THU", width: 15 },
-    { header: "CAST PLAN (đ)", width: 16 },
-    { header: "CAST NGHIỆM THU (đ)", width: 20 },
+    { header: "CAST PLAN", width: 16 },
+    { header: "CAST NGHIỆM THU", width: 20 },
     ...(isHost
       ? [
-          { header: "GMV TikTok (đ)", width: 17 },
+          { header: "GMV TikTok", width: 17 },
           { header: "CAST % TikTok", width: 14 },
-          { header: "GMV Shopee (đ)", width: 17 },
+          { header: "GMV Shopee", width: 17 },
           { header: "CAST % Shopee", width: 14 }
         ]
       : []),

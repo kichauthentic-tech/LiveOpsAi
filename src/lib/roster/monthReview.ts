@@ -1,4 +1,5 @@
 import type { LiveSession, Talent, TalentRateHistoryEntry } from "../../types";
+import { fmtFixed } from "../format";
 import { computeSessionPnl, isPnlSession } from "../pnl";
 import { platformOf, REPORT_PLATFORMS, type ReportPlatform } from "../reportPlatform";
 import { personRoleMinutes, roleShares, segmentsOfRole, type StaffRole } from "../staffSegments";
@@ -172,7 +173,7 @@ function reasonsOf(cur: Acc, prev: Acc | undefined, role: ReviewRole, prevLabel:
       if (c.gmv > 0 && p.gmv > 0 && c.hours >= 8 && p.hours >= 8) {
         const a = c.cast / c.gmv;
         const b = p.cast / p.gmv;
-        if (Math.abs(a - b) >= 0.005) out.push(`Cast/GMV ${pf} ${a > b ? "tăng" : "giảm"} ${(b * 100).toFixed(1).replace(".", ",")}% → ${(a * 100).toFixed(1).replace(".", ",")}%`);
+        if (Math.abs(a - b) >= 0.005) out.push(`Cast/GMV ${pf} ${a > b ? "tăng" : "giảm"} ${fmtFixed(b * 100, 1)}% → ${fmtFixed(a * 100, 1)}%`);
       }
     }
   }

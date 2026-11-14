@@ -1,9 +1,10 @@
 import React from "react";
-import { Bar, BarChart, CartesianGrid, Cell, ComposedChart, LabelList, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { changePct, type PnlLine, type PnlRow, type PnlStatement, type PnlTrendPoint, type DailyTrend } from "../lib/accounting/pnlStatement";
 import { fmtFixed, fmtMonth, fmtVndFull, fmtVndShort } from "../lib/format";
+import { platformOf, type ReportPlatform } from "../lib/reportPlatform";
 import { PlatformChip } from "./common/PlatformChip";
 import { StatTile } from "./common/StatTile";
+import { niceMax, useTooltip } from "./dashboard/shared";
 
 const TH = "py-2 pr-3 text-2xs font-semibold text-[var(--text-muted)] whitespace-nowrap";
 const TD = "py-2 pr-3 whitespace-nowrap";
@@ -32,8 +33,7 @@ const C_PAY = "#fb7185";
 const C_COST = "#fbbf24";
 const C_GP = "#10b981";
 const C_LOSS = "#ef4444";
-const AXIS = { fontSize: 11, fill: "var(--text-muted)" };
-const TIP = { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 };
+const C_MARGIN = "#f472b6";
 
 const Legend2: React.FC<{ items: [string, string][] }> = ({ items }) => (
   <div className="flex flex-wrap gap-x-4 gap-y-1 text-2xs text-[var(--text-muted)]">
@@ -56,31 +56,57 @@ const Card: React.FC<{ title: string; hint?: string; className?: string; childre
   </section>
 );
 
+// Trục Y của cả ba biểu đồ chia 4 mức; r1 giữ toạ độ SVG một chữ số thập phân cho file nhẹ.
+const TICKS = [0, 1, 2, 3, 4];
+const r1 = (v: number) => Math.round(v * 10) / 10;
+/** Mức âm (lỗ) cũng cần một đầu trục tròn trịa. */
+const axisMin = (lo: number) => (lo < 0 ? -niceMax(-lo) : 0);
+
 /** Thác nước dọc: doanh thu → trừ công talent → trừ chi phí ca → lãi gộp. */
 const Waterfall: React.FC<{ statement: PnlStatement }> = ({ statement }) => {
+  const tip = useTooltip();
   const [rev, pay, cost, gp] = statement.waterfall;
-  const data = [
-    { name: "Doanh thu", range: [0, rev.value], fill: C_REV, shown: rev.value },
-    { name: "Công talent", range: [rev.value + pay.value, rev.value], fill: C_PAY, shown: pay.value },
-    { name: "Chi phí ca", range: [gp.value, rev.value + pay.value], fill: C_COST, shown: cost.value },
-    { name: "Lãi gộp", range: [Math.min(gp.value, 0), Math.max(gp.value, 0)], fill: gp.value < 0 ? C_LOSS : C_GP, shown: gp.value }
+  const bars = [
+    { name: "Doanh thu", lo: 0, hi: rev.value, fill: C_REV, shown: rev.value },
+    { name: "Công talent", lo: rev.value + pay.value, hi: rev.value, fill: C_PAY, shown: pay.value },
+    { name: "Chi phí ca", lo: gp.value, hi: rev.value + pay.value, fill: C_COST, shown: cost.value },
+    { name: "Lãi gộp", lo: Math.min(gp.value, 0), hi: Math.max(gp.value, 0), fill: gp.value < 0 ? C_LOSS : C_GP, shown: gp.value }
   ];
+  const W = 480, H = 260, L = 54, R = 8, T = 24, B = 26, iw = W - L - R, ih = H - T - B;
+  const ymax = niceMax(Math.max(1, ...bars.map((b) => b.hi)));
+  const ymin = axisMin(Math.min(0, ...bars.map((b) => b.lo)));
+  const Y = (v: number) => T + ih - (ih * (v - ymin)) / (ymax - ymin);
+  const slot = iw / bars.length, bw = Math.min(64, slot * 0.6);
   return (
-    <div className="h-[260px]" role="img" aria-label={`Doanh thu ${fmtVndFull(rev.value)}, lãi gộp ${fmtVndFull(gp.value)}`}>
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 16, right: 4, left: 0, bottom: 0 }}>
-          <CartesianGrid stroke="var(--border-muted)" vertical={false} />
-          <XAxis dataKey="name" tick={AXIS} axisLine={false} tickLine={false} interval={0} />
-          <YAxis tickFormatter={(v: number) => fmtVndShort(v)} tick={AXIS} axisLine={false} tickLine={false} width={44} />
-          <Tooltip contentStyle={TIP} cursor={false} formatter={(_v, _n, item) => fmtVndFull((item.payload as { shown: number }).shown)} />
-          <Bar dataKey="range" radius={[3, 3, 0, 0]} isAnimationActive={false}>
-            {data.map((d) => (
-              <Cell key={d.name} fill={d.fill} />
-            ))}
-            <LabelList dataKey="shown" position="top" formatter={(v: unknown) => fmtVndShort(Number(v))} style={{ fontSize: 11, fill: "var(--text)" }} />
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
+    <div onMouseMove={tip.onMove} onMouseLeave={tip.onLeave}>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label={`Doanh thu ${fmtVndFull(rev.value)}, lãi gộp ${fmtVndFull(gp.value)}`}>
+        {TICKS.map((j) => {
+          const v = ymin + ((ymax - ymin) * j) / 4;
+          return (
+            <g key={j}>
+              <line x1={L} x2={L + iw} y1={r1(Y(v))} y2={r1(Y(v))} stroke="var(--border-muted)" />
+              <text x={L - 6} y={r1(Y(v)) + 3.5} textAnchor="end" fontSize="11" fill="var(--text-muted)">
+                {fmtVndShort(v)}
+              </text>
+            </g>
+          );
+        })}
+        {bars.map((b, i) => {
+          const x = L + slot * i + (slot - bw) / 2;
+          return (
+            <g key={b.name} data-tip={`${b.name}: ${fmtVndFull(b.shown)}`}>
+              <rect x={r1(x)} y={r1(Y(b.hi))} width={r1(bw)} height={r1(Math.max(1, Y(b.lo) - Y(b.hi)))} rx="3" fill={b.fill} />
+              <text x={r1(x + bw / 2)} y={r1(Y(b.hi)) - 7} textAnchor="middle" fontSize="11" fill="var(--text)">
+                {fmtVndShort(b.shown)}
+              </text>
+              <text x={r1(x + bw / 2)} y={H - 7} textAnchor="middle" fontSize="11" fill="var(--text-muted)">
+                {b.name}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+      {tip.node}
     </div>
   );
 };
@@ -116,54 +142,97 @@ const BrandBars: React.FC<{ rows: PnlRow[] }> = ({ rows }) => {
 
 /** Xu hướng nhiều tháng: cột chồng = doanh thu tách thành công talent / chi phí ca / lãi gộp; đường = biên lãi %. */
 const TrendChart: React.FC<{ trend: PnlTrendPoint[]; current: string }> = ({ trend, current }) => {
-  const data = trend.map((t) => ({
-    name: `T${Number(t.month.slice(5))}/${t.month.slice(2, 4)}`,
+  const tip = useTooltip();
+  const pts = trend.map((t) => ({
     month: t.month,
-    "Công talent": Math.round(t.talentPay),
-    "Chi phí ca": Math.round(t.sessionCosts),
-    "Lãi gộp": Math.round(Math.max(t.grossProfit, 0)),
-    "Doanh thu": Math.round(t.revenue),
-    "Biên lãi": t.margin == null ? null : Math.round(t.margin * 10) / 10,
-    partial: t.coverage !== "full"
+    name: `T${Number(t.month.slice(5))}/${t.month.slice(2, 4)}`,
+    pay: Math.round(t.talentPay),
+    cost: Math.round(t.sessionCosts),
+    gp: Math.round(Math.max(t.grossProfit, 0)),
+    revenue: Math.round(t.revenue),
+    margin: t.margin == null ? null : Math.round(t.margin * 10) / 10
   }));
+  const W = 760, H = 260, L = 54, R = 44, T = 14, B = 26, iw = W - L - R, ih = H - T - B;
+  const n = Math.max(pts.length, 1);
+  const ymax = niceMax(Math.max(1, ...pts.map((p) => p.pay + p.cost + p.gp)));
+  const Y = (v: number) => T + ih - (ih * v) / ymax;
+  const Ypct = (v: number) => T + ih - (ih * v) / 100;
+  const slot = iw / n, bw = Math.min(56, slot * 0.62);
+  const X = (i: number) => L + slot * (i + 0.5);
+  const marginPath = pts
+    .map((p, i) => (p.margin == null ? null : `${r1(X(i))} ${r1(Ypct(p.margin))}`))
+    .filter((v): v is string => v !== null)
+    .map((v, i) => `${i ? "L" : "M"}${v}`)
+    .join("");
   return (
     <div className="space-y-2">
-      <Legend2 items={[[C_PAY, "Công talent"], [C_COST, "Chi phí ca"], [C_GP, "Lãi gộp"], ["#f472b6", "Biên lãi % (trục phải)"]]} />
-      <div className="h-[260px]" role="img" aria-label="Doanh thu tách công talent, chi phí ca, lãi gộp và biên lãi theo tháng">
-        <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={data} margin={{ top: 8, right: 0, left: 0, bottom: 0 }}>
-            <CartesianGrid stroke="var(--border-muted)" vertical={false} />
-            <XAxis dataKey="name" tick={AXIS} axisLine={false} tickLine={false} />
-            <YAxis yAxisId="vnd" tickFormatter={(v: number) => fmtVndShort(v)} tick={AXIS} axisLine={false} tickLine={false} width={44} />
-            <YAxis yAxisId="pct" orientation="right" domain={[0, 100]} tickFormatter={(v: number) => `${v}%`} tick={AXIS} axisLine={false} tickLine={false} width={38} />
-            <Tooltip contentStyle={TIP} formatter={(v, n) => (n === "Biên lãi" ? `${v}%` : fmtVndFull(Number(v)))} />
-            <Bar yAxisId="vnd" dataKey="Công talent" stackId="s" fill={C_PAY} maxBarSize={56} isAnimationActive={false} />
-            <Bar yAxisId="vnd" dataKey="Chi phí ca" stackId="s" fill={C_COST} maxBarSize={56} isAnimationActive={false} />
-            <Bar yAxisId="vnd" dataKey="Lãi gộp" stackId="s" fill={C_GP} maxBarSize={56} isAnimationActive={false} radius={[3, 3, 0, 0]}>
-              {data.map((d) => (
-                <Cell key={d.month} fillOpacity={d.month === current ? 1 : 0.55} />
-              ))}
-            </Bar>
-            <Line yAxisId="pct" type="monotone" dataKey="Biên lãi" stroke="#f472b6" strokeWidth={2} dot={{ r: 3 }} connectNulls />
-          </ComposedChart>
-        </ResponsiveContainer>
+      <Legend2 items={[[C_PAY, "Công talent"], [C_COST, "Chi phí ca"], [C_GP, "Lãi gộp"], [C_MARGIN, "Biên lãi % (trục phải)"]]} />
+      <div onMouseMove={tip.onMove} onMouseLeave={tip.onLeave}>
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label="Doanh thu tách công talent, chi phí ca, lãi gộp và biên lãi theo tháng">
+          {TICKS.map((j) => {
+            const v = (ymax * j) / 4;
+            return (
+              <g key={j}>
+                <line x1={L} x2={L + iw} y1={r1(Y(v))} y2={r1(Y(v))} stroke="var(--border-muted)" />
+                <text x={L - 6} y={r1(Y(v)) + 3.5} textAnchor="end" fontSize="11" fill="var(--text-muted)">
+                  {fmtVndShort(v)}
+                </text>
+                <text x={L + iw + 6} y={r1(Ypct((100 * j) / 4)) + 3.5} fontSize="11" fill="var(--text-muted)">
+                  {(100 * j) / 4}%
+                </text>
+              </g>
+            );
+          })}
+          {pts.map((p, i) => {
+            const x = L + slot * i + (slot - bw) / 2;
+            const o = p.month === current ? 1 : 0.55;
+            const seg = (lo: number, hi: number, fill: string, k: string) =>
+              hi > lo ? <rect key={k} x={r1(x)} y={r1(Y(hi))} width={r1(bw)} height={r1(Math.max(1, Y(lo) - Y(hi)))} fill={fill} opacity={o} rx={k === "gp" ? 3 : 0} /> : null;
+            return (
+              <g
+                key={p.month}
+                data-tip={`${p.name}\nDoanh thu ${fmtVndFull(p.revenue)}\nCông talent ${fmtVndFull(p.pay)}\nChi phí ca ${fmtVndFull(p.cost)}\nLãi gộp ${fmtVndFull(p.gp)}${p.margin == null ? "" : `\nBiên lãi ${fmtFixed(p.margin, 1)}%`}`}
+              >
+                <rect x={r1(L + slot * i)} y={T} width={r1(slot)} height={ih} fill="transparent" />
+                {seg(0, p.pay, C_PAY, "pay")}
+                {seg(p.pay, p.pay + p.cost, C_COST, "cost")}
+                {seg(p.pay + p.cost, p.pay + p.cost + p.gp, C_GP, "gp")}
+                <text x={r1(X(i))} y={H - 7} textAnchor="middle" fontSize="11" fill="var(--text-muted)">
+                  {p.name}
+                </text>
+              </g>
+            );
+          })}
+          {marginPath && <path d={marginPath} fill="none" stroke={C_MARGIN} strokeWidth="2" />}
+          {pts.map((p, i) => (p.margin == null ? null : <circle key={`m${p.month}`} cx={r1(X(i))} cy={r1(Ypct(p.margin))} r="3" fill={C_MARGIN} />))}
+        </svg>
+        {tip.node}
       </div>
     </div>
   );
 };
 
 // Màu phân loại cho account: tránh hồng/vàng/xanh lá đã dành cho công talent / chi phí / lãi gộp.
+// Nét vẽ theo sàn (hồ sơ sàn không giữ nét vẽ nên khai Record ở đây, không rẽ nhánh if theo tên sàn).
+const LINE_DASH: Record<ReportPlatform, string | undefined> = { TikTok: undefined, Shopee: "6 3" };
+
 const ACCOUNT_COLORS = ["#60a5fa", "#a78bfa", "#2dd4bf", "#fb923c", "#e879f9", "#38bdf8", "#a3e635", "#f87171"];
 
-/** Mỗi account (brand · sàn) một đường lãi gộp theo ngày trong tháng; đường 0 là ranh lãi/lỗ, Shopee nét đứt. */
+/** Mỗi account (brand · sàn) một đường lãi gộp theo ngày trong tháng; đường 0 là ranh lỗ, Shopee nét đứt. */
 const DailyLines: React.FC<{ daily: DailyTrend }> = ({ daily }) => {
   const [mode, setMode] = React.useState<"cumulative" | "perDay">("cumulative");
+  const tip = useTooltip();
   const series = daily.series.slice(0, ACCOUNT_COLORS.length);
   const label = (s: (typeof series)[number]) => `${s.brandName} · ${s.platform}`;
-  const data = daily.days.map((d, i) => ({
-    day: d,
-    ...Object.fromEntries(series.map((s) => [label(s), Math.round(mode === "cumulative" ? s.cumulative[i] : s.perDay[i])]))
-  }));
+  const vals = series.map((s) => (mode === "cumulative" ? s.cumulative : s.perDay).map((v) => Math.round(v)));
+  const W = 760, H = 300, L = 56, R = 14, T = 14, B = 26, iw = W - L - R, ih = H - T - B;
+  const n = Math.max(daily.days.length, 1);
+  const flat = vals.flat();
+  const ymax = niceMax(Math.max(1, ...flat));
+  const ymin = axisMin(Math.min(0, ...flat));
+  const X = (i: number) => (n === 1 ? L + iw / 2 : L + (iw * i) / (n - 1));
+  const Y = (v: number) => T + ih - (ih * (v - ymin)) / (ymax - ymin);
+  const every = Math.ceil(n / 10);
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -171,7 +240,7 @@ const DailyLines: React.FC<{ daily: DailyTrend }> = ({ daily }) => {
         <div className="inline-flex rounded-lg border border-[var(--border)] p-0.5 text-xs" role="group" aria-label="Kiểu số liệu">
           {(
             [
-              ["cumulative", "Cộng dồn"],
+              ["cumulative", "Luỹ kế"],
               ["perDay", "Từng ngày"]
             ] as const
           ).map(([k, l]) => (
@@ -181,19 +250,52 @@ const DailyLines: React.FC<{ daily: DailyTrend }> = ({ daily }) => {
           ))}
         </div>
       </div>
-      <div className="h-[300px]" role="img" aria-label="Lãi gộp từng account theo ngày trong tháng">
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
-            <CartesianGrid stroke="var(--border-muted)" vertical={false} />
-            <XAxis dataKey="day" tick={AXIS} axisLine={false} tickLine={false} tickFormatter={(d: number) => `${d}`} interval="preserveStartEnd" />
-            <YAxis tickFormatter={(v: number) => fmtVndShort(v)} tick={AXIS} axisLine={false} tickLine={false} width={48} />
-            <Tooltip contentStyle={TIP} labelFormatter={(d) => `Ngày ${d}`} formatter={(v) => fmtVndFull(Number(v))} itemSorter={(i) => -Number(i.value ?? 0)} />
-            <ReferenceLine y={0} stroke="var(--text-faint)" strokeDasharray="4 3" />
-            {series.map((s, i) => (
-              <Line key={s.key} type="monotone" dataKey={label(s)} stroke={ACCOUNT_COLORS[i]} strokeWidth={2} strokeDasharray={s.platform === "Shopee" ? "6 3" : undefined} dot={false} activeDot={{ r: 4 }} isAnimationActive={false} />
-            ))}
-          </LineChart>
-        </ResponsiveContainer>
+      <div onMouseMove={tip.onMove} onMouseLeave={tip.onLeave}>
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label="Lãi gộp từng account theo ngày trong tháng">
+          {TICKS.map((j) => {
+            const v = ymin + ((ymax - ymin) * j) / 4;
+            return (
+              <g key={j}>
+                <line x1={L} x2={L + iw} y1={r1(Y(v))} y2={r1(Y(v))} stroke="var(--border-muted)" />
+                <text x={L - 6} y={r1(Y(v)) + 3.5} textAnchor="end" fontSize="11" fill="var(--text-muted)">
+                  {fmtVndShort(v)}
+                </text>
+              </g>
+            );
+          })}
+          {ymin < 0 && <line x1={L} x2={L + iw} y1={r1(Y(0))} y2={r1(Y(0))} stroke="var(--text-faint)" strokeDasharray="4 3" />}
+          {daily.days.map((d, i) => (i % every === 0 ? (
+            <text key={d} x={r1(X(i))} y={H - 7} textAnchor="middle" fontSize="11" fill="var(--text-muted)">
+              {d}
+            </text>
+          ) : null))}
+          {series.map((s, si) => (
+            <path
+              key={s.key}
+              d={vals[si].map((v, i) => `${i ? "L" : "M"}${r1(X(i))} ${r1(Y(v))}`).join("")}
+              fill="none"
+              stroke={ACCOUNT_COLORS[si]}
+              strokeWidth="2"
+              strokeDasharray={LINE_DASH[platformOf(s)]}
+            />
+          ))}
+          {daily.days.map((d, i) => (
+            <rect
+              key={`t${d}`}
+              x={r1(X(i) - iw / n / 2)}
+              y={T}
+              width={r1(Math.max(2, iw / n))}
+              height={ih}
+              fill="transparent"
+              data-tip={`Ngày ${d}\n${series
+                .map((s, si) => ({ t: `${label(s)}: ${fmtVndFull(vals[si][i] ?? 0)}`, v: vals[si][i] ?? 0 }))
+                .sort((a, b) => b.v - a.v)
+                .map((x) => x.t)
+                .join("\n")}`}
+            />
+          ))}
+        </svg>
+        {tip.node}
       </div>
     </div>
   );

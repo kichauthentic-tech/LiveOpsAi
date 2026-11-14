@@ -42,7 +42,7 @@ export const MonthReviewPanel: React.FC<{
       .filter((x) => x.v !== null)
       .map(({ p, v }) => (
         <span key={p} className="block whitespace-nowrap" title={`${p}: GMV ${fmtVndShort(by[p].gmv)} · cast ${fmtVndShort(by[p].cast)} · ${fmtH(by[p].hours)}`}>
-          <span className="text-2xs text-[var(--text-faint)]">{p === "TikTok" ? "TikTok" : "Shopee"}</span> <b className="text-[var(--text)]">{fmtFixed((v as number) * 100, 1)}%</b>
+          <span className="text-2xs text-[var(--text-faint)]">{p}</span> <b className="text-[var(--text)]">{fmtFixed((v as number) * 100, 1)}%</b>
         </span>
       ));
   // Dòng "plan" chỉ hiện khi lệch ≥ 5% so với nghiệm thu — còn lại là số lặp, chỉ gây rối.
@@ -83,7 +83,7 @@ export const MonthReviewPanel: React.FC<{
         </button>
       </div>
       <p className="text-2xs text-[var(--text-muted)]">
-        Giờ và cast là số nghiệm thu (đã cộng OT, trừ off sớm); "plan" chỉ hiện khi lệch ≥ 5%.
+        Giờ và cast là số nghiệm thu (đã cộng OT, trừ ca kết thúc sớm); "plan" chỉ hiện khi lệch ≥ 5%.
         {review.hasUpcoming && " Tháng còn ca chưa diễn ra nên nghiệm thu thấp hơn plan."}
       </p>
       <div className="overflow-auto rounded-xl border border-[var(--border)] max-h-[560px]">
