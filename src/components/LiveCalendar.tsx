@@ -1,4 +1,3 @@
-import { hostSplitRows, hostSplitKey } from "../lib/hostSplit";
 import React, { useState, useEffect, useMemo } from "react";
 import SearchSelect from "./ui/SearchSelect";
 import { LiveSession, ShiftSlot, ShiftRegistration, Studio, Talent, Brand, PromoScheme, UserRole, BrandStudio, AuditLogEntry, BrandChannel } from "../types";
@@ -1239,8 +1238,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
         const toMin = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
         // Ca qua đêm (end <= start) kéo sang hôm sau.
         const endMin = (start: string, end: string) => { const e = toMin(end); return e <= toMin(start) ? e + 24 * 60 : e; };
-        // Ca đổi host giữa ca đã có số liệu: mỗi host một thẻ (dòng ảo, cùng id ca gốc nên bấm/kéo vẫn đúng ca) — lib/hostSplit.ts.
-        const daySessions = filteredSessions.filter((s) => s.date === selectedDate && s.status !== "Cancelled").flatMap(hostSplitRows);
+        const daySessions = filteredSessions.filter((s) => s.date === selectedDate && s.status !== "Cancelled");
         const daySlots = openSlots.filter((sl) => sl.date === selectedDate);
         const allStarts = [...daySessions.map((s) => toMin(s.startTime)), ...daySlots.map((sl) => toMin(sl.startTime))];
         const allEnds = [...daySessions.map((s) => endMin(s.startTime, s.endTime)), ...daySlots.map((sl) => endMin(sl.startTime, sl.endTime))];
@@ -1258,7 +1256,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
         const layoutLanes = (slots: ShiftSlot[], sessions: LiveSession[]) => {
           const items: LaneItem[] = [
             ...slots.map((sl) => ({ id: `slot_${sl.id}`, s: toMin(sl.startTime), e: endMin(sl.startTime, sl.endTime), lane: 0, slot: sl })),
-            ...sessions.map((ms) => ({ id: `ses_${hostSplitKey(ms)}`, s: toMin(ms.startTime), e: endMin(ms.startTime, ms.endTime), lane: 0, session: ms }))
+            ...sessions.map((ms) => ({ id: `ses_${ms.id}`, s: toMin(ms.startTime), e: endMin(ms.startTime, ms.endTime), lane: 0, session: ms }))
           ].sort((a, b) => a.s - b.s || a.e - b.e);
           const laneEnds: number[] = [];
           for (const it of items) {
