@@ -26,7 +26,10 @@ const PER_FILE_MAX: [string, number][] = [
   ["src/lib/todoList.ts", 430],
   ["src/lib/scheduling/suggestEngine.ts", 400],
   ["src/lib/performance/handlingPlan.ts", 360],
-  ["src/components/brand-workspace/ReconciliationPanel.tsx", 240],
+  // 14/11 nâng 240 → 290: audit "điểm khó dùng" thêm 4 việc phải nói thành lời trên màn — lô không khớp ca nào
+  // thì giải thích vì sao, hộp xác nhận Áp dụng nói ghi vào bao nhiêu ca và lệch bao nhiêu tiền, hai cảnh báo
+  // không hoàn tác (gộp / xoá lô), bảng gõ số hàng loạt. Đã cắt từ 514 xuống 283 bằng cách tách câu ngắn.
+  ["src/components/brand-workspace/ReconciliationPanel.tsx", 290],
   ["src/components/dashboard/period/BrandTab.tsx", 230],
 ];
 

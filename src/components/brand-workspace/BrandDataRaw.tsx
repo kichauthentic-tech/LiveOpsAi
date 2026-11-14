@@ -214,7 +214,7 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ platform, brandId, b
         try {
           await importReconciliationFromParsed(justName, justParsed, brandId, platform);
           setReconKey((k) => k + 1);
-          setNotice("Đã lưu vào Dữ Liệu Gốc và tạo lần đối soát — xem rổ khớp ca ở mục Đối soát số liệu phía trên rồi bấm Áp dụng.");
+          setNotice("Đã lưu vào Dữ Liệu Gốc và tạo lần đối soát — xem rổ khớp ca ở mục Đối soát số liệu ngay bên dưới rồi bấm Áp dụng.");
         } catch (e) {
           setError(`Đã lưu vào Dữ Liệu Gốc, nhưng chưa tạo được lần đối soát: ${errorMessage(e)}. Bấm "Đối soát" ở lần tải này trong Lịch Sử Import để thử lại.`);
         }
@@ -242,7 +242,7 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ platform, brandId, b
       };
       await importReconciliationFromParsed(imp.fileName, parsed, brandId, platform);
       setReconKey((k) => k + 1);
-      setNotice(`Đã tạo lần đối soát từ ${formatPeriodShort(imp)} — xem rổ khớp ca ở mục Đối soát số liệu phía trên.`);
+      setNotice(`Đã tạo lần đối soát từ ${formatPeriodShort(imp)} — xem rổ khớp ca ở mục Đối soát số liệu ngay bên dưới.`);
     } catch (e) {
       setError(errorMessage(e, "Không tạo được lần đối soát."));
     } finally {
@@ -351,38 +351,6 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ platform, brandId, b
         <div className="bg-emerald-950/30 border border-emerald-800/50 text-emerald-400 text-xs font-semibold p-3 rounded-xl">{notice}</div>
       )}
 
-      {/* Hai khối dưới đọc danh sách ca: chờ ca về (cờ coreReady) thay vì hiện "0 ca" — phần up file bên dưới không phải chờ. */}
-      {!coreReady && isReconType && (
-        <div className="bg-[var(--surface)] p-4 rounded-2xl border border-[var(--border)] text-xs text-[var(--text-muted)]">
-          Đang tải danh sách ca để đối soát / nạp bù — bạn vẫn có thể chọn file ở khung Import bên dưới.
-        </div>
-      )}
-
-      {/* Đối soát số liệu — gộp vào đây (07/10), cùng một lần up với Dữ Liệu Gốc */}
-      {coreReady && isReconType && (
-        <ReconciliationPanel
-          brandId={brandId}
-          brandName={brandName}
-          platform={platform}
-          sessions={brandSessions}
-          reloadKey={reconKey}
-          onApplied={onSessionsChanged}
-        />
-      )}
-
-      {/* Nạp bù ca từ file — chỉ có ý nghĩa với file số liệu theo ca của sàn (TikTok Creator-Live-Performance, Shopee Live List; Shopee từ 0156) */}
-      {coreReady && isReconType && (
-        <BackfillFromRooms
-          platform={platform}
-          brandId={brandId}
-          brandName={brandName}
-          months={backfillMonths(imports, sessions, brandId)}
-          sessions={sessions}
-          talents={talents}
-          onSessionsChanged={async () => { await onSessionsChanged(); setReconKey((k) => k + 1); }}
-        />
-      )}
-
       {/* Upload */}
       <div className="bg-[var(--surface)] p-6 rounded-2xl border border-[var(--border)] shadow-sm space-y-4">
         <h3 className="font-bold text-[var(--text)] text-sm flex items-center gap-2">
@@ -443,6 +411,39 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ platform, brandId, b
           </div>
         )}
       </div>
+
+      {/* Hai khối này đọc danh sách ca: chờ ca về (cờ coreReady) thay vì hiện "0 ca". Đặt NGAY SAU khối Import (audit 14/11,
+          điểm 9): trước đây chọn file ở dưới mà kết quả hiện ở trên nên thông báo phải viết "xem … phía trên". */}
+      {!coreReady && isReconType && (
+        <div className="bg-[var(--surface)] p-4 rounded-2xl border border-[var(--border)] text-xs text-[var(--text-muted)]">
+          Đang tải danh sách ca để đối soát / nạp bù — bạn vẫn có thể chọn file ở khung Import phía trên.
+        </div>
+      )}
+
+      {/* Đối soát số liệu — gộp vào đây (07/10), cùng một lần up với Dữ Liệu Gốc */}
+      {coreReady && isReconType && (
+        <ReconciliationPanel
+          brandId={brandId}
+          brandName={brandName}
+          platform={platform}
+          sessions={brandSessions}
+          reloadKey={reconKey}
+          onApplied={onSessionsChanged}
+        />
+      )}
+
+      {/* Nạp bù ca từ file — chỉ có ý nghĩa với file số liệu theo ca của sàn (TikTok Creator-Live-Performance, Shopee Live List; Shopee từ 0156) */}
+      {coreReady && isReconType && (
+        <BackfillFromRooms
+          platform={platform}
+          brandId={brandId}
+          brandName={brandName}
+          months={backfillMonths(imports, sessions, brandId)}
+          sessions={sessions}
+          talents={talents}
+          onSessionsChanged={async () => { await onSessionsChanged(); setReconKey((k) => k + 1); }}
+        />
+      )}
 
       {/* Import history — nhóm theo tháng, chỉ nhóm gần nhất mở sẵn */}
       <div className="bg-[var(--surface)] p-4 rounded-2xl border border-[var(--border)] shadow-sm space-y-2">

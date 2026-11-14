@@ -175,6 +175,25 @@ export async function setReconciliationBucket(
   return (data as number) ?? 0;
 }
 
+/** Gán nhãn rổ cho các dòng ĐƯỢC CHỌN (0218) — chỉ qua lại 'unassigned' ↔ 'inhouse'. Trả số dòng đã đổi. */
+export async function setReconciliationRowsBucket(
+  batchId: string,
+  rowIds: string[],
+  to: Extract<ReconciliationBucket, "unassigned" | "inhouse">
+): Promise<number> {
+  if (rowIds.length === 0) return 0;
+  const { data, error } = await supabase.rpc("set_reconciliation_rows_bucket", {
+    p_batch_id: batchId,
+    p_row_ids: rowIds,
+    p_to_bucket: to
+  });
+  if (error) {
+    if (error.code === "PGRST202") throw featureOffError("gán nhãn từng phiên ngoài lịch", "migration 0218");
+    throw error;
+  }
+  return (data as number) ?? 0;
+}
+
 /** Gộp các nhóm dòng (mỗi nhóm = ids của một ca bị restart/ngắt) thành một dòng/nhóm (0167). Trả số dòng đã gộp bỏ. */
 export async function mergeReconciliationRows(batchId: string, groups: string[][]): Promise<number> {
   const { data, error } = await supabase.rpc("merge_reconciliation_rows", { p_batch_id: batchId, p_groups: groups });
