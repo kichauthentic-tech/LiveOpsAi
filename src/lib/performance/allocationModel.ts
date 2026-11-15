@@ -30,7 +30,7 @@ import { TargetWeightModel, targetWeightModel, targetWeights } from "./slotInsig
 type BucketOf = (date: string) => CampDayBucket;
 export type SlotLike = { date: string; startTime: string; endTime: string };
 export type AllocParams = Pick<EngineParams, "allocEnsembleShare" | "allocRidge" | "allocMinMonths" | "allocUseBand" | "allocUseCampPos"> &
-  Partial<Pick<EngineParams, "allocUseWeekend" | "allocWeekendRidge">>;
+  Partial<Pick<EngineParams, "allocUseWeekend" | "allocWeekendRidge" | "allocFloorDday" | "allocFloorMidmonth" | "allocFloorPayday">>;
 
 /** T7–CN của NGÀY DAILY (ngày Campaign rơi vào cuối tuần không tính — hệ số loại ngày đã lo). */
 const WEEKEND_DOW = new Set([0, 6]);
@@ -220,6 +220,8 @@ export interface Allocator {
   old: TargetWeightModel | null;
   /** Tỷ trọng mô hình v2 trong phần trộn (0 = chỉ cách cũ, 1 = chỉ v2). */
   share: number;
+  /** Sàn target/giờ ngày camp so với ngày thường (luật vận hành — xem applyCampFloor). */
+  floors: Partial<Record<CampDayBucket, number>>;
 }
 
 /** `old` truyền vào (kể cả null) để backtest không dựng lại mô hình cũ mỗi lần vặn tham số. Không có gì để chia ⇒ null. */
@@ -228,13 +230,71 @@ export function buildAllocator(history: LiveSession[], month: string, params: Al
   const oldModel = old !== undefined ? old : targetWeightModel(history, month, bucketOfFixed);
   const glm = fitAllocationModel(history, month, params);
   if (!glm && !oldModel) return null;
-  return { glm, old: oldModel, share: Math.min(1, Math.max(0, params.allocEnsembleShare)) };
+  return {
+    glm,
+    old: oldModel,
+    share: Math.min(1, Math.max(0, params.allocEnsembleShare)),
+    floors: { dday: params.allocFloorDday ?? 0, midmonth: params.allocFloorMidmonth ?? 0, payday: params.allocFloorPayday ?? 0 }
+  };
 }
 
 const normalize = (w: number[]): number[] => {
   const s = w.reduce((a, b) => a + b, 0);
   return s > 0 ? w.map((x) => x / s) : w.map(() => 0);
 };
+
+/**
+ * Sàn target ngày Campaign (15/11) — luật VẬN HÀNH, không phải dự báo: ngày camp phải nhận target mỗi giờ ít nhất
+ * `floor` lần ngày thường. Lịch sử nhiều kênh TikTok cho Mid-Month/Pay Day ngang hoặc dưới ngày thường, nên kế hoạch
+ * in ra một ngày "Campaign" thấp hơn ngày thường — không giải thích được với brand. Phần nâng lên lấy từ ca ngày
+ * thường nên TỔNG target tháng không đổi; hạ ngày thường lại kéo sàn xuống theo nên lặp vài vòng cho hội tụ.
+ * Chỉ áp cho bộ CHIA TARGET. Dự báo (monthForecast) và run-rate không gọi hàm này.
+ */
+export function applyCampFloor(w: number[], slots: SlotLike[], bucketOf: BucketOf, floors: Partial<Record<CampDayBucket, number>>): number[] {
+  const CAMP: CampDayBucket[] = ["dday", "midmonth", "payday"];
+  if (!CAMP.some((b) => (floors[b] ?? 0) > 0)) return w;
+  const bucket = slots.map((s) => bucketOf(s.date));
+  const hours = slots.map((s) => sessionDurationHours(s.startTime, s.endTime));
+  const idx = (b: CampDayBucket) => bucket.map((x, i) => (x === b ? i : -1)).filter((i) => i >= 0);
+  const dailyIdx = idx("daily");
+  const dailyHours = dailyIdx.reduce((a, i) => a + hours[i], 0);
+  if (dailyIdx.length === 0 || dailyHours <= 0) return w; // không có ngày thường để so và để lấy phần bù
+  const out = [...w];
+  const sumOf = (ids: number[]) => ids.reduce((a, i) => a + out[i], 0);
+  const camps = CAMP.map((b) => ({ b, f: floors[b] ?? 0, ids: idx(b) }))
+    .filter((c) => c.f > 0 && c.ids.length > 0)
+    .map((c) => ({ ...c, h: c.ids.reduce((a, i) => a + hours[i], 0), cur: sumOf(c.ids) }));
+  if (camps.length === 0) return w;
+  const dailyCur = sumOf(dailyIdx);
+  // Chỉ xáo trong "hồ" ngày thường + các nhóm camp có sàn; nhóm camp tắt sàn giữ nguyên phần của nó.
+  const total = dailyCur + camps.reduce((a, c) => a + c.cur, 0);
+  // Điểm cân bằng: nâng ngày camp lên đúng `f` lần GMV/giờ ngày thường SAU khi đã rút — rút làm ngày thường thấp đi nên
+  // nâng theo mức trước khi rút là vượt sàn. Giải bằng chia đôi: D giảm ⇒ vế trái giảm, nên có nghiệm duy nhất.
+  const campAt = (d: number) => camps.map((c) => Math.max(c.cur, c.f * (d / dailyHours) * c.h));
+  const lhs = (d: number) => d + campAt(d).reduce((a, v) => a + v, 0);
+  if (lhs(dailyCur) <= total + 1e-12) return w; // mọi nhóm camp đã trên sàn
+  // Không rút ngày thường quá nửa: kế hoạch còn đọc được khi sàn đặt quá cao so với lịch sử của kênh.
+  const floorD = dailyCur * 0.5;
+  let d: number;
+  let want: number[];
+  if (lhs(floorD) > total) {
+    // Sàn cao tới mức không đạt được trong giới hạn: rút đúng phần cho phép, chia theo tỷ lệ phần còn thiếu của từng nhóm.
+    d = floorD;
+    const full = campAt(d);
+    const need = full.reduce((a, v, k) => a + v - camps[k].cur, 0);
+    const share = need > 0 ? (dailyCur - d) / need : 0;
+    want = full.map((v, k) => camps[k].cur + (v - camps[k].cur) * share);
+  } else {
+    let lo = floorD, hi = dailyCur;
+    for (let it = 0; it < 60; it++) { const mid = (lo + hi) / 2; if (lhs(mid) > total) hi = mid; else lo = mid; }
+    d = (lo + hi) / 2;
+    want = campAt(d);
+  }
+  camps.forEach((c, k) => { const ratio = want[k] / c.cur; for (const i of c.ids) out[i] *= ratio; });
+  const kDaily = d / dailyCur;
+  for (const i of dailyIdx) out[i] *= kDaily;
+  return normalize(out);
+}
 
 export interface AllocatorWeights {
   glm: number[] | null;
@@ -249,7 +309,8 @@ export function allocatorWeights(a: Allocator, slots: SlotLike[], bucketOf: Buck
   const wk = a.glm?.coef.weekend ? Math.exp(a.glm.coef.weekend) : 1;
   const oldRaw = a.old ? targetWeights(slots, a.old, bucketOf) : null;
   const old = oldRaw ? normalize(wk === 1 ? oldRaw : oldRaw.map((v, i) => (bucketOf(slots[i].date) === "daily" && isWeekendDate(slots[i].date) ? v * wk : v))) : null;
-  const blended = glm && old ? glm.map((v, i) => a.share * v + (1 - a.share) * old[i]) : glm ?? old ?? slots.map(() => 0);
+  const mixed = glm && old ? glm.map((v, i) => a.share * v + (1 - a.share) * old[i]) : glm ?? old ?? slots.map(() => 0);
+  const blended = applyCampFloor(mixed, slots, bucketOf, a.floors);
   return { glm, old, blended };
 }
 

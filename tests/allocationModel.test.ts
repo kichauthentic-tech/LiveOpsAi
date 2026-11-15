@@ -2,6 +2,7 @@
 // Chạy: npx vitest run tests/allocationModel.test.ts
 import { describe, expect, test } from "vitest";
 import {
+  applyCampFloor,
   ALLOC_METHODS,
   allocBand,
   allocatorWeights,
@@ -139,20 +140,22 @@ describe("trọng số chia target", () => {
   });
 
   test("allocator trộn: share=1 ra đúng v2, share=0 ra đúng cách cũ, tổng luôn 1", () => {
-    const a1 = buildAllocator(hist, "2026-10", { ...P, allocEnsembleShare: 1 })!;
-    const a0 = buildAllocator(hist, "2026-10", { ...P, allocEnsembleShare: 0 })!;
+    // Tắt sàn ngày Campaign: phép trộn phải ra đúng nguồn, còn sàn là bước vận hành sau đó (describe riêng bên dưới).
+    const P0 = { ...P, allocFloorDday: 0, allocFloorMidmonth: 0, allocFloorPayday: 0 };
+    const a1 = buildAllocator(hist, "2026-10", { ...P0, allocEnsembleShare: 1 })!;
+    const a0 = buildAllocator(hist, "2026-10", { ...P0, allocEnsembleShare: 0 })!;
     const w1 = allocatorWeights(a1, slots, bucketOf);
     const w0 = allocatorWeights(a0, slots, bucketOf);
     expect(w1.blended).toEqual(w1.glm);
     expect(w0.blended).toEqual(w0.old);
-    for (const x of [w1.blended, w0.blended, allocatorWeights(buildAllocator(hist, "2026-10", P)!, slots, bucketOf).blended]) {
+    for (const x of [w1.blended, w0.blended, allocatorWeights(buildAllocator(hist, "2026-10", P0)!, slots, bucketOf).blended]) {
       expect(x.reduce((s, v) => s + v, 0)).toBeCloseTo(1, 9);
     }
   });
   test("thiếu một nguồn thì dùng nguồn còn lại; thiếu cả hai ⇒ null", () => {
     const thin = world(["2026-08"]);
     expect(buildAllocator(thin, "2026-09", P)).toBeNull();
-    const a = buildAllocator(thin, "2026-09", { ...P, allocMinMonths: 1 })!;
+    const a = buildAllocator(thin, "2026-09", { ...P, allocMinMonths: 1, allocFloorDday: 0, allocFloorMidmonth: 0, allocFloorPayday: 0 })!;
     expect(a.glm).not.toBeNull();
     expect(a.old).toBeNull();
     expect(allocatorWeights(a, slots, bucketOf).blended).toEqual(allocatorWeights(a, slots, bucketOf).glm);
@@ -237,5 +240,46 @@ describe("hệ số T7–CN ngày Daily (allocUseWeekend, 08/11)", () => {
     const g = glmWeights(slots, fitAllocationModel(hist, "2026-09", prm)!, bucketOf);
     const g0 = glmWeights(slots, fitAllocationModel(hist, "2026-09", P)!, bucketOf);
     expect(g[1] / g[2]).toBeGreaterThan(1.2 * (g0[1] / g0[2])); // T7 Daily tăng so với D-Day; ngày Campaign không nhân hệ số
+  });
+});
+
+// Sàn target ngày Campaign (15/11) — luật vận hành: ngày camp phải nhận target/giờ cao hơn ngày thường dù lịch sử nói ngược lại.
+describe("applyCampFloor", () => {
+  const bucketOf = (d: string) => resolveCampBucketType(d, {});
+  const H = 3;
+  const mk = (date: string) => ({ date, startTime: "18:00", endTime: "21:00" });
+  // 2026-09: 7-9 là D-Day (9.9), 13-15 Mid-Month, 23-25 Pay Day.
+  const slots = [mk("2026-09-01"), mk("2026-09-02"), mk("2026-09-03"), mk("2026-09-09"), mk("2026-09-14"), mk("2026-09-24")];
+  const rateOf = (w: number[]) => {
+    const g: Record<string, { t: number; h: number }> = {};
+    slots.forEach((s, i) => { const b = bucketOf(s.date); (g[b] ??= { t: 0, h: 0 }); g[b].t += w[i]; g[b].h += H; });
+    const d = g.daily.t / g.daily.h;
+    return Object.fromEntries(Object.entries(g).map(([b, v]) => [b, v.t / v.h / d]));
+  };
+  const flat = slots.map(() => 1 / slots.length); // lịch sử "ngày camp bằng ngày thường"
+
+  test("nâng đúng tới sàn, không vượt, tổng không đổi", () => {
+    const w = applyCampFloor(flat, slots, bucketOf, { dday: 1.5, midmonth: 1.2, payday: 1.2 });
+    expect(w.reduce((a, b) => a + b, 0)).toBeCloseTo(1, 10);
+    const r = rateOf(w);
+    expect(r.dday).toBeCloseTo(1.5, 3);
+    expect(r.midmonth).toBeCloseTo(1.2, 3);
+    expect(r.payday).toBeCloseTo(1.2, 3);
+  });
+  test("nhóm đã trên sàn thì giữ nguyên", () => {
+    const strong = [1, 1, 1, 9, 1, 1].map((v) => v / 14);
+    const w = applyCampFloor(strong, slots, bucketOf, { dday: 1.5, midmonth: 0, payday: 0 });
+    expect(w).toEqual(strong);
+  });
+  test("sàn = 0 hoặc không có ngày thường ⇒ không đụng vào", () => {
+    expect(applyCampFloor(flat, slots, bucketOf, {})).toEqual(flat);
+    const campOnly = [mk("2026-09-09"), mk("2026-09-14")];
+    const w2 = [0.5, 0.5];
+    expect(applyCampFloor(w2, campOnly, bucketOf, { dday: 1.5, midmonth: 1.2, payday: 1.2 })).toEqual(w2);
+  });
+  test("không rút ngày thường quá một nửa dù sàn đặt rất cao", () => {
+    const w = applyCampFloor(flat, slots, bucketOf, { dday: 50, midmonth: 50, payday: 50 });
+    const daily = w[0] + w[1] + w[2];
+    expect(daily).toBeGreaterThan((3 / 6) * 0.5 - 1e-9);
   });
 });
