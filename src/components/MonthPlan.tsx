@@ -15,7 +15,7 @@ import { buildCalibration, evaluatePlan } from "../lib/scheduling/planEvaluation
 import { computeCommitmentProgress, contractCovering, monthCommitmentOf, todayVn } from "../lib/performance/brandCommitment";
 import { useDefaultBrand } from "../hooks/useDefaultBrand";
 import { resolveCampBucketType } from "../lib/campaignDays";
-import { allocatorWeights, buildAllocator } from "../lib/performance/allocationModel";
+import { allocatorWeights, applyCampFloor, buildAllocator } from "../lib/performance/allocationModel";
 import {
   PlanDraftSlot,
   GROUP_BUCKETS,
@@ -435,8 +435,17 @@ export default function MonthPlan({
     () => buildAllocator(platformSessions.filter((s) => s.brandId === brandId), month, engineParams),
     [platformSessions, brandId, month, engineParams]
   );
-  const allocationWeights = (next: PlanDraftSlot[], forecasts: number[], camp = campRanges) =>
-    allocator ? allocatorWeights(allocator, next, (d) => resolveCampBucketType(d, camp)).blended : forecasts;
+  // Kênh chưa đủ lịch sử cho v2 chia theo dự báo engine — sàn ngày Campaign vẫn phải áp, nếu không FUJIWA/Franklin Shopee
+  // lại in ra ngày Campaign thấp hơn ngày thường (đo 15/11: FUJIWA Mid-Month ×0,94, Franklin Shopee Pay Day ×0,65).
+  const campFloors = {
+    dday: engineParams.allocFloorDday,
+    midmonth: engineParams.allocFloorMidmonth,
+    payday: engineParams.allocFloorPayday
+  };
+  const allocationWeights = (next: PlanDraftSlot[], forecasts: number[], camp = campRanges) => {
+    const bucketOf = (d: string) => resolveCampBucketType(d, camp);
+    return allocator ? allocatorWeights(allocator, next, bucketOf).blended : applyCampFloor(forecasts, next, bucketOf, campFloors);
+  };
   // Dự báo GMV từng ca = engine target v3 (lib/performance/monthForecast.ts, 10/10): cùng mô hình hình dạng với bộ chia target, mức
   // = trung bình nhân (28 ngày gần nhất, 3 tháng gần nhất), ngày giờ vượt vùng lịch sử bị giảm. Thay `estimateSlots` (đếm uplift camp
   // hai lần — sai số tổng tháng lúc lập 31% so với 13%). Brand chưa đủ 15 ca lịch sử (cold start mượn hình dạng) vẫn rơi về engine cũ.
