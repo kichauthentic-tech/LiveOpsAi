@@ -1,6 +1,7 @@
 import { BoostSlot, Brand, BrandChannel, BrandMonthPlan, BrandMonthPlanSlot, BrandMonthlyCommitment, BrandMonthlyReport, BrandPlatformRate, LiveSession, ShiftSlot, Talent } from "../types";
 import { isUnconfirmedPast } from "./sessionStatus";
 import { isCountable } from "./performance/hostPerformance";
+import { dataSourceTier } from "./dataSource";
 import { fmtDateVn, fmtMonth } from "./format";
 import { platformOf, brandMonthKey, brandPlatformKey, platformIdSuffix, sessionBrandMonthKey } from "./reportPlatform";
 import { profileOf } from "./platforms/profiles";
@@ -166,6 +167,22 @@ export function buildTodos(input: TodoInput): Todo[] {
           action: "Tải lên file"
         });
       }
+      // 1b. CHƯA ĐỐI SOÁT tháng trước (15/11): tháng đã đóng mà ca vẫn mang số lúc giao ca / số tự khai thì report,
+      // lương và P&L đang đọc số chưa chốt. Chỉ nhắc kênh có ca đã chạy tháng đó — kênh nghỉ thì không có gì để đối soát.
+      const prevDone = ownP.filter((s) => s.date.startsWith(prevMonth) && s.status === "Completed" && !s.isBackfill);
+      const prevUnrec = prevDone.filter((s) => dataSourceTier(s) !== "reconciled").length;
+      if (prevDone.length > 0 && prevUnrec > 0) {
+        out.push({
+          id: `recon-${b.id}${sfx}`,
+          level: prevUnrec === prevDone.length ? "high" : "medium",
+          title: `${name}: ${prevUnrec}/${prevDone.length} ca tháng ${fmtMonth(prevMonth)} chưa đối soát`,
+          detail: "Số của các ca này chưa khớp file sàn.",
+          tab: "brand_dataraw",
+          brandId: b.id,
+          action: "Mở đối soát"
+        });
+      }
+
       // 2–3. Kế hoạch tháng này.
       const cur = input.plansThisMonth.get(brandPlatformKey(b.id, p));
       if (cur?.status === "draft") {

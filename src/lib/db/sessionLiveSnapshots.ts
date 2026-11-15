@@ -66,6 +66,24 @@ interface DbSnapshotRow {
   orig_gmv?: string | null;
 }
 
+/** Ca nào trong danh sách đã có file giao ca THẬT (không phải bản ước lượng) — màn đối soát dùng để nói ca nào sẽ
+ *  phải chia ước tính. Chỉ lấy cột session_id nên nhẹ, nhưng vẫn chia mẻ để URL không quá dài. */
+export async function fetchSessionsWithSnapshot(sessionIds: string[]): Promise<Set<string>> {
+  const out = new Set<string>();
+  for (let i = 0; i < sessionIds.length; i += 150) {
+    const chunk = sessionIds.slice(i, i + 150);
+    if (chunk.length === 0) continue;
+    const { data, error } = await supabase
+      .from("session_live_snapshots")
+      .select("session_id")
+      .in("session_id", chunk)
+      .eq("is_estimated", false);
+    if (error) throw error;
+    for (const r of (data ?? []) as Array<{ session_id: string }>) out.add(r.session_id);
+  }
+  return out;
+}
+
 export async function fetchSessionSnapshot(sessionId: string): Promise<SessionSnapshot | null> {
   const { data, error } = await supabase
     .from("session_live_snapshots")

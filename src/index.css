@@ -238,6 +238,33 @@ html.density-comfy main { --spacing: 0.3rem; }
   accent đặc chỉ cho nút hành động chính; ô đang chọn là nền accent pha loãng + chữ đậm màu chữ chính. Ngoài @layer nên thắng
   utility nền/chữ của Tailwind.
 */
+/*
+  Nút nhỏ trên thẻ "việc cần quyết" (màn Đối soát, 15/11): nút chính màu accent, nút phụ viền — cùng cỡ chữ 2xs,
+  dùng được ở mọi theme vì chỉ đọc token.
+*/
+.btn-task,
+.btn-task-ghost {
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  padding: 0.3rem 0.7rem;
+  border-radius: 0.5rem;
+  white-space: nowrap;
+  transition: background-color 120ms ease;
+}
+.btn-task {
+  background-color: var(--accent);
+  color: var(--accent-contrast);
+}
+.btn-task:hover:not(:disabled) { background-color: var(--accent-hover); }
+.btn-task-ghost {
+  background-color: var(--surface-elevated);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.btn-task-ghost:hover:not(:disabled) { background-color: var(--surface-hover); }
+.btn-task:disabled,
+.btn-task-ghost:disabled { opacity: 0.4; }
+
 .seg-on {
   background-color: color-mix(in srgb, var(--accent) 18%, transparent);
   border-color: color-mix(in srgb, var(--accent) 45%, transparent);
