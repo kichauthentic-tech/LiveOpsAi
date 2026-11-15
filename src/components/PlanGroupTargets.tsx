@@ -20,29 +20,48 @@ interface Props {
   onChange: (next: GroupTargets) => void;
 }
 
+/** Ngưỡng cảnh báo: target/giờ của nhóm cao hơn GMV/giờ lịch sử của chính nhóm đó bao nhiêu lần thì coi là khó đạt. */
+const AMBITIOUS = 1.5;
+
 export const PlanGroupTargetsBlock: React.FC<Props> = ({ rows, targets, targetTotal, historyRate, editable, locked, onChange }) => {
   const given = GROUP_BUCKETS.filter((b) => (targets[b] ?? 0) > 0);
   const all = given.length === GROUP_BUCKETS.length;
   const remain = targetTotal - sumGroupTargets(targets);
   const restWithSlots = rows.filter((r) => !r.given && r.slots > 0);
+  // Mở sẵn (15/11): để đóng thì cả 18 kế hoạch T10–T12 đều không ai nhập nhóm nào, target đợt camp thành phẳng theo giờ.
+  const [open, setOpen] = React.useState(true);
   const set = (b: CampDayBucket, v: number) => {
     const next = { ...targets };
     if (v > 0) next[b] = v;
     else delete next[b];
     onChange(next);
   };
+  /** Lấy đúng số engine đang chia (tổng khớp Target tháng từng đồng) làm điểm xuất phát để ops sửa tay. */
+  const fillFromEngine = () => {
+    const next: GroupTargets = {};
+    for (const r of rows) if (r.slots > 0 && r.slotTarget > 0) next[r.bucket] = r.slotTarget;
+    onChange(next);
+  };
   return (
-    <details className="text-xs" open={given.length > 0}>
+    <details className="text-xs" open={open} onToggle={(e) => setOpen((e.currentTarget as HTMLDetailsElement).open)}>
       <summary className="cursor-pointer font-bold text-[var(--text-muted)] min-h-6">
-        Target theo nhóm ngày <span className="font-normal text-[var(--text-faint)]">(tuỳ chọn{given.length > 0 ? ` — đã nhập ${given.length}/4 nhóm` : ""})</span>
+        Target theo nhóm ngày <span className="font-normal text-[var(--text-faint)]">{given.length > 0 ? `— đã nhập ${given.length}/4 nhóm` : "(đang để engine chia)"}</span>
       </summary>
       <div className="mt-2 space-y-2">
         <p className="text-2xs text-[var(--text-faint)] leading-snug">
           Nhập target từng nhóm thì ca của nhóm đó chia đúng số này; nhóm bỏ trống chia chung phần còn lại của Target tháng{all ? ". Đã nhập đủ 4 nhóm: Target tháng = tổng 4 nhóm." : "."}
         </p>
+        {given.length === 0 && editable && !locked && rows.some((r) => r.slotTarget > 0) && (
+          <button onClick={fillFromEngine} className="min-h-6 px-2 py-1 text-2xs font-bold rounded-lg border border-[var(--border)] text-[var(--accent-text)] hover:bg-[var(--surface-raised)]">
+            Điền số engine đang chia để sửa tay
+          </button>
+        )}
         {rows.map((r) => {
-          const perHour = r.hours > 0 ? r.slotTarget / r.hours : 0;
+          // Hộp "Chia lại target" chưa chia lại ca cho tới lúc xem thử, nên Σ ca vẫn là số cũ — lấy số ops vừa nhập để soi ngay.
+          const amount = (r.given ?? 0) > 0 ? (r.given as number) : r.slotTarget;
+          const perHour = r.hours > 0 ? amount / r.hours : 0;
           const rate = historyRate?.[r.bucket] ?? 0;
+          const ratio = rate > 0 && perHour > 0 ? perHour / rate : 0;
           return (
             <div key={r.bucket} className="space-y-0.5">
               <div className="flex items-center justify-between gap-2">
@@ -56,8 +75,11 @@ export const PlanGroupTargetsBlock: React.FC<Props> = ({ rows, targets, targetTo
                 />
               </div>
               <div className="text-2xs text-[var(--text-faint)] text-right">
-                {r.slots === 0 ? "chưa có ca" : <>Σ ca <b className="text-[var(--text-muted)]">{fmtVndShort(r.slotTarget)}</b> · {fmtVndShort(perHour)}/giờ{rate > 0 && perHour > 0 ? <> · <b className="text-[var(--text-muted)]">×{fmtFixed(perHour / rate, 2)}</b> lịch sử</> : null}</>}
+                {r.slots === 0 ? "chưa có ca" : <>Σ ca <b className="text-[var(--text-muted)]">{fmtVndShort(amount)}</b> · {fmtVndShort(perHour)}/giờ{ratio > 0 ? <> · <b className={ratio >= AMBITIOUS ? "text-rose-400" : "text-[var(--text-muted)]"}>×{fmtFixed(ratio, 2)}</b> lịch sử</> : null}</>}
               </div>
+              {ratio >= AMBITIOUS && (
+                <p className="text-2xs text-rose-400 text-right">Cao hơn GMV/giờ lịch sử của nhóm {fmtFixed(ratio, 1)} lần — {fmtVndShort(rate * r.hours)} mới là mức theo lịch sử.</p>
+              )}
               {r.orphaned && <p className="text-2xs text-amber-300 text-right">Đã nhập target nhưng lưới chưa có ca {GROUP_LABEL[r.bucket]} — phần này chưa chia đi đâu.</p>}
             </div>
           );
