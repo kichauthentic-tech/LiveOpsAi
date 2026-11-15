@@ -52,7 +52,7 @@ export const PlanGroupTargetsBlock: React.FC<Props> = ({ rows, targets, targetTo
           Nhập target từng nhóm thì ca của nhóm đó chia đúng số này; nhóm bỏ trống chia chung phần còn lại của Target tháng{all ? ". Đã nhập đủ 4 nhóm: Target tháng = tổng 4 nhóm." : "."}
         </p>
         {given.length === 0 && editable && !locked && rows.some((r) => r.slotTarget > 0) && (
-          <button onClick={fillFromEngine} className="min-h-6 px-2 py-1 text-2xs font-bold rounded-lg border border-[var(--border)] text-[var(--accent-text)] hover:bg-[var(--surface-raised)]">
+          <button onClick={fillFromEngine} className="min-h-6 px-2 py-1 text-2xs font-bold rounded-lg border border-[var(--border)] text-[var(--accent-text)] hover:bg-[var(--surface-elevated)]">
             Điền số engine đang chia để sửa tay
           </button>
         )}
