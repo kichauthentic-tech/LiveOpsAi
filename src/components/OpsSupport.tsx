@@ -8,7 +8,7 @@ import { benchmarkForWindow, type EstimateCtx } from "../lib/opsSupport";
 import { todayVn } from "../lib/performance/brandCommitment";
 import { sessionDurationHours } from "../lib/pnl";
 import { fmtVndShort } from "../lib/format";
-import type { CampOverrides } from "../lib/campaignDays";
+import { resolveCampBucketType, type CampOverrides } from "../lib/campaignDays";
 import { platformOf, type ReportPlatform } from "../lib/reportPlatform";
 import { profileOf } from "../lib/platforms/profiles";
 
@@ -63,7 +63,9 @@ export default function OpsSupport({ win, expected, sessions, promoSchemes, engi
 
   const hours = sessionDurationHours(win.startTime, win.endTime);
   const target = win.targetGmv ?? 0;
-  const high = target > 0 && expected != null && target > expected * engineParams.highExpectationRatio;
+  // Ngày Campaign có sàn target nên ngưỡng cờ riêng (15/11) — dùng chung ngưỡng ngày thường thì ca camp nào cũng bị cờ.
+  const highRatio = resolveCampBucketType(win.date, camp) === "daily" ? engineParams.highExpectationRatio : engineParams.highExpectationRatioCamp;
+  const high = target > 0 && expected != null && target > expected * highRatio;
   const cell = (label: string, value: string, tone = "") => (
     <div className="min-w-0">
       <p className="text-2xs text-[var(--text-faint)]">{label}</p>
@@ -84,7 +86,7 @@ export default function OpsSupport({ win, expected, sessions, promoSchemes, engi
         {funnel.hasOrderFunnel && b && cell("Ads / giờ", b.adsPerHour === null ? "chưa có report" : fmtVndShort(b.adsPerHour))}
       </div>
       {expected === undefined && <p className="text-2xs text-[var(--text-faint)]">Kênh chưa đủ lịch sử để chiếu kỳ vọng (dưới 15 ca có số liệu).</p>}
-      {high && <p className="text-2xs text-amber-300">Target ca cao hơn {engineParams.highExpectationRatio.toLocaleString("vi-VN")} lần kỳ vọng.</p>}
+      {high && <p className="text-2xs text-amber-300">Target ca cao hơn {highRatio.toLocaleString("vi-VN")} lần kỳ vọng.</p>}
       {b && (b.thin || b.cellTags.includes("weak") || b.cellTags.includes("traffic_low_cvr")) && (
         <p className="text-2xs text-amber-300">
           {b.thin ? "Ít dữ liệu ở khung này — phễu chỉ tham khảo. " : ""}

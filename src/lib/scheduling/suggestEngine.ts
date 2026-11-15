@@ -932,7 +932,7 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
       targetGmv: target,
       bucket: s.bucket,
       reason: reasonParts.join(" · "),
-      highExpectation: target > exp * P.highExpectationRatio,
+      highExpectation: target > exp * (s.bucket === "daily" ? P.highExpectationRatio : P.highExpectationRatioCamp),
       fixed: fixedKeys.has(`${s.date}|${toHhmm(s.start)}`),
       dayLabel: dayLabelOf(s.date)
     };

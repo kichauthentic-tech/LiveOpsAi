@@ -43,6 +43,9 @@ export interface EngineParams {
   leanNewDayPenalty: number;
   // --- Target ---
   highExpectationRatio: number; // target/ca > dự báo × X → cờ đỏ "kỳ vọng quá sức"
+  // Ngày Campaign có sàn target (allocFloor*) nên target vốn ĐƯỢC đặt cao hơn dự báo — dùng chung ngưỡng ngày thường thì
+  // gần như ca camp nào cũng bị cờ, cờ mất nghĩa (đo 15/11: VERA TikTok 32/32 ca camp bị cờ).
+  highExpectationRatioCamp: number;
   hoursToHitMultiplier: number; // tìm giờ cần cho target tới X× cam kết
   targetGapWarnPct: number; // lưới nháp dự báo thiếu > X% target → dải cảnh báo + phương án bù giờ
   // --- Chia target ca (engine v2, lib/performance/allocationModel.ts) ---
@@ -107,6 +110,7 @@ export const DEFAULT_ENGINE_PARAMS: EngineParams = {
   leanExtraHours: 1,
   leanNewDayPenalty: 0.92,
   highExpectationRatio: 1.3,
+  highExpectationRatioCamp: 1.8,
   hoursToHitMultiplier: 2,
   targetGapWarnPct: 0.03,
   allocEnsembleShare: 0.5,
@@ -186,6 +190,7 @@ export const ENGINE_PARAM_META: EngineParamMeta[] = [
   { key: "leanExtraHours", group: "schedule", label: "Tiết kiệm: ca dài thêm (giờ)", help: "Ca = mặc định + X giờ, ít ca hơn, ít ngày hơn.", kind: "number", min: 0, max: 6, step: 0.5 },
   { key: "leanNewDayPenalty", group: "schedule", label: "Tiết kiệm: phạt mở ngày mới", help: "", kind: "number", min: 0.1, max: 1, step: 0.01 },
   { key: "highExpectationRatio", group: "target", label: "Cờ đỏ khi target/ca > dự báo × X", help: "Ca bị kỳ vọng quá sức so với lịch sử — ops nên xem lại target hoặc thêm giờ.", kind: "number", min: 1, max: 3, step: 0.05 },
+  { key: "highExpectationRatioCamp", group: "target", label: "Cờ đỏ ngày Campaign khi target/ca > dự báo × X", help: "Ngày Campaign có sàn target (ba dòng \u201cSàn target\u2026\u201d bên dưới) nên target được ĐẶT cao hơn dự báo — dùng chung ngưỡng ngày thường thì ca camp nào cũng bị cờ và cờ mất nghĩa. Đo 15/11: VERA TikTok 32/32 ca camp bị cờ ở ngưỡng 1,3.", kind: "number", min: 1, max: 5, step: 0.05 },
   { key: "hoursToHitMultiplier", group: "target", label: "Tìm giờ cần cho target tới X× cam kết", help: "Khi dự báo thiếu target, engine chạy tiếp tới X× giờ cam kết để tìm mốc đủ.", kind: "number", min: 1, max: 5, step: 0.5 },
   { key: "targetGapWarnPct", group: "target", label: "Cảnh báo khi lưới nháp dự báo thiếu > X target", help: "Sửa ca trong nháp là target chia lại tự động; dự báo cả lưới hụt quá ngưỡng này thì hiện dải cảnh báo kèm số giờ cần bù và nút bù giờ. 0.03 = 3%.", kind: "number", min: 0, max: 0.5, step: 0.01 },
   { key: "allocEnsembleShare", group: "target", label: "Chia target ca: tỷ trọng mô hình v2", help: "Target ca = v2 × X + cách cũ × (1−X). 0.5 là mức backtest cho sai số thấp nhất và ổn định nhất qua các brand; 1 = chỉ v2; 0 = chỉ cách cũ. Bảng backtest ngay bên dưới cho thấy đổi số này tác động sai số ra sao.", kind: "number", min: 0, max: 1, step: 0.05 },

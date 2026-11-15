@@ -500,8 +500,14 @@ export default function MonthPlan({
   const withForecast = (next: PlanDraftSlot[], target = targetTotal, ctx = estimateCtx, groupTargets = settings.groupTargets): PlanDraftSlot[] => {
     if (next.length === 0) return next;
     const w = forecastsFor(next, ctx);
-    const flag = (d: PlanDraftSlot) => ({ ...d, highExpectation: d.expectedGmv ? d.targetGmv > d.expectedGmv * engineParams.highExpectationRatio : d.highExpectation });
     const camp = ctx.camp ?? campRanges;
+    // Ngày Campaign có sàn target nên dùng ngưỡng riêng, nếu không gần như ca camp nào cũng bị cờ (15/11).
+    const flag = (d: PlanDraftSlot) => ({
+      ...d,
+      highExpectation: d.expectedGmv
+        ? d.targetGmv > d.expectedGmv * (resolveCampBucketType(d.date, camp) === "daily" ? engineParams.highExpectationRatio : engineParams.highExpectationRatioCamp)
+        : d.highExpectation
+    });
     const total = Math.max(target, sumGroupTargets(groupTargets));
     if (!locked && total > 0) return allocateDraftTargets(next, total, allocationWeights(next, w, camp), w, groupSpec(groupTargets, camp)).map(flag);
     return next.map((d, i) => flag({
@@ -699,6 +705,16 @@ export default function MonthPlan({
     [forecaster, drafts, campRanges, targetTotal]
   );
   const gridOutlook = useMemo(() => (engineOutlook ? scaleOutlook(engineOutlook, kbFactor, targetTotal) : null), [engineOutlook, kbFactor, targetTotal]);
+  // Lưu ý chỉ nói về CÁCH TÍNH dự báo (không phải việc phải làm) — nằm trong ngăn "Dự báo của lịch" (15/11).
+  const forecastNotes: React.ReactNode[] = [];
+  if (gridOutlook && gridOutlook.excessHours > 0.05)
+    forecastNotes.push(
+      <p key="excess" className="text-amber-300">
+        {fmtH(gridOutlook.excessHours)}h ở những ngày nhiều giờ hơn mức thông thường — dự báo chỉ tính {Math.round(engineParams.fcOutOfRangeFactor * 100)}% {platformText("GMV/giờ", platform)} cho phần giờ đó
+        <InfoDot label="Mức thông thường là gì">Vượt phân vị 90 số giờ/ngày của chính kênh này trong lịch sử.</InfoDot>
+      </p>
+    );
+  if (forecaster?.mostlyManual) forecastNotes.push(<p key="manual" className="text-amber-300">Lịch sử kênh chủ yếu là số nhập tay nên dự báo có độ tin cậy thấp — tải lên file đối soát.</p>);
   const baseConstraints = useMemo(() => ({
     month,
     today,
@@ -1327,18 +1343,8 @@ export default function MonthPlan({
         </div>
       </div>
 
-      {plan && (engineOutlook || scenario.length > 0) && (
-        <BrandScenarioPanel
-          planId={plan.id}
-          lines={plan.brandScenario}
-          engineP50={engineOutlook?.p50 ?? null}
-          canEdit={canRetarget}
-          actual={month < curMonth ? monthActualDone : null}
-          onSaved={(lines) => setPlan((p) => (p ? { ...p, brandScenario: lines } : p))}
-        />
-      )}
-
-      {(committedGmv > 0 && monthTarget > 0 && monthTarget < committedGmv) || (!locked && committedGmv > 0 && targetTotal <= 0) || (gridOutlook && gridOutlook.excessHours > 0.05) || forecaster?.mostlyManual ? (
+      {/* Việc phải làm — luôn hiện. */}
+      {(committedGmv > 0 && monthTarget > 0 && monthTarget < committedGmv) || (!locked && committedGmv > 0 && targetTotal <= 0) ? (
         <div className="space-y-1 text-2xs px-1">
           {committedGmv > 0 && monthTarget > 0 && monthTarget < committedGmv && <p className="text-amber-300">Target thấp hơn {platformText("GMV", platform)} hợp đồng {fmtVndShort(committedGmv - monthTarget)} — run-rate đạt 100% vẫn hụt cam kết với brand.</p>}
           {!locked && committedGmv > 0 && targetTotal <= 0 && (
@@ -1346,12 +1352,33 @@ export default function MonthPlan({
               Đặt target = {platformText("GMV", platform)} hợp đồng ({fmtVndShort(committedGmv)})
             </button>
           )}
-          {gridOutlook && gridOutlook.excessHours > 0.05 && <p className="text-amber-300">{fmtH(gridOutlook.excessHours)}h ở những ngày nhiều giờ hơn mức thông thường — dự báo chỉ tính {Math.round(engineParams.fcOutOfRangeFactor * 100)}% {platformText("GMV/giờ", platform)} cho phần giờ đó
-            <InfoDot label="Mức thông thường là gì">Vượt phân vị 90 số giờ/ngày của chính kênh này trong lịch sử.</InfoDot>
-          </p>}
-          {forecaster?.mostlyManual && <p className="text-amber-300">Lịch sử kênh chủ yếu là số nhập tay nên dự báo có độ tin cậy thấp — tải lên file đối soát.</p>}
         </div>
       ) : null}
+
+      {/* Dự báo (engine + Kịch bản brand + lưu ý cách tính) gom vào MỘT ngăn đóng sẵn — 15/11, user: màn chỉ cần
+          nhập target rồi chia ra lưới ca; dự báo chỉ để đối chiếu lúc target về nên không chiếm chỗ của bước đó. */}
+      {plan && (engineOutlook || scenario.length > 0 || forecastNotes.length > 0) && (
+        <details className="rounded-xl border border-[var(--border)] bg-[var(--surface)] text-xs" data-testid="forecast-drawer">
+          <summary className="cursor-pointer px-3 py-2 min-h-9 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[var(--text-muted)]">
+            <span className="font-bold text-[var(--text)]">Dự báo của lịch</span>
+            {gridOutlook && <b className="tabular-nums text-[var(--text)]">{fmtVndShort(gridOutlook.p50)}</b>}
+            {scenario.length > 0 && <span className="text-[var(--text-faint)]">· kịch bản {scenario.length} dòng</span>}
+            {forecastNotes.length > 0 && <span className="text-amber-300">· {forecastNotes.length} lưu ý</span>}
+          </summary>
+          <div className="px-3 pb-3 space-y-2 border-t border-[var(--border)]/60 pt-2">
+            {forecastNotes.length > 0 && <div className="space-y-1 text-2xs">{forecastNotes}</div>}
+            <BrandScenarioPanel
+              embedded
+              planId={plan.id}
+              lines={plan.brandScenario}
+              engineP50={engineOutlook?.p50 ?? null}
+              canEdit={canRetarget}
+              actual={month < curMonth ? monthActualDone : null}
+              onSaved={(lines) => setPlan((p) => (p ? { ...p, brandScenario: lines } : p))}
+            />
+          </div>
+        </details>
+      )}
 
       {/* Một dòng tham số; "sửa" mở khung đầy đủ (kế hoạch mới thì mở sẵn). */}
       <div className="rounded-xl border border-dashed border-[var(--border)] px-3 py-2 text-xs space-y-3">
@@ -1436,7 +1463,7 @@ export default function MonthPlan({
       {needsTarget && !retargetOpen && (
         <div className="rounded-2xl border border-[var(--accent)]/60 bg-[var(--accent)]/10 p-3 flex flex-wrap items-center gap-3 text-xs" data-testid="needs-target">
           <p className="flex-1 min-w-[240px] text-[var(--text)]">
-            <b>Chờ target tháng {fmtMonth(month)} từ buổi họp monthly với brand.</b> Lịch đã chốt {drafts.length} ca · {fmtH(totals.hours)}h{gridOutlook ? <> · dự báo {fmtVndShort(gridOutlook.p50)} (dải {fmtVndShort(gridOutlook.lo)} – {fmtVndShort(gridOutlook.hi)})</> : ""}.
+            <b>Chờ target tháng {fmtMonth(month)}.</b> Lịch {drafts.length} ca · {fmtH(totals.hours)}h{gridOutlook ? <> · dự báo {fmtVndShort(gridOutlook.p50)}</> : ""}.
             <InfoDot label="Nhập target vào đây thì app làm gì">
               App so target với dự báo của lịch: lệch ≤ {Math.round(INTAKE_ALLOCATE_MAX * 100)}% chỉ chia target xuống ca,
               {" "}{Math.round(INTAKE_ALLOCATE_MAX * 100)}–{Math.round(INTAKE_ADD_MAX * 100)}% gợi ý thêm ca bổ sung,
@@ -1507,8 +1534,12 @@ export default function MonthPlan({
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
               <h3 className="text-sm font-bold text-[var(--text)]">{totals.target <= 0 ? `Nhận target brand tháng ${fmtMonth(month)}` : "Chia lại target theo lịch hiện có"}</h3>
-              <p className="text-2xs text-[var(--text-muted)] leading-relaxed max-w-3xl">
-                Lấy MỌI ca đang có trên lịch của kênh trong tháng (ca đã trong kế hoạch + ca OP thêm ngoài kế hoạch, kể cả ngày đã qua), bỏ ca đã huỷ, rồi chia target mới xuống các ca còn chạy theo bộ chia engine (v2 nếu brand đủ lịch sử, không thì dự báo engine). Ca OP thêm được đưa vào kế hoạch ngay (tính vào giờ + tổng target); ca huỷ về target 0. Giờ ca không đổi. Ghi xong thì % Target ca đã xong, run-rate và Dashboard của tháng này đổi theo; mỗi lần có nhật ký target cũ → mới. Chỉ ceo/admin ghi được.
+              <p className="text-2xs text-[var(--text-muted)] max-w-3xl">
+                Nhập target tháng, chọn target từng đợt campaign nếu muốn, rồi Xem trước → Áp dụng là chia xuống lưới ca.
+                <InfoDot label="Chia xuống những ca nào">
+                  Mọi ca của kênh trong tháng (ca trong kế hoạch + ca OP thêm ngoài kế hoạch, kể cả ngày đã qua); ca huỷ về target 0; giờ ca không đổi.
+                  Ca OP thêm được đưa vào kế hoạch ngay. Ghi xong thì % Target ca đã xong, run-rate và Dashboard đổi theo; mỗi lần có nhật ký target cũ → mới. Chỉ ceo/admin ghi được.
+                </InfoDot>
               </p>
             </div>
             <button onClick={() => { setRetargetKey(null); setRetargetPreview(null); }} className="px-2.5 py-1 rounded-lg border border-[var(--border)] font-bold text-[var(--text-muted)] hover:text-[var(--text)]">Đóng</button>
