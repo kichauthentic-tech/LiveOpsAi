@@ -33,7 +33,7 @@ import {
   type RosterWeek
 } from "../lib/db/roster";
 import type { BrandTalentRule } from "../lib/commercial/terms";
-import type { TalentBrandRole } from "../lib/roster/talentBrandRoles";
+import { inferRoleRows, type TalentBrandRole } from "../lib/roster/talentBrandRoles";
 import { analyzeRoster, buildBrandRuleIndex, buildRosterShifts, channelKeyOf, DEFAULT_ROSTER_RULES, type RosterRole, type RosterRules, type RosterShift } from "../lib/roster/rules";
 import { autofillWeek, buildFamiliarity, famOf, planCostCut, shiftCost, type CostMove, type RankContext, type RankMode } from "../lib/roster/candidates";
 import { ShiftPanel, dayLabel } from "./roster/ShiftPanel";
@@ -285,9 +285,10 @@ export const RosterBoard: React.FC<Props> = (p) => {
     () => buildRosterShifts(p.sessions, p.shiftSlots, drafts, p.shiftRegistrations, addDays(weekStart, -7), addDays(weekEnd, 1)),
     [p.sessions, p.shiftSlots, drafts, p.shiftRegistrations, weekStart, weekEnd]
   );
+  const inferredRoles = useMemo(() => inferRoleRows(p.sessions), [p.sessions]);
   const brandRules = useMemo(
-    () => ((p.talentRules?.length ?? 0) > 0 || (p.talentBrandRoles?.length ?? 0) > 0 ? buildBrandRuleIndex(p.talentRules ?? [], (id) => p.brands.find((b) => b.id === id)?.name ?? "brand", p.talentBrandRoles ?? []) : undefined),
-    [p.talentRules, p.talentBrandRoles, p.brands]
+    () => ((p.talentRules?.length ?? 0) > 0 || (p.talentBrandRoles?.length ?? 0) > 0 || inferredRoles.length > 0 ? buildBrandRuleIndex(p.talentRules ?? [], (id) => p.brands.find((b) => b.id === id)?.name ?? "brand", p.talentBrandRoles ?? [], inferredRoles) : undefined),
+    [p.talentRules, p.talentBrandRoles, p.brands, inferredRoles]
   );
   const analysis = useMemo(() => analyzeRoster(shifts, rules, weekStart, nameOf, familiar, brandRules), [shifts, rules, weekStart, nameOf, familiar, brandRules]);
   const hostPerf = useMemo(() => buildHostPerformance(p.sessions, getTodayDate()), [p.sessions]);

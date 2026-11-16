@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import type { Brand, LiveSession, Talent } from "../types";
 import { deleteTalentBrandRole, upsertTalentBrandRoles } from "../lib/db/talentBrandRoles";
-import { roleHistoryByChannel, suggestRolesFromHistory, TALENT_BRAND_ROLE_LABEL, type TalentBrandRole, type TalentBrandRoleKind } from "../lib/roster/talentBrandRoles";
+import { INFER_MIN_SESSIONS, inferKind, roleHistoryByChannel, suggestRolesFromHistory, TALENT_BRAND_ROLE_LABEL, type TalentBrandRole, type TalentBrandRoleKind } from "../lib/roster/talentBrandRoles";
 import { errorMessage } from "../lib/errorMessage";
 
 // Vai được xếp theo brand × sàn của MỘT talent. Điều Phối Lịch Live (Tự fill, gợi ý người, cảnh báo lịch) đọc để không xếp host vào kênh
@@ -117,11 +117,13 @@ export const TalentBrandRolesPanel: React.FC<Props> = ({ talent, brands, session
               {platforms.map((p) => {
                 const h = history.get(`${brand.id}|${p}`);
                 const cur = find(brand.id, p)?.role ?? "none";
+                const guess = cur === "none" && !shared ? inferKind(h) : undefined;
                 return (
                   <div key={p} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                     <span className="text-[var(--text-muted)]">
                       {p}
                       {h && <span className="text-2xs text-[var(--text-faint)]"> · {h.host} ca host · {h.assist} ca trợ</span>}
+                      {guess && <span className="text-2xs text-amber-300"> · tự suy: {TALENT_BRAND_ROLE_LABEL[guess]}</span>}
                     </span>
                     <span className="flex border border-[var(--border)] rounded-lg overflow-hidden text-2xs font-bold" role="group" aria-label={`Vai ở ${brand.name} ${p}`}>
                       {OPTIONS.map((o) => (
@@ -145,7 +147,7 @@ export const TalentBrandRolesPanel: React.FC<Props> = ({ talent, brands, session
         })}
       </ul>
       <p className="text-2xs text-[var(--text-faint)] leading-relaxed">
-        Chưa cài = không hạn chế như trước. Cài "Host" thì Tự fill không xếp bạn làm trợ ở kênh đó; cài "Trợ live" thì không xếp làm host. Xếp tay vẫn được nhưng lịch sẽ hiện cảnh báo.
+        Chưa cài: nếu từ {INFER_MIN_SESSIONS} ca trở lên chỉ làm một vai ở kênh đó thì bộ xếp tự coi là chỉ được vai đó ("tự suy"); chưa đủ ca thì không hạn chế. Cài tay luôn thắng (chọn "Cả hai" nếu muốn bỏ hạn chế). Cài "Host" thì Tự fill không xếp bạn làm trợ ở kênh đó; cài "Trợ live" thì không xếp làm host. Xếp tay vẫn được nhưng lịch sẽ hiện cảnh báo.
       </p>
       {error && <p className="text-2xs text-rose-300">{error}</p>}
     </div>

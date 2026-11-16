@@ -7,6 +7,7 @@ vi.mock("../src/lib/supabaseClient", () => ({ supabase: {} }));
 
 const R = await import("../src/lib/roster/rules");
 const C = await import("../src/lib/roster/candidates");
+const T = await import("../src/lib/roster/talentBrandRoles");
 import type { LiveSession, ShiftSlot, Talent, TalentRateHistoryEntry } from "../src/types";
 import type { RosterShift } from "../src/lib/roster/rules";
 import type { RankContext, RankMode } from "../src/lib/roster/candidates";
@@ -329,5 +330,27 @@ describe("vai được xếp theo brand × sàn", () => {
     expect(R.brandRuleViolation(idx, "b3", "x", "host", "TikTok")).toBeUndefined();
     expect(R.brandRuleViolation(idx, "b4", "x", "co_host", "TikTok")).toBeUndefined();
     expect(R.brandRuleViolation(idx, "b1", "x")).toBeUndefined();
+  });
+});
+
+// ---- Tự suy vai từ lịch sử ----
+describe("tự suy vai từ lịch sử", () => {
+  const mk = (n: number, hostId: string, asst?: string, brandId = "b1", platform = "TikTok") =>
+    Array.from({ length: n }, (_, i) => ({ id: `${hostId}${asst}${i}`, brandId, platform, hostId, assistantId: asst, status: "Completed" })) as never[];
+  test("≥10 ca chỉ một vai ⇒ suy; ít hơn hoặc làm cả hai vai ⇒ không suy", () => {
+    const rows = T.inferRoleRows([...mk(12, "p", "q"), ...mk(5, "r"), ...mk(11, "s", "s2"), ...mk(11, "s2", "s")] as never);
+    const get = (id: string) => rows.find((x) => x.talentId === id)?.role;
+    expect(get("p")).toBe("host");
+    expect(get("q")).toBe("assistant");
+    expect(get("r")).toBeUndefined();
+    expect(get("s")).toBeUndefined(); // vừa host vừa trợ
+  });
+  test("cài tay thắng suy; chỉ suy đúng sàn; cảnh báo ghi 'theo lịch sử'", () => {
+    const inferred = [{ brandId: "b1", platform: "TikTok" as const, talentId: "p", role: "host" as const }];
+    const none = R.buildBrandRuleIndex([], (id) => id, [], inferred);
+    expect(R.brandRuleViolation(none, "b1", "p", "co_host", "TikTok")?.text).toContain("theo lịch sử");
+    expect(R.brandRuleViolation(none, "b1", "p", "co_host", "Shopee")).toBeUndefined();
+    const manual = R.buildBrandRuleIndex([], (id) => id, [{ brandId: "b1", talentId: "p", role: "both", platform: "TikTok" }], inferred);
+    expect(R.brandRuleViolation(manual, "b1", "p", "co_host", "TikTok")).toBeUndefined();
   });
 });

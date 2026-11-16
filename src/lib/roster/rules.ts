@@ -249,13 +249,17 @@ export interface BrandRuleIndex {
   exclusive: ReadonlyMap<string, string>;
   /** Vai cài cho người này ở brand × sàn (talent_brand_roles, 0221/0222): dòng theo sàn thắng dòng "cả hai sàn". undefined = chưa cài ⇒ không hạn chế. */
   roleKind: (brandId: string, platform: string | undefined, talentId: string) => "host" | "assistant" | "both" | undefined;
+  /** true = vai này do bộ xếp TỰ SUY từ lịch sử (chưa ai cài tay cho kênh) — chỉ để ghi chú trong cảnh báo. */
+  roleInferred: (brandId: string, platform: string | undefined, talentId: string) => boolean;
   brandName: (brandId: string) => string;
 }
 
 export function buildBrandRuleIndex(
   rules: readonly { brandId: string; talentId: string; rule: "preferred" | "blocked" | "exclusive" }[],
   brandName: (brandId: string) => string,
-  brandRoles: readonly { brandId: string; talentId: string; role: "host" | "assistant" | "both"; platform?: "all" | "TikTok" | "Shopee" }[] = []
+  brandRoles: readonly { brandId: string; talentId: string; role: "host" | "assistant" | "both"; platform?: "all" | "TikTok" | "Shopee" }[] = [],
+  /** Vai suy từ lịch sử (`inferRoleRows`) — chỉ dùng khi kênh đó chưa có dòng cài tay nào (theo sàn hoặc chung). */
+  inferred: readonly { brandId: string; talentId: string; role: "host" | "assistant" | "both"; platform: "TikTok" | "Shopee" }[] = []
 ): BrandRuleIndex {
   const blocked = new Set<string>();
   const preferred = new Set<string>();
@@ -267,8 +271,12 @@ export function buildBrandRuleIndex(
   }
   const kinds = new Map<string, "host" | "assistant" | "both">();
   for (const r of brandRoles) kinds.set(`${r.brandId}|${r.platform ?? "all"}|${r.talentId}`, r.role);
-  const roleKind = (brandId: string, platform: string | undefined, talentId: string) => (platform ? kinds.get(`${brandId}|${platform}|${talentId}`) : undefined) ?? kinds.get(`${brandId}|all|${talentId}`);
-  return { blocked, preferred, exclusive, roleKind, brandName };
+  const explicit = (brandId: string, platform: string | undefined, talentId: string) => (platform ? kinds.get(`${brandId}|${platform}|${talentId}`) : undefined) ?? kinds.get(`${brandId}|all|${talentId}`);
+  const guess = new Map<string, "host" | "assistant" | "both">();
+  for (const r of inferred) guess.set(`${r.brandId}|${r.platform}|${r.talentId}`, r.role);
+  const roleKind = (brandId: string, platform: string | undefined, talentId: string) => explicit(brandId, platform, talentId) ?? (platform ? guess.get(`${brandId}|${platform}|${talentId}`) : undefined);
+  const roleInferred = (brandId: string, platform: string | undefined, talentId: string) => explicit(brandId, platform, talentId) === undefined && roleKind(brandId, platform, talentId) !== undefined;
+  return { blocked, preferred, exclusive, roleKind, roleInferred, brandName };
 }
 
 /** Lý do host KHÔNG hợp với brand này theo điều khoản (undefined = hợp lệ). Một chỗ cho cảnh báo lịch và danh sách gợi ý. */
@@ -276,7 +284,7 @@ export function brandRuleViolation(idx: BrandRuleIndex | undefined, brandId: str
   if (!idx) return undefined;
   const kind = role ? idx.roleKind(brandId, platform, talentId) : undefined;
   if (role && kind && kind !== "both" && (kind === "host" ? "host" : "co_host") !== role) {
-    const where = `${idx.brandName(brandId)}${platform ? ` ${platform}` : ""}`;
+    const where = `${idx.brandName(brandId)}${platform ? ` ${platform}` : ""}${idx.roleInferred(brandId, platform, talentId) ? " (theo lịch sử, chưa cài tay)" : ""}`;
     return { code: "brand_role", text: kind === "host" ? `chỉ được xếp host ở ${where}, không làm trợ` : `chỉ được xếp trợ live ở ${where}, không đứng host` };
   }
   if (idx.blocked.has(`${brandId}|${talentId}`)) return { code: "brand_blocked", text: `${idx.brandName(brandId)} không nhận host này` };

@@ -48,3 +48,38 @@ export function suggestRolesFromHistory(history: ReadonlyMap<string, { host: num
   }
   return out;
 }
+
+/** Số ca tối thiểu để tự suy vai từ lịch sử (chỉ làm một vai suốt ≥ ngưỡng này ⇒ coi như chỉ được xếp vai đó ở kênh đó). */
+export const INFER_MIN_SESSIONS = 10;
+
+/** Vai suy ra từ lịch sử một kênh: chỉ có ca host (≥ ngưỡng) ⇒ host, chỉ có ca trợ (≥ ngưỡng) ⇒ trợ; còn lại không suy (undefined). */
+export function inferKind(h: { host: number; assist: number } | undefined): TalentBrandRoleKind | undefined {
+  if (!h) return undefined;
+  if (h.host >= INFER_MIN_SESSIONS && h.assist === 0) return "host";
+  if (h.assist >= INFER_MIN_SESSIONS && h.host === 0) return "assistant";
+  return undefined;
+}
+
+/** Mọi dòng vai suy ra từ lịch sử cho cả agency (brand × sàn × người). Cài tay luôn thắng — xem `buildBrandRuleIndex`. */
+export function inferRoleRows(sessions: readonly LiveSession[]): { brandId: string; platform: "TikTok" | "Shopee"; talentId: string; role: TalentBrandRoleKind }[] {
+  const acc = new Map<string, { host: number; assist: number }>();
+  const bump = (key: string, k: "host" | "assist") => {
+    const cur = acc.get(key) ?? { host: 0, assist: 0 };
+    cur[k] += 1;
+    acc.set(key, cur);
+  };
+  for (const s of sessions) {
+    if (s.status === "Cancelled") continue;
+    if (s.hostId) bump(`${s.brandId}|${s.platform}|${s.hostId}`, "host");
+    const asst = s.assistantId || s.coHostId;
+    if (asst) bump(`${s.brandId}|${s.platform}|${asst}`, "assist");
+  }
+  const out: { brandId: string; platform: "TikTok" | "Shopee"; talentId: string; role: TalentBrandRoleKind }[] = [];
+  for (const [key, h] of acc) {
+    const role = inferKind(h);
+    if (!role) continue;
+    const [brandId, platform, talentId] = key.split("|") as [string, "TikTok" | "Shopee", string];
+    out.push({ brandId, platform, talentId, role });
+  }
+  return out;
+}
