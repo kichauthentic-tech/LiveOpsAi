@@ -303,29 +303,31 @@ describe("điều khoản về host với brand", () => {
   });
 });
 
-// ---- Vai được xếp theo brand (0221) ----
-describe("vai được xếp theo brand", () => {
+// ---- Vai được xếp theo brand × sàn (0221/0222) ----
+describe("vai được xếp theo brand × sàn", () => {
   const idx = R.buildBrandRuleIndex(
     [],
     (id) => id.toUpperCase(),
     [
-      { brandId: "b1", talentId: "x", role: "host" },
-      { brandId: "b2", talentId: "x", role: "assistant" },
+      { brandId: "b1", talentId: "x", role: "host", platform: "TikTok" },
+      { brandId: "b1", talentId: "x", role: "assistant", platform: "Shopee" },
+      { brandId: "b2", talentId: "x", role: "assistant" }, // dòng cũ 0221 = cả hai sàn
+      { brandId: "b2", talentId: "x", role: "host", platform: "Shopee" }, // cài riêng thắng cài chung
       { brandId: "b3", talentId: "x", role: "both" }
     ]
   );
-  test("host-only không làm trợ, trợ-only không làm host, both/chưa cài thì không hạn chế", () => {
-    expect(R.brandRuleViolation(idx, "b1", "x", "co_host")?.code).toBe("brand_role");
-    expect(R.brandRuleViolation(idx, "b1", "x", "host")).toBeUndefined();
-    expect(R.brandRuleViolation(idx, "b2", "x", "host")?.code).toBe("brand_role");
-    expect(R.brandRuleViolation(idx, "b2", "x", "co_host")).toBeUndefined();
-    expect(R.brandRuleViolation(idx, "b3", "x", "host")).toBeUndefined();
-    expect(R.brandRuleViolation(idx, "b4", "x", "co_host")).toBeUndefined();
-    expect(R.brandRuleViolation(idx, "b1", "x")).toBeUndefined();
+  test("cùng brand, mỗi sàn một vai", () => {
+    expect(R.brandRuleViolation(idx, "b1", "x", "co_host", "TikTok")?.code).toBe("brand_role");
+    expect(R.brandRuleViolation(idx, "b1", "x", "host", "TikTok")).toBeUndefined();
+    expect(R.brandRuleViolation(idx, "b1", "x", "host", "Shopee")?.code).toBe("brand_role");
+    expect(R.brandRuleViolation(idx, "b1", "x", "co_host", "Shopee")).toBeUndefined();
   });
-  test("cài host/cả hai ⇒ đủ điều kiện host dù hồ sơ ghi Assistant", () => {
-    expect(idx.hostAllowed.has("b1|x")).toBe(true);
-    expect(idx.hostAllowed.has("b3|x")).toBe(true);
-    expect(idx.hostAllowed.has("b2|x")).toBe(false);
+  test("dòng chung 'all' làm nền, dòng theo sàn thắng; chưa cài thì không hạn chế", () => {
+    expect(R.brandRuleViolation(idx, "b2", "x", "host", "TikTok")?.code).toBe("brand_role");
+    expect(R.brandRuleViolation(idx, "b2", "x", "host", "Shopee")).toBeUndefined();
+    expect(R.brandRuleViolation(idx, "b2", "x", "co_host", "Shopee")?.code).toBe("brand_role");
+    expect(R.brandRuleViolation(idx, "b3", "x", "host", "TikTok")).toBeUndefined();
+    expect(R.brandRuleViolation(idx, "b4", "x", "co_host", "TikTok")).toBeUndefined();
+    expect(R.brandRuleViolation(idx, "b1", "x")).toBeUndefined();
   });
 });

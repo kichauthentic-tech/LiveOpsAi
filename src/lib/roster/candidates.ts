@@ -64,6 +64,12 @@ export const famOf = (fam: FamiliarityMap, talentId: string, channelKey: string)
   fam.get(talentId)?.get(channelKey) ?? { host: 0, co: 0 };
 
 /** Đứng được vai host: hồ sơ là Host, hoặc đã đứng host ≥ 3 ca ở bất kỳ kênh nào (hồ sơ chỉ là nhãn, không chặn). */
+/** Đã cài rõ là host / cả hai ở brand × sàn của ca ⇒ đủ điều kiện host dù hồ sơ ghi Assistant. */
+export const hostAllowedAt = (idx: BrandRuleIndex | undefined, shift: { brandId: string; platform: string }, talentId: string): boolean => {
+  const k = idx?.roleKind(shift.brandId, shift.platform, talentId);
+  return k === "host" || k === "both";
+};
+
 export function canHost(t: Talent, fam: FamiliarityMap): boolean {
   if (t.role === "Host") return true;
   let n = 0;
@@ -142,7 +148,7 @@ const fmtH = (h: number) => (Math.round(h * 10) / 10).toString().replace(".", ",
 
 /** Những gì sẽ xảy ra nếu xếp `talentId` vào ca: trùng (chặn), quá giờ tuần (chặn), nghỉ ngắn / chạy phòng / quá giờ ngày (cảnh báo). */
 function whatIf(shift: RosterShift, talentId: string, role: RosterRole, ctx: RankContext, an: RosterAnalysis): { blocked?: string; issues: string[]; weekHours: number } {
-  const violation = brandRuleViolation(ctx.brandRules, shift.brandId, talentId, role);
+  const violation = brandRuleViolation(ctx.brandRules, shift.brandId, talentId, role, shift.platform);
   if (violation) return { blocked: violation.text[0].toUpperCase() + violation.text.slice(1), issues: [], weekHours: 0 };
   const want = { date: shift.date, startTime: shift.startTime, endTime: shift.endTime };
   const [a, b] = absRange(want);
@@ -197,7 +203,7 @@ export function rankCandidates(shift: RosterShift, role: RosterRole, ctx: RankCo
   const out: Candidate[] = [];
   for (const t of ctx.talents) {
     if (t.id === other || t.id === current) continue;
-    if (role === "host" && !canHost(t, ctx.fam) && !ctx.brandRules?.hostAllowed.has(`${shift.brandId}|${t.id}`)) continue;
+    if (role === "host" && !canHost(t, ctx.fam) && !hostAllowedAt(ctx.brandRules, shift, t.id)) continue;
     const f = famOf(ctx.fam, t.id, shift.channelKey);
     const w = whatIf(shift, t.id, role, ctx, an);
     const cost = plannedCost(t, ctx.history, role, shift.date, h);

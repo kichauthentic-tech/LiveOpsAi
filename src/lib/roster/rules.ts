@@ -247,17 +247,15 @@ export interface BrandRuleIndex {
   preferred: ReadonlySet<string>;
   /** talentId → brandId mà host chỉ được làm cho brand đó. */
   exclusive: ReadonlyMap<string, string>;
-  /** `${brandId}|${talentId}` → vai DUY NHẤT được xếp ở brand đó (talent_brand_roles, 0221). Không có khoá = không hạn chế. */
-  roleOnly: ReadonlyMap<string, RosterRole>;
-  /** `${brandId}|${talentId}` đã được cài rõ là host / cả hai ⇒ đủ điều kiện host dù hồ sơ ghi Assistant. */
-  hostAllowed: ReadonlySet<string>;
+  /** Vai cài cho người này ở brand × sàn (talent_brand_roles, 0221/0222): dòng theo sàn thắng dòng "cả hai sàn". undefined = chưa cài ⇒ không hạn chế. */
+  roleKind: (brandId: string, platform: string | undefined, talentId: string) => "host" | "assistant" | "both" | undefined;
   brandName: (brandId: string) => string;
 }
 
 export function buildBrandRuleIndex(
   rules: readonly { brandId: string; talentId: string; rule: "preferred" | "blocked" | "exclusive" }[],
   brandName: (brandId: string) => string,
-  brandRoles: readonly { brandId: string; talentId: string; role: "host" | "assistant" | "both" }[] = []
+  brandRoles: readonly { brandId: string; talentId: string; role: "host" | "assistant" | "both"; platform?: "all" | "TikTok" | "Shopee" }[] = []
 ): BrandRuleIndex {
   const blocked = new Set<string>();
   const preferred = new Set<string>();
@@ -267,20 +265,20 @@ export function buildBrandRuleIndex(
     else if (r.rule === "preferred") preferred.add(`${r.brandId}|${r.talentId}`);
     else exclusive.set(r.talentId, r.brandId);
   }
-  const roleOnly = new Map<string, RosterRole>();
-  const hostAllowed = new Set<string>();
-  for (const r of brandRoles) {
-    if (r.role !== "both") roleOnly.set(`${r.brandId}|${r.talentId}`, r.role === "host" ? "host" : "co_host");
-    if (r.role !== "assistant") hostAllowed.add(`${r.brandId}|${r.talentId}`);
-  }
-  return { blocked, preferred, exclusive, roleOnly, hostAllowed, brandName };
+  const kinds = new Map<string, "host" | "assistant" | "both">();
+  for (const r of brandRoles) kinds.set(`${r.brandId}|${r.platform ?? "all"}|${r.talentId}`, r.role);
+  const roleKind = (brandId: string, platform: string | undefined, talentId: string) => (platform ? kinds.get(`${brandId}|${platform}|${talentId}`) : undefined) ?? kinds.get(`${brandId}|all|${talentId}`);
+  return { blocked, preferred, exclusive, roleKind, brandName };
 }
 
 /** Lý do host KHÔNG hợp với brand này theo điều khoản (undefined = hợp lệ). Một chỗ cho cảnh báo lịch và danh sách gợi ý. */
-export function brandRuleViolation(idx: BrandRuleIndex | undefined, brandId: string, talentId: string, role?: RosterRole): { code: "brand_blocked" | "brand_exclusive" | "brand_role"; text: string } | undefined {
+export function brandRuleViolation(idx: BrandRuleIndex | undefined, brandId: string, talentId: string, role?: RosterRole, platform?: string): { code: "brand_blocked" | "brand_exclusive" | "brand_role"; text: string } | undefined {
   if (!idx) return undefined;
-  const only = role ? idx.roleOnly.get(`${brandId}|${talentId}`) : undefined;
-  if (role && only && only !== role) return { code: "brand_role", text: only === "host" ? `chỉ được xếp host ở ${idx.brandName(brandId)}, không làm trợ` : `chỉ được xếp trợ live ở ${idx.brandName(brandId)}, không đứng host` };
+  const kind = role ? idx.roleKind(brandId, platform, talentId) : undefined;
+  if (role && kind && kind !== "both" && (kind === "host" ? "host" : "co_host") !== role) {
+    const where = `${idx.brandName(brandId)}${platform ? ` ${platform}` : ""}`;
+    return { code: "brand_role", text: kind === "host" ? `chỉ được xếp host ở ${where}, không làm trợ` : `chỉ được xếp trợ live ở ${where}, không đứng host` };
+  }
   if (idx.blocked.has(`${brandId}|${talentId}`)) return { code: "brand_blocked", text: `${idx.brandName(brandId)} không nhận host này` };
   const ex = idx.exclusive.get(talentId);
   if (ex && ex !== brandId) return { code: "brand_exclusive", text: `host độc quyền của ${idx.brandName(ex)}` };
@@ -383,7 +381,7 @@ export function analyzeRoster(
   for (const sh of shifts) {
     for (const tid of [sh.hostId, sh.coHostId]) {
       if (!tid) continue;
-      const v = brandRuleViolation(brandRules, sh.brandId, tid, tid === sh.hostId ? "host" : "co_host");
+      const v = brandRuleViolation(brandRules, sh.brandId, tid, tid === sh.hostId ? "host" : "co_host", sh.platform);
       if (v) add(v.code, sh, `${nameOf(tid)}: ${v.text}`, tid);
     }
     if (!sh.hostId) {

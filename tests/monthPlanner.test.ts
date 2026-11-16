@@ -169,8 +169,8 @@ describe("vai được xếp theo brand (0221)", () => {
     const slots = [slot("s1", day(2))];
     const regs = [reg("s1", "trợ-brand"), reg("s1", "host-brand")];
     const brandRules = R.buildBrandRuleIndex([], (id) => id, [
-      { brandId: "crocs", talentId: "trợ-brand", role: "assistant" },
-      { brandId: "crocs", talentId: "host-brand", role: "host" }
+      { brandId: "crocs", talentId: "trợ-brand", role: "assistant", platform: "TikTok" },
+      { brandId: "crocs", talentId: "host-brand", role: "host", platform: "TikTok" }
     ]);
     const plan = run({ slots, talents, regs, goal: "cost", brandRules });
     const at = (role: "host" | "co_host") => plan.assignments.find((x) => x.role === role)?.talentId;

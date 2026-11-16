@@ -1,5 +1,5 @@
 import { supabase } from "../supabaseClient";
-import type { TalentBrandRole, TalentBrandRoleKind } from "../roster/talentBrandRoles";
+import type { TalentBrandRole, TalentBrandRoleKind, TalentBrandRolePlatform } from "../roster/talentBrandRoles";
 
 // Vai được xếp theo brand (0221). Bảng chưa có (migration chưa chạy) ⇒ fetch trả null, app giữ cách xếp cũ.
 const TABLE_MISSING = new Set(["PGRST205", "42P01"]);
@@ -10,8 +10,9 @@ interface DbRow {
   talent_id: string;
   brand_id: string;
   role: TalentBrandRoleKind;
+  platform?: TalentBrandRolePlatform | null;
 }
-const fromDb = (r: DbRow): TalentBrandRole => ({ id: r.id, talentId: r.talent_id, brandId: r.brand_id, role: r.role });
+const fromDb = (r: DbRow): TalentBrandRole => ({ id: r.id, platform: r.platform ?? "all", talentId: r.talent_id, brandId: r.brand_id, role: r.role });
 
 export async function fetchTalentBrandRoles(): Promise<TalentBrandRole[] | null> {
   const { data, error } = await supabase.from("talent_brand_roles").select("*");
@@ -23,11 +24,11 @@ export async function fetchTalentBrandRoles(): Promise<TalentBrandRole[] | null>
 }
 
 /** Ghi nhiều brand một lần cho một talent (đặt nhanh). */
-export async function upsertTalentBrandRoles(talentId: string, rows: { brandId: string; role: TalentBrandRoleKind }[]): Promise<TalentBrandRole[]> {
+export async function upsertTalentBrandRoles(talentId: string, rows: { brandId: string; platform: TalentBrandRolePlatform; role: TalentBrandRoleKind }[]): Promise<TalentBrandRole[]> {
   if (rows.length === 0) return [];
   const { data, error } = await supabase
     .from("talent_brand_roles")
-    .upsert(rows.map((r) => ({ talent_id: talentId, brand_id: r.brandId, role: r.role })), { onConflict: "talent_id,brand_id" })
+    .upsert(rows.map((r) => ({ talent_id: talentId, brand_id: r.brandId, platform: r.platform, role: r.role })), { onConflict: "talent_id,brand_id,platform" })
     .select();
   if (error) throw error;
   return ((data as DbRow[]) ?? []).map(fromDb);
