@@ -141,8 +141,8 @@ const SOFT_WEEK_CAP = 36;
 const fmtH = (h: number) => (Math.round(h * 10) / 10).toString().replace(".", ",");
 
 /** Những gì sẽ xảy ra nếu xếp `talentId` vào ca: trùng (chặn), quá giờ tuần (chặn), nghỉ ngắn / chạy phòng / quá giờ ngày (cảnh báo). */
-function whatIf(shift: RosterShift, talentId: string, ctx: RankContext, an: RosterAnalysis): { blocked?: string; issues: string[]; weekHours: number } {
-  const violation = brandRuleViolation(ctx.brandRules, shift.brandId, talentId);
+function whatIf(shift: RosterShift, talentId: string, role: RosterRole, ctx: RankContext, an: RosterAnalysis): { blocked?: string; issues: string[]; weekHours: number } {
+  const violation = brandRuleViolation(ctx.brandRules, shift.brandId, talentId, role);
   if (violation) return { blocked: violation.text[0].toUpperCase() + violation.text.slice(1), issues: [], weekHours: 0 };
   const want = { date: shift.date, startTime: shift.startTime, endTime: shift.endTime };
   const [a, b] = absRange(want);
@@ -197,9 +197,9 @@ export function rankCandidates(shift: RosterShift, role: RosterRole, ctx: RankCo
   const out: Candidate[] = [];
   for (const t of ctx.talents) {
     if (t.id === other || t.id === current) continue;
-    if (role === "host" && !canHost(t, ctx.fam)) continue;
+    if (role === "host" && !canHost(t, ctx.fam) && !ctx.brandRules?.hostAllowed.has(`${shift.brandId}|${t.id}`)) continue;
     const f = famOf(ctx.fam, t.id, shift.channelKey);
-    const w = whatIf(shift, t.id, ctx, an);
+    const w = whatIf(shift, t.id, role, ctx, an);
     const cost = plannedCost(t, ctx.history, role, shift.date, h);
     const registered = shift.registrants.includes(t.id);
     if (w.blocked) {

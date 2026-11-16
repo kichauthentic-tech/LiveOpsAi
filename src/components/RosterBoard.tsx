@@ -33,6 +33,7 @@ import {
   type RosterWeek
 } from "../lib/db/roster";
 import type { BrandTalentRule } from "../lib/commercial/terms";
+import type { TalentBrandRole } from "../lib/roster/talentBrandRoles";
 import { analyzeRoster, buildBrandRuleIndex, buildRosterShifts, channelKeyOf, DEFAULT_ROSTER_RULES, type RosterRole, type RosterRules, type RosterShift } from "../lib/roster/rules";
 import { autofillWeek, buildFamiliarity, famOf, planCostCut, shiftCost, type CostMove, type RankContext, type RankMode } from "../lib/roster/candidates";
 import { ShiftPanel, dayLabel } from "./roster/ShiftPanel";
@@ -66,6 +67,8 @@ interface Props {
   talentRateHistory: TalentRateHistoryEntry[];
   /** Điều khoản về host với brand (0191) — cảnh báo khi xếp host brand không nhận / độc quyền brand khác. */
   talentRules?: BrandTalentRule[];
+  /** Vai được xếp theo brand (0221) — Tự fill / gợi ý / cảnh báo lịch. */
+  talentBrandRoles?: TalentBrandRole[];
   brandChannels: BrandChannel[];
   brandStudios: BrandStudio[];
   studios: Studio[];
@@ -282,7 +285,10 @@ export const RosterBoard: React.FC<Props> = (p) => {
     () => buildRosterShifts(p.sessions, p.shiftSlots, drafts, p.shiftRegistrations, addDays(weekStart, -7), addDays(weekEnd, 1)),
     [p.sessions, p.shiftSlots, drafts, p.shiftRegistrations, weekStart, weekEnd]
   );
-  const brandRules = useMemo(() => (p.talentRules && p.talentRules.length > 0 ? buildBrandRuleIndex(p.talentRules, (id) => p.brands.find((b) => b.id === id)?.name ?? "brand") : undefined), [p.talentRules, p.brands]);
+  const brandRules = useMemo(
+    () => ((p.talentRules?.length ?? 0) > 0 || (p.talentBrandRoles?.length ?? 0) > 0 ? buildBrandRuleIndex(p.talentRules ?? [], (id) => p.brands.find((b) => b.id === id)?.name ?? "brand", p.talentBrandRoles ?? []) : undefined),
+    [p.talentRules, p.talentBrandRoles, p.brands]
+  );
   const analysis = useMemo(() => analyzeRoster(shifts, rules, weekStart, nameOf, familiar, brandRules), [shifts, rules, weekStart, nameOf, familiar, brandRules]);
   const hostPerf = useMemo(() => buildHostPerformance(p.sessions, getTodayDate()), [p.sessions]);
   const hostChGmv = useMemo(() => buildHostChannelGmv(p.sessions, getTodayDate()), [p.sessions]);

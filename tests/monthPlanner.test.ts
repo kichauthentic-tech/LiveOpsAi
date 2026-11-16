@@ -162,3 +162,20 @@ describe("luật trợ / host", () => {
     expect(plan.assignments.find((a) => a.role === "co_host")?.talentId).toBe("tro");
   });
 });
+
+describe("vai được xếp theo brand (0221)", () => {
+  test("Tự fill không xếp người cài 'chỉ trợ' làm host, kể cả hồ sơ Host; người cài 'host' dù hồ sơ Assistant vẫn đứng host được", () => {
+    const talents = [tal("trợ-brand", "Host", 100000), tal("host-brand", "Assistant", 300000)];
+    const slots = [slot("s1", day(2))];
+    const regs = [reg("s1", "trợ-brand"), reg("s1", "host-brand")];
+    const brandRules = R.buildBrandRuleIndex([], (id) => id, [
+      { brandId: "crocs", talentId: "trợ-brand", role: "assistant" },
+      { brandId: "crocs", talentId: "host-brand", role: "host" }
+    ]);
+    const plan = run({ slots, talents, regs, goal: "cost", brandRules });
+    const at = (role: "host" | "co_host") => plan.assignments.find((x) => x.role === role)?.talentId;
+    expect(at("host")).toBe("host-brand");
+    // host-brand chỉ được host ⇒ trợ phải là trợ-brand
+    expect(at("co_host")).toBe("trợ-brand");
+  });
+});

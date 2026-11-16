@@ -355,7 +355,7 @@ export function planMonth(input: PlanInput): MonthPlan {
     if (s.coHostId) assignments.push({ shiftKey: s.key, slotId: s.slotId!, role: "co_host", talentId: s.coHostId, source: "draft" });
   }
 
-  const eligible = (t: Talent, role: RosterRole) => (role === "host" ? canHost(t, fam) : true);
+  const eligible = (t: Talent, role: RosterRole, brandId: string) => (role === "host" ? canHost(t, fam) || !!input.brandRules?.hostAllowed.has(`${brandId}|${t.id}`) : true);
 
   // Ca ít người đăng ký xếp trước (khó nhất trước), rồi theo ngày.
   const order = [...targets].sort((a, b) => a.registrants.length - b.registrants.length || a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
@@ -372,14 +372,14 @@ export function planMonth(input: PlanInput): MonthPlan {
         continue;
       }
       const other = role === "host" ? cur.co_host : cur.host;
-      const pool = shift.registrants.filter((id) => id !== other && talentById.has(id) && eligible(talentById.get(id)!, role));
+      const pool = shift.registrants.filter((id) => id !== other && talentById.has(id) && eligible(talentById.get(id)!, role, shift.brandId));
       if (pool.length === 0) {
         unfilled.push({ shiftKey: shift.key, role, reason: "no_registrant", detail: shift.registrants.length === 0 ? "chưa ai đăng ký ca này" : role === "host" ? "người đăng ký chưa đủ điều kiện làm host" : "không có người đăng ký phù hợp" });
         continue;
       }
       const cands: { id: string; why: string | null; cost: number; load: number; b: HourBounds }[] = pool.map((id) => {
         const b = bounds.get(id)!;
-        const violation = brandRuleViolation(input.brandRules, shift.brandId, id);
+        const violation = brandRuleViolation(input.brandRules, shift.brandId, id, role);
         return { id, why: violation ? violation.text : roster.blocked(id, shift, b.max, month), cost: costNum(id, role, shift), load: roster.hoursInMonth(id, month), b };
       });
       const ok = cands.filter((c) => !c.why);
@@ -541,12 +541,12 @@ function rebalance(
         const cur = assigned.get(a.shiftKey)!;
         const otherRole = a.role === "host" ? cur.co_host : cur.host;
         if (otherRole === n.t.id) continue;
-        if (a.role === "host" && !canHost(n.t, fam)) continue;
+        if (a.role === "host" && !canHost(n.t, fam) && !input.brandRules?.hostAllowed.has(`${s.brandId}|${n.t.id}`)) continue;
         const h = shiftHours(s);
         const holderLoad = roster.hoursInMonth(a.talentId, month);
         const holderMin = bounds.get(a.talentId)?.min ?? 0;
         if (holderLoad - h < holderMin - 1e-6 || holderLoad <= n.load + h) continue;
-        if (brandRuleViolation(input.brandRules, s.brandId, n.t.id)) continue;
+        if (brandRuleViolation(input.brandRules, s.brandId, n.t.id, a.role)) continue;
         roster.remove(a.talentId, a.shiftKey, a.role);
         if (roster.blocked(n.t.id, s, n.b.max, month)) {
           roster.add(a.talentId, s, a.role, true);

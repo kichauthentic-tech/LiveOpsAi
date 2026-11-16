@@ -1,3 +1,5 @@
+import { TalentBrandRolesPanel } from "./TalentBrandRolesPanel";
+import type { TalentBrandRole } from "../lib/roster/talentBrandRoles";
 import { platformText } from "../lib/metricGlossary";
 import React, { useMemo, useRef, useState } from "react";
 import { Talent, Brand, UserRole, LiveSession } from "../types";
@@ -68,6 +70,8 @@ interface TalentMatcherProps {
   brands: Brand[];
   // Số GMV/số ca của talent cộng từ ca thật, thay cho cột nhập tay trên hồ sơ (audit 2026-09-21).
   sessions: LiveSession[];
+  talentBrandRoles?: TalentBrandRole[];
+  onTalentBrandRolesChanged?: (next: TalentBrandRole[]) => void;
   onCreateTalentAccount?: (payload: NewTalentAccountPayload) => Promise<string | undefined>;
   onUpdateTalent?: (id: string, patch: Partial<Talent>) => void;
   onDeleteTalent?: (id: string) => void;
@@ -90,6 +94,8 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
   talents,
   brands,
   sessions,
+  talentBrandRoles,
+  onTalentBrandRolesChanged,
   onCreateTalentAccount,
   onUpdateTalent,
   onDeleteTalent
@@ -624,6 +630,17 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                   Muốn xếp hạng host trong một brand thì mở Hiệu Suất Host (có lọc brand, thứ và khung giờ).
                 </p>
               </div>
+
+              {onTalentBrandRolesChanged && (
+                <TalentBrandRolesPanel
+                  talent={selected.t}
+                  brands={brands}
+                  sessions={sessions}
+                  roles={talentBrandRoles ?? []}
+                  canEdit={currentRole === "ceo" || currentRole === "admin" || currentRole === "operations" || currentRole === "trainer"}
+                  onChanged={onTalentBrandRolesChanged}
+                />
+              )}
 
               {canSeeRate && (
                 <div className="grid grid-cols-2 gap-2 bg-amber-950/30 p-3 rounded-xl border border-amber-500/30">

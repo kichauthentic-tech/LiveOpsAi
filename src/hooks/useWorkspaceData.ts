@@ -39,6 +39,8 @@ import { fetchAiAgentPrompts } from "../lib/db/aiAgentPrompts";
 import { fetchBrandPlatformRates } from "../lib/db/brandPlatformRates";
 import { fetchBrandStudios } from "../lib/db/brandStudios";
 import { fetchBrandChannels } from "../lib/db/brandChannels";
+import { fetchTalentBrandRoles } from "../lib/db/talentBrandRoles";
+import type { TalentBrandRole } from "../lib/roster/talentBrandRoles";
 import { fetchMonthFeeInputs, fetchTalentRules, fetchTermsPeriods } from "../lib/db/brandTerms";
 import type { BrandTalentRule, MonthFeeInputs, TermsPeriod } from "../lib/commercial/terms";
 import { fetchShiftSlots } from "../lib/db/shiftSlots";
@@ -219,6 +221,7 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
   const [termsAvailable, setTermsAvailable] = useState(true);
   const [monthFeeInputs, setMonthFeeInputs] = useState<MonthFeeInputs[]>([]);
   const [talentRules, setTalentRules] = useState<BrandTalentRule[]>([]);
+  const [talentBrandRoles, setTalentBrandRoles] = useState<TalentBrandRole[]>([]);
   const [shiftRegistrations, setShiftRegistrations] = useState<ShiftRegistration[]>([]);
   const [phase14Error, setPhase14Error] = useState<string | null>(null);
 
@@ -524,13 +527,14 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
     if (!authUserId || !(isOpsRole || currentRole === "trainer" || currentRole === "brand")) return;
     let cancelled = false;
     const staff = isOpsRole || currentRole === "trainer";
-    Promise.all([fetchTermsPeriods(), staff ? fetchMonthFeeInputs() : Promise.resolve([]), staff ? fetchTalentRules() : Promise.resolve([])])
-      .then(([periods, inputs, rules]) => {
+    Promise.all([fetchTermsPeriods(), staff ? fetchMonthFeeInputs() : Promise.resolve([]), staff ? fetchTalentRules() : Promise.resolve([]), staff ? fetchTalentBrandRoles() : Promise.resolve([])])
+      .then(([periods, inputs, rules, brandRoles]) => {
         if (cancelled) return;
         setTermsAvailable(periods !== null);
         setTermsPeriods(periods ?? []);
         setMonthFeeInputs(inputs ?? []);
         setTalentRules(rules ?? []);
+        setTalentBrandRoles(brandRoles ?? []);
       })
       .catch((err) => {
         if (!cancelled) setPhase19Error(`Không tải được điều khoản hợp tác (tính tiền theo cấu hình cũ): ${errorMessage(err)}`);
@@ -756,6 +760,8 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
     setMonthFeeInputs,
     talentRules,
     setTalentRules,
+    talentBrandRoles,
+    setTalentBrandRoles,
     shiftRegistrations,
     setShiftRegistrations,
     phase14Error,

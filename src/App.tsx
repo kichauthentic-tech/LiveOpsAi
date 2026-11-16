@@ -409,6 +409,8 @@ export default function App() {
     monthFeeInputs,
     setMonthFeeInputs,
     talentRules,
+    talentBrandRoles,
+    setTalentBrandRoles,
     setTalentRules,
     shiftRegistrations,
     setShiftRegistrations,
@@ -2099,6 +2101,7 @@ export default function App() {
                     talents={talents}
                     talentRateHistory={talentRateHistory}
                     talentRules={talentRules}
+                    talentBrandRoles={talentBrandRoles}
                     brandChannels={channels}
                     brandStudios={brandStudios}
                     studios={studios}
@@ -2557,6 +2560,8 @@ export default function App() {
                     talents={activeTalents}
                     brands={brands}
                     sessions={activeSessions}
+                    talentBrandRoles={talentBrandRoles}
+                    onTalentBrandRolesChanged={setTalentBrandRoles}
                     onCreateTalentAccount={handleCreateTalentAccount}
                     onUpdateTalent={handleUpdateTalent}
                     onDeleteTalent={handleDeleteTalent}
