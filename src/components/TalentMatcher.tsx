@@ -1,6 +1,6 @@
 import { upsertTalentBrandRolesBulk } from "../lib/db/talentBrandRoles";
 import { TalentBrandRolesPanel } from "./TalentBrandRolesPanel";
-import { BULK_MIN_SESSIONS, bulkSuggestRows, type TalentBrandRole } from "../lib/roster/talentBrandRoles";
+import { bulkSuggestRows, type TalentBrandRole } from "../lib/roster/talentBrandRoles";
 import { platformText } from "../lib/metricGlossary";
 import React, { useMemo, useRef, useState } from "react";
 import { Talent, Brand, UserRole, LiveSession } from "../types";
@@ -11,6 +11,7 @@ import { REPORT_PLATFORMS, type ReportPlatform } from "../lib/reportPlatform";
 import { PlatformChip } from "./common/PlatformChip";
 import { errorMessage } from "../lib/errorMessage";
 import { useConfirm } from "../hooks/useConfirm";
+import { useToast } from "../hooks/useToast";
 
 import { talentRateLabel } from "../lib/talentRate";
 import { fmtVndShort, fmtVndFull, fmtFixed } from "../lib/format";
@@ -102,6 +103,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
   onDeleteTalent
 }) => {
   const confirm = useConfirm();
+  const { showToast } = useToast();
   // Rate Card/Hoa hồng — chỉ ceo/admin xem được (đúng dữ liệu trả về từ view `talents_secure`,
   // vốn đã mask thành 0 cho role khác — ẩn luôn UI cho nhất quán thay vì hiện "0đ" gây hiểu lầm).
   // Tạo talent mới giờ luôn kèm tạo account thật (Supabase Admin API) nên cũng chỉ ceo/admin
@@ -324,13 +326,13 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
   async function applyBulkRoles() {
     if (!onTalentBrandRolesChanged || bulkRows.length === 0) return;
     const people = new Set(bulkRows.map((r) => r.talentId)).size;
-    if (!window.confirm(`Điền vai theo lịch sử cho ${people} talent (${bulkRows.length} kênh chưa cài, đủ ${BULK_MIN_SESSIONS} ca trở lên). Kênh đã cài tay không bị đổi, sửa lại từng người được. Tiếp tục?`)) return;
+    if (!(await confirm(`Cài vai cho ${people} talent (${bulkRows.length} kênh) theo lịch sử?`, { confirmLabel: "Cài vai" }))) return;
     setBulkBusy(true);
     try {
       const saved = await upsertTalentBrandRolesBulk(bulkRows);
       onTalentBrandRolesChanged([...(talentBrandRoles ?? []).filter((r) => !saved.some((x) => x.talentId === r.talentId && x.brandId === r.brandId && x.platform === r.platform)), ...saved]);
     } catch (e) {
-      window.alert(errorMessage(e, "Không lưu được vai theo kênh."));
+      showToast(errorMessage(e, "Không lưu được vai theo kênh."));
     } finally {
       setBulkBusy(false);
     }
@@ -417,7 +419,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
               type="button"
               disabled={bulkBusy}
               onClick={applyBulkRoles}
-              title="Điền vai Host / Trợ live theo lịch sử ca cho mọi talent ở các kênh chưa cài (sửa lại từng người được)"
+              title="Điền vai theo lịch sử ca cho các kênh chưa cài"
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border border-amber-400/60 text-amber-300 hover:bg-amber-400/10 disabled:opacity-50"
             >
               Cài vai tự động cho tất cả ({bulkRows.length} kênh)

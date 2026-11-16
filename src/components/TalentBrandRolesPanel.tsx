@@ -90,7 +90,7 @@ export const TalentBrandRolesPanel: React.FC<Props> = ({ talent, brands, session
     <div className="space-y-1.5">
       <div className="flex items-center justify-between gap-2">
         <p className="font-bold text-[var(--text-muted)]">
-          Vai được xếp theo kênh <span className="font-normal text-[var(--text-faint)]">(brand × sàn, Tự fill lịch dựa vào đây)</span>
+          Vai được xếp theo kênh
         </p>
         {canEdit && suggestions.length > 0 && (
           <button type="button" onClick={applySuggestions} disabled={busy} className="text-2xs font-bold text-[var(--accent-text)] hover:underline shrink-0">
@@ -106,7 +106,7 @@ export const TalentBrandRolesPanel: React.FC<Props> = ({ talent, brands, session
               <p className="text-[var(--text)] font-medium">{brand.name}</p>
               {shared && (
                 <p className="text-2xs text-amber-300">
-                  Đang cài chung cả hai sàn: {TALENT_BRAND_ROLE_LABEL[shared.role]} (sàn nào cài riêng thì theo cài riêng)
+                  Cài chung hai sàn: {TALENT_BRAND_ROLE_LABEL[shared.role]}
                   {canEdit && (
                     <button type="button" onClick={() => dropShared(shared)} disabled={busy} className="ml-1.5 font-bold underline">
                       Bỏ cài chung
@@ -150,7 +150,7 @@ export const TalentBrandRolesPanel: React.FC<Props> = ({ talent, brands, session
         })}
       </ul>
       <p className="text-2xs text-[var(--text-faint)] leading-relaxed">
-        Chưa cài: nếu từ {INFER_MIN_SESSIONS} ca trở lên chỉ làm một vai ở kênh đó thì bộ xếp tự coi là chỉ được vai đó ("tự suy"); chưa đủ ca thì không hạn chế. Nút viền vàng là gợi ý theo lịch sử, bấm một lần là lưu. Cài tay luôn thắng (chọn "Cả hai" nếu muốn bỏ hạn chế). Cài "Host" thì Tự fill không xếp bạn làm trợ ở kênh đó; cài "Trợ live" thì không xếp làm host. Xếp tay vẫn được nhưng lịch sẽ hiện cảnh báo.
+        Chưa cài: từ {INFER_MIN_SESSIONS} ca chỉ một vai thì bộ xếp tự suy ("tự suy"). Viền vàng = gợi ý theo lịch sử. Chọn "Cả hai" để bỏ hạn chế.
       </p>
       {error && <p className="text-2xs text-rose-300">{error}</p>}
     </div>

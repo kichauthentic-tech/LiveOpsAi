@@ -1,3 +1,5 @@
+import { PersonPill } from "./PersonPill";
+import { NO_ASSISTANT_COLOR, type PersonColor } from "../../lib/roster/personColor";
 import { platformText } from "../../lib/metricGlossary";
 import React, { useMemo, useState } from "react";
 import { Plus } from "lucide-react";
@@ -23,12 +25,9 @@ export interface ChannelRow {
 }
 
 const fmtH = (h: number) => (Math.round(h * 10) / 10).toString().replace(".", ",");
-const CARD_BORDER: Record<string, string> = {
-  block: "border-l-red-500 bg-red-500/10",
-  hole: "border-l-red-500 bg-red-500/10",
-  warn: "border-l-amber-500 bg-amber-500/10",
-  ok: "border-l-emerald-500"
-};
+// Nền chỉ tô khi có vấn đề (ca ổn để trống cho đỡ rối); chấm nhỏ cạnh giờ nói mức độ.
+const CARD_WASH: Record<string, string> = { block: "bg-red-500/10", hole: "bg-red-500/10", warn: "bg-amber-500/10", ok: "" };
+const SEV_DOT: Record<string, string> = { block: "bg-red-500", hole: "bg-red-500", warn: "bg-amber-400", ok: "" };
 
 // ---------------- Lưới tuần ----------------
 export const WeekGrid: React.FC<{
@@ -41,19 +40,21 @@ export const WeekGrid: React.FC<{
   nameOf: (id: string) => string;
   /** Vai hồ sơ của talent ("Host"/"Assistant") — để đếm người đã đăng ký theo host / trợ trên thẻ ca mở. */
   roleOf?: (id: string) => string | undefined;
+  /** Màu cố định của từng người (ô tên tô màu như sheet của trainer). */
+  colorOf?: (id: string) => PersonColor | undefined;
   selectedKey: string | null;
   canAdd: boolean;
   onSelect: (key: string) => void;
   onAdd: (channel: ChannelRow, date: string) => void;
   /** Bản gọn 25/10: giờ tháng + một kết luận dưới tên kênh (thay chế độ "Tháng này"). */
   channelMeta?: (channel: ChannelRow) => React.ReactNode;
-}> = ({ weekStart, month, channels, shifts, analysis, nameOf, roleOf, selectedKey, canAdd, onSelect, onAdd, channelMeta }) => {
+}> = ({ weekStart, month, channels, shifts, analysis, nameOf, roleOf, colorOf, selectedKey, canAdd, onSelect, onAdd, channelMeta }) => {
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)).filter((d) => !month || d.slice(0, 7) === month);
   const labelW = channelMeta ? 168 : 140;
   return (
     <div className="space-y-2">
       <div className="overflow-x-auto rounded-xl border border-[var(--border)]">
-        <div className="grid" style={{ minWidth: labelW + days.length * 128, gridTemplateColumns: `${labelW}px repeat(${days.length}, minmax(126px, 1fr))` }}>
+        <div className="grid" style={{ minWidth: labelW + days.length * 168, gridTemplateColumns: `${labelW}px repeat(${days.length}, minmax(164px, 1fr))` }}>
           <div className="sticky left-0 z-10 bg-[var(--surface-elevated)] px-2 py-2 text-xs font-bold text-[var(--text-muted)] border-b border-r border-[var(--border)]">Kênh</div>
           {days.map((d) => (
             <div key={d} className="bg-[var(--surface-elevated)] px-2 py-2 text-xs font-bold text-[var(--text)] border-b border-r border-[var(--border)]">
@@ -80,19 +81,27 @@ export const WeekGrid: React.FC<{
                           onClick={() => onSelect(s.key)}
                           // Bố cục 19/10: thẻ ca chỉ còn vạch màu bên trái (đỏ/vàng/xanh) + nền nhạt — trước mỗi thẻ thêm viền đủ 4 cạnh
                           // trong ô lưới cũng có viền (~90 hộp lồng một tuần). Ca mở vẫn viền đứt để khác ca đã có người.
-                          className={`block w-full text-left rounded-md border-l-[3px] px-1.5 py-1 text-2xs leading-snug hover:bg-[var(--surface-hover)] ${sev === "ok" ? "bg-[var(--surface-elevated)]/50" : ""} ${CARD_BORDER[sev]} ${selectedKey === s.key ? "ring-2 ring-[var(--accent)]" : ""} ${s.kind === "open" ? "border border-dashed border-[var(--border)]" : ""}`}
+                          className={`block w-full text-left rounded-lg px-1 py-1 text-2xs leading-snug hover:bg-[var(--surface-hover)] ${CARD_WASH[sev]} ${selectedKey === s.key ? "ring-2 ring-[var(--accent)]" : ""} ${s.kind === "open" ? "border border-dashed border-[var(--border)]" : ""}`}
                         >
-                          <span className="font-mono font-bold text-[var(--text)]">
+                          <span className="mb-0.5 flex items-center gap-1 whitespace-nowrap px-0.5 font-mono text-[var(--text-muted)]">
                             {s.startTime}–{s.endTime}
+                            {SEV_DOT[sev] && <i className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${SEV_DOT[sev]}`} aria-label="có cảnh báo" />}
+                            {s.kind === "open" && (() => {
+                              const nCo = s.registrants.filter((id) => roleOf?.(id) === "Assistant").length;
+                              const nHost = s.registrants.length - nCo;
+                              return <span title={`${s.drafted ? "Nháp" : "Ca mở"} · đăng ký: ${nHost} host · ${nCo} trợ`} className={`ml-auto font-sans ${s.registrants.length > 0 ? "text-emerald-300" : "text-[var(--text-faint)]"}`}>ĐK {nHost}·{nCo}</span>;
+                            })()}
                           </span>
-                          {s.kind === "open" && <span className="ml-1 text-2xs font-bold text-sky-300">{s.drafted ? "nháp" : "mở"}</span>}
-                          <span className="block truncate text-[var(--text)]">{s.hostId ? nameOf(s.hostId) : <span className="text-red-300 font-bold">thiếu host</span>}</span>
-                          <span className="block truncate text-[var(--text-muted)]">{s.coHostId ? nameOf(s.coHostId) : s.noAssistant ? <span className="text-[var(--text-faint)]">No Asst</span> : <span className="text-amber-300">{s.kind === "open" && s.hostId ? "cần trợ · chưa công bố" : "thiếu trợ"}</span>}</span>
-                          {s.kind === "open" && (() => {
-                            const nCo = s.registrants.filter((id) => roleOf?.(id) === "Assistant").length;
-                            const nHost = s.registrants.length - nCo;
-                            return <span className={`block text-2xs ${s.registrants.length > 0 ? "text-emerald-300" : "text-[var(--text-faint)]"}`}>ĐK: {nHost} host · {nCo} trợ</span>;
-                          })()}
+                          <span className="grid grid-cols-2 items-center gap-1">
+                            {s.hostId ? <PersonPill name={nameOf(s.hostId)} color={colorOf?.(s.hostId)} /> : <span className="block whitespace-nowrap truncate rounded-full border border-red-400/70 px-1 py-0.5 text-center text-2xs font-bold tracking-tight text-red-300">THIẾU HOST</span>}
+                            {s.coHostId ? (
+                              <PersonPill name={nameOf(s.coHostId)} color={colorOf?.(s.coHostId)} />
+                            ) : s.noAssistant ? (
+                              <PersonPill name="No Ass" color={NO_ASSISTANT_COLOR} />
+                            ) : (
+                              <span className="block whitespace-nowrap truncate rounded-full border border-dashed border-amber-400/70 px-1 py-0.5 text-center text-2xs font-bold tracking-tight text-amber-300">{s.kind === "open" && s.hostId ? "CẦN TRỢ" : "THIẾU TRỢ"}</span>
+                            )}
+                          </span>
                         </button>
                       );
                     })}

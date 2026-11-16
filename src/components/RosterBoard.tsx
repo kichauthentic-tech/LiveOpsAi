@@ -44,6 +44,7 @@ import { monthStatus } from "../lib/roster/monthStatus";
 import { OpenMonthWizard } from "./roster/OpenMonthWizard";
 import { BrandScheduleExportDialog } from "./roster/BrandScheduleExportDialog";
 import { MonthPlanPanel } from "./roster/MonthPlanPanel";
+import { buildPersonColors } from "../lib/roster/personColor";
 import { WorkloadTable } from "./roster/WorkloadTable";
 import { MonthReviewPanel } from "./roster/MonthReviewPanel";
 import { DEFAULT_BOUNDS, GOALS, GOAL_HINT, GOAL_LABEL, applyPlanRows, buildHostChannelGmv, buildHostPerformance, daysInMonth, planMonth, releaseAutoFilled, releaseRoleViolations, type AutoFill, type MonthBounds, type PlanGoal } from "../lib/roster/monthPlanner";
@@ -285,6 +286,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
     () => buildRosterShifts(p.sessions, p.shiftSlots, drafts, p.shiftRegistrations, addDays(weekStart, -7), addDays(weekEnd, 1)),
     [p.sessions, p.shiftSlots, drafts, p.shiftRegistrations, weekStart, weekEnd]
   );
+  const personColors = useMemo(() => buildPersonColors(p.talents), [p.talents]);
   const inferredRoles = useMemo(() => inferRoleRows(p.sessions), [p.sessions]);
   const brandRules = useMemo(
     () => ((p.talentRules?.length ?? 0) > 0 || (p.talentBrandRoles?.length ?? 0) > 0 || inferredRoles.length > 0 ? buildBrandRuleIndex(p.talentRules ?? [], (id) => p.brands.find((b) => b.id === id)?.name ?? "brand", p.talentBrandRoles ?? [], inferredRoles) : undefined),
@@ -1010,15 +1012,16 @@ export const RosterBoard: React.FC<Props> = (p) => {
             </div>
             {!monthWeeks.some((w) => w.start === weekStart) && <span className="text-amber-300">Tuần {dayLabel(weekStart)} – {dayLabel(weekEnd)} không thuộc tháng này — chọn một tuần.</span>}
           </div>
-          <WeekGrid weekStart={weekStart} month={viewMonth} channels={channels} shifts={wk} analysis={analysis} nameOf={nameOf} roleOf={(id) => talentById.get(id)?.role} selectedKey={selectedKey} canAdd={!readOnly} onSelect={setSelectedKey} onAdd={addShift} channelMeta={channelMeta} />
+          <WeekGrid weekStart={weekStart} month={viewMonth} channels={channels} shifts={wk} analysis={analysis} nameOf={nameOf} roleOf={(id) => talentById.get(id)?.role} colorOf={(id) => personColors.get(id)} selectedKey={selectedKey} canAdd={!readOnly} onSelect={setSelectedKey} onAdd={addShift} channelMeta={channelMeta} />
         </div>
-        <section className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 space-y-2" aria-label="Khối lượng nhân sự">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <details className="group bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 space-y-2" aria-label="Khối lượng nhân sự">
+          {/* Gập mặc định (trainer: Điều Phối rối mắt) — chỉ mở khi cần cân giờ. */}
+          <summary className="flex cursor-pointer list-none flex-wrap items-baseline justify-between gap-2">
             <h2 className="text-sm font-black text-[var(--text)]">Khối lượng nhân sự · {planScopeLabel}</h2>
             <span className="text-2xs text-[var(--text-muted)]">
-              {workload.totals.below} dưới tối thiểu · {workload.totals.over} vượt tối đa · tính theo ca đã lên lịch + nháp hiện có
+              {workload.totals.below} dưới tối thiểu · {workload.totals.over} vượt tối đa · bấm để xem
             </span>
-          </div>
+          </summary>
           <p className="text-2xs text-[var(--text-muted)]">
             Đậm = đã lên lịch · nhạt = nháp · vạch đứng = giờ tối thiểu
             <InfoDot label="Chú giải thanh giờ">Nháp là ca chưa công bố. Vạch đứng là giờ tối thiểu (đảm bảo thu nhập), cuối thanh là giờ tối đa.</InfoDot>
@@ -1036,7 +1039,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
               );
             })}
           </div>
-        </section>
+        </details>
         <aside className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 space-y-2" aria-label="Việc cần làm">
           <h2 className="flex items-baseline justify-between gap-2 text-sm font-black text-[var(--text)]">
             Việc cần làm
