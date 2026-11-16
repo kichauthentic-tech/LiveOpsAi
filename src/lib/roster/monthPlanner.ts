@@ -193,6 +193,7 @@ export interface UnfilledSpot {
 export type LoadStatus = "below" | "ok" | "over" | "idle";
 export interface PersonLoad {
   talentId: string;
+  /** Vai ĐỨNG THẬT trong ca của dòng này (không phải vai chính hồ sơ): người vừa host vừa trợ có MỘT dòng cho mỗi vai, giờ tách riêng. */
   role: RosterRole;
   /** Giờ trong tháng đã có từ trước (ca đã lên lịch + nháp). */
   fixedHours: number;
@@ -420,25 +421,30 @@ export function planMonth(input: PlanInput): MonthPlan {
   // ---- báo cáo khối lượng ----
   const planned = assignments.filter((a) => a.source === "plan");
   const shiftByKey = new Map(shifts.map((s) => [s.key, s]));
+  // Mỗi (người, vai đứng thật) một dòng: người host brand này, trợ brand kia có giờ ở CẢ HAI bảng, mỗi bảng chỉ giờ của vai đó.
+  // Tối thiểu chỉ áp cho vai chính hồ sơ (đảm bảo thu nhập); tối đa theo ngưỡng của chính vai đó. Số "đăng ký" chỉ gắn vào dòng vai chính.
   const load = new Map<string, PersonLoad>();
-  const ensure = (id: string): PersonLoad | null => {
+  const ensure = (id: string, role: RosterRole): PersonLoad | null => {
     const t = talentById.get(id);
     if (!t) return null;
-    let l = load.get(id);
+    const key = `${id}|${role}`;
+    let l = load.get(key);
     if (!l) {
-      const b = bounds.get(id)!;
-      l = { talentId: id, role: primaryRole(t), fixedHours: 0, draftHours: 0, plannedHours: 0, hours: 0, min: b.min, max: b.max, shifts: 0, registered: registeredIn.get(id) ?? 0, cost: 0, costMissing: false, perf: perf.get(id), status: "ok" };
-      load.set(id, l);
+      const main = primaryRole(t) === role;
+      const own = personBounds(t, { host: input.bounds.host, co_host: input.bounds.co_host }, rules, month);
+      const b = main ? { min: own.min * minScale, max: own.max } : { min: 0, max: Math.min(input.bounds[role].max, Math.round((rules.maxWeekHours * daysInMonth(month)) / 7)) };
+      l = { talentId: id, role, fixedHours: 0, draftHours: 0, plannedHours: 0, hours: 0, min: b.min, max: b.max, shifts: 0, registered: main ? registeredIn.get(id) ?? 0 : 0, cost: 0, costMissing: false, perf: role === "host" ? perf.get(id) : undefined, status: "ok" };
+      load.set(key, l);
     }
     return l;
   };
   // Giờ cố định = mọi ca không phải gợi ý của bộ xếp (ca đã lên lịch + nháp) trong tháng.
   const plannedKeys = new Set(planned.map((a) => `${a.shiftKey}|${a.role}|${a.talentId}`));
   for (const [id, list] of personEntries(shifts)) {
-    const l = ensure(id);
-    if (!l) continue;
     for (const e of list) {
       if (!inMonth(e.shift.date, month) || e.shift.date > loadTo || plannedKeys.has(`${e.shift.key}|${e.role}|${id}`)) continue;
+      const l = ensure(id, e.role);
+      if (!l) continue;
       const h = e.minutes / 60;
       l.fixedHours += h;
       if (e.shift.kind === "open") l.draftHours += h;
@@ -449,7 +455,7 @@ export function planMonth(input: PlanInput): MonthPlan {
     }
   }
   for (const a of planned) {
-    const l = ensure(a.talentId);
+    const l = ensure(a.talentId, a.role);
     const s = shiftByKey.get(a.shiftKey);
     if (!l || !s || s.date > loadTo) continue;
     const h = shiftHours(s);
@@ -459,8 +465,8 @@ export function planMonth(input: PlanInput): MonthPlan {
     l.cost += c.missing ? 0 : c.amount;
     l.costMissing = l.costMissing || c.missing;
   }
-  // Người đã đăng ký mà chưa có giờ nào cũng phải hiện (đang dưới tối thiểu).
-  for (const t of talents) if ((t.role === "Host" || t.role === "Assistant") && (registeredIn.get(t.id) ?? 0) > 0) ensure(t.id);
+  // Người đã đăng ký mà chưa có giờ nào cũng phải hiện (ở vai chính, đang dưới tối thiểu).
+  for (const t of talents) if ((t.role === "Host" || t.role === "Assistant") && (registeredIn.get(t.id) ?? 0) > 0) ensure(t.id, primaryRole(t));
   for (const l of load.values()) {
     l.hours = l.fixedHours + l.plannedHours;
     l.status = l.hours > l.max + 1e-6 ? "over" : l.hours < l.min - 1e-6 ? (l.registered > 0 || l.hours > 0 ? "below" : "idle") : "ok";

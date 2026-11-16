@@ -76,7 +76,7 @@ describe("planMonth", () => {
     const bounds = { host: { min: 6, max: 12 }, co_host: { min: 6, max: 12 } };
     const off = run({ slots, talents, regs, goal: "cost", bounds, guaranteeMin: false });
     const on = run({ slots, talents, regs, goal: "cost", bounds, guaranteeMin: true });
-    const h = (p: typeof on, id: string) => p.load.find((l) => l.talentId === id)?.hours ?? 0;
+    const h = (p: typeof on, id: string) => p.load.filter((l) => l.talentId === id).reduce((n, l) => n + l.hours, 0); // người có thể có 2 dòng (host + trợ)
     expect(h(on, "ít")).toBeGreaterThanOrEqual(6);
     expect(h(on, "ít")).toBeGreaterThanOrEqual(h(off, "ít"));
     expect(on.totals.below).toBeLessThanOrEqual(off.totals.below);
@@ -198,5 +198,28 @@ describe("gỡ nháp sai vai để xếp lại", () => {
     expect(s1.hostId).toBeUndefined();
     expect(s1.coHostId).toBeUndefined();
     expect(out.find((s) => s.slotId === "s2")!.hostId).toBe("host-brand");
+  });
+});
+
+describe("khối lượng tách giờ host / giờ trợ", () => {
+  test("người host ca này, trợ ca kia có giờ ở cả hai vai, không phụ thuộc vai chính hồ sơ", () => {
+    const talents = [tal("a", "Host", 200000), tal("b", "Host", 200000)];
+    const slots = [slot("s1", day(2), "19:00", "22:00"), slot("s2", day(3), "19:00", "21:00")];
+    const drafts = [
+      { slotId: "s1", hostId: "a", coHostId: "b" },
+      { slotId: "s2", hostId: "b", coHostId: "a" }
+    ];
+    const shifts = R.buildRosterShifts([] as LiveSession[], slots, drafts as never, [], "2026-10-25", "2026-12-07");
+    const plan = P.planMonth({ shifts, month: MONTH, today: "2026-10-30", goal: "balance", bounds: { host: { min: 1, max: 99 }, co_host: { min: 1, max: 99 } }, guaranteeMin: false, rules: R.DEFAULT_ROSTER_RULES, talents, history: [], fam: new Map(), perf: new Map(), reportOnly: true });
+    const rows = plan.load.filter((l) => l.talentId === "a");
+    const host = rows.find((l) => l.role === "host")!;
+    const asst = rows.find((l) => l.role === "co_host")!;
+    expect(rows).toHaveLength(2); // MỘT dòng cho mỗi vai đứng thật
+    expect(host.hours).toBeCloseTo(3);
+    expect(asst.hours).toBeCloseTo(2);
+    expect(host.shifts).toBe(1);
+    expect(asst.shifts).toBe(1);
+    expect(host.min).toBeGreaterThan(0); // vai chính (Host) giữ tối thiểu
+    expect(asst.min).toBe(0); // vai phụ không bị báo dưới tối thiểu
   });
 });
