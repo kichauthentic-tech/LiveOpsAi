@@ -179,3 +179,24 @@ describe("vai được xếp theo brand (0221)", () => {
     expect(at("co_host")).toBe("trợ-brand");
   });
 });
+
+describe("gỡ nháp sai vai để xếp lại", () => {
+  test("nháp (kể cả xếp tay) có người sai vai bị gỡ; người đúng vai và ca không nháp giữ nguyên", () => {
+    const slots = [slot("s1", day(2)), slot("s2", day(3))];
+    const drafts = [
+      { slotId: "s1", hostId: "trợ-brand", coHostId: "host-brand" }, // cả hai đều sai vai
+      { slotId: "s2", hostId: "host-brand", coHostId: "trợ-brand" } // đúng vai
+    ];
+    const shifts = R.buildRosterShifts([] as LiveSession[], slots, drafts as never, [], "2026-10-25", "2026-12-07");
+    const brandRules = R.buildBrandRuleIndex([], (id) => id, [
+      { brandId: "crocs", talentId: "trợ-brand", role: "assistant", platform: "TikTok" },
+      { brandId: "crocs", talentId: "host-brand", role: "host", platform: "TikTok" }
+    ]);
+    const { shifts: out, released } = P.releaseRoleViolations(shifts, brandRules);
+    expect(released.map((r) => `${r.slotId}:${r.role}:${r.talentId}`).sort()).toEqual(["s1:co_host:host-brand", "s1:host:trợ-brand"]);
+    const s1 = out.find((s) => s.slotId === "s1")!;
+    expect(s1.hostId).toBeUndefined();
+    expect(s1.coHostId).toBeUndefined();
+    expect(out.find((s) => s.slotId === "s2")!.hostId).toBe("host-brand");
+  });
+});

@@ -578,6 +578,33 @@ export function releaseAutoFilled(shifts: readonly RosterShift[], auto: AutoFill
   });
 }
 
+/**
+ * Gỡ khỏi NHÁP (ca mở, trong `range`) người đang đứng SAI VAI theo luật vai-theo-kênh (cài tay hoặc tự suy từ lịch sử), kể cả ô do Trainer xếp tay
+ * hoặc nháp cũ chưa có dấu "tự fill" — để bấm Tự fill là xếp lại được. Ca đã lên lịch thật không đụng. Trả thêm danh sách ô bị gỡ.
+ */
+export function releaseRoleViolations(
+  shifts: readonly RosterShift[],
+  brandRules: BrandRuleIndex | undefined,
+  range?: { from: string; to: string }
+): { shifts: RosterShift[]; released: { slotId: string; role: RosterRole; talentId: string }[] } {
+  const released: { slotId: string; role: RosterRole; talentId: string }[] = [];
+  if (!brandRules) return { shifts: shifts as RosterShift[], released };
+  const out = shifts.map((s) => {
+    if (s.kind !== "open" || !s.slotId || !s.drafted || (range && (s.date < range.from || s.date > range.to))) return s as RosterShift;
+    let { hostId, coHostId } = s;
+    if (hostId && brandRuleViolation(brandRules, s.brandId, hostId, "host", s.platform)?.code === "brand_role") {
+      released.push({ slotId: s.slotId, role: "host", talentId: hostId });
+      hostId = undefined;
+    }
+    if (coHostId && brandRuleViolation(brandRules, s.brandId, coHostId, "co_host", s.platform)?.code === "brand_role") {
+      released.push({ slotId: s.slotId, role: "co_host", talentId: coHostId });
+      coHostId = undefined;
+    }
+    return hostId === s.hostId && coHostId === s.coHostId ? s : { ...s, hostId, coHostId, drafted: !!(hostId || coHostId) };
+  });
+  return { shifts: out, released };
+}
+
 /** Các dòng nháp cần ghi + bản ghi "đã tự fill" mới sau khi xếp. Ô đã từng tự fill mà lần này không ai đủ điều kiện ⇒ dòng rỗng (xoá nháp). */
 export function applyPlanRows(
   plan: MonthPlan,

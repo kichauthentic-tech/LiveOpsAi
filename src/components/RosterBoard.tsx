@@ -46,7 +46,7 @@ import { BrandScheduleExportDialog } from "./roster/BrandScheduleExportDialog";
 import { MonthPlanPanel } from "./roster/MonthPlanPanel";
 import { WorkloadTable } from "./roster/WorkloadTable";
 import { MonthReviewPanel } from "./roster/MonthReviewPanel";
-import { DEFAULT_BOUNDS, GOALS, GOAL_HINT, GOAL_LABEL, applyPlanRows, buildHostChannelGmv, buildHostPerformance, daysInMonth, planMonth, releaseAutoFilled, type AutoFill, type MonthBounds, type PlanGoal } from "../lib/roster/monthPlanner";
+import { DEFAULT_BOUNDS, GOALS, GOAL_HINT, GOAL_LABEL, applyPlanRows, buildHostChannelGmv, buildHostPerformance, daysInMonth, planMonth, releaseAutoFilled, releaseRoleViolations, type AutoFill, type MonthBounds, type PlanGoal } from "../lib/roster/monthPlanner";
 import { platformOf } from "../lib/reportPlatform";
 import type { EngineParams } from "../lib/scheduling/engineParams";
 import type { ReportPlatform } from "../lib/reportPlatform";
@@ -607,9 +607,17 @@ export const RosterBoard: React.FC<Props> = (p) => {
         /* chỉ là tiện ích */
       }
       const monthEnd = `${viewMonth}-${String(daysInMonth(viewMonth)).padStart(2, "0")}`;
-      const freed = releaseAutoFilled(buildRosterShifts(p.sessions, p.shiftSlots, drafts, p.shiftRegistrations, addDays(`${viewMonth}-01`, -7), addDays(monthEnd, 7)), auto, planRange);
+      const freed0 = releaseAutoFilled(buildRosterShifts(p.sessions, p.shiftSlots, drafts, p.shiftRegistrations, addDays(`${viewMonth}-01`, -7), addDays(monthEnd, 7)), auto, planRange);
+      // Nháp đang đứng sai vai (theo cài đặt vai hoặc tự suy từ lịch sử) cũng được gỡ để xếp lại, kể cả ô xếp tay / nháp cũ.
+      const { shifts: freed, released: wrongRole } = releaseRoleViolations(freed0, brandRules, planRange);
       const plan = planMonth({ shifts: freed, month: viewMonth, today, goal: g, bounds, guaranteeMin: true, rules, talents: p.talents, history: p.talentRateHistory, fam, perf: buildHostPerformance(p.sessions, today), brandRules, range: planRange, minScale: planMinScale });
       const { rows, nextAuto } = applyPlanRows(plan, freed, auto, planRange);
+      // Ô bị gỡ vì sai vai mà lần này không ai lấp được ⇒ vẫn phải ghi dòng rỗng để xoá nháp cũ.
+      for (const w of wrongRole) {
+        if (rows.some((r) => r.slotId === w.slotId)) continue;
+        const sh = freed.find((x) => x.slotId === w.slotId);
+        if (sh) rows.push({ slotId: w.slotId, hostId: sh.hostId, coHostId: sh.coHostId, noAssistant: sh.noAssistant });
+      }
       if (plan.totals.openShifts === 0) {
         setPlanNote(`Chưa có ca mở nào trong ${planScopeLabel}. Mở lịch ở "Mở lịch tháng sau" trước.`);
         return;
@@ -620,7 +628,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
       }
       persistAuto(nextAuto);
       const empty = plan.unfilled.filter((u) => u.reason === "no_registrant").length;
-      setPlanNote(`${GOAL_LABEL[g]} · ${planScopeLabel}: lấp ${plan.totals.plannedCount} chỗ vào nháp, còn ${plan.unfilled.length} chỗ trống${empty ? ` (${empty} chỗ chưa ai đăng ký)` : ""}. Nháp, talent chưa thấy.`);
+      setPlanNote(`${GOAL_LABEL[g]} · ${planScopeLabel}: lấp ${plan.totals.plannedCount} chỗ vào nháp, còn ${plan.unfilled.length} chỗ trống${empty ? ` (${empty} chỗ chưa ai đăng ký)` : ""}.${wrongRole.length ? ` Đã gỡ ${wrongRole.length} ô đang sai vai (${[...new Set(wrongRole.map((w) => nameOf(w.talentId)))].slice(0, 4).join(", ")}${new Set(wrongRole.map((w) => w.talentId)).size > 4 ? "…" : ""}) để xếp lại.` : ""} Nháp, talent chưa thấy.`);
     });
   // Tuần (Thứ 2) có nháp trong phạm vi đang chọn. Tuần nằm vắt qua ngày 15/cuối tháng được công bố TRỌN tuần (RPC công bố theo tuần).
   const rangeWeeks = useMemo(() => {
