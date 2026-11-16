@@ -6689,3 +6689,33 @@ dự báo, kênh nhỏ ±45%; "Kịch bản brand" = dòng điều chỉnh có l
 +19% so Q3), chấm FVA sau tháng; target ca kèm dải p10–p90, đạt/hụt chấm theo ngày/tuần/đợt; ghi cả v3 + bộ xếp ca vào sổ, đổi mô hình khi
 hơn ≥ 2 điểm ngoài mẫu (T11–T12); ca xong > 2 ngày chưa số vào "Cần xử lý" (bán 0 / chưa nhập). Nguồn: Fildes et al. 2009 (IJF 25(1)):
 điều chỉnh tay lớn + có lý do giúp, điều chỉnh tăng hay sai chiều.
+
+
+## Đề xuất đơn giản hoá toàn app (2026-11-15)
+
+User: "audit toàn bộ… đề xuất tối ưu, đơn giản hoá, ai cũng dùng được"; uỷ quyền tự làm, chỉ là đề xuất. Trang: https://claude.ai/artifact/9DtpgmXouc7LWxvERRDthh.
+KHÔNG sửa code. Script chỉ-đọc: `scratchpad/audit_simplify_{1..5}.cjs` (DB), `audit_simplify_static.cjs` (cây component), đo màn bằng script trong trang
+(admin, 1440×900, pushState + popstate).
+
+**Đo DB 15/11:** profiles: talent 46, admin 2, operations 2 (1 là "Test 1"), ceo 1, brand 1 (tài khoản thử), trainer 0. Lượt mở tuần 09–15/11: talent
+1.395 (36 người), admin 788, operations 47, brand 4, ceo 0 — talent bắt đầu dùng thật từ 09/11. `session_availability` 3.137 dòng / 34 người (09–15/11);
+480 ca có đăng ký, 383 ca ≥5 người. File giao ca 01–15/11: admin 181 (trễ trung vị 70'; ≤15' 56, 15–60' 36, 1–4h 34, 4–12h 40, >12h 18), talent 26
+(6 người, trung vị 8', 0 ca >60'); admin ~13 lần/ngày; 239/252 ca có trợ đã có tài khoản; 96/252 ca nối ngay sau ca trước. Cuối 15/11: 33 ca qua giờ
+chưa số (6 không trợ). Thông báo 30 ngày 2.394, đọc 152 (shift_assigned 1.031/67, shift_open 604/34, handover_due 330/16); tuần 09–15/11 trung vị 16
+tin/người, max 66. Dữ Liệu Gốc T10: 44 file / 20 loại / 5 ngày; 14/14 lô đối soát do admin. Report: 16 bản chụp, 1 phát hành. Bảng 0 dòng:
+`tiktok_shop_connections`, `equipments`, `brand_bulletins`, `session_finance`, `roster_months`, `roster_weeks`, `brand_talent_rules`,
+`recurring_shift_templates`, `brand_inhouse_rooms`; `brand_contracts` 1, `promo_schemes` 1, `shift_swap_requests` 5 (đều cancelled).
+
+**Đo màn (số chữ / màn hình cuộn / nút):** Sổ Ca 3.670/12,8/21 · Leader Board 1.805/6,4/19 · Dashboard brand 1.709/6,1/25 · Bảng Vận Hành
+1.305/4,4/74 (56 loại; ca hôm nay vẽ 2 lần, việc cần làm 2 khối) · Talent Pool 866/4,2/61 · AI Training 1.414/3,8/63 (58 ô) · SKU 1.009/3,5/205 ·
+Điều Phối 1.267/3,2/162 (97 loại) · Kế Hoạch Tháng 557/2,2/180. Code: 421 file, 96.949 dòng; 32 cây màn = 1.101 onClick, 455 ô nhập.
+
+**Đề xuất:** menu 19+11 → Hôm nay · Lịch · Lập tháng · Kết quả · Chốt tháng + Thiết lập; brand = bộ lọc. Đợt 0 dọn nợ (commit, 0207/0218/0219,
+rút WORKSPACE) · Đợt 1 hàng đợi "ca chưa số" theo trợ + nạp bù cả ngày 1 file/kênh (dùng bộ khớp Đối soát; ca nối = ước tính) + gộp thông báo ·
+Đợt 2 Chốt tháng một bảng (File → Đối soát → Report → Lương & lãi), thả nhiều file tự nhận loại (TikTok chưa có, Shopee có `detectShopeeShopKind`/
+`detectShopeeAdsKind`), nút Chốt tháng thay Phát hành, gộp Kế Toán + Finance · Đợt 3 Hôm nay (1 danh sách ca, 1 hàng đợi, 3 trạng thái số) ·
+Đợt 4 menu + 1 Lịch (Sổ Ca = Danh sách) + ẩn mục 0 dữ liệu + 4 vai · Đợt 5 Lập tháng một đường 4 bước, 3 số đầu trang, mặc định Tự xếp ·
+Đợt 6 Kết quả (giờ giao/cam kết · GMV/target · lãi gộp một bảng), Host, Engine gập, dọn code.
+
+**6 quyết định chờ user:** gom menu 5 chỗ; bỏ workspace brand; ẩn mục 0 dữ liệu; gộp Trainer vào Vận hành; thông báo tin tổng; nạp bù 1 file/ngày.
+**Giữ nguyên:** app talent + tab Đăng ký, giao ca TikTok bằng file 3 bước, Report Tháng, đối soát bản 2, OP giữ cửa chốt người/mở/huỷ/dời ca.

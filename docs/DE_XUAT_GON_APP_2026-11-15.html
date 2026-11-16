@@ -1,0 +1,455 @@
+<title>LiveOps gọn</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Bố cục: một cột đọc ~880px; mỗi phát hiện = một hình + một câu trả lời + một dòng đề xuất; chi tiết nằm trong ngăn gập. */
+:root{
+  --bg:#f5f5f3; --card:#ffffff; --raised:#f1f1ee; --line:#dedfe3;
+  --fg:#17171a; --muted:#4a4a52; --faint:#5e5e66;
+  --accent:#1f4fd1; --accent-soft:#e6ecfb; --ok:#0f7b4f; --ok-soft:#e2f3ea; --warn:#b45309; --warn-soft:#fbefdc; --bad:#c42630; --bad-soft:#fbe6e7;
+  --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0b0b0d; --card:#141417; --raised:#1d1d22; --line:#2a2a30;
+  --fg:#f2f2f4; --muted:#b4b4bd; --faint:#93939c;
+  --accent:#f2c94c; --accent-soft:#2b2512; --ok:#6fcf97; --ok-soft:#14261c; --warn:#f2c94c; --warn-soft:#2b2512; --bad:#eb6b6b; --bad-soft:#2c1717; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#0b0b0d; --card:#141417; --raised:#1d1d22; --line:#2a2a30;
+  --fg:#f2f2f4; --muted:#b4b4bd; --faint:#93939c;
+  --accent:#f2c94c; --accent-soft:#2b2512; --ok:#6fcf97; --ok-soft:#14261c; --warn:#f2c94c; --warn-soft:#2b2512; --bad:#eb6b6b; --bad-soft:#2c1717; color-scheme:dark }
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--font);font-size:15px;line-height:1.55;padding-block:28px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));font-variant-numeric:tabular-nums}
+.wrap{max-width:880px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+h1{font-size:30px;line-height:1.15;margin:0;letter-spacing:-.01em;text-wrap:balance}
+h2{font-size:21px;margin:26px 0 0;line-height:1.25;text-wrap:balance}
+h3{font-size:16px;margin:0;line-height:1.3}
+p{margin:0}
+.lead{font-size:17px;color:var(--muted);max-width:62ch}
+.meta{font-size:13px;color:var(--faint)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;min-width:0}
+.kpi b{display:block;font-size:30px;line-height:1.1;letter-spacing:-.02em}
+.kpi span{font-size:13px;color:var(--muted)}
+.ans{font-weight:700;font-size:16px}
+.to{color:var(--accent);font-weight:600}
+.to::before{content:"→ "}
+.bars{display:flex;flex-direction:column;gap:7px}
+.bar{display:grid;grid-template-columns:150px 1fr 96px;gap:10px;align-items:center;font-size:13px}
+.bar .t{height:16px;background:var(--raised);border-radius:5px;overflow:hidden}
+.bar .t i{display:block;height:100%;background:var(--accent);border-radius:5px}
+.bar .t i.bad{background:var(--bad)} .bar .t i.ok{background:var(--ok)} .bar .t i.gr{background:var(--faint)}
+.bar .v{text-align:right;color:var(--muted)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.pill{display:inline-block;font-size:12px;font-weight:600;padding:2px 9px;border-radius:999px;background:var(--raised);color:var(--muted);white-space:nowrap}
+.pill.ok{background:var(--ok-soft);color:var(--ok)} .pill.bad{background:var(--bad-soft);color:var(--bad)} .pill.warn{background:var(--warn-soft);color:var(--warn)} .pill.ac{background:var(--accent-soft);color:var(--accent)}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-weight:600;color:var(--faint);font-size:12px}
+td.n,th.n{text-align:right;white-space:nowrap}
+details{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:0 18px}
+details>summary{cursor:pointer;padding:14px 0;font-weight:600;list-style:none;display:flex;justify-content:space-between;gap:12px}
+details>summary::after{content:"mở";font-weight:500;font-size:12px;color:var(--faint)}
+details[open]>summary::after{content:"đóng"}
+details>div{padding:0 0 16px;display:flex;flex-direction:column;gap:10px;font-size:14px;color:var(--muted)}
+summary:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+.menu{display:grid;grid-template-columns:1fr 28px 1fr;gap:10px;align-items:start}
+.menu .col{background:var(--raised);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:5px;min-width:0}
+.menu .col h4{margin:0 0 4px;font-size:12px;color:var(--faint);font-weight:600}
+.mi{font-size:13px;padding:5px 9px;border-radius:8px;background:var(--card);border:1px solid var(--line)}
+.mi small{color:var(--faint);display:block;font-size:11.5px;line-height:1.35}
+.mi.on{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
+.mi.off{opacity:.55;text-decoration:line-through}
+.arrow{align-self:center;text-align:center;color:var(--faint);font-size:20px}
+.wave{display:grid;grid-template-columns:86px 1fr;gap:14px}
+.wave .no{font-size:13px;font-weight:700;color:var(--accent)}
+.wave .no small{display:block;font-weight:500;color:var(--faint);font-size:12px;margin-top:2px}
+.todo{display:flex;flex-direction:column;gap:9px}
+.todo li{margin-left:18px}
+.ba{display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px}
+.ba div{background:var(--raised);border-radius:10px;padding:9px 11px}
+.ba div b{display:block;font-size:11.5px;color:var(--faint);font-weight:600}
+.mock{border:1px solid var(--line);border-radius:12px;background:var(--bg);padding:12px;display:flex;flex-direction:column;gap:8px;font-size:13px}
+.mock .row{display:grid;grid-template-columns:92px 1fr auto auto;gap:10px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:9px;padding:7px 10px}
+.mock .row span.m{color:var(--muted)}
+.mock .hd{display:flex;justify-content:space-between;align-items:center;font-weight:700}
+.btn{font-size:12px;font-weight:700;padding:5px 10px;border-radius:8px;background:var(--accent);color:var(--card);white-space:nowrap}
+.btn.ghost{background:var(--raised);color:var(--fg)}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.steps div{background:var(--card);border:1px solid var(--line);border-radius:9px;padding:8px 10px;font-size:12.5px}
+.steps div b{display:block}
+.grid4{display:grid;grid-template-columns:1.3fr repeat(4,1fr);gap:6px;font-size:12.5px;align-items:center}
+.grid4 .h{color:var(--faint);font-weight:600;font-size:11.5px}
+.dec{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.dec .card{gap:8px}
+.dec .q{font-weight:700}
+.rec{font-size:13px;color:var(--ok);font-weight:600}
+ul{margin:0;padding:0}
+a{color:var(--accent)}
+@media (max-width:640px){
+  h1{font-size:24px} .kpis,.two,.dec{grid-template-columns:1fr} .menu{grid-template-columns:1fr} .arrow{transform:rotate(90deg)}
+  .bar{grid-template-columns:104px 1fr 78px} .wave{grid-template-columns:1fr} .steps{grid-template-columns:1fr 1fr} .ba{grid-template-columns:1fr}
+  .mock .row{grid-template-columns:76px 1fr auto}.mock .row .x{display:none}
+}
+</style>
+
+<div class="wrap">
+
+<header style="display:flex;flex-direction:column;gap:10px">
+  <span class="meta">Đề xuất · đo trên app và dữ liệu thật ngày 15/11/2026 · chưa sửa dòng code nào</span>
+  <h1>App không thiếu tính năng. App có quá nhiều chỗ, và một người đang gánh gần hết.</h1>
+  <p class="lead">Mỗi màn riêng lẻ đã được gọt nhiều lần. Phần còn phức tạp nằm ở cấu trúc: việc nằm rải ở hơn 30 màn, và gần như mọi thao tác đều dồn về một tài khoản admin. Đề xuất này gom app về 5 chỗ làm việc và đẩy từng việc về đúng người làm.</p>
+</header>
+
+<div class="kpis">
+  <div class="kpi"><b>87%</b><span>file giao ca tháng 11 do admin tự tải (181/207), trễ trung vị 70 phút. Trợ live tự tải: 8 phút.</span></div>
+  <div class="kpi"><b>30 mục</b><span>trên menu của admin (19 mục Agency + 11 mục cho mỗi brand), khoảng 1.100 nút bấm trong code.</span></div>
+  <div class="kpi"><b>6%</b><span>thông báo được mở đọc: 152 trên 2.394 tin trong 30 ngày.</span></div>
+</div>
+
+<h2>Phần 1. Đo được gì</h2>
+
+<section class="card">
+  <h3>1. Ai đang thật sự dùng app</h3>
+  <div class="bars">
+    <div class="bar"><span>Host / trợ live</span><div class="t"><i class="ok" style="width:100%"></i></div><span class="v">1.395 lượt · 36 người</span></div>
+    <div class="bar"><span>Admin</span><div class="t"><i style="width:56%"></i></div><span class="v">788 lượt · 2 người</span></div>
+    <div class="bar"><span>Vận hành (OP)</span><div class="t"><i class="gr" style="width:3.4%"></i></div><span class="v">47 lượt · 2 người</span></div>
+    <div class="bar"><span>Brand</span><div class="t"><i class="gr" style="width:.5%"></i></div><span class="v">4 lượt · 1 người</span></div>
+    <div class="bar"><span>CEO, Trainer</span><div class="t"></div><span class="v">0 lượt</span></div>
+  </div>
+  <p class="meta">Lượt mở màn tuần 09–15/11. Không có tài khoản Trainer nào; tài khoản brand duy nhất là tài khoản thử.</p>
+  <p class="ans">App talent chỉ có 4 tab, và 36/46 người đã dùng ngay tuần đầu (3.137 lượt đăng ký ca tháng 12). Phía quản lý có 30 mục thì chỉ một người dùng nổi.</p>
+  <p class="to">Bài học để áp cho cả app: mỗi vai một chỗ làm việc nhỏ, đúng việc của họ.</p>
+</section>
+
+<section class="card">
+  <h3>2. Giao ca: việc lặp nhiều nhất đang nằm sai người</h3>
+  <div class="two">
+    <div>
+      <p class="meta" style="margin-bottom:6px">Admin tải file giao ca sau khi hết ca bao lâu (184 ca, 01–15/11)</p>
+      <div class="bars">
+        <div class="bar"><span>Trong 15 phút</span><div class="t"><i class="ok" style="width:100%"></i></div><span class="v">56 ca</span></div>
+        <div class="bar"><span>15–60 phút</span><div class="t"><i style="width:64%"></i></div><span class="v">36 ca</span></div>
+        <div class="bar"><span>1–4 giờ</span><div class="t"><i class="bad" style="width:61%"></i></div><span class="v">34 ca</span></div>
+        <div class="bar"><span>4–12 giờ</span><div class="t"><i class="bad" style="width:71%"></i></div><span class="v">40 ca</span></div>
+        <div class="bar"><span>Hơn 12 giờ</span><div class="t"><i class="bad" style="width:32%"></i></div><span class="v">18 ca</span></div>
+      </div>
+    </div>
+    <div>
+      <p class="meta" style="margin-bottom:6px">Số lần giao ca mỗi ngày</p>
+      <div class="bars">
+        <div class="bar"><span>Admin</span><div class="t"><i class="bad" style="width:100%"></i></div><span class="v">~13 lần/ngày</span></div>
+        <div class="bar"><span>Trợ live (từ 10/11)</span><div class="t"><i class="ok" style="width:36%"></i></div><span class="v">~5 lần/ngày · 6 người</span></div>
+      </div>
+      <p style="margin-top:10px;font-size:13px;color:var(--muted)">239/252 ca nửa đầu tháng 11 có trợ live đã có tài khoản. Cuối ngày 15/11: 33 ca đã qua giờ chưa có số, 27 ca trong đó có trợ live.</p>
+    </div>
+  </div>
+  <p class="ans">Một nửa số ca admin giao trễ hơn 1 giờ, nên Dashboard và run-rate trong ngày luôn thiếu số. Khi trợ tự giao thì không ca nào trễ quá 60 phút.</p>
+  <p class="to">Hàng đợi "ca chưa có số" xếp theo tên trợ để nhắc người, và cho admin một đường nạp bù cả ngày bằng 1 file mỗi kênh (Đợt 1).</p>
+</section>
+
+<section class="card">
+  <h3>3. Màn nào đang nặng nhất</h3>
+  <div class="scroll"><table>
+    <tr><th>Màn (admin, 1440px)</th><th class="n">Dài</th><th class="n">Số chữ</th><th class="n">Nút bấm</th><th>Điểm nghẽn</th></tr>
+    <tr><td>Sổ Ca</td><td class="n">12,8 màn hình</td><td class="n">3.670</td><td class="n">21</td><td>Một bảng dài, phải cuộn để tìm ca</td></tr>
+    <tr><td>Leader Board</td><td class="n">6,4</td><td class="n">1.805</td><td class="n">19</td><td>Liệt kê từng ca của cả đợt</td></tr>
+    <tr><td>Dashboard brand</td><td class="n">6,1</td><td class="n">1.709</td><td class="n">25</td><td>8 khối, số và phân tích lẫn nhau</td></tr>
+    <tr><td>Bảng Vận Hành</td><td class="n">4,4</td><td class="n">1.305</td><td class="n">74 (56 loại)</td><td>Ca hôm nay hiện 2 lần, việc cần làm hiện 2 lần</td></tr>
+    <tr><td>Talent Pool</td><td class="n">4,2</td><td class="n">866</td><td class="n">61</td><td>52 thẻ người</td></tr>
+    <tr><td>AI Training Center</td><td class="n">3,8</td><td class="n">1.414</td><td class="n">63</td><td>58 ô tham số</td></tr>
+    <tr><td>Sản phẩm lên live</td><td class="n">3,5</td><td class="n">1.009</td><td class="n">205</td><td>3 nút trên mỗi dòng SKU</td></tr>
+    <tr><td>Điều Phối Lịch Live</td><td class="n">3,2</td><td class="n">1.267</td><td class="n">162 (97 loại)</td><td>Lưới + khối lượng + việc cần làm cùng màn</td></tr>
+    <tr><td>Kế Hoạch Tháng</td><td class="n">2,2</td><td class="n">557</td><td class="n">180</td><td>8 con số đầu trang trước khi tới lưới</td></tr>
+  </table></div>
+  <p class="ans">Trên Bảng Vận Hành, 24 ca hôm nay được vẽ hai lần (Bản tin target và Ca hôm nay), còn việc "ca chưa có số" và "trùng người" cũng xuất hiện ở hai khối khác nhau.</p>
+  <p class="to">Một danh sách ca, một hàng đợi việc (Đợt 3).</p>
+</section>
+
+<section class="card">
+  <h3>4. Cùng một ca đang hiện ở 6 màn</h3>
+  <div style="display:flex;flex-wrap:wrap;gap:6px">
+    <span class="pill">Kế Hoạch Tháng (lưới)</span><span class="pill">Điều Phối Lịch Live</span><span class="pill">Bảng Vận Hành</span><span class="pill">Lịch &amp; Studio</span><span class="pill">Lịch Vận Hành (từng brand)</span><span class="pill">Sổ Ca (agency + từng brand)</span>
+  </div>
+  <p class="ans">Sáu màn dùng chung một cửa sổ ca, chỉ khác cách xếp. Người mới không biết sửa ca ở đâu là đúng; người cũ phải nhớ màn nào có nút nào.</p>
+  <p class="to">Còn 3 chỗ theo thời điểm: Lập tháng (trước tháng), Hôm nay (trong ngày), Lịch (tra cứu, có chế độ Danh sách thay Sổ Ca).</p>
+</section>
+
+<section class="card">
+  <h3>5. Có trong menu nhưng không có dữ liệu sau 2 tháng chạy thật</h3>
+  <div class="scroll"><table>
+    <tr><th>Tính năng</th><th class="n">Dữ liệu thật</th><th>Đề xuất</th></tr>
+    <tr><td>TikTok API</td><td class="n">0 kết nối</td><td>Ẩn khỏi menu (anh đã chốt không nối API)</td></tr>
+    <tr><td>Studios &amp; Gear → Thiết bị</td><td class="n">0 thiết bị</td><td>Ẩn tab Thiết bị</td></tr>
+    <tr><td>Phát hành Report cho brand</td><td class="n">1/16 bản chụp</td><td>Gộp vào nút "Chốt tháng"; bản gửi brand là file HTML/PDF</td></tr>
+    <tr><td>Bản tin cho brand</td><td class="n">0 bản tin</td><td>Tạm ẩn tới khi có tài khoản brand thật</td></tr>
+    <tr><td>Finance &amp; P&amp;L (sổ từng ca)</td><td class="n">0 dòng nhập</td><td>Gộp vào Kế Toán thành một trang "Lương &amp; lãi"</td></tr>
+    <tr><td>Hợp đồng</td><td class="n">1/6 kênh</td><td>Giữ, nhưng không để màn khác phụ thuộc</td></tr>
+    <tr><td>Công bố lịch theo tuần</td><td class="n">0 tuần</td><td>Bỏ nhánh tuần, chỉ giữ chốt theo đợt của tháng</td></tr>
+    <tr><td>Luật brand–talent, lịch lặp, phòng brand tự live</td><td class="n">0 dòng</td><td>Ẩn</td></tr>
+    <tr><td>Khuyến mãi trên lịch brand</td><td class="n">1 dòng</td><td>Dùng một nguồn là khung Campaign của Kế Hoạch Tháng</td></tr>
+  </table></div>
+  <p class="ans">Mỗi mục thừa là thêm một lần người dùng phải tự hỏi "cái này có cần bấm không".</p>
+</section>
+
+<section class="card">
+  <h3>6. Cuối tháng: 44 file, 20 loại, chọn tay từng cái</h3>
+  <div class="bars">
+    <div class="bar"><span>Franklin</span><div class="t"><i style="width:100%"></i></div><span class="v">20 file</span></div>
+    <div class="bar"><span>VERA</span><div class="t"><i style="width:60%"></i></div><span class="v">12 file</span></div>
+    <div class="bar"><span>CROCS</span><div class="t"><i style="width:35%"></i></div><span class="v">7 file</span></div>
+    <div class="bar"><span>JOCKEY</span><div class="t"><i style="width:25%"></i></div><span class="v">5 file</span></div>
+  </div>
+  <p class="meta">File tháng 10, tải rải trong 5 ngày (26/10–01/11). Mỗi file: vào brand → chọn sàn → chọn đúng tab loại file → chọn file. 14/14 lô đối soát do admin làm.</p>
+  <p class="ans">App đã tự nhận loại file cho nhóm Shopee cả shop và Shopee Ads, nhưng 8 loại file TikTok thì vẫn phải chọn tab bằng tay.</p>
+  <p class="to">Thả tất cả file của một kênh vào một ô, app tự nhận loại và báo còn thiếu file nào (Đợt 2).</p>
+</section>
+
+<section class="card">
+  <h3>7. Thông báo: gửi nhiều tới mức không ai đọc</h3>
+  <div class="bars">
+    <div class="bar"><span>Được xếp vào ca</span><div class="t"><i class="gr" style="width:100%"></i></div><span class="v">1.031 · đọc 67</span></div>
+    <div class="bar"><span>Có ca mở đăng ký</span><div class="t"><i class="gr" style="width:59%"></i></div><span class="v">604 · đọc 34</span></div>
+    <div class="bar"><span>Nhắc giao ca</span><div class="t"><i class="gr" style="width:32%"></i></div><span class="v">330 · đọc 16</span></div>
+    <div class="bar"><span>Đổi giờ ca</span><div class="t"><i class="gr" style="width:17%"></i></div><span class="v">175 · đọc 6</span></div>
+    <div class="bar"><span>Bị rút khỏi ca</span><div class="t"><i class="gr" style="width:14%"></i></div><span class="v">148 · đọc 14</span></div>
+    <div class="bar"><span>Ca bị huỷ</span><div class="t"><i class="gr" style="width:8%"></i></div><span class="v">82 · đọc 7</span></div>
+  </div>
+  <p class="ans">Tuần 09–15/11 mỗi người nhận trung vị 16 tin, có người 66 tin. Tin quan trọng (đổi giờ, bị rút khỏi ca) chìm trong tin báo từng ca.</p>
+  <p class="to">Một tin tổng cho mỗi lần chốt lịch hoặc mở đăng ký; tin riêng chỉ dành cho thay đổi trong 48 giờ tới (Đợt 1).</p>
+</section>
+
+<section class="card">
+  <h3>8. Logic phía sau cũng đang phình theo từng ngoại lệ</h3>
+  <div class="kpis">
+    <div class="kpi"><b>219</b><span>migration, 325 định nghĩa hàm SQL, 68 trigger</span></div>
+    <div class="kpi"><b>9/25</b><span>migration gần nhất chỉ để xử lý giờ ca và chia GMV ca nối</span></div>
+    <div class="kpi"><b>58</b><span>tham số engine đang phơi ra màn hình</span></div>
+  </div>
+  <p class="ans">Mỗi tình huống lạ (ca nối, room bật trễ, file tải trễ, đổi host giữa ca) đang thành một ô hoặc một dòng cảnh báo thường trực cho mọi người.</p>
+  <p class="to">Luật từ nay: ngoại lệ chỉ đi vào một hàng đợi của người quản lý; màn của trợ và OP không thêm ô mới.</p>
+</section>
+
+<h2>Phần 2. App sau khi gọn: 5 chỗ làm việc</h2>
+
+<section class="card">
+  <div class="menu">
+    <div class="col">
+      <h4>Hiện tại · 19 mục Agency + 11 mục mỗi brand</h4>
+      <div class="mi">Dashboard</div>
+      <div class="mi">Kế Hoạch Tháng · Điều Phối Lịch Live</div>
+      <div class="mi">Bảng Vận Hành · Lịch &amp; Studio · Sổ Ca</div>
+      <div class="mi">Hiệu Suất Host · Leader Board · Toàn Cảnh Brand</div>
+      <div class="mi">Talent Pool · Studios &amp; Gear · CRM · TikTok API</div>
+      <div class="mi">Finance &amp; P&amp;L · Kế Toán · Phân Quyền · AI Training</div>
+      <div class="mi">Mỗi brand: Dashboard · Lịch · Sổ Ca · Kế Hoạch Tháng Sau · Sản phẩm · Giỏ live · Report Tháng · Affiliate · Hợp Đồng · Nhập Ads · Dữ Liệu Gốc</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="col">
+      <h4>Đề xuất · 5 mục + Thiết lập, brand là bộ lọc</h4>
+      <div class="mi on"><b>Hôm nay</b><small>Ca đang và sắp live, một hàng đợi việc cần xử lý. Mỗi ngày.</small></div>
+      <div class="mi on"><b>Lịch</b><small>Một lịch: Tháng · Tuần · Phòng theo giờ · Danh sách (Sổ Ca cũ). Lọc brand × sàn.</small></div>
+      <div class="mi on"><b>Lập tháng</b><small>Lưới ca → Mở đăng ký → Xếp người → Gửi brand. Trước mỗi tháng.</small></div>
+      <div class="mi on"><b>Kết quả</b><small>Tổng quan kênh · Chi tiết kênh · Host (hiệu suất + giải thưởng).</small></div>
+      <div class="mi on"><b>Chốt tháng</b><small>Nạp file → Đối soát → Report → Lương &amp; lãi. Cuối mỗi tháng.</small></div>
+      <div class="mi"><b>Thiết lập</b><small>Người &amp; tài khoản · Phòng · Brand &amp; hợp đồng · Quyền · Engine.</small></div>
+    </div>
+  </div>
+  <p class="ans">Ba mục giữa đi theo ba nhịp của công việc: mỗi ngày, trước tháng, cuối tháng. Người mới chỉ cần biết hôm nay đang ở nhịp nào.</p>
+</section>
+
+<details>
+  <summary>Màn cũ đi đâu (không mất chức năng nào đang có dữ liệu)</summary>
+  <div class="scroll"><table>
+    <tr><th>Chỗ mới</th><th>Gom từ</th></tr>
+    <tr><td>Hôm nay</td><td>Bảng Vận Hành (chế độ Hôm nay &amp; tuần), bản tin target, phễu benchmark mở từ dòng ca</td></tr>
+    <tr><td>Lịch</td><td>Lịch &amp; Studio, Lịch Vận Hành của brand, Sổ Ca (agency và brand), Bảng Vận Hành chế độ Cả tháng</td></tr>
+    <tr><td>Lập tháng</td><td>Kế Hoạch Tháng, Điều Phối Lịch Live, hộp Mở lịch tháng, Kế Hoạch Tháng Sau (brand), Sản phẩm lên live + Giỏ live, kế hoạch Affiliate</td></tr>
+    <tr><td>Kết quả</td><td>Dashboard, Dashboard brand, Hiệu Suất Host, Leader Board</td></tr>
+    <tr><td>Chốt tháng</td><td>Toàn Cảnh Brand, Dữ Liệu Gốc (gồm Đối soát), Nhập Ads, Report Tháng, theo dõi Affiliate, Kế Toán, Finance &amp; P&amp;L, Tổng kết tháng theo người</td></tr>
+    <tr><td>Thiết lập</td><td>Talent Pool, Studios, CRM (Hợp đồng &amp; giá), Hợp Đồng (brand), Phân Quyền &amp; Role, AI Training Center</td></tr>
+    <tr><td>Ẩn</td><td>TikTok API, tab Thiết bị, bản tin brand, nhánh công bố tuần</td></tr>
+  </table></div>
+  <div>Đường dẫn cũ tự chuyển sang chỗ mới, giống cách đã làm khi gộp Run-rate và Phòng Điều Hành.</div>
+</details>
+
+<section class="card">
+  <h3>Hôm nay, sau khi gọn</h3>
+  <p class="meta">Dữ liệu thật ngày 15/11. Hiện tại màn này dài 4,4 màn hình.</p>
+  <div class="mock">
+    <div class="hd"><span>Cần xử lý · 3 việc</span><span class="pill ac">một hàng đợi duy nhất</span></div>
+    <div class="row"><span class="pill bad">33 ca</span><span>chưa có số · A.Toàn 4, Q.Huy 3, Bin 3, H.Vy 3, Phương Loan 3, Thịnh 3… · 6 ca không có trợ</span><span class="btn ghost x">Chép tin nhắc</span><span class="btn">Nạp bù bằng file</span></div>
+    <div class="row"><span class="pill warn">7 ca</span><span>giờ ca cần kiểm (room bật trễ, file dài hơn giờ khai)</span><span class="x"></span><span class="btn ghost">Xem</span></div>
+    <div class="row"><span class="pill warn">6 chỗ</span><span>trùng người, sớm nhất hôm nay (Q.Huy)</span><span class="x"></span><span class="btn ghost">Đổi người</span></div>
+    <div class="hd" style="margin-top:6px"><span>Ca hôm nay · 24 ca · target TikTok 411,5M · Shopee 78,9M</span><span class="btn ghost">Chép tin Zalo</span></div>
+    <div class="row"><span>18:00–21:00</span><span>CROCS TikTok · <span class="m">Kiều Trang, trợ Thái Toàn</span></span><span class="m x">target 59,9M</span><span class="pill bad">chưa có số</span></div>
+    <div class="row"><span>21:00–00:00</span><span>CROCS TikTok · <span class="m">Sỹ Hùng, trợ Thái Toàn</span></span><span class="m x">target 60,5M</span><span class="pill ok">đang live</span></div>
+    <div class="row"><span>20:00–23:00</span><span>VERA Shopee · <span class="m">Yến Nhi, trợ Trà Giang</span></span><span class="m x">target 15,4M</span><span class="pill">sắp live</span></div>
+    <span class="meta">Mỗi ca một dòng. Phễu benchmark và chi tiết mở khi bấm vào dòng. Mục tiêu: không quá 1,5 màn hình.</span>
+  </div>
+</section>
+
+<section class="card">
+  <h3>Chốt tháng, sau khi gọn</h3>
+  <p class="meta">Một bảng cho cả tháng. Mỗi ô là trạng thái và cũng là nút dẫn tới việc tiếp theo. (Trạng thái minh hoạ.)</p>
+  <div class="mock">
+    <div class="grid4"><span class="h">Kênh · tháng 11</span><span class="h">1 · File</span><span class="h">2 · Đối soát</span><span class="h">3 · Report</span><span class="h">4 · Lương &amp; lãi</span></div>
+    <div class="grid4"><span>CROCS TikTok</span><span class="pill ok">8/8 file</span><span class="pill ok">khớp</span><span class="pill warn">chờ chốt</span><span class="pill">—</span></div>
+    <div class="grid4"><span>VERA TikTok</span><span class="pill warn">6/8 · thiếu 2</span><span class="pill">—</span><span class="pill">—</span><span class="pill">—</span></div>
+    <div class="grid4"><span>VERA Shopee</span><span class="pill bad">chưa có file</span><span class="pill">—</span><span class="pill">—</span><span class="pill">—</span></div>
+    <div style="border:1.5px dashed var(--line);border-radius:10px;padding:12px;text-align:center;color:var(--muted)">Thả tất cả file của tháng vào đây. App tự nhận brand, sàn, loại file và tháng.</div>
+  </div>
+</section>
+
+<section class="card">
+  <h3>Lập tháng, sau khi gọn</h3>
+  <p class="meta">Hiện tại việc này nằm ở 3 chỗ: Kế Hoạch Tháng (4 bước cho từng kênh), Điều Phối Lịch Live và hộp Mở lịch tháng.</p>
+  <div class="mock">
+    <div class="steps">
+      <div><b>1 · Lưới ca</b>6 kênh · 473 ca · giờ so với cam kết</div>
+      <div><b>2 · Mở đăng ký</b>34 người đã đăng ký · hạn tuỳ chọn</div>
+      <div><b>3 · Xếp người</b>bấm "Tự xếp", rồi sửa ca ngoại lệ</div>
+      <div><b>4 · Gửi brand</b>xuất Excel lịch, 1 tin cho mỗi người</div>
+    </div>
+    <span class="meta">Target tháng nhập được ở bất kỳ bước nào, app chia xuống ca. Tháng 12 có 383/480 ca được từ 5 người trở lên đăng ký, nên bước 3 phải mặc định là tự xếp.</span>
+  </div>
+</section>
+
+<h2>Phần 3. Cần làm gì, theo thứ tự</h2>
+<p class="lead">Sáu đợt, mỗi đợt làm trong một phiên riêng, xong đợt nào đo lại đợt đó. Thứ tự xếp theo việc lặp nhiều nhất và theo mốc lịch phải kịp.</p>
+
+<section class="card wave">
+  <div class="no">Đợt 0<small>dọn nợ trước</small></div>
+  <div class="todo">
+    <h3>Đưa những gì đã làm lên bản thật</h3>
+    <ul>
+      <li>Commit và deploy 11 file đang sửa dở (Kế Hoạch Tháng gọn, đối soát bản 2, cắt chữ).</li>
+      <li>Chạy các migration ghi chú là chưa chạy: 0207, 0218, 0219.</li>
+      <li>Rút WORKSPACE_DESIGN.md về dưới 500 dòng (đang 982 dòng, 301 KB — phiên mới không đọc hết được).</li>
+    </ul>
+  </div>
+</section>
+
+<section class="card wave">
+  <div class="no">Đợt 1<small>làm ngay</small></div>
+  <div class="todo">
+    <h3>Giao ca về đúng người, thông báo bớt ồn</h3>
+    <ul>
+      <li><b>Hàng đợi theo người.</b> Khối "ca chưa có số" xếp theo tên trợ live, mỗi người một nút chép tin nhắc Zalo. Chỉ sửa giao diện.</li>
+      <li><b>Nạp bù cả ngày bằng 1 file.</b> Admin thả một file Creator-Live-Performance (hoặc Live List của Shopee) của kênh; app khớp vào mọi ca chưa có số của kênh đó, dùng lại bộ khớp của Đối soát. Ca nối không có mốc giao ca thì chia theo giờ và ghi rõ dấu ≈.</li>
+      <li><b>Gộp thông báo.</b> Một tin khi chốt lịch ("Lịch tháng 12 của bạn: 24 ca"), một tin khi mở đăng ký. Tin riêng chỉ còn: thay đổi trong 48 giờ tới và nhắc giao ca. Cần 1 migration sửa trigger.</li>
+    </ul>
+    <div class="ba"><div><b>Hiện tại</b>13% ca do trợ giao · admin ~13 lần/ngày · 16 tin/người/tuần</div><div><b>Đo lại sau 2 tuần</b>≥70% ca do trợ giao · trễ trung vị dưới 15 phút · ≤5 tin/người/tuần</div></div>
+  </div>
+</section>
+
+<section class="card wave">
+  <div class="no">Đợt 2<small>kịp trước 30/11</small></div>
+  <div class="todo">
+    <h3>Chốt tháng trên một bảng</h3>
+    <ul>
+      <li><b>Bảng kênh × 4 bước</b> thay Toàn Cảnh Brand: File → Đối soát → Report → Lương &amp; lãi.</li>
+      <li><b>Thả nhiều file một lần.</b> Tự nhận loại theo tiêu đề cột (mở rộng cách đang làm cho Shopee sang 8 loại TikTok), tự nhận tháng theo dữ liệu, báo file còn thiếu.</li>
+      <li><b>Một nút "Chốt tháng".</b> Khoá số của kênh-tháng và tạo bản HTML/PDF gửi brand. Bỏ bước "Phát hành" riêng.</li>
+      <li><b>Một trang "Lương &amp; lãi"</b> gộp Kế Toán, Finance &amp; P&amp;L và Tổng kết tháng theo người.</li>
+    </ul>
+    <div class="ba"><div><b>Hiện tại</b>44 lần chọn loại file · 4 màn khác nhau · 1/16 tháng được chốt</div><div><b>Đo lại đầu tháng 12</b>6 lần thả file · 1 màn · 6/6 kênh chốt tháng 11</div></div>
+  </div>
+</section>
+
+<section class="card wave">
+  <div class="no">Đợt 3</div>
+  <div class="todo">
+    <h3>Màn Hôm nay</h3>
+    <ul>
+      <li>Gộp Bản tin target và Ca hôm nay thành một danh sách, mỗi ca một dòng.</li>
+      <li>Gộp "Cần xử lý", "Hôm nay phải xong", "Giờ ca cần kiểm" và "Việc tháng" thành một hàng đợi.</li>
+      <li>Phễu benchmark mở từ dòng ca, không chiếm chỗ thường trực.</li>
+      <li>Trạng thái số của ca chỉ còn 3 chữ: <span class="pill ok">có số</span> <span class="pill warn">≈ ước tính</span> <span class="pill bad">chưa có số</span>. Nguồn số (file ca, đối soát, gõ tay) xem khi bấm vào.</li>
+    </ul>
+    <div class="ba"><div><b>Hiện tại</b>4,4 màn hình · 56 loại nút</div><div><b>Sau</b>≤1,5 màn hình · ≤20 loại nút</div></div>
+  </div>
+</section>
+
+<section class="card wave">
+  <div class="no">Đợt 4</div>
+  <div class="todo">
+    <h3>Menu 5 chỗ, brand thành bộ lọc</h3>
+    <ul>
+      <li>Sidebar còn 5 mục + Thiết lập; đường dẫn cũ tự chuyển.</li>
+      <li>Bỏ việc chuyển qua lại giữa "Agency" và từng brand: thanh lọc Brand đứng cạnh thanh Sàn đã có.</li>
+      <li>Một màn Lịch với 4 cách xem; Sổ Ca thành cách xem Danh sách.</li>
+      <li>Ẩn các mục không có dữ liệu ở mục 5 trên.</li>
+      <li>Vai trò còn 4: Quản lý · Vận hành · Host/Trợ · Brand (Trainer gộp vào Vận hành, kèm công tắc "xem chi phí").</li>
+    </ul>
+    <div class="ba"><div><b>Hiện tại</b>30 mục menu · 6 vai × 9 quyền</div><div><b>Sau</b>6 mục · 4 vai</div></div>
+  </div>
+</section>
+
+<section class="card wave">
+  <div class="no">Đợt 5<small>kịp mở lịch tháng 1</small></div>
+  <div class="todo">
+    <h3>Lập tháng thành một đường</h3>
+    <ul>
+      <li>Một bảng cho cả tháng, mọi kênh: Lưới ca → Mở đăng ký → Xếp người → Gửi brand.</li>
+      <li>Đầu trang Kế Hoạch Tháng còn 3 số: Giờ · Target · Dự báo. Dải dự báo, mức 80%/50%, độ tin kênh nằm sau một lần bấm.</li>
+      <li>Xếp người mặc định là "Tự xếp" (3 mục tiêu đã có), người quản lý chỉ sửa ngoại lệ.</li>
+    </ul>
+    <div class="ba"><div><b>Hiện tại</b>3 chỗ · Điều Phối 162 nút · Kế Hoạch Tháng 8 số đầu trang</div><div><b>Sau</b>1 chỗ · 4 bước · 3 số</div></div>
+  </div>
+</section>
+
+<section class="card wave">
+  <div class="no">Đợt 6</div>
+  <div class="todo">
+    <h3>Kết quả, Thiết lập và dọn code</h3>
+    <ul>
+      <li><b>Kết quả → Tổng quan:</b> một bảng 6 kênh với ba nhóm số agency sống bằng nó: giờ đã giao / giờ cam kết · GMV / target · lãi gộp. Hiện ba nhóm này nằm ở ba màn.</li>
+      <li>Hiệu Suất Host và Leader Board thành một mục "Host".</li>
+      <li>58 tham số engine vào Thiết lập → Engine, mặc định gập; AI Training Center không còn là mục menu.</li>
+      <li>Xoá code của các màn đã gộp; tách App.tsx (2.764 dòng).</li>
+    </ul>
+  </div>
+</section>
+
+<h2>Phần 4. Sáu việc cần anh chốt</h2>
+<div class="dec">
+  <div class="card"><p class="q">1. Gom menu về 5 chỗ + Thiết lập?</p><p class="rec">Đề nghị: có</p><p class="meta">Đây là thay đổi lớn nhất về thói quen. Làm ở Đợt 4, sau khi các màn bên trong đã gọn.</p></div>
+  <div class="card"><p class="q">2. Bỏ workspace từng brand, dùng bộ lọc Brand?</p><p class="rec">Đề nghị: có</p><p class="meta">Tài khoản brand thật chưa có. Khi có, cổng brand chỉ cần 4 trang: Tổng quan, Lịch, Báo cáo, Hợp đồng.</p></div>
+  <div class="card"><p class="q">3. Ẩn các mục không có dữ liệu?</p><p class="rec">Đề nghị: ẩn, không xoá</p><p class="meta">TikTok API, Thiết bị, bản tin brand, công bố tuần, luật brand–talent, lịch lặp. Bật lại được khi cần.</p></div>
+  <div class="card"><p class="q">4. Gộp vai Trainer vào Vận hành?</p><p class="rec">Đề nghị: có</p><p class="meta">Chưa có tài khoản Trainer nào; người điều phối hiện là admin. Giữ công tắc "xem chi phí" cho người xếp lịch.</p></div>
+  <div class="card"><p class="q">5. Thông báo gộp thành tin tổng?</p><p class="rec">Đề nghị: có</p><p class="meta">Zalo vẫn là kênh chính; nút "Chép tin Zalo" giữ nguyên.</p></div>
+  <div class="card"><p class="q">6. Cho nạp bù cả ngày bằng 1 file?</p><p class="rec">Đề nghị: có, là đường dự phòng</p><p class="meta">Trợ giao ca đúng giờ vẫn là đường chính vì giữ được mốc giữa hai ca nối (96/252 ca là ca nối). Nạp bù thì ca nối chỉ có số ước tính.</p></div>
+</div>
+
+<details>
+  <summary>Giữ nguyên, không đụng</summary>
+  <div>
+    <ul class="todo">
+      <li>App talent 4 tab và tab Đăng ký riêng: đang được dùng thật.</li>
+      <li>Giao ca TikTok bằng file trong 3 bước; cửa sổ ca bản gọn.</li>
+      <li>Nội dung và bố cục Report Tháng, đối soát bản 2, bộ chia target và sàn ngày Campaign.</li>
+      <li>OP vẫn chốt người, mở, huỷ, dời ca được (quyết định 23/10).</li>
+      <li>Dashboard chỉ số, không chữ phân tích (quyết định 25/10).</li>
+    </ul>
+  </div>
+</details>
+
+<details>
+  <summary>Không đề xuất lại (đã thử hoặc anh đã bỏ)</summary>
+  <div>Nối API TikTok · agent AI · tồn kho và bundle trong Giỏ live · đổi luồng Report · bảng kiểu sàn chứng khoán · chấm trợ live theo GMV · cảnh báo mệt của host · thêm ô nhập bắt buộc cho nhân viên · tách ca khi đổi host · tách số brand tự live.</div>
+</details>
+
+<details>
+  <summary>Cách đo và giới hạn</summary>
+  <div>
+    <p><b>Dữ liệu thật</b> (chỉ đọc, 15/11): đếm dòng 65 bảng; lượt mở màn theo vai và tuần; người tải 207 file giao ca tháng 11 và độ trễ so với giờ hết ca; 2.394 thông báo 30 ngày; 145 lần nạp Dữ Liệu Gốc; 14 lô đối soát; 3.137 lượt đăng ký ca.</p>
+    <p><b>App thật</b> (admin, 1440×900): đi qua 28 màn, đo số chữ, chiều dài trang, số nút và ô nhập đang hiện.</p>
+    <p><b>Code:</b> 421 file, 96.949 dòng; cây component của 32 màn (1.101 chỗ bấm, 455 ô nhập); 219 migration.</p>
+    <p><b>Giới hạn:</b> lượt mở của admin lẫn cả lượt kiểm thử nên chỉ dùng để so tương đối; số lượt của talent, OP là người thật. App mới có người dùng ngoài admin từ 09/11 nên số tuần đầu có thể chưa ổn định. Con số "sau" ở mỗi đợt là mục tiêu, chưa phải kết quả đo.</p>
+    <p><b>Tham khảo ngoài:</b> không tìm thấy phần mềm có sẵn nào làm đủ xếp ca host + giao ca + đối soát cho agency livestream; sản phẩm gần nhất (<a href="https://saasbrowser.com/fr/saas/1537192/livehost">LiveHost</a>) cũng gom về ba việc: xếp lịch, theo dõi GMV, tính tiền. Hướng dẫn thiết kế công cụ nội bộ của <a href="https://clearleft.com/thinking/supporting-your-customer-support-staff-with-internal-service-design">Clearleft</a> ưu tiên hai thứ: tốc độ xong việc và độ đúng của số nhập; <a href="https://axonify.com/?p=165393">Axonify</a> ghi nhận danh sách việc chung gây sót bước, giao việc theo vai thì không. Các nguồn này là bài của nhà cung cấp và người làm nghề, không phải nghiên cứu có đối chứng.</p>
+  </div>
+</details>
+
+</div>
