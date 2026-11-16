@@ -1,5 +1,6 @@
+import { upsertTalentBrandRolesBulk } from "../lib/db/talentBrandRoles";
 import { TalentBrandRolesPanel } from "./TalentBrandRolesPanel";
-import type { TalentBrandRole } from "../lib/roster/talentBrandRoles";
+import { BULK_MIN_SESSIONS, bulkSuggestRows, type TalentBrandRole } from "../lib/roster/talentBrandRoles";
 import { platformText } from "../lib/metricGlossary";
 import React, { useMemo, useRef, useState } from "react";
 import { Talent, Brand, UserRole, LiveSession } from "../types";
@@ -314,6 +315,26 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
         .sort((a, b) => totalCa(b) - totalCa(a) || b.real.sessionCount - a.real.sessionCount || a.t.name.localeCompare(b.t.name, "vi")),
     [talents, sessions]
   );
+  const canEditRoles = currentRole === "ceo" || currentRole === "admin" || currentRole === "operations" || currentRole === "trainer";
+  const bulkRows = useMemo(
+    () => (onTalentBrandRolesChanged ? bulkSuggestRows(sessions, talentBrandRoles ?? [], { talentIds: new Set(talents.map((t) => t.id)), brandIds: new Set(brands.map((b) => b.id)) }) : []),
+    [sessions, talentBrandRoles, talents, brands, onTalentBrandRolesChanged]
+  );
+  const [bulkBusy, setBulkBusy] = useState(false);
+  async function applyBulkRoles() {
+    if (!onTalentBrandRolesChanged || bulkRows.length === 0) return;
+    const people = new Set(bulkRows.map((r) => r.talentId)).size;
+    if (!window.confirm(`Điền vai theo lịch sử cho ${people} talent (${bulkRows.length} kênh chưa cài, đủ ${BULK_MIN_SESSIONS} ca trở lên). Kênh đã cài tay không bị đổi, sửa lại từng người được. Tiếp tục?`)) return;
+    setBulkBusy(true);
+    try {
+      const saved = await upsertTalentBrandRolesBulk(bulkRows);
+      onTalentBrandRolesChanged([...(talentBrandRoles ?? []).filter((r) => !saved.some((x) => x.talentId === r.talentId && x.brandId === r.brandId && x.platform === r.platform)), ...saved]);
+    } catch (e) {
+      window.alert(errorMessage(e, "Không lưu được vai theo kênh."));
+    } finally {
+      setBulkBusy(false);
+    }
+  }
   const query = searchTerm.trim().toLowerCase();
   const rosterRows = allRows.filter(
     ({ t }) =>
@@ -390,7 +411,18 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
         title="Talent Pool"
         description={`Host và trợ live của agency: vai trò, số ca, ${platformText("GMV", "all")} và rate. Chọn một người để xem hồ sơ bên cạnh.`}
         actions={
-          // Khối AI nằm cuối trang (sau danh sách ~40 người) — nút này mở và cuộn thẳng tới nó.
+          <div className="flex flex-wrap items-center gap-2">
+          {canEditRoles && bulkRows.length > 0 && (
+            <button
+              type="button"
+              disabled={bulkBusy}
+              onClick={applyBulkRoles}
+              title="Điền vai Host / Trợ live theo lịch sử ca cho mọi talent ở các kênh chưa cài (sửa lại từng người được)"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border border-amber-400/60 text-amber-300 hover:bg-amber-400/10 disabled:opacity-50"
+            >
+              Cài vai tự động cho tất cả ({bulkRows.length} kênh)
+            </button>
+          )}
           <button
             onClick={() => {
               const el = aiRef.current;
@@ -402,6 +434,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
           >
             <Sparkles className="w-4 h-4" /> Gợi ý host bằng AI
           </button>
+          </div>
         }
       />
 

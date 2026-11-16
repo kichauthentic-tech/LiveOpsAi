@@ -118,6 +118,8 @@ export const TalentBrandRolesPanel: React.FC<Props> = ({ talent, brands, session
                 const h = history.get(`${brand.id}|${p}`);
                 const cur = find(brand.id, p)?.role ?? "none";
                 const guess = cur === "none" && !shared ? inferKind(h) : undefined;
+                // Gợi ý từ lịch sử (bất kể ít ca) — nút được viền vàng, bấm một lần là lưu.
+                const suggested = cur === "none" ? suggestRolesFromHistory(new Map(h ? [[`${brand.id}|${p}`, h]] : [])).get(`${brand.id}|${p}`) : undefined;
                 return (
                   <div key={p} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                     <span className="text-[var(--text-muted)]">
@@ -133,7 +135,8 @@ export const TalentBrandRolesPanel: React.FC<Props> = ({ talent, brands, session
                           disabled={!canEdit || busy}
                           aria-pressed={cur === o}
                           onClick={() => cur !== o && save(brand.id, p, o)}
-                          className={`px-2 py-1 ${cur === o ? "seg-on" : "text-[var(--text-muted)] hover:text-[var(--text)]"}`}
+                          title={suggested === o ? `Gợi ý theo lịch sử: ${h?.host ?? 0} ca host, ${h?.assist ?? 0} ca trợ` : undefined}
+                          className={`px-2 py-1 ${cur === o ? "seg-on" : suggested === o ? "text-amber-300 ring-1 ring-inset ring-amber-400/70" : "text-[var(--text-muted)] hover:text-[var(--text)]"}`}
                         >
                           {optLabel(o)}
                         </button>
@@ -147,7 +150,7 @@ export const TalentBrandRolesPanel: React.FC<Props> = ({ talent, brands, session
         })}
       </ul>
       <p className="text-2xs text-[var(--text-faint)] leading-relaxed">
-        Chưa cài: nếu từ {INFER_MIN_SESSIONS} ca trở lên chỉ làm một vai ở kênh đó thì bộ xếp tự coi là chỉ được vai đó ("tự suy"); chưa đủ ca thì không hạn chế. Cài tay luôn thắng (chọn "Cả hai" nếu muốn bỏ hạn chế). Cài "Host" thì Tự fill không xếp bạn làm trợ ở kênh đó; cài "Trợ live" thì không xếp làm host. Xếp tay vẫn được nhưng lịch sẽ hiện cảnh báo.
+        Chưa cài: nếu từ {INFER_MIN_SESSIONS} ca trở lên chỉ làm một vai ở kênh đó thì bộ xếp tự coi là chỉ được vai đó ("tự suy"); chưa đủ ca thì không hạn chế. Nút viền vàng là gợi ý theo lịch sử, bấm một lần là lưu. Cài tay luôn thắng (chọn "Cả hai" nếu muốn bỏ hạn chế). Cài "Host" thì Tự fill không xếp bạn làm trợ ở kênh đó; cài "Trợ live" thì không xếp làm host. Xếp tay vẫn được nhưng lịch sẽ hiện cảnh báo.
       </p>
       {error && <p className="text-2xs text-rose-300">{error}</p>}
     </div>

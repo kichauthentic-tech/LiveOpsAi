@@ -38,3 +38,18 @@ export async function deleteTalentBrandRole(id: string): Promise<void> {
   const { error } = await supabase.from("talent_brand_roles").delete().eq("id", id);
   if (error) throw error;
 }
+
+/** Ghi nhiều talent một lần (nút "cài tự động cho tất cả"), chia lô để không vượt giới hạn request. */
+export async function upsertTalentBrandRolesBulk(rows: { talentId: string; brandId: string; platform: TalentBrandRolePlatform; role: TalentBrandRoleKind }[]): Promise<TalentBrandRole[]> {
+  const out: TalentBrandRole[] = [];
+  for (let i = 0; i < rows.length; i += 200) {
+    const chunk = rows.slice(i, i + 200);
+    const { data, error } = await supabase
+      .from("talent_brand_roles")
+      .upsert(chunk.map((r) => ({ talent_id: r.talentId, brand_id: r.brandId, platform: r.platform, role: r.role })), { onConflict: "talent_id,brand_id,platform" })
+      .select();
+    if (error) throw error;
+    out.push(...((data as DbRow[]) ?? []).map(fromDb));
+  }
+  return out;
+}

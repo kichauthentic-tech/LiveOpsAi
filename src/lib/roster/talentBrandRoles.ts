@@ -83,3 +83,36 @@ export function inferRoleRows(sessions: readonly LiveSession[]): { brandId: stri
   }
   return out;
 }
+
+/** Số ca tối thiểu cho nút "cài tự động cho tất cả" (ghi dòng thật, sửa được từng người): thấp hơn `INFER_MIN_SESSIONS` vì ghi ra thì thấy và sửa được. */
+export const BULK_MIN_SESSIONS = 3;
+
+/** Dòng cần ghi để cài vai cho MỌI talent từ lịch sử: chỉ kênh CHƯA có dòng cài tay (theo sàn hoặc chung), đủ ≥ BULK_MIN_SESSIONS ca ở vai đó; chỉ làm một vai ⇒ vai đó, làm cả hai ⇒ cả hai. */
+export function bulkSuggestRows(
+  sessions: readonly LiveSession[],
+  existing: readonly TalentBrandRole[],
+  valid: { talentIds: ReadonlySet<string>; brandIds: ReadonlySet<string> }
+): { talentId: string; brandId: string; platform: "TikTok" | "Shopee"; role: TalentBrandRoleKind }[] {
+  const acc = new Map<string, { host: number; assist: number }>();
+  const bump = (key: string, k: "host" | "assist") => {
+    const cur = acc.get(key) ?? { host: 0, assist: 0 };
+    cur[k] += 1;
+    acc.set(key, cur);
+  };
+  for (const s of sessions) {
+    if (s.status === "Cancelled") continue;
+    if (s.hostId) bump(`${s.brandId}|${s.platform}|${s.hostId}`, "host");
+    const asst = s.assistantId || s.coHostId;
+    if (asst) bump(`${s.brandId}|${s.platform}|${asst}`, "assist");
+  }
+  const has = new Set(existing.map((r) => `${r.brandId}|${r.platform}|${r.talentId}`));
+  const out: { talentId: string; brandId: string; platform: "TikTok" | "Shopee"; role: TalentBrandRoleKind }[] = [];
+  for (const [key, h] of acc) {
+    const [brandId, platform, talentId] = key.split("|") as [string, "TikTok" | "Shopee", string];
+    if (!valid.talentIds.has(talentId) || !valid.brandIds.has(brandId)) continue;
+    if (has.has(key) || has.has(`${brandId}|all|${talentId}`)) continue;
+    if (h.host + h.assist < BULK_MIN_SESSIONS) continue;
+    out.push({ talentId, brandId, platform, role: h.host > 0 && h.assist > 0 ? "both" : h.host > 0 ? "host" : "assistant" });
+  }
+  return out;
+}

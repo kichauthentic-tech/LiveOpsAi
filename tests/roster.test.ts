@@ -354,3 +354,17 @@ describe("tự suy vai từ lịch sử", () => {
     expect(R.brandRuleViolation(manual, "b1", "p", "co_host", "TikTok")).toBeUndefined();
   });
 });
+
+describe("cài vai tự động cho tất cả", () => {
+  const mk = (n: number, hostId: string, asst: string | undefined, platform = "TikTok") =>
+    Array.from({ length: n }, (_, i) => ({ id: `${hostId}${asst}${platform}${i}`, brandId: "b1", platform, hostId, assistantId: asst, status: "Completed" })) as never[];
+  const valid = { talentIds: new Set(["p", "q", "r"]), brandIds: new Set(["b1"]) };
+  test("≥3 ca mới ghi; kênh đã cài tay (riêng hoặc chung) bị bỏ qua", () => {
+    const rows = T.bulkSuggestRows([...mk(4, "p", "q"), ...mk(2, "r", undefined), ...mk(3, "p", undefined, "Shopee")] as never, [{ id: "x", talentId: "q", brandId: "b1", platform: "all", role: "both" }], valid);
+    const get = (t: string, pf: string) => rows.find((x) => x.talentId === t && x.platform === pf)?.role;
+    expect(get("p", "TikTok")).toBe("host");
+    expect(get("p", "Shopee")).toBe("host");
+    expect(get("q", "TikTok")).toBeUndefined(); // đã cài chung
+    expect(get("r", "TikTok")).toBeUndefined(); // chỉ 2 ca
+  });
+});
