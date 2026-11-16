@@ -44,10 +44,7 @@ import { PlanGroupTargetsBlock } from "./PlanGroupTargets";
 import { PlanMonthGrid, type GridExtra } from "./monthplan/PlanMonthGrid";
 import type { SlotOutcome } from "../lib/scheduling/planWeeks";
 import { HistorySummary, RELIABLE_BLOCK_MIN_CA, STRATEGY_LABEL, SuggestResult, SuggestStrategy, buildBorrowedHistory, buildHistory, estimateSlots, suggestMonthPlan } from "../lib/scheduling/suggestEngine";
-import { RELIABILITY_LABEL, buildMonthForecaster, forecastReliability, planOutlook, scaleOutlook, slotForecasts, targetForChance } from "../lib/performance/monthForecast";
-import { scenarioFactor } from "../lib/scheduling/brandScenario";
-import { channelMonthActual } from "../lib/performance/modelScoreboard";
-import { BrandScenarioPanel } from "./monthplan/BrandScenarioPanel";
+import { RELIABILITY_LABEL, buildMonthForecaster, forecastReliability, planOutlook, slotForecasts, targetForChance } from "../lib/performance/monthForecast";
 import { recordForecastSnapshots, type ForecastSnapshotInput } from "../lib/db/forecastSnapshots";
 import { EngineParams } from "../lib/scheduling/engineParams";
 import { findBrandStudioId } from "../lib/db/brandStudios";
@@ -695,16 +692,13 @@ export default function MonthPlan({
     const theirs = sumOf(estimateSlots(engineHistory, sample, estimateCtx));
     return mine > 0 && theirs > 0 ? target * (theirs / mine) : target;
   };
-  // Dự báo cả lưới (P50 + dải ~80% + khả năng đạt target) — cùng phân phối với Dashboard. `engineOutlook` = riêng engine v3;
-  // `gridOutlook` = engine × Kịch bản brand (0201, 07/11) — MỌI số dự báo của màn (ô Dự báo, Nhận target, cảnh báo thiếu target) đi
-  // qua con số này; sổ dự báo ghi cả hai để cuối tháng chấm kịch bản có giúp hay không.
-  const scenario = plan?.brandScenario ?? [];
-  const kbFactor = scenarioFactor(scenario);
-  const engineOutlook = useMemo(
+  // Dự báo cả lưới (P50 + dải ~80% + khả năng đạt target) — cùng phân phối với Dashboard. MỌI số dự báo của màn (ô Dự báo lưới,
+  // Nhận target, cảnh báo thiếu target) đi qua con số này. 15/11: bỏ Kịch bản brand (hệ số % CEO nhập tay) — target thật từ brand
+  // thay chỗ dự báo, nên dự báo chỉ còn một nguồn là engine v3.
+  const gridOutlook = useMemo(
     () => (forecaster && drafts.length > 0 ? planOutlook(forecaster, drafts, (d) => resolveCampBucketType(d, campRanges), targetTotal) : null),
     [forecaster, drafts, campRanges, targetTotal]
   );
-  const gridOutlook = useMemo(() => (engineOutlook ? scaleOutlook(engineOutlook, kbFactor, targetTotal) : null), [engineOutlook, kbFactor, targetTotal]);
   // Lưu ý chỉ nói về CÁCH TÍNH dự báo (không phải việc phải làm) — nằm trong ngăn "Dự báo của lịch" (15/11).
   const forecastNotes: React.ReactNode[] = [];
   if (gridOutlook && gridOutlook.excessHours > 0.05)
@@ -827,7 +821,7 @@ export default function MonthPlan({
     const act = activeDrafts(rebaseSet);
     if (total <= 0 || act.length === 0) return null;
     const bucket = (d: string) => resolveCampBucketType(d, campRanges);
-    const outlook = forecaster ? scaleOutlook(planOutlook(forecaster, act, bucket, total), kbFactor, total) : null;
+    const outlook = forecaster ? planOutlook(forecaster, act, bucket, total) : null;
     const forecast = outlook ? outlook.p50 : sumOf(estimateSlots(engineHistory, act, estimateCtx));
     const hours = act.reduce((a, d) => a + slotHours(d), 0);
     const r = targetIntake(total, forecast, hours);
@@ -843,7 +837,7 @@ export default function MonthPlan({
       extras = pickExtraSlots(ranked, r.hoursNeeded, r.hoursCap, today).sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime));
     }
     return { ...r, total, forecast, hours, slots: act.length, outlook, extras };
-  }, [retargetOpen, rebaseSet, retargetTotal, retargetGroups, campRanges, forecaster, engineHistory, estimateCtx, baseConstraints, strategy, today, kbFactor]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [retargetOpen, rebaseSet, retargetTotal, retargetGroups, campRanges, forecaster, engineHistory, estimateCtx, baseConstraints, strategy, today]); // eslint-disable-line react-hooks/exhaustive-deps
   const extraKey = (sl: { date: string; startTime: string; endTime: string }) => `${sl.date}|${sl.startTime}|${sl.endTime}`;
   const pickedExtras = intake ? intake.extras.filter((sl) => !extraOff.has(extraKey(sl))) : [];
   const openExtras = async () => {
@@ -1010,16 +1004,13 @@ export default function MonthPlan({
     try {
       const r = await lockMonthPlan(p.id);
       // Sổ độ chính xác (0163): dự báo LÚC CHỐT của lưới vừa chốt — để cuối tháng so với GMV thật. Lỗi ghi không chặn việc chốt.
-      if (engineOutlook && gridOutlook) {
-        // 0201 (07/11): ghi CẢ engine v3, bộ xếp ca và v3 × kịch bản brand — cuối tháng chấm mô hình nào đúng hơn. DB chưa có 0201 (cột
-        // brand_scenario chưa có ⇒ plan.brandScenario undefined) thì chỉ ghi v3: khoá cũ không có `model`, dòng sau sẽ đè dòng v3.
+      if (gridOutlook) {
+        // 0201 (07/11): ghi cả engine v3 và bộ xếp ca — cuối tháng chấm mô hình nào đúng hơn. Dòng 'v3_kb' (v3 × Kịch bản brand) bỏ
+        // 15/11 cùng khối Kịch bản brand; các dòng v3_kb đã ghi trước đó vẫn nằm trong sổ nhưng không ai đọc nữa.
         const tgt = Math.round(totals.target);
-        const rows: ForecastSnapshotInput[] = [{ brandId, platform, month, asOf: today, kind: "plan", model: "v3", p50: engineOutlook.p50, lo: engineOutlook.lo, hi: engineOutlook.hi, target: tgt }];
-        if (plan?.brandScenario !== undefined) {
-          const sched = sumOf(estimateSlots(engineHistory, drafts, estimateCtx));
-          if (sched > 0) rows.push({ brandId, platform, month, asOf: today, kind: "plan", model: "sched", p50: sched, target: tgt });
-          if (kbFactor !== 1) rows.push({ brandId, platform, month, asOf: today, kind: "plan", model: "v3_kb", p50: gridOutlook.p50, lo: gridOutlook.lo, hi: gridOutlook.hi, target: tgt });
-        }
+        const rows: ForecastSnapshotInput[] = [{ brandId, platform, month, asOf: today, kind: "plan", model: "v3", p50: gridOutlook.p50, lo: gridOutlook.lo, hi: gridOutlook.hi, target: tgt }];
+        const sched = sumOf(estimateSlots(engineHistory, drafts, estimateCtx));
+        if (sched > 0) rows.push({ brandId, platform, month, asOf: today, kind: "plan", model: "sched", p50: sched, target: tgt });
         recordForecastSnapshots(rows).catch((e) => console.warn("Ghi sổ dự báo lúc chốt không được:", e));
       }
       await onPlanLocked();
@@ -1185,11 +1176,6 @@ export default function MonthPlan({
       ? ` Chi phí host + trợ ~${fmtVndShort(hours * hourCost.perHour)} (≈ ${fmtVndShort(hourCost.perHour)}/giờ)${gain && gain > 0 ? ` · mỗi 1 đồng lương ≈ ${fmtFixed(gain / (hours * hourCost.perHour), 0)} đồng GMV dự báo` : ""}.`
       : "";
   const reliability = forecaster ? forecastReliability(forecaster.pastErrors) : null;
-  // GMV thật cả tháng của kênh (ca có số, kể cả ngoài kế hoạch) — để chấm Kịch bản brand khi tháng đã hết.
-  const monthActualDone = useMemo(
-    () => channelMonthActual(platformSessions.filter((s) => s.brandId === brandId), month),
-    [platformSessions, brandId, month]
-  );
   const reliabilityText = reliability && reliability.level !== "unknown"
     ? `Độ tin dự báo kênh: ${RELIABILITY_LABEL[reliability.level]} · lệch TB ${Math.round(reliability.meanAbs! * 100)}% (${reliability.months} tháng)${reliability.bias !== null ? ` · thường ${reliability.bias > 0 ? "cao" : "thấp"} hơn thực tế ~${Math.round(Math.abs(reliability.bias) * 100)}%` : ""}`
     : reliability ? "Độ tin dự báo kênh: chưa đủ tháng để chấm" : null;
@@ -1304,13 +1290,12 @@ export default function MonthPlan({
           </div>
         ) : (
           <div className={TILE} data-testid="grid-forecast">
-            <span className={TILE_LABEL}>Dự báo lưới <Info of="Dự báo lưới" text={`Engine target v3: giờ × loại ngày × khung giờ × vị trí ngày, mức = trung bình nhân 28 ngày gần nhất và 3 tháng gần nhất. Lúc lập kế hoạch mọi cách tính đều lệch ~20–23% (thử 8 cách, 07/11) vì GMV/giờ của kênh tự trôi theo nhu cầu brand — thông tin brand đưa vào bằng Kịch bản brand. Dải: kênh lớn ±22%, kênh nhỏ ±45%, kênh sai nhiều hơn thì nới theo sai số thật của kênh.${isAdmin ? pastErrorsText : ""}${calibration ? ` Đã hiệu chỉnh từ ${calibration.observations} ca kế hoạch có thực tế ở các tháng khác.` : ""}`} /></span>
+            <span className={TILE_LABEL}>Dự báo lưới <Info of="Dự báo lưới" text={`Engine target v3: giờ × loại ngày × khung giờ × vị trí ngày, mức = trung bình nhân 28 ngày gần nhất và 3 tháng gần nhất. Lúc lập kế hoạch mọi cách tính đều lệch ~20–23% (thử 8 cách, 07/11) vì GMV/giờ của kênh tự trôi theo nhu cầu brand — Dải: kênh lớn ±22%, kênh nhỏ ±45%, kênh sai nhiều hơn thì nới theo sai số thật của kênh.${isAdmin ? pastErrorsText : ""}${calibration ? ` Đã hiệu chỉnh từ ${calibration.observations} ca kế hoạch có thực tế ở các tháng khác.` : ""}`} /></span>
             <b className="text-xl font-black tabular-nums text-[var(--text)]">{gridOutlook ? fmtVndShort(gridOutlook.p50) : "—"}</b>
             <span className="text-2xs text-[var(--text-faint)] tabular-nums">
               {gridOutlook ? <>dải {fmtVndShort(gridOutlook.lo)} – {fmtVndShort(gridOutlook.hi)}</> : forecaster ? "lưới trống" : "kênh chưa đủ lịch sử"}
               {gridOutlook?.pHit != null && <> · đạt target <b className={gridOutlook.pHit >= 0.8 ? "text-emerald-400" : gridOutlook.pHit >= 0.5 ? "text-sky-400" : gridOutlook.pHit >= 0.2 ? "text-amber-400" : "text-rose-400"}>{Math.round(gridOutlook.pHit * 100)}%</b></>}
             </span>
-            {engineOutlook && kbFactor !== 1 && <span className="text-2xs text-[var(--text-faint)] tabular-nums">engine {fmtVndShort(engineOutlook.p50)} · kịch bản brand {kbFactor >= 1 ? "+" : "−"}{fmtFixed(Math.abs(kbFactor - 1) * 100, 1)}%</span>}
             {gridOutlook && canRetarget && <span className="text-2xs text-[var(--text-faint)] tabular-nums">target khả thi: 80% ≈ {fmtVndShort(targetForChance(gridOutlook, 0.8))} · 50% ≈ {fmtVndShort(gridOutlook.p50)}</span>}
             {isAdmin && reliabilityText && <span className={`text-2xs tabular-nums ${reliabilityTone}`}>{reliabilityText}</span>}
           </div>
@@ -1357,26 +1342,14 @@ export default function MonthPlan({
 
       {/* Dự báo (engine + Kịch bản brand + lưu ý cách tính) gom vào MỘT ngăn đóng sẵn — 15/11, user: màn chỉ cần
           nhập target rồi chia ra lưới ca; dự báo chỉ để đối chiếu lúc target về nên không chiếm chỗ của bước đó. */}
-      {plan && (engineOutlook || scenario.length > 0 || forecastNotes.length > 0) && (
+      {forecastNotes.length > 0 && (
         <details className="rounded-xl border border-[var(--border)] bg-[var(--surface)] text-xs" data-testid="forecast-drawer">
           <summary className="cursor-pointer px-3 py-2 min-h-9 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[var(--text-muted)]">
             <span className="font-bold text-[var(--text)]">Dự báo của lịch</span>
             {gridOutlook && <b className="tabular-nums text-[var(--text)]">{fmtVndShort(gridOutlook.p50)}</b>}
-            {scenario.length > 0 && <span className="text-[var(--text-faint)]">· kịch bản {scenario.length} dòng</span>}
-            {forecastNotes.length > 0 && <span className="text-amber-300">· {forecastNotes.length} lưu ý</span>}
+            <span className="text-amber-300">· {forecastNotes.length} lưu ý</span>
           </summary>
-          <div className="px-3 pb-3 space-y-2 border-t border-[var(--border)]/60 pt-2">
-            {forecastNotes.length > 0 && <div className="space-y-1 text-2xs">{forecastNotes}</div>}
-            <BrandScenarioPanel
-              embedded
-              planId={plan.id}
-              lines={plan.brandScenario}
-              engineP50={engineOutlook?.p50 ?? null}
-              canEdit={canRetarget}
-              actual={month < curMonth ? monthActualDone : null}
-              onSaved={(lines) => setPlan((p) => (p ? { ...p, brandScenario: lines } : p))}
-            />
-          </div>
+          <div className="px-3 pb-3 space-y-1 text-2xs border-t border-[var(--border)]/60 pt-2">{forecastNotes}</div>
         </details>
       )}
 

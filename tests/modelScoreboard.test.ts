@@ -4,7 +4,7 @@ import { modelScoreboard, switchAdvice, type ModelScoreRow } from "../src/lib/pe
 import { DEFAULT_ENGINE_PARAMS } from "../src/lib/scheduling/engineParams";
 import type { LiveSession } from "../src/types";
 
-const row = (month: string, v3: number, sched: number, src: "ledger" | "backtest" = "ledger"): ModelScoreRow => ({ month, actual: 100, v3: { error: v3, source: src }, sched: { error: sched, source: src }, v3Kb: null });
+const row = (month: string, v3: number, sched: number, src: "ledger" | "backtest" = "ledger"): ModelScoreRow => ({ month, actual: 100, v3: { error: v3, source: src }, sched: { error: sched, source: src } });
 
 describe("switchAdvice", () => {
   test("bộ xếp ca đúng hơn ≥ 2 điểm ở 2 tháng sổ gần nhất ⇒ đủ điều kiện đổi", () => {

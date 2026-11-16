@@ -238,7 +238,6 @@ export const ForecastTrainingCard: React.FC<Props> = ({ brandId, sessions, param
                       <th className="font-normal px-1.5">{platformText("GMV", platform)}</th>
                       <th className="font-normal px-1.5">v3</th>
                       <th className="font-normal px-1.5">Bộ xếp ca</th>
-                      <th className="font-normal px-1.5" title="v3 × Kịch bản brand — chỉ có khi đã ghi kịch bản trước lúc chốt (0201)">v3 × kịch bản</th>
                       <th className="font-normal px-1.5">Nguồn</th>
                     </tr>
                   </thead>
@@ -252,7 +251,6 @@ export const ForecastTrainingCard: React.FC<Props> = ({ brandId, sessions, param
                           <td className="px-1.5 text-[var(--text)]">{fmtVndShort(r.actual)}</td>
                           <td className={`px-1.5 ${win === "v3" ? "font-bold text-emerald-400" : "text-[var(--text-muted)]"}`}>{pct(r.v3?.error, true)}</td>
                           <td className={`px-1.5 ${win === "sched" ? "font-bold text-emerald-400" : "text-[var(--text-muted)]"}`}>{pct(r.sched?.error, true)}</td>
-                          <td className="px-1.5 text-[var(--text-muted)]">{pct(r.v3Kb, true)}</td>
                           <td className="px-1.5 text-[var(--text-faint)]">{r.v3?.source === "ledger" || r.sched?.source === "ledger" ? "sổ" : "backtest"}</td>
                         </tr>
                       );

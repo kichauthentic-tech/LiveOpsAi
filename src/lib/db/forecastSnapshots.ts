@@ -5,8 +5,9 @@ import type { ReportPlatform } from "../reportPlatform";
 // (ceo/operations/admin), đọc thẳng bảng (RLS cùng nhóm role). Chưa chạy 0163 ⇒ ghi bị bỏ qua lặng lẽ, đọc trả `missing`.
 
 export type ForecastSnapshotKind = "plan" | "daily";
-/** 0201: 'v3' engine chính · 'sched' bộ xếp ca · 'v3_kb' v3 × Kịch bản brand. Trước 0201 mọi dòng là 'v3'. */
-export type ForecastModel = "v3" | "sched" | "v3_kb";
+/** 0201: 'v3' engine chính · 'sched' bộ xếp ca. Trước 0201 mọi dòng là 'v3'. ('v3_kb' = v3 × Kịch bản brand, bỏ 15/11 — DB vẫn
+ *  nhận giá trị đó nhưng app không ghi và không đọc nữa.) */
+export type ForecastModel = "v3" | "sched";
 
 export interface ForecastSnapshotInput {
   brandId: string;

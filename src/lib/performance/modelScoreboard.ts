@@ -8,7 +8,6 @@ import { isCountable } from "./hostPerformance";
 // Bảng chấm mô hình dự báo theo tháng (07/11, thay đổi 5 của đề xuất dự báo) — mỗi tháng đã hết, dự báo LÚC LẬP của:
 //   v3     engine chính (Kế Hoạch Tháng, Dashboard)
 //   sched  bộ xếp ca (`estimateSlots` — mô hình gợi ý lịch)
-//   v3_kb  v3 × Kịch bản brand (chỉ có trong sổ, 0201)
 // lệch bao nhiêu so với GMV thật. Nguồn: sổ dự báo (con số app thật sự nói lúc chốt, ngoài mẫu) khi có, thiếu thì backtest walk-forward
 // (dữ liệu tới ngày 20 tháng trước, lịch = ca đã live thật).
 // Luật đổi mô hình (user "làm cả 5", chọn "chờ T11–T12"): chỉ xét tháng có SỔ của cả hai mô hình — backtest đã dùng để chỉnh bộ xếp ca
@@ -21,8 +20,6 @@ export interface ModelScoreRow {
   actual: number;
   v3: { error: number; source: ScoreSource } | null;
   sched: { error: number; source: ScoreSource } | null;
-  /** Chỉ từ sổ (kịch bản brand không có trong backtest). */
-  v3Kb: number | null;
 }
 
 export interface LedgerPlanRow {
@@ -63,7 +60,6 @@ export function modelScoreboard(channel: LiveSession[], params: ForecastParams &
     const fold = bt.folds.find((f) => f.month === m);
     const lv3 = lastPlan(ledger, m, "v3");
     const lsc = lastPlan(ledger, m, "sched");
-    const lkb = lastPlan(ledger, m, "v3_kb");
     let sched: ModelScoreRow["sched"] = lsc ? { error: err(lsc.p50), source: "ledger" } : null;
     if (!sched && fold) {
       const [y, mo] = m.split("-").map(Number);
@@ -82,8 +78,7 @@ export function modelScoreboard(channel: LiveSession[], params: ForecastParams &
       month: m,
       actual,
       v3: lv3 ? { error: err(lv3.p50), source: "ledger" } : fold ? { error: fold.planError, source: "backtest" } : null,
-      sched,
-      v3Kb: lkb ? err(lkb.p50) : null
+      sched
     });
   }
   return rows;
