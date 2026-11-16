@@ -26,7 +26,7 @@ export interface ChannelRow {
 
 const fmtH = (h: number) => (Math.round(h * 10) / 10).toString().replace(".", ",");
 // Nền chỉ tô khi có vấn đề (ca ổn để trống cho đỡ rối); chấm nhỏ cạnh giờ nói mức độ.
-const CARD_WASH: Record<string, string> = { block: "bg-red-500/10", hole: "bg-red-500/10", warn: "bg-amber-500/10", ok: "" };
+const CARD_WASH: Record<string, string> = { block: "bg-red-500/10", hole: "bg-red-500/10", warn: "bg-amber-500/10", ok: "bg-[var(--surface-base)]" };
 const SEV_DOT: Record<string, string> = { block: "bg-red-500", hole: "bg-red-500", warn: "bg-amber-400", ok: "" };
 
 // ---------------- Lưới tuần ----------------
@@ -71,7 +71,7 @@ export const WeekGrid: React.FC<{
               {days.map((d) => {
                 const list = shifts.filter((s) => s.channelKey === ch.key && s.date === d);
                 return (
-                  <div key={d} className="p-1.5 border-b border-r border-[var(--border)] space-y-1.5 min-w-0">
+                  <div key={d} className="p-1.5 border-b border-r border-[var(--border)] space-y-2 min-w-0">
                     {list.map((s) => {
                       const sev = worstSeverity(analysis.byShift.get(s.key)) ?? "ok";
                       return (
@@ -81,9 +81,9 @@ export const WeekGrid: React.FC<{
                           onClick={() => onSelect(s.key)}
                           // Bố cục 19/10: thẻ ca chỉ còn vạch màu bên trái (đỏ/vàng/xanh) + nền nhạt — trước mỗi thẻ thêm viền đủ 4 cạnh
                           // trong ô lưới cũng có viền (~90 hộp lồng một tuần). Ca mở vẫn viền đứt để khác ca đã có người.
-                          className={`block w-full text-left rounded-lg px-1 py-1 text-2xs leading-snug hover:bg-[var(--surface-hover)] ${CARD_WASH[sev]} ${selectedKey === s.key ? "ring-2 ring-[var(--accent)]" : ""} ${s.kind === "open" ? "border border-dashed border-[var(--border)]" : ""}`}
+                          className={`block w-full text-left rounded-lg border px-1.5 py-1.5 text-2xs leading-snug shadow-sm hover:bg-[var(--surface-hover)] ${CARD_WASH[sev]} ${selectedKey === s.key ? "ring-2 ring-[var(--accent)]" : ""} ${s.kind === "open" ? "border-dashed border-[var(--text-faint)]" : "border-solid border-[var(--border)]"}`}
                         >
-                          <span className="mb-0.5 flex items-center gap-1 whitespace-nowrap px-0.5 font-mono text-[var(--text-muted)]">
+                          <span className="mb-1 flex items-center gap-1 whitespace-nowrap border-b border-[var(--border)] px-0.5 pb-1 font-mono text-xs font-bold text-[var(--text)]">
                             {s.startTime}–{s.endTime}
                             {SEV_DOT[sev] && <i className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${SEV_DOT[sev]}`} aria-label="có cảnh báo" />}
                             {s.kind === "open" && (() => {

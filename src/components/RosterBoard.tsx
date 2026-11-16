@@ -9,6 +9,7 @@ import { errorMessage } from "../lib/errorMessage";
 import { fmtVndShort } from "../lib/format";
 import { talentShortName } from "../lib/talentName";
 import { addDays, getTodayDate, isoWeekStart } from "../lib/dateUtils";
+import { sumGmvByPlatform } from "../lib/platforms/perf";
 import { halfRange } from "../lib/roster/milestones";
 import { suggestNextShift } from "../lib/scheduling/nextShift";
 import { updateOpenSlotTime } from "../lib/db/shiftSlots";
@@ -34,7 +35,7 @@ import {
 } from "../lib/db/roster";
 import type { BrandTalentRule } from "../lib/commercial/terms";
 import { inferRoleRows, type TalentBrandRole } from "../lib/roster/talentBrandRoles";
-import { analyzeRoster, buildBrandRuleIndex, buildRosterShifts, channelKeyOf, DEFAULT_ROSTER_RULES, type RosterRole, type RosterRules, type RosterShift } from "../lib/roster/rules";
+import { analyzeRoster, buildBrandRuleIndex, buildRosterShifts, channelKeyOf, DEFAULT_ROSTER_RULES, shiftHours, type RosterRole, type RosterRules, type RosterShift } from "../lib/roster/rules";
 import { autofillWeek, buildFamiliarity, famOf, planCostCut, shiftCost, type CostMove, type RankContext, type RankMode } from "../lib/roster/candidates";
 import { ShiftPanel, dayLabel } from "./roster/ShiftPanel";
 import { AbsencePanel, ChangeLogPanel, ChecksPanel, HoursCostPanel, MatrixPanel, RulesPanel, WeekGrid, type ChannelRow } from "./roster/panels";
@@ -188,6 +189,8 @@ export const RosterBoard: React.FC<Props> = (p) => {
   const [monthsNonce, setMonthsNonce] = useState(0);
   const [mode, setMode] = useState<RankMode>(loadMode);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  // Lọc lưới theo brand (mặc định Tất cả). Chỉ ảnh hưởng cách hiển thị lưới, giờ/luật vẫn tính mọi brand.
+  const [brandView, setBrandView] = useState<string>("all");
   const [busy, setBusy] = useState(false);
   const [weeks, setWeeks] = useState<RosterWeek[]>([]);
   const [drafts, setDrafts] = useState<RosterDraft[]>([]);
@@ -312,6 +315,13 @@ export const RosterBoard: React.FC<Props> = (p) => {
     return [...rows.values()].sort((a, b) => a.brandName.localeCompare(b.brandName) || a.platform.localeCompare(b.platform));
   }, [p.brandChannels, brandNameById, wk]);
 
+  const gridChannels = useMemo(() => (brandView === "all" || !channels.some((c) => c.brandId === brandView) ? channels : channels.filter((c) => c.brandId === brandView)), [channels, brandView]);
+  const gridBrands = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const c of channels) if (c.brandName) seen.set(c.brandId, c.brandName);
+    return [...seen].map(([id, name]) => ({ id, name }));
+  }, [channels]);
+
   const showCost = p.talents.some((t) => t.ratePerHour > 0 || t.assistantRatePerHour > 0 || t.ratePerSession > 0) || p.talentRateHistory.length > 0;
   const weekIssues = analysis.issues;
   const blocks = weekIssues.filter((i) => i.severity === "block");
@@ -343,6 +353,52 @@ export const RosterBoard: React.FC<Props> = (p) => {
     canWrite: !readOnly
   };
   const desk = useRosterDesk({ ...deskProps, registrations: p.shiftRegistrations, drafts, weeks });
+  // GMV/giờ theo KÊNH (brand × sàn) 28 ngày gần nhất — nền cho GMV ước tính của tuần. Không chia theo host (hiệu suất host phần lớn là nhiễu).
+  const chGmvPerHour = useMemo(() => {
+    const from = addDays(today, -28);
+    const byCh = new Map<string, LiveSession[]>();
+    for (const x of p.sessions) {
+      if (x.status === "Cancelled" || x.date < from || x.date >= today || !(x.actualGmv > 0) || shiftHours(x) <= 0) continue;
+      const k = channelKeyOf(x.brandId, x.platform);
+      byCh.set(k, [...(byCh.get(k) ?? []), x]);
+    }
+    const out = new Map<string, number>();
+    for (const [k, rows] of byCh) {
+      // Mỗi nhóm là MỘT kênh brand × sàn nên cộng không lẫn hai sàn.
+      const gmv = sumGmvByPlatform(rows)[rows[0].platform];
+      const hrs = rows.map(shiftHours).reduce((u, v) => u + v, 0);
+      if (hrs >= 10) out.set(k, gmv / hrs);
+    }
+    return out;
+  }, [p.sessions, today]);
+  // Thanh chỉ số của phạm vi đang xem (brand đang chọn hoặc tất cả): giờ tháng, chi phí tuần, độ phủ ca, độ tập trung giờ trong tuần.
+  const brandStats = useMemo(() => {
+    const inScope = (s: { brandId: string }) => brandView === "all" || !channels.some((c) => c.brandId === brandView) || s.brandId === brandView;
+    const ws = wk.filter(inScope);
+    const hours = new Map<string, number>();
+    let filled = 0, cost = 0, missing = 0, noRate = 0;
+    const gmv: Record<"TikTok" | "Shopee", number> = { TikTok: 0, Shopee: 0 };
+    for (const s of ws) {
+      const h = shiftHours(s);
+      const r = chGmvPerHour.get(s.channelKey);
+      if (r) gmv[s.platform] += r * h;
+      else noRate++;
+      for (const id of [s.hostId, s.coHostId]) if (id) hours.set(id, (hours.get(id) ?? 0) + h);
+      if (s.hostId && (s.coHostId || s.noAssistant)) filled++;
+      const c = shiftCost(s, p.talents, p.talentRateHistory);
+      cost += c.amount;
+      if (c.missing) missing++;
+    }
+    const sorted = [...hours.values()].sort((a, b) => b - a);
+    const total = sorted.reduce((a, b) => a + b, 0);
+    const top = (n: number) => (total > 0 ? Math.round((sorted.slice(0, n).reduce((a, b) => a + b, 0) / total) * 100) : 0);
+    const month = viewMonth === desk.month ? desk.nowRows.filter((r) => inScope(r)) : [];
+    const done = month.reduce((a, r) => a + r.h.delivered, 0);
+    const planned = month.reduce((a, r) => a + r.h.scheduled + r.h.open, 0);
+    const committed = month.reduce((a, r) => a + r.committed, 0);
+    return { gmv, noRate, shifts: ws.length, filled, cost, missing, people: hours.size, top1: top(1), top3: top(3), done, planned, committed, hasMonth: month.length > 0 };
+  }, [wk, brandView, channels, p.talents, p.talentRateHistory, viewMonth, desk.month, desk.nowRows, chGmvPerHour]);
+
   const m0 = desk.month, m1 = desk.next, m2 = nextMonthOf(m1);
   const wizardChannels = useMemo(
     () =>
@@ -1012,7 +1068,43 @@ export const RosterBoard: React.FC<Props> = (p) => {
             </div>
             {!monthWeeks.some((w) => w.start === weekStart) && <span className="text-amber-300">Tuần {dayLabel(weekStart)} – {dayLabel(weekEnd)} không thuộc tháng này — chọn một tuần.</span>}
           </div>
-          <WeekGrid weekStart={weekStart} month={viewMonth} channels={channels} shifts={wk} analysis={analysis} nameOf={nameOf} roleOf={(id) => talentById.get(id)?.role} colorOf={(id) => personColors.get(id)} selectedKey={selectedKey} canAdd={!readOnly} onSelect={setSelectedKey} onAdd={addShift} channelMeta={channelMeta} />
+          {gridBrands.length > 1 && (
+            <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs" aria-label="Brand">
+              <span className="font-black text-[var(--text)]">Brand</span>
+              <div className="flex flex-wrap items-center rounded-xl border border-[var(--border)] bg-[var(--surface-base)] p-1 font-bold" role="group">
+                {[{ id: "all", name: "Tất cả" }, ...gridBrands].map((b) => (
+                  <button key={b.id} type="button" aria-pressed={brandView === b.id} onClick={() => setBrandView(b.id)} className={`px-2.5 py-1 rounded-lg ${brandView === b.id ? "seg-on" : "text-[var(--text-muted)] hover:text-[var(--text)]"}`}>
+                    {b.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="mb-2 flex flex-wrap items-center gap-x-5 gap-y-1 rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-2 text-xs tabular-nums" aria-label="Chỉ số tuần">
+            <span className="font-black text-[var(--text)]">{brandView === "all" ? "Tất cả brand" : gridBrands.find((b) => b.id === brandView)?.name ?? "Tất cả brand"}</span>
+            {brandStats.hasMonth && (
+              <span title="Giờ cả tháng: đã live + còn trong lịch / giờ cam kết">
+                Giờ tháng <b className="text-[var(--text)]">{Math.round(brandStats.done)} + {Math.round(brandStats.planned)}{brandStats.committed > 0 ? ` / ${Math.round(brandStats.committed)}` : ""}</b>
+              </span>
+            )}
+            <span>Tuần: <b className="text-[var(--text)]">{brandStats.filled}/{brandStats.shifts}</b> ca đủ người</span>
+            {showCost && (
+              <span title={brandStats.missing > 0 ? `${brandStats.missing} ca chưa có đơn giá nên chưa tính` : undefined}>
+                Chi phí tuần <b className="text-[var(--text)]">{fmtVndShort(brandStats.cost)}</b>
+                {brandStats.missing > 0 && <span className="text-amber-300"> (thiếu giá {brandStats.missing} ca)</span>}
+              </span>
+            )}
+            {(["TikTok", "Shopee"] as const).filter((pl) => brandStats.gmv[pl] > 0).map((pl) => (
+              <span key={pl} title="Ước tính theo GMV/giờ của kênh 28 ngày gần nhất × giờ đã xếp, sai số ~20%. Không tính theo người; không cộng hai sàn.">
+                GMV ước tính {pl} <b className="text-[var(--text)]">{fmtVndShort(brandStats.gmv[pl] * 0.8)}–{fmtVndShort(brandStats.gmv[pl] * 1.2)}</b>
+              </span>
+            ))}
+            {brandStats.noRate > 0 && <span className="text-amber-300">{brandStats.noRate} ca chưa có lịch sử để ước tính</span>}
+            <span title="Tỷ lệ giờ tuần dồn vào 1 / 3 người nhiều giờ nhất">
+              Tập trung giờ: top 1 <b className="text-[var(--text)]">{brandStats.top1}%</b> · top 3 <b className="text-[var(--text)]">{brandStats.top3}%</b> ({brandStats.people} người)
+            </span>
+          </div>
+          <WeekGrid weekStart={weekStart} month={viewMonth} channels={gridChannels} shifts={wk} analysis={analysis} nameOf={nameOf} roleOf={(id) => talentById.get(id)?.role} colorOf={(id) => personColors.get(id)} selectedKey={selectedKey} canAdd={!readOnly} onSelect={setSelectedKey} onAdd={addShift} channelMeta={channelMeta} />
         </div>
         <details className="group bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 space-y-2" aria-label="Khối lượng nhân sự">
           {/* Gập mặc định (trainer: Điều Phối rối mắt) — chỉ mở khi cần cân giờ. */}

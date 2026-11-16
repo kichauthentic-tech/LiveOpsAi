@@ -985,3 +985,7 @@ target khung camp ở Nhập Ads bỏ 06/10 — tháng không có kế hoạch c
 | `## Rà soát UX/workflow theo module (bắt đầu 2026-09-13)` | Module 1–N: đăng ký/chốt ca, cam kết, gợi ý host, chốt hàng loạt, thông báo |
 | `## Hạ tầng Supabase` (bản cũ) | trạng thái từng migration 0082–0123 kèm cách đã verify |
 | `## Đề xuất đơn giản hoá toàn app (2026-11-15)` | số đo ai dùng gì, bề mặt 28 màn, tính năng 0 dữ liệu, 5 chỗ làm việc, 6 đợt, 6 quyết định chờ |
+
+### Điều Phối: lọc brand + thanh chỉ số (16/11)
+- `RosterBoard.tsx`: hàng `Brand` (mặc định Tất cả) chỉ lọc lưới tuần; thanh chỉ số (giờ tháng, ca đủ người, chi phí tuần, GMV ước tính ±20% tách TikTok/Shopee từ GMV/giờ kênh 28 ngày, tập trung giờ top1/top3). Thẻ ca có viền + khung giờ đậm (`roster/panels.tsx`).
+- Biểu đồ giờ theo người/GMV theo tuần đã thử rồi bỏ theo ý user (chưa đúng ý) — chưa có chỗ đặt/hình dạng chốt; không đề xuất lại khi chưa hỏi.
