@@ -7,7 +7,7 @@ import { commitmentsRead, contractsRead, upsertMonthlyCommitment } from "../lib/
 import type { TabPrefetchCtx } from "../lib/db/prefetch";
 import { loadRememberedBrandId } from "../lib/defaultBrand";
 import { errorMessage } from "../lib/errorMessage";
-import { PlanSettings, calendarEventsRead, deleteMonthPlan, fetchBoostSlots, fetchBrandLockedPlanSlots, fetchMonthPlan, fetchPlanStatuses, fetchRetargetHistory, lockMonthPlan, lockedPlanSlotsRead, monthPlanRead, openExtraPlanSlots, planStatusesRead, replacePlanSlots, rebaseMonthPlan, setBoostTargets, upsertMonthPlan } from "../lib/db/monthPlans";
+import { PlanSettings, calendarEventsRead, deleteMonthPlan, fetchBoostSlots, fetchBrandLockedPlanSlots, fetchMonthPlan, fetchPlanStatuses, fetchRetargetHistory, countRegistrationsBySlot, lockMonthPlan, lockedPlanSlotsRead, monthPlanRead, openExtraPlanSlots, planStatusesRead, replacePlanSlots, rebaseMonthPlan, setBoostTargets, upsertMonthPlan } from "../lib/db/monthPlans";
 import { INTAKE_ADD_MAX, INTAKE_ALLOCATE_MAX, pickExtraSlots, targetIntake } from "../lib/scheduling/targetIntake";
 import { channelHourCost } from "../lib/scheduling/extraHoursCost";
 import { addDays } from "../lib/dateUtils";
@@ -970,10 +970,10 @@ export default function MonthPlan({
       setMsg("Lưới trống — chưa có gì để chốt.");
       return;
     }
-    if (drafts.length === 0 && locked && !(await confirm(`Lưới trống — chốt lại sẽ HUỶ toàn bộ ca đang mở của kế hoạch ${brandLabel(brand?.name)} tháng ${fmtMonth(month)} (trừ ca đã có người đăng ký). Tiếp tục?`, { danger: true }))) return;
+    if (drafts.length === 0 && locked && !(await confirm(`Lưới trống — chốt lại sẽ HUỶ toàn bộ ca đang mở của kế hoạch ${brandLabel(brand?.name)} tháng ${fmtMonth(month)}. Ca đã có người báo rảnh cũng huỷ — hộp xác nhận cuối nêu số lượng. Tiếp tục?`, { danger: true }))) return;
     const gap = planHours - totals.hours;
     const warn = planHours > 0 && Math.abs(gap) > 0.01 ? `\n\nGiờ kế hoạch ${fmtH(totals.hours)}h ${gap > 0 ? "THIẾU" : "VƯỢT"} ${fmtH(Math.abs(gap))}h so với ${fmtH(planHours)}h cam kết tháng này.` : "";
-    const relockNote = locked ? "\n\nChốt lại sẽ mở thêm ca mới và HUỶ ca đang mở đã bị bỏ khỏi kế hoạch (trừ ca đã có người đăng ký)." : "";
+    const relockNote = locked ? "\n\nChốt lại sẽ mở thêm ca mới và HUỶ ca đang mở đã bị bỏ khỏi kế hoạch. Ca đã có người báo rảnh cũng huỷ — hộp xác nhận cuối nêu số lượng." : "";
     const targetWarn = targetGap && targetGap.pct > engineParams.targetGapWarnPct ? `\n\nDự báo lưới ${fmtVndShort(targetGap.forecast)} THIẾU ${fmtVndShort(targetGap.gap)} (${Math.round(targetGap.pct * 100)}%) so với target ${fmtVndShort(targetTotal)}${targetGap.fill ? ` — cần bù ~${fmtH(targetGap.extraHours)}h.` : "."} Chốt xong target/ca không chia lại.` : "";
     const sumDelta = Math.round(totals.target) - targetTotal;
     const sumNote = Math.abs(sumDelta) >= 1
@@ -997,12 +997,33 @@ export default function MonthPlan({
     // 09/11 (audit mở lịch): chốt kế hoạch THÁNG SAU lần đầu ⇒ mỗi talent nhận một tin "đã mở đăng ký" cho TỪNG kênh chốt lẻ. Mở nhiều kênh
     // cùng lúc nên dùng "Mở lịch tháng sau" (Điều Phối Lịch Live): chốt một giao dịch, một tin. Hạn đăng ký không bắt buộc — chỉ nhắc, không chặn.
     const signupNote = !locked && month > today.slice(0, 7) ? "\n\nTalent nhận tin đã mở đăng ký cho kênh này." : "";
-    if (!(await confirm(`${locked ? "Chốt lại" : "Chốt"} kế hoạch ${brandLabel(brand?.name)} tháng ${fmtMonth(month)}: ${drafts.length} ca${matchedCount > 0 ? ` (${matchedCount} gắn ca đã nhập, ${drafts.length - matchedCount} chờ đăng ký)` : " chờ đăng ký"}?${warn}${targetWarn}${sumNote}${relockNote}${studioNote}${clashNote}${capNote}${matchedNote}${pastNote}${signupNote}`))) return;
+    // 0220: ca MỞ bị bỏ khỏi lưới mà đã có người báo rảnh — trước đây bị giữ lại, không có nút bỏ. Nay nói rõ rồi huỷ + báo từng người.
+    let dropRegistered = false;
+    let regNote = "";
+    if (locked && plan) {
+      const keep = new Set(drafts.map((d) => d.slotId).filter(Boolean) as string[]);
+      const orphanIds = shiftSlots.filter((sl) => sl.planId === plan.id && sl.status === "open" && !keep.has(sl.id)).map((sl) => sl.id);
+      if (orphanIds.length > 0) {
+        try {
+          const regs = await countRegistrationsBySlot(orphanIds);
+          const slotsWithRegs = [...regs.keys()].length;
+          const totalRegs = [...regs.values()].reduce((a, b) => a + b, 0);
+          if (slotsWithRegs > 0) {
+            dropRegistered = true;
+            regNote = `\n\n⚠ ${slotsWithRegs} ca bị bỏ đã có ${totalRegs} lượt báo rảnh. Chốt lại sẽ HUỶ các ca này, gỡ lượt báo rảnh và báo từng người liên quan. Ca đã chốt người không bị đụng.`;
+          }
+        } catch (e) {
+          setMsg(`Không kiểm tra được lượt báo rảnh của ca bị bỏ: ${errorMessage(e)}`);
+          return;
+        }
+      }
+    }
+    if (!(await confirm(`${locked ? "Chốt lại" : "Chốt"} kế hoạch ${brandLabel(brand?.name)} tháng ${fmtMonth(month)}: ${drafts.length} ca${matchedCount > 0 ? ` (${matchedCount} gắn ca đã nhập, ${drafts.length - matchedCount} chờ đăng ký)` : " chờ đăng ký"}?${warn}${targetWarn}${sumNote}${relockNote}${regNote}${studioNote}${clashNote}${capNote}${matchedNote}${pastNote}${signupNote}`))) return;
     const p = await save({ committing: true });
     if (!p) return;
     setSaving(true);
     try {
-      const r = await lockMonthPlan(p.id);
+      const r = await lockMonthPlan(p.id, dropRegistered);
       // Sổ độ chính xác (0163): dự báo LÚC CHỐT của lưới vừa chốt — để cuối tháng so với GMV thật. Lỗi ghi không chặn việc chốt.
       if (gridOutlook) {
         // 0201 (07/11): ghi cả engine v3 và bộ xếp ca — cuối tháng chấm mô hình nào đúng hơn. Dòng 'v3_kb' (v3 × Kịch bản brand) bỏ
@@ -1022,8 +1043,8 @@ export default function MonthPlan({
       refreshMissing();
       setLockedSlotsTick((t) => t + 1);
       setMsg(
-        `Đã chốt: mở ${r.created} ca mới${(r.linked_sessions ?? 0) > 0 ? `, gắn ${r.linked_sessions} ca đã nhập` : ""}${r.linked > 0 ? `, gắn ${r.linked} ca đã có sẵn` : ""}${r.cancelled > 0 ? `, huỷ ${r.cancelled} ca bị bỏ` : ""}` +
-          `${r.kept_registered > 0 ? `, GIỮ ${r.kept_registered} ca bị bỏ nhưng đã có người đăng ký (xử lý ở Bảng Vận Hành)` : ""}${(r.kept_cancelled ?? 0) > 0 ? `, giữ huỷ ${r.kept_cancelled} ca đã huỷ (không mở lại)` : ""}${(r.skipped_past ?? 0) > 0 ? `, bỏ qua ${r.skipped_past} ca ngày đã qua (ca nào đã live: mở ca đúng giờ ở Lịch & Studio rồi bấm Chốt lại để gắn target)` : ""} — ${r.total_slots} ca kế hoạch đã có ca thật/ca chờ${r.created > 0 ? ` (${r.created} ca đang chờ đăng ký)` : ""}.`
+        `Đã chốt: mở ${r.created} ca mới${(r.linked_sessions ?? 0) > 0 ? `, gắn ${r.linked_sessions} ca đã nhập` : ""}${r.linked > 0 ? `, gắn ${r.linked} ca đã có sẵn` : ""}${r.cancelled > 0 ? `, huỷ ${r.cancelled} ca bị bỏ` : ""}${(r.dropped_registrations ?? 0) > 0 ? ` (${r.dropped_registered_slots} ca đã có ${r.dropped_registrations} lượt báo rảnh, đã gỡ và báo người liên quan)` : ""}` +
+          `${r.kept_registered > 0 ? `, GIỮ ${r.kept_registered} ca bị bỏ nhưng đã có người đăng ký (không xử lý được tự động)` : ""}${(r.kept_cancelled ?? 0) > 0 ? `, giữ huỷ ${r.kept_cancelled} ca đã huỷ (không mở lại)` : ""}${(r.skipped_past ?? 0) > 0 ? `, bỏ qua ${r.skipped_past} ca ngày đã qua (ca nào đã live: mở ca đúng giờ ở Lịch & Studio rồi bấm Chốt lại để gắn target)` : ""} — ${r.total_slots} ca kế hoạch đã có ca thật/ca chờ${r.created > 0 ? ` (${r.created} ca đang chờ đăng ký)` : ""}.`
       );
     } catch (e) {
       setMsg(`Không chốt được: ${errorMessage(e)}`);

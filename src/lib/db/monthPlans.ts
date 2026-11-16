@@ -250,10 +250,16 @@ export interface LockPlanResult {
   skipped_past?: number; // 0099: ca kế hoạch ở ngày đã qua, không sinh slot
   linked_sessions?: number; // 0151: ca kế hoạch gắn vào ca thật nạp sẵn (không mở đăng ký)
   kept_cancelled?: number; // 0185: ca kế hoạch đã huỷ, không có ca thay thế — giữ huỷ, không mở lại
+  dropped_registered_slots?: number; // 0220: ca mở bị bỏ dù đã có người báo rảnh (chỉ khi gửi dropRegistered)
+  dropped_registrations?: number; // 0220: số lượt báo rảnh đã gỡ cùng các ca đó
 }
 
-export async function lockMonthPlan(planId: string): Promise<LockPlanResult> {
-  const { data, error } = await supabase.rpc("lock_month_plan", { p_plan_id: planId });
+/**
+ * `dropRegistered` (0220): ca MỞ bị bỏ khỏi kế hoạch mà đã có người báo rảnh thì huỷ luôn + báo từng người (mặc định: giữ lại như trước).
+ * Chỉ truyền true sau hộp xác nhận đã nêu số ca / số lượt báo rảnh.
+ */
+export async function lockMonthPlan(planId: string, dropRegistered = false): Promise<LockPlanResult> {
+  const { data, error } = await supabase.rpc("lock_month_plan", dropRegistered ? { p_plan_id: planId, p_drop_registered: true } : { p_plan_id: planId });
   if (error) throw error;
   return data as LockPlanResult;
 }
@@ -516,4 +522,14 @@ export async function fetchPlanCoverage(month: string): Promise<PlanCoverage> {
     }
   }
   return { slotsByPlan, boostByPlan };
+}
+
+/** Số lượt báo rảnh (session_availability) theo ca — để hộp "Chốt lại" nói rõ ca bị bỏ đang kéo theo bao nhiêu người. */
+export async function countRegistrationsBySlot(slotIds: string[]): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  if (slotIds.length === 0) return out;
+  const { data, error } = await supabase.from("session_availability").select("slot_id").in("slot_id", slotIds);
+  if (error) throw error;
+  for (const r of (data ?? []) as { slot_id: string }[]) out.set(r.slot_id, (out.get(r.slot_id) ?? 0) + 1);
+  return out;
 }

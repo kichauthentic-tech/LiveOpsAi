@@ -454,3 +454,13 @@ test("migration từ 0198 tạo view thì phải revoke quyền ghi của view �
   }
   expect(bad).toEqual([]);
 });
+
+// 0220: "Chốt lại" bỏ được ca MỞ đã có người báo rảnh. Giữ ba điều: mặc định vẫn là hành vi cũ (client cũ gọi 1 tham số),
+// nhánh huỷ chỉ chạy khi cờ bật và chỉ xét ca status 'open' (ca đã chốt người không bị đụng), và mỗi người bị gỡ nhận thông báo.
+test("0220 lock_month_plan: cờ drop mặc định false, chỉ ca open, có thông báo", () => {
+  const sql = sqlOnly(readFileSync(join(DIR, "0220_lock_plan_drop_registered.sql"), "utf8"));
+  expect(sql).toMatch(/p_drop_registered\s+boolean\s+default\s+false/i);
+  expect(sql).toMatch(/s\.plan_id\s*=\s*p_plan_id\s+and\s+s\.status\s*=\s*'open'/i);
+  expect(sql).toMatch(/if\s+p_drop_registered\s+then[\s\S]*insert\s+into\s+notifications[\s\S]*delete\s+from\s+session_availability/i);
+  expect(sql).toMatch(/drop\s+function\s+if\s+exists\s+lock_month_plan\(uuid\)/i);
+});
