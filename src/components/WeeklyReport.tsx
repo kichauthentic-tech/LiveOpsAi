@@ -306,9 +306,10 @@ export const ChannelSection: React.FC<{ w: WeeklyChannel; brand?: Pick<Brand, "n
       <div className="grid lg:grid-cols-2 gap-4">
         <Card title="Target vs thực đạt từng ngày" hint="Cột = thực đạt (màu theo % target), đường đứt = target ngày. Gạch màu dưới ngày = ngày Campaign."><DailyChart w={w} /></Card>
         <Card title="Luỹ kế từ đầu tháng" hint="Khoảng cách giữa hai đường = số còn thiếu/vượt so với target luỹ kế."><CumChart w={w} /></Card>
-        <Card title="Tổng từng đợt" hint="Mỗi dải Campaign liền nhau là một đợt; ngày thường gộp một dòng. Đợt chưa tới hiện target cả đợt."><EventsChart w={w} /></Card>
-        <Card title="Gãy ở chỉ số nào" hint="So với kỳ liền trước."><LiveFunnel views={[w.funnelView]} /></Card>
+        <Card className="lg:col-span-2" title="Tổng từng đợt" hint="Mỗi dải Campaign liền nhau là một đợt; ngày thường gộp một dòng. Đợt chưa tới hiện target cả đợt."><EventsChart w={w} /></Card>
       </div>
+
+      <Card title="Gãy ở chỉ số nào" hint="So với kỳ liền trước."><LiveFunnel views={[w.funnelView]} /></Card>
 
       <div className="grid lg:grid-cols-2 gap-4">
         <Card title={<span className="flex items-center gap-1.5 text-[var(--danger)]"><XCircle className="w-4 h-4" /> Ca đáng lưu ý</span>} hint={`Đạt dưới ${WEEKLY_THRESHOLDS.weakPct * 100}% target (ca mở thêm: GMV/giờ dưới ${WEEKLY_THRESHOLDS.weakRate * 100}% nền kênh). Chỉ số lệch = thấp hơn nền kênh ${WEEKLY_THRESHOLDS.baselineDays} ngày quá ${Math.round((1 - WEEKLY_THRESHOLDS.breakRatio) * 100)}%.`}>
