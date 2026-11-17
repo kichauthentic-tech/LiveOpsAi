@@ -79,7 +79,9 @@ const RECHARTS_FILES = [
   // Report Shopee từ 29/10 vẽ bằng SVG (demoCharts.ts) như report TikTok — không còn dùng recharts.
   "components/brand-workspace/report/ui.tsx",
   // GĐ2 biểu đồ Report Tháng (cầu, scatter) — chỉ MonthlyReportTabs import nên cùng chunk lazy.
-  "components/brand-workspace/report/Visuals.tsx"
+  "components/brand-workspace/report/Visuals.tsx",
+  // Báo Cáo Tuần (17/11): tab agency nạp lazy (lazyNamed ở App.tsx) — recharts nằm trong chunk riêng của tab, không vào file chính.
+  "components/WeeklyReport.tsx"
   // Trang Quảng cáo dựng lại theo demo bằng SVG (demoCharts.ts) — không còn dùng recharts.
 ];
 

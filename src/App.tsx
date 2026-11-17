@@ -113,6 +113,7 @@ const OpsBoard = lazyNamed(() => import("./components/OpsBoard"), "OpsBoard");
 const TodoPanel = lazyNamed(() => import("./components/TodoPanel"), "TodoPanel");
 const GlossaryDialog = lazyNamed(() => import("./components/GlossaryDialog"), "GlossaryDialog");
 const HostPerformance = lazyNamed(() => import("./components/HostPerformance"), "HostPerformance");
+const WeeklyReport = lazyNamed(() => import("./components/WeeklyReport"), "WeeklyReport");
 const Leaderboard = lazyNamed(() => import("./components/Leaderboard"), "Leaderboard");
 const BrandsOverview = lazyNamed(() => import("./components/BrandsOverview"), "BrandsOverview");
 const TalentShiftSignup = lazyNamed(() => import("./components/TalentShiftSignup"), "default");
@@ -143,6 +144,7 @@ const TAB_CHUNKS: Record<string, { preload: () => void }[]> = {
   month_plan: [MonthPlan],
   agency_overview: [AgencyDashboard],
   host_performance: [HostPerformance],
+  weekly_report: [WeeklyReport],
   leaderboard: [Leaderboard],
   brands_overview: [BrandsOverview],
   brand_dashboard: [BrandDashboard],
@@ -2361,6 +2363,12 @@ export default function App() {
 
                 {activeTab === "host_performance" && (
                   perPlatformBlocks((p) => <HostPerformance key={p} platform={p} sessions={activeSessions} brands={brandsOn(p)} />)
+                )}
+
+                {activeTab === "weekly_report" && (
+                  perPlatformBlocks((p) => (
+                    <WeeklyReport key={p} platform={p} today={todayVn()} brands={brandsOn(p)} brandChannels={channels} sessions={visibleSessions} shiftSlots={shiftSlots} engineParams={engineParams} currentRole={currentRole} />
+                  ))
                 )}
 
                 {activeTab === "leaderboard" && <Leaderboard sessions={visibleSessions} />}

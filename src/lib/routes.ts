@@ -19,6 +19,7 @@ const AGENCY_TAB_SLUGS: Record<string, string> = {
   sessions: "so-ca",
   roster: "dieu-phoi-lich",
   host_performance: "hieu-suat-host",
+  weekly_report: "bao-cao-tuan",
   leaderboard: "leader-board",
   brands_overview: "toan-canh-brand",
   talents: "talent-pool",

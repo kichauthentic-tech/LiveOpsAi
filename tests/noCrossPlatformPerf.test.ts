@@ -85,6 +85,7 @@ const SUM_RE = new RegExp(`reduce\\s*[<(]|\\+=|\\+\\s*\\(?\\s*[\\w!?.]+\\.(${PER
  */
 const SINGLE_PLATFORM_FILES: Record<string, string> = {
   "lib/performance/modelScoreboard.ts": "modelScoreboard có assertOnePlatform; channelMonthActual nhận ca của MỘT kênh brand × sàn (Kế Hoạch Tháng truyền platformSessions của brand)",
+  "lib/performance/weeklyReport.ts": "Báo Cáo Tuần: buildWeeklyChannel nhận thẻ + ca của MỘT kênh brand × sàn (ca đã lọc brand + platformOf); rollupChannels chỉ cộng các kênh CÙNG sàn (mỗi sàn một khối)",
   "lib/leaderboard/awards.ts": "Leader Board: mọi giải xét riêng từng account brand × sàn (accountKey lọc trước khi cộng GMV/target đợt)",
   "lib/sku/skuHistory.ts": "mỗi SkuHistory dựng từ file Sản Phẩm của MỘT sàn (buildSkuHistory nhận `platform`); cộng theo kỳ trong cùng sàn",
   "lib/dailyTargetBrief.ts": "Bản tin target ngày: monthActual cộng theo TỪNG kênh brand × sàn (khoá `brand|platform`), tổng ngày tách TikTok/Shopee",
