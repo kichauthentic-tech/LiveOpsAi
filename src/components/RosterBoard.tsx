@@ -312,7 +312,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
       rows.set(channelKeyOf(c.brandId, c.platform), { key: channelKeyOf(c.brandId, c.platform), brandId: c.brandId, brandName: brandNameById.get(c.brandId) ?? "", platform: c.platform });
     }
     for (const s of wk) if (!rows.has(s.channelKey)) rows.set(s.channelKey, { key: s.channelKey, brandId: s.brandId, brandName: s.brandName, platform: s.platform });
-    return [...rows.values()].sort((a, b) => a.brandName.localeCompare(b.brandName) || a.platform.localeCompare(b.platform));
+    return [...rows.values()].sort((a, b) => a.brandName.localeCompare(b.brandName) || (a.platform === b.platform ? 0 : a.platform.toLowerCase() === "tiktok" ? -1 : b.platform.toLowerCase() === "tiktok" ? 1 : a.platform.localeCompare(b.platform)));
   }, [p.brandChannels, brandNameById, wk]);
 
   const gridChannels = useMemo(() => (brandView === "all" || !channels.some((c) => c.brandId === brandView) ? channels : channels.filter((c) => c.brandId === brandView)), [channels, brandView]);
