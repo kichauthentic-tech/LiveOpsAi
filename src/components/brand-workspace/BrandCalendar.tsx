@@ -1,5 +1,5 @@
 import { platformText } from "../../lib/metricGlossary";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { inChannelScope, platformOf, type ChannelScope } from "../../lib/reportPlatform";
 import { Brand, LiveSession, PromoScheme, ShiftSlot, ShiftRegistration, Studio, Talent, UserRole, BrandStudio, AuditLogEntry, BrandChannel } from "../../types";
 import { SessionWindow } from "../SessionWindow";
@@ -25,6 +25,11 @@ import {
 import { getBrandTheme } from "../../lib/brandTheme";
 import { metricsHiddenFor } from "../../lib/sessionLedger";
 import { MonthPicker } from "../common/MonthPicker";
+import { StatTile } from "../common/StatTile";
+import { commitmentsRead, contractsRead } from "../../lib/db/brandContracts";
+import { monthCommitmentOf } from "../../lib/performance/brandCommitment";
+import { monthProgress, nowMinutesVn } from "../../lib/calendar/monthProgress";
+import type { BrandContract, BrandMonthlyCommitment } from "../../types";
 
 interface BrandCalendarProps {
   brandId: string;
@@ -146,6 +151,32 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
     () => shiftSlots.filter((sl) => sl.brandId === brandId && sl.status === "open" && inChannelScope(sl, platformScope)),
     [shiftSlots, brandId, platformScope]
   );
+
+  // Ô số tiến độ tháng: giờ đã live / đang live còn bao nhiêu / sắp tới / đã huỷ + GMV thực so target. Tháng đang xem theo chế độ (Tháng: ô chọn tháng; Tuần/Ngày: tháng của ngày đang chọn).
+  const progMonth = viewMode === "month" ? month : selectedDate.slice(0, 7);
+  const [cm, setCm] = useState<{ commitments: BrandMonthlyCommitment[]; contracts: BrandContract[] } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    Promise.all([commitmentsRead.take(), contractsRead.take()])
+      .then(([commitments, contracts]) => alive && setCm({ commitments, contracts }))
+      .catch(() => alive && setCm(null));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const progress = useMemo(
+    () => monthProgress(brandSessions, brandOpenSlots, progMonth, getTodayDateString(), nowMinutesVn(), (x) => currentRole === "brand" && metricsHiddenFor(x, "brand")),
+    [brandSessions, brandOpenSlots, progMonth, currentRole]
+  );
+  const progPlatforms = useMemo(() => {
+    const set = new Set<"TikTok" | "Shopee">();
+    if (platformScope !== "all") set.add(platformScope);
+    else for (const c of channels) if (c.brandId === brandId && c.status === "active") set.add(platformOf(c));
+    return (["TikTok", "Shopee"] as const).filter((pl) => set.has(pl));
+  }, [platformScope, channels, brandId]);
+  const commitFor = (pl: "TikTok" | "Shopee") => (cm ? monthCommitmentOf(cm.commitments, cm.contracts, brandId, pl, `${progMonth}-01`) : null);
+  const committedHours = progPlatforms.reduce((a, pl) => a + (commitFor(pl)?.hours ?? 0), 0);
+  const h1 = (v: number) => `${Math.round(v * 10) / 10}`.replace(".", ",");
 
   const studioById = useMemo(() => {
     const map: Record<string, Studio> = {};
@@ -379,6 +410,39 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
         }
       />
 
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3" aria-label={`Tiến độ tháng ${progMonth}`}>
+        {progPlatforms.map((pl) => {
+          const target = commitFor(pl)?.gmv ?? 0;
+          const actual = progress.gmv[pl];
+          return (
+            <StatTile
+              key={pl}
+              frame="card"
+              label={`GMV ${pl} tháng ${progMonth.slice(5)}`}
+              value={`${fmtVndShort(actual)}${target > 0 ? ` / ${fmtVndShort(target)}` : ""}`}
+              hint={target > 0 ? `${Math.round((actual / target) * 100)}% target` : "chưa có target"}
+              title="GMV thực của các ca đã live / target tháng. Không cộng hai sàn."
+            />
+          );
+        })}
+        <StatTile frame="card" label="Đã live" value={`${h1(progress.done)}h`} hint={committedHours > 0 ? `/ ${h1(committedHours)}h cam kết` : undefined} title="Giờ live thật đã giao trong tháng (ca đang live tính theo lịch)" />
+        <StatTile
+          frame="card"
+          label="Sắp tới"
+          value={`${h1(progress.upcoming)}h`}
+          hint={`${progress.upcomingCount} ca đã chốt${progress.openCount > 0 ? ` · +${h1(progress.open)}h ca mở` : ""}`}
+          title="Giờ các ca đã chốt chưa live, ca mở chờ đăng ký tính riêng"
+        />
+        <StatTile
+          frame="card"
+          label="Đã huỷ"
+          value={`${progress.cancelledCount} ca`}
+          tone={progress.cancelledCount > 0 ? "text-[var(--warning)]" : undefined}
+          hint={`${h1(progress.cancelled)}h không tính vào giờ live`}
+          title="Các ca đã huỷ trong tháng"
+        />
+      </div>
 
       {viewMode === "month" && emptySchemeWeeks > 0 && (
         <p className="text-2xs text-[var(--text-faint)] -mb-2">
