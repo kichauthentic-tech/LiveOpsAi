@@ -1,8 +1,8 @@
 import React from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { addDays, isoWeekNumber, isoWeekStart } from "../lib/dateUtils";
+import { isoWeekNumber, isoWeekStart } from "../lib/dateUtils";
 import { fmtDateVn } from "../lib/format";
-import { weeklyBounds, type WeeklyMode } from "../lib/performance/weeklyReport";
+import { shiftWeeklyAnchor, weeklyBounds, type WeeklyMode } from "../lib/performance/weeklyReport";
 import type { WeeklyPeriod } from "../lib/weeklyPeriodStore";
 
 // Thanh chọn kỳ của Báo Cáo Tuần — tách khỏi WeeklyReport.tsx để App import thẳng mà không kéo recharts vào bundle chính
@@ -22,11 +22,9 @@ function periodLabel(p: WeeklyPeriod): string {
   return `Tuần ${week} · ${fmtDateVn(b.from, false)} – ${fmtDateVn(b.to, false)}`;
 }
 
-/** Bước sang kỳ trước/sau: tuần ±7 ngày, tháng ±1 tháng (neo vào ngày 1 — tránh trôi ngày). */
+/** Bước sang kỳ trước/sau — luật ở shiftWeeklyAnchor (tuần vắt tháng thành hai đoạn, không bỏ ngày). */
 function shift(p: WeeklyPeriod, dir: -1 | 1): WeeklyPeriod {
-  if (p.mode === "week") return { ...p, anchor: addDays(isoWeekStart(p.anchor), 7 * dir) };
-  const d = new Date(Date.UTC(Number(p.anchor.slice(0, 4)), Number(p.anchor.slice(5, 7)) - 1 + dir, 1));
-  return { ...p, anchor: `${d.getUTCFullYear()}-${`${d.getUTCMonth() + 1}`.padStart(2, "0")}-01` };
+  return { ...p, anchor: shiftWeeklyAnchor(p.mode, p.anchor, dir, isoWeekStart) };
 }
 
 /** Thanh chọn kỳ — App đặt MỘT lần phía trên các khối sàn để hai sàn cùng xem một kỳ. */

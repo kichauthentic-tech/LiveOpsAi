@@ -2,7 +2,7 @@ import { useSyncExternalStore } from "react";
 import type { WeeklyMode } from "./performance/weeklyReport";
 
 // Kỳ đang xem của Báo Cáo Tuần — một biến module để hai khối sàn (TikTok / Shopee, mỗi khối một component) cùng xem MỘT kỳ
-// mà App.tsx không phải giữ state hay import tĩnh component tab (tests/bundleSplit). Không lưu localStorage: mở lại là "Từ đầu tháng".
+// mà App.tsx không phải giữ state hay import tĩnh component tab (tests/bundleSplit). Không lưu localStorage; kỳ chọn còn giữ khi chuyển tab, tải lại trang mới về "Từ đầu tháng".
 
 export interface WeeklyPeriod {
   mode: WeeklyMode;

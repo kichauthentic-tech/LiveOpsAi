@@ -5,6 +5,7 @@ import { dataSourceTier } from "../dataSource";
 import { profileOf } from "../platforms/profiles";
 import type { ReportPlatform } from "../reportPlatform";
 import { lastDataDate } from "./ceoBrief";
+import { estimateFunnelCv, MIN_COMPARE_SESSIONS, type FunnelView } from "./channelHealth";
 import { isCountable, sessionHours } from "./hostPerformance";
 import type { ChannelCard } from "./channelCard";
 import { planTargetOf } from "./targetAllocation";
@@ -12,7 +13,7 @@ import { fmtDateVn, fmtVndShort } from "../format";
 import { CAMP_DAY_BUCKET_LABEL } from "../campaignDays";
 
 // Báo Cáo Tuần (agency) — MỘT hàm trả lời cho từng kênh (brand × sàn) các câu sếp hỏi:
-//   1. Target tới nay được bao nhiêu?            → `range.targetToDate / actual / pct`, `month.*` (luỹ kế từ đầu tháng)
+//   1. Thực đạt trên target tổng của kỳ?        → `range.target / actual / pct` (pct = thực đạt ÷ target TỔNG cả kỳ), `monthTotal.*`
 //   2. Target/actual từng ngày, ngày camp?       → `days[]` (bucket D-Day / Mid-Month / Pay Day / Daily)
 //   3. Tổng từng đợt?                            → `events[]` (mỗi dải camp liền nhau một dòng) + `daily`
 //   4. Ca đáng lưu ý, gãy ở chỉ số nào?          → `weak[]` + `breaks` của từng ca, `funnel[]` của cả kỳ
@@ -25,7 +26,7 @@ import { CAMP_DAY_BUCKET_LABEL } from "../campaignDays";
 
 /** Ngưỡng chấm — đặt MỘT chỗ để nhãn, màu và test cùng đọc. */
 export const WEEKLY_THRESHOLDS = {
-  /** Thực đạt ÷ target tới nay: ≥ 1 đạt, ≥ NEAR sát, dưới đó hụt. */
+  /** Thực đạt ÷ target tổng: ≥ 1 đạt, ≥ NEAR sát, dưới đó hụt. */
   near: 0.8,
   /** Ca có target: dưới mức này (ví dụ 0,6 = đạt chưa tới 60%) là ca đáng lưu ý. */
   weakPct: 0.6,
@@ -65,6 +66,8 @@ export interface WeeklyDay {
   dow: number;
   bucket: CampDayBucket;
   target: number;
+  /** Mẫu số run-rate của ngày (như Dashboard "Tháng này"): ngày đủ số = target cả ngày; ngày cuối mới có một phần ca = chỉ target các ca đã có số. 0 khi ngày chưa vào run-rate. */
+  targetToDate: number;
   actual: number;
   /** done = đã có số; waiting = ngày đã qua/hôm nay nhưng chưa có số; future = chưa tới. */
   state: DayState;
@@ -183,6 +186,8 @@ export interface WeeklyChannel {
   events: WeeklyEvent[];
   daily: { target: number; targetToDate: number; actual: number; pct: number | null };
   funnel: FunnelRow[];
+  /** Phễu live NGANG (module LiveFunnel của Dashboard): bậc → tỷ lệ giữa các bậc, kỳ này so với kỳ liền trước CÙNG SỐ NGÀY. */
+  funnelView: FunnelView;
   weak: SessionNote[];
   strong: SessionNote[];
   missing: MissingNote[];
@@ -210,8 +215,12 @@ export function buildWeeklyChannel(x: { card: ChannelCard; sessions: LiveSession
   const { card, sessions, from, to, today } = x;
   const th = WEEKLY_THRESHOLDS;
   const platform = card.platform;
-  const metrics = profileOf(platform).metrics;
+  const profile = profileOf(platform);
+  const metrics = profile.metrics;
   const rr = card.rr;
+  // Mốc "tới nay" đi theo MỘT luật với Dashboard: buildAccountRunRate (cắt theo ca — ngày cuối mới có một phần ca chỉ lấy target các ca đã có số).
+  const rep = card.report ?? null;
+  const repDay = new Map((rep?.days ?? []).map((d) => [d.date, d]));
   const month = card.month;
   const mStart = `${month}-01`;
   const mEnd = monthLast(month);
@@ -231,6 +240,8 @@ export function buildWeeklyChannel(x: { card: ChannelCard; sessions: LiveSession
   const monthTargetSum = eachDay(mStart, mEnd).reduce((a, d) => a + targetOn(d), 0);
   const targetSource: WeeklyChannel["targetSource"] = rr ? "plan" : monthTargetSum > 0 ? "sessions" : "none";
   const upTo = (d: string) => through != null && d <= through;
+  /** Mẫu số run-rate của một ngày đã có số: theo báo cáo run-rate (từng ca) nếu có, không thì target cả ngày. */
+  const expectedOn = (d: string) => (rep ? repDay.get(d)?.expected ?? 0 : targetOn(d));
 
   const sessionsOnDate = new Map<string, number>();
   for (const s of monthSessions) if (live(s)) sessionsOnDate.set(s.date, (sessionsOnDate.get(s.date) ?? 0) + 1);
@@ -238,8 +249,9 @@ export function buildWeeklyChannel(x: { card: ChannelCard; sessions: LiveSession
   const dayRow = (d: string): WeeklyDay => {
     const target = targetOn(d);
     const actual = upTo(d) ? actualOn(d) : 0;
+    const targetToDate = upTo(d) ? expectedOn(d) : 0;
     const state: DayState = d > today ? "future" : upTo(d) ? "done" : "waiting";
-    return { date: d, dow: dowOf(d), bucket: bucketOf(d), target, actual, state, sessions: sessionsOnDate.get(d) ?? 0, pct: state === "done" ? ratio(actual, target) : null };
+    return { date: d, dow: dowOf(d), bucket: bucketOf(d), target, targetToDate, actual, state, sessions: sessionsOnDate.get(d) ?? 0, pct: state === "done" ? ratio(actual, target) : null };
   };
   const days = eachDay(from, to).map(dayRow);
 
@@ -259,11 +271,11 @@ export function buildWeeklyChannel(x: { card: ChannelCard; sessions: LiveSession
     if (!open) return;
     const ds = open.days;
     const target = ds.reduce((a, d) => a + targetOn(d), 0);
-    const targetToDate = ds.filter(upTo).reduce((a, d) => a + targetOn(d), 0);
+    const targetToDate = ds.filter(upTo).reduce((a, d) => a + expectedOn(d), 0);
     const actual = ds.filter(upTo).reduce((a, d) => a + actualOn(d), 0);
     const last = ds[ds.length - 1];
     const status: WeeklyEvent["status"] = through && last <= through ? "done" : !through || ds[0] > through ? "next" : "live";
-    events.push({ bucket: open.bucket, from: ds[0], to: last, target, targetToDate, actual, pct: ratio(actual, targetToDate), status, inRange: ds.some((d) => d >= from && d <= to) });
+    events.push({ bucket: open.bucket, from: ds[0], to: last, target, targetToDate, actual, pct: ratio(actual, target), status, inRange: ds.some((d) => d >= from && d <= to) });
     open = null;
   };
   for (const d of eachDay(mStart, mEnd)) {
@@ -277,21 +289,25 @@ export function buildWeeklyChannel(x: { card: ChannelCard; sessions: LiveSession
   const dailyDays = eachDay(mStart, mEnd).filter((d) => bucketOf(d) === "daily");
   const daily = {
     target: dailyDays.reduce((a, d) => a + targetOn(d), 0),
-    targetToDate: dailyDays.filter(upTo).reduce((a, d) => a + targetOn(d), 0),
+    targetToDate: dailyDays.filter(upTo).reduce((a, d) => a + expectedOn(d), 0),
     actual: dailyDays.filter(upTo).reduce((a, d) => a + actualOn(d), 0),
     pct: null as number | null
   };
-  daily.pct = ratio(daily.actual, daily.targetToDate);
+  daily.pct = ratio(daily.actual, daily.target);
 
   // ---- tổng kỳ ----
   const rangeSessions = monthSessions.filter((s) => s.date >= from && s.date <= to && live(s));
   const rangeCountable = rangeSessions.filter((s) => isCountable(s) && s.date <= today);
-  const rTargetToDate = days.filter((d) => upTo(d.date)).reduce((a, d) => a + d.target, 0);
+  const rTargetToDate = days.reduce((a, d) => a + d.targetToDate, 0);
+  const rTargetTotal = days.reduce((a, d) => a + d.target, 0);
   const rActual = days.reduce((a, d) => a + d.actual, 0);
   const rHours = rangeCountable.reduce((a, s) => a + sessionHours(s), 0);
-  const prev = prevRange(from, to);
+  // So CÙNG SỐ NGÀY: kỳ chưa hết (tháng đang chạy, tuần đang chạy) chỉ có số tới `through`, nên kỳ trước cũng cắt đúng bấy nhiêu ngày —
+  // không lấy cả tháng/tuần trước đặt cạnh nửa kỳ này (luôn ra "giảm" giả).
+  const effTo = through != null && through < to ? through : to;
+  const prev = prevRange(from, effTo >= from ? effTo : from);
   const prevCountable = sessions.filter((s) => s.date >= prev.from && s.date <= prev.to && isCountable(s));
-  const prevActual = prevCountable.length > 0 ? sumActual(prevCountable) : null;
+  const prevActual = through != null && through >= from && prevCountable.length > 0 ? sumActual(prevCountable) : null;
   const waiting = rr ? rr.slots.filter((t) => t.state === "no_data" && t.planSlot.date >= from && t.planSlot.date <= to).length : 0;
   const cancelledInRange = rr
     ? rr.slots.filter((t) => t.state === "cancelled" && t.planSlot.date >= from && t.planSlot.date <= to).length
@@ -327,6 +343,18 @@ export function buildWeeklyChannel(x: { card: ChannelCard; sessions: LiveSession
     const base = preM ? metrics.value(preM, key) : null;
     return [{ key, label: def.label, cur, base, delta: cur != null && base != null && base > 0 ? cur / base - 1 : null, goodWhenUp: def.goodWhenUp }];
   });
+
+  // Phễu ngang cho UI: cùng hàm dựng phễu của Dashboard (profile.liveFunnel + ngưỡng dao động theo số ca), kỳ này so kỳ liền trước cùng số ngày.
+  const prevCountableFunnel = prevCountable;
+  const fl = profile.liveFunnel({ pairs: new Map(), cur: rangeCountable, prev: prevCountableFunnel }, estimateFunnelCv(sessions));
+  const funnelView: FunnelView = {
+    key: "mtd",
+    tab: "Kỳ báo cáo",
+    sub: through != null && through >= from ? `${dm(from)}–${dm(effTo)} so với ${dm(prev.from)}–${dm(prev.to)}` : "chưa có ngày có số",
+    funnel: fl,
+    empty: fl ? null : `Chưa đủ ca: ${rangeCountable.length} và ${prevCountableFunnel.length}, cần ≥ ${MIN_COMPARE_SESSIONS} mỗi kỳ.`,
+    note: null
+  };
 
   // ---- từng ca ----
   const slotBySession = new Map<string, { target: number; state: string }>();
@@ -366,15 +394,17 @@ export function buildWeeklyChannel(x: { card: ChannelCard; sessions: LiveSession
   return {
     key: card.key, brandId: card.brandId, brandName: card.brandName, brandLogo: card.brandLogo, platform, name: card.name, month, from, to, today, through, targetSource,
     range: {
-      target: days.reduce((a, d) => a + d.target, 0), targetToDate: rTargetToDate, actual: rActual, pct: ratio(rActual, rTargetToDate), gap: rActual - rTargetToDate,
+      target: rTargetTotal, targetToDate: rTargetToDate, actual: rActual, pct: ratio(rActual, rTargetTotal), gap: rActual - rTargetTotal,
       hours: rHours, gmvPerHour: rHours > 0 ? rActual / rHours : null, sessions: rangeCountable.length, cancelled: cancelledInRange, waiting,
       prevActual, prevDelta: prevActual != null && prevActual > 0 ? rActual / prevActual - 1 : null
     },
-    monthTotal: rr
-      ? { target: rr.total.target, targetToDate: rr.total.targetToDate, actual: rr.total.actual, pct: rr.total.runRate, keepPace: rr.total.keepPace, remainingDays: rr.total.remainingDays, needPerRemainingDay: rr.total.needPerRemainingDay }
-      : { target: monthTargetSum, targetToDate: cum.filter((c) => upTo(c.date)).length ? cum.filter((c) => upTo(c.date)).slice(-1)[0].cumTarget : 0, actual: cA, pct: null, keepPace: null, remainingDays: 0, needPerRemainingDay: null },
-    level: paceLevel(ratio(rActual, rTargetToDate)),
-    days, cum, events, daily, funnel, weak, strong, missing,
+    monthTotal: rep
+      ? { target: rep.total.target, targetToDate: rep.total.targetToDate, actual: rep.total.actual, pct: ratio(rep.total.actual, rep.total.target), keepPace: rep.total.keepPace, remainingDays: rep.total.remainingDays, needPerRemainingDay: rep.total.needPerRemainingDay }
+      : rr
+      ? { target: rr.total.target, targetToDate: rr.total.targetToDate, actual: rr.total.actual, pct: ratio(rr.total.actual, rr.total.target), keepPace: rr.total.keepPace, remainingDays: rr.total.remainingDays, needPerRemainingDay: rr.total.needPerRemainingDay }
+      : { target: monthTargetSum, targetToDate: cum.filter((c) => upTo(c.date)).length ? cum.filter((c) => upTo(c.date)).slice(-1)[0].cumTarget : 0, actual: cA, pct: ratio(cA, monthTargetSum), keepPace: null, remainingDays: 0, needPerRemainingDay: null },
+    level: paceLevel(ratio(rActual, rTargetTotal)),
+    days, cum, events, daily, funnel, funnelView, weak, strong, missing,
     manualCount: rangeCountable.filter((s) => dataSourceTier(s) === "manual").length,
     baselineSessions: baseSessions.length
   };
@@ -408,12 +438,13 @@ export interface PlatformRollup {
 
 export function rollupChannels(list: WeeklyChannel[]): PlatformRollup {
   const targetToDate = list.reduce((a, c) => a + c.range.targetToDate, 0);
+  const target = list.reduce((a, c) => a + c.range.target, 0);
   const actual = list.reduce((a, c) => a + c.range.actual, 0);
   return {
-    target: list.reduce((a, c) => a + c.range.target, 0),
+    target,
     targetToDate,
     actual,
-    pct: ratio(actual, targetToDate),
+    pct: ratio(actual, target),
     channels: list.length,
     on: list.filter((c) => c.level === "on").length,
     near: list.filter((c) => c.level === "near").length,
@@ -438,6 +469,20 @@ export function weeklyBounds(mode: WeeklyMode, anchor: string, weekStart: (d: st
   return { from: ws < mStart ? mStart : ws, to: we > mEnd ? mEnd : we, month };
 }
 
+/**
+ * Neo của kỳ liền trước/sau. Tuần: bước qua đúng MỘT đoạn (tuần ISO đã cắt theo tháng) — ngày liền sau `to` hoặc liền trước `from`,
+ * nên tuần vắt qua hai tháng thành hai đoạn và không ngày nào (vd 01/11 là Chủ nhật của tuần 26/10–01/11) bị bỏ qua.
+ * Tháng: neo vào ngày 1 của tháng kề.
+ */
+export function shiftWeeklyAnchor(mode: WeeklyMode, anchor: string, dir: -1 | 1, weekStart: (d: string) => string): string {
+  if (mode === "week") {
+    const b = weeklyBounds("week", anchor, weekStart);
+    return dir > 0 ? addDays(b.to, 1) : addDays(b.from, -1);
+  }
+  const d = new Date(Date.UTC(Number(anchor.slice(0, 4)), Number(anchor.slice(5, 7)) - 1 + dir, 1));
+  return `${d.getUTCFullYear()}-${`${d.getUTCMonth() + 1}`.padStart(2, "0")}-01`;
+}
+
 // ---------------------------------------------------------------------------
 // Kết luận bằng chữ — các gạch đầu dòng sếp đọc trước khi nhìn biểu đồ. Mọi câu đều suy từ số trong `WeeklyChannel`,
 // không có câu nào cố định: kênh không có gì đáng nói thì chỉ còn câu đầu.
@@ -453,18 +498,18 @@ export function channelHeadline(w: WeeklyChannel): string[] {
   const r = w.range;
   if (w.targetSource === "none") {
     out.push(`Chưa có target: thực đạt ${fmtVndShort(r.actual)}, ${r.sessions} ca có số.`);
-  } else if (w.through == null || r.targetToDate <= 0) {
+  } else if (w.through == null || r.target <= 0) {
     out.push("Kỳ này chưa ngày nào có số để so target.");
   } else {
     const word = w.level === "on" ? "đạt" : w.level === "near" ? "sát target" : "hụt target";
     const delta = r.prevDelta != null ? `; ${r.prevDelta >= 0 ? "tăng" : "giảm"} ${pctText(Math.abs(r.prevDelta))} so với kỳ liền trước` : "";
-    out.push(`Tới ${dm(w.through)}: ${fmtVndShort(r.actual)} / ${fmtVndShort(r.targetToDate)} target tới nay = ${pctText(r.pct ?? 0)} (${word})${delta}.`);
+    out.push(`Tới ${dm(w.through)}: ${fmtVndShort(r.actual)} / ${fmtVndShort(r.target)} target tổng = ${pctText(r.pct ?? 0)} (${word})${delta}.`);
   }
   const ev = w.events.filter((e) => e.inRange && e.pct != null && e.status !== "next").sort((a, b) => (a.pct ?? 0) - (b.pct ?? 0));
   if (ev.length > 0) {
     const worst = ev[0], best = ev[ev.length - 1];
     const label = (e: WeeklyEvent) => `${CAMP_DAY_BUCKET_LABEL[e.bucket].split(" (")[0]} ${spanLabel(e.from, e.to)}`;
-    if ((worst.pct ?? 1) < WEEKLY_THRESHOLDS.near) out.push(`Đợt kéo xuống: ${label(worst)} chỉ ${pctText(worst.pct ?? 0)} target (${fmtVndShort(worst.actual)} / ${fmtVndShort(worst.targetToDate)}).`);
+    if ((worst.pct ?? 1) < WEEKLY_THRESHOLDS.near) out.push(`Đợt kéo xuống: ${label(worst)} chỉ ${pctText(worst.pct ?? 0)} target (${fmtVndShort(worst.actual)} / ${fmtVndShort(worst.target)}).`);
     if (best !== worst && (best.pct ?? 0) >= 1) out.push(`Đợt tốt: ${label(best)} đạt ${pctText(best.pct ?? 0)} target.`);
   }
   const who = (n: SessionNote) => `${dm(n.session.date)} ${n.session.startTime.slice(0, 5)} (${n.session.hostName || "chưa gán host"})`;

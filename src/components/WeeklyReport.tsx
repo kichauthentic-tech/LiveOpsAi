@@ -7,12 +7,12 @@ import { fmtFixed, fmtVndFull, fmtVndShort } from "../lib/format";
 import { CAMP_DAY_BUCKET_LABEL, type CampDayBucket } from "../lib/campaignDays";
 import { platformOf, type ReportPlatform } from "../lib/reportPlatform";
 import { downloadSheetsAsXlsx, xlsxFailText } from "../lib/exportXlsx";
-import { profileOf } from "../lib/platforms/profiles";
 import {
   buildWeeklyChannel, channelHeadline, rollupChannels, spanLabel, WEEKLY_THRESHOLDS,
   type PaceLevel, type SessionNote, type WeeklyChannel
 } from "../lib/performance/weeklyReport";
 import { channelRefs, useChannelCards } from "./dashboard/useChannelCards";
+import { LiveFunnel } from "./dashboard/LiveFunnel";
 import { useToast } from "../hooks/useToast";
 import { periodOf, WeeklyPeriodBar } from "./WeeklyPeriodBar";
 import { useWeeklyPeriod } from "../lib/weeklyPeriodStore";
@@ -23,7 +23,7 @@ import { PlatformChip } from "./common/PlatformChip";
 import { SectionNav } from "./common/SectionNav";
 import { BrandLogo } from "./ui/BrandLogo";
 
-// Báo Cáo Tuần (agency): MỘT trang cho sếp — mỗi kênh (account × sàn) một mục, trả lời: target tới nay được bao nhiêu, target/thực đạt
+// Báo Cáo Tuần (agency): MỘT trang cho sếp — mỗi kênh (account × sàn) một mục, trả lời: thực đạt trên target tổng, target/thực đạt
 // từng ngày (ngày Campaign tô riêng), tổng từng đợt, ca đáng lưu ý và gãy ở chỉ số nào, ca tốt vì sao. Toàn bộ số do
 // `lib/performance/weeklyReport.ts` dựng từ cùng thẻ kênh/run-rate của Dashboard — trang này chỉ vẽ.
 // Màu lấy từ token của theme (đổi theme là đổi theo), mức đạt luôn kèm chữ + biểu tượng, không chỉ có màu.
@@ -179,9 +179,9 @@ const EventsChart: React.FC<{ w: WeeklyChannel }> = ({ w }) => {
   const rows = [
     ...w.events.map((e) => ({
       name: `${CAMP_SHORT[e.bucket]} ${spanLabel(e.from, e.to)}`,
-      target: e.status === "next" ? e.target : e.targetToDate, actual: e.status === "next" ? null : e.actual, pct: e.pct, status: e.status, color: CAMP_COLOR[e.bucket]
+      target: e.target, actual: e.status === "next" ? null : e.actual, pct: e.pct, status: e.status, color: CAMP_COLOR[e.bucket]
     })),
-    { name: "Ngày thường", target: w.daily.targetToDate, actual: w.daily.actual, pct: w.daily.pct, status: "done" as const, color: C.faint }
+    { name: "Ngày thường", target: w.daily.target, actual: w.daily.actual, pct: w.daily.pct, status: "done" as const, color: C.faint }
   ].filter((r) => r.target > 0 || (r.actual ?? 0) > 0);
   if (rows.length === 0) return <p className="text-xs text-[var(--text-muted)]">Chưa có target theo đợt.</p>;
   return (
@@ -200,7 +200,7 @@ const EventsChart: React.FC<{ w: WeeklyChannel }> = ({ w }) => {
                 return (
                   <div style={tooltipBox}>
                     <p className="font-bold">{r.name}</p>
-                    <p>{r.status === "next" ? "Target cả đợt (chưa tới)" : "Target tới nay"}: <b>{fmtVndFull(r.target)}</b></p>
+                    <p>{r.status === "next" ? "Target cả đợt (chưa tới)" : "Target cả đợt"}: <b>{fmtVndFull(r.target)}</b></p>
                     <p>Thực đạt: <b>{r.actual == null ? "—" : fmtVndFull(r.actual)}</b></p>
                     {r.pct != null && <p>Đạt: <b>{pctStr(r.pct)}</b></p>}
                   </div>
@@ -223,48 +223,12 @@ const EventsChart: React.FC<{ w: WeeklyChannel }> = ({ w }) => {
           </li>
         ))}
       </ul>
-      <Legend items={[{ swatch: C.target, label: "Target (tới nay; đợt chưa tới: cả đợt)" }, { swatch: C.good, label: "≥ 100%" }, { swatch: C.warn, label: `${WEEKLY_THRESHOLDS.near * 100}–99%` }, { swatch: C.bad, label: `< ${WEEKLY_THRESHOLDS.near * 100}%` }]} />
+      <Legend items={[{ swatch: C.target, label: "Target cả đợt" }, { swatch: C.good, label: "≥ 100%" }, { swatch: C.warn, label: `${WEEKLY_THRESHOLDS.near * 100}–99%` }, { swatch: C.bad, label: `< ${WEEKLY_THRESHOLDS.near * 100}%` }]} />
     </div>
   );
 };
 
 /** Phễu: mỗi chỉ số một dòng, thanh lệch so với 28 ngày liền trước kỳ (xanh = tốt lên, đỏ = tệ đi; chỉ số trung tính xám). */
-const FunnelBlock: React.FC<{ w: WeeklyChannel }> = ({ w }) => {
-  const metrics = profileOf(w.platform).metrics;
-  if (w.funnel.length === 0) return <p className="text-xs text-[var(--text-muted)]">Chưa đủ ca có số (cần ≥ {WEEKLY_THRESHOLDS.minFunnelSessions}) để đọc chỉ số của kỳ.</p>;
-  const MAX = 0.6;
-  return (
-    <ul className="space-y-2">
-      {w.funnel.map((f) => {
-        const def = metrics.defs.find((d) => d.key === f.key);
-        const d = f.delta;
-        const bad = d != null && f.goodWhenUp != null && (f.goodWhenUp ? d < 0 : d > 0);
-        const good = d != null && f.goodWhenUp != null && (f.goodWhenUp ? d > 0 : d < 0);
-        const color = d == null || f.goodWhenUp == null ? C.faint : bad ? C.bad : good ? C.good : C.faint;
-        const bar = d == null ? 0 : Math.min(1, Math.abs(d) / MAX) * 50;
-        const broken = bad && d != null && d <= -(1 - WEEKLY_THRESHOLDS.breakRatio);
-        return (
-          <li key={f.key} className="grid grid-cols-[minmax(7rem,1fr)_minmax(0,1.4fr)_5.5rem] items-center gap-3 text-xs">
-            <span className="text-[var(--text)] font-medium flex items-center gap-1.5 min-w-0">
-              <span className="truncate">{f.label}</span>
-              {broken && <span className="text-2xs font-black text-[var(--danger)] border border-[var(--danger)]/40 rounded px-1 shrink-0">gãy</span>}
-            </span>
-            <span className="relative h-3 rounded bg-[var(--surface-elevated)]" role="img" aria-label={`${f.label} ${d == null ? "chưa so được" : `${d >= 0 ? "tăng" : "giảm"} ${pctStr(Math.abs(d))} so với 28 ngày trước`}`}>
-              <span className="absolute inset-y-0 left-1/2 w-px bg-[var(--border)]" />
-              {d != null && <span className="absolute inset-y-0.5 rounded" style={{ background: color, width: `${bar}%`, left: d >= 0 ? "50%" : `${50 - bar}%` }} />}
-            </span>
-            <span className="text-right tabular-nums">
-              <b style={{ color }}>{d == null ? "—" : `${d >= 0 ? "+" : "−"}${pctStr(Math.abs(d))}`}</b>
-              <span className="block text-2xs text-[var(--text-faint)]">{def ? metrics.fmt(def, f.cur) : "—"} <span aria-hidden>←</span> {def ? metrics.fmt(def, f.base) : "—"}</span>
-            </span>
-          </li>
-        );
-      })}
-      <li className="text-2xs text-[var(--text-faint)]">Kỳ này so với 28 ngày liền trước kỳ (số nhỏ: kỳ này ← kỳ so sánh). Thanh giữa = không đổi.</li>
-    </ul>
-  );
-};
-
 // ---------- ca ----------
 
 const TIER_LABEL = { manual: "tự khai", handover: "số giao ca", reconciled: "đã đối soát" } as const;
@@ -332,18 +296,18 @@ export const ChannelSection: React.FC<{ w: WeeklyChannel; brand?: Pick<Brand, "n
       </ul>
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        <StatTile frame="card" label="Target tới nay" value={r.targetToDate > 0 ? fmtVndShort(r.targetToDate) : "—"} hint={r.target > r.targetToDate ? `cả kỳ ${fmtVndShort(r.target)}` : undefined} />
+        <StatTile frame="card" label="Target tổng" value={r.target > 0 ? fmtVndShort(r.target) : "—"} />
         <StatTile frame="card" label="Thực đạt" value={fmtVndShort(r.actual)} tone={L.tone} hint={r.prevDelta != null ? <span className="inline-flex items-center gap-1">{r.prevDelta >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}{pctStr(Math.abs(r.prevDelta))} so kỳ trước</span> : "kỳ trước chưa có số"} />
-        <StatTile frame="card" label={r.gap >= 0 ? "Vượt target" : "Còn thiếu"} value={r.targetToDate > 0 ? fmtVndShort(Math.abs(r.gap)) : "—"} tone={r.gap >= 0 ? "text-[var(--success)]" : "text-[var(--danger)]"} />
+        <StatTile frame="card" label={r.gap >= 0 ? "Vượt target" : "Còn thiếu"} value={r.target > 0 ? fmtVndShort(Math.abs(r.gap)) : "—"} tone={r.gap >= 0 ? "text-[var(--success)]" : "text-[var(--danger)]"} />
         <StatTile frame="card" label="GMV/giờ live" value={fmtVndShort(r.gmvPerHour)} hint={`${fmtFixed(r.hours, 1)}h live`} />
         <StatTile frame="card" label="Ca có số" value={`${r.sessions}`} hint={[r.waiting > 0 && `${r.waiting} chưa có số`, r.cancelled > 0 && `${r.cancelled} huỷ`].filter(Boolean).join(" · ") || "đủ số"} />
       </div>
 
       <div className="grid lg:grid-cols-2 gap-4">
         <Card title="Target vs thực đạt từng ngày" hint="Cột = thực đạt (màu theo % target), đường đứt = target ngày. Gạch màu dưới ngày = ngày Campaign."><DailyChart w={w} /></Card>
-        <Card title="Luỹ kế từ đầu tháng" hint="Khoảng cách giữa hai đường = số còn thiếu/vượt tới nay."><CumChart w={w} /></Card>
+        <Card title="Luỹ kế từ đầu tháng" hint="Khoảng cách giữa hai đường = số còn thiếu/vượt so với target luỹ kế."><CumChart w={w} /></Card>
         <Card title="Tổng từng đợt" hint="Mỗi dải Campaign liền nhau là một đợt; ngày thường gộp một dòng. Đợt chưa tới hiện target cả đợt."><EventsChart w={w} /></Card>
-        <Card title="Gãy ở chỉ số nào" hint="Phễu live của kỳ so với 28 ngày liền trước."><FunnelBlock w={w} /></Card>
+        <Card title="Gãy ở chỉ số nào" hint="So với kỳ liền trước."><LiveFunnel views={[w.funnelView]} /></Card>
       </div>
 
       <div className="grid lg:grid-cols-2 gap-4">
@@ -377,19 +341,19 @@ export const ChannelSection: React.FC<{ w: WeeklyChannel; brand?: Pick<Brand, "n
 export const OverviewBlock: React.FC<{ list: WeeklyChannel[] }> = ({ list }) => {
   const roll = useMemo(() => rollupChannels(list), [list]);
   const rows = useMemo(
-    () => list.filter((c) => c.range.targetToDate > 0 || c.range.actual > 0).sort((a, b) => (a.range.pct ?? 9) - (b.range.pct ?? 9)).map((c) => ({ name: c.name, target: c.range.targetToDate, actual: c.range.actual, pct: c.range.pct })),
+    () => list.filter((c) => c.range.target > 0 || c.range.actual > 0).sort((a, b) => (a.range.pct ?? 9) - (b.range.pct ?? 9)).map((c) => ({ name: c.name, target: c.range.target, actual: c.range.actual, pct: c.range.pct })),
     [list]
   );
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatTile frame="card" label="Target tới nay" value={fmtVndShort(roll.targetToDate)} hint={`${roll.channels} account`} />
+        <StatTile frame="card" label="Target tổng" value={fmtVndShort(roll.target)} hint={`${roll.channels} account`} />
         <StatTile frame="card" label="Thực đạt" value={fmtVndShort(roll.actual)} />
         <StatTile frame="card" label="% target" value={pctStr(roll.pct)} tone={roll.pct == null ? undefined : roll.pct >= 1 ? "text-[var(--success)]" : roll.pct >= WEEKLY_THRESHOLDS.near ? "text-[var(--warning)]" : "text-[var(--danger)]"} />
         <StatTile frame="card" label="Account đạt / sát / hụt" value={`${roll.on} / ${roll.near} / ${roll.behind}`} hint={roll.none > 0 ? `${roll.none} chưa có target` : undefined} />
       </div>
       {rows.length > 0 && (
-        <Card title="Mỗi account: thực đạt so target tới nay" hint="Xếp từ hụt nhiều nhất lên đầu.">
+        <Card title="Mỗi account: thực đạt so target tổng" hint="Xếp từ hụt nhiều nhất lên đầu.">
           <div style={{ height: Math.max(140, rows.length * 44 + 20) }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={rows} layout="vertical" margin={{ top: 4, right: 16, left: 8, bottom: 0 }} barCategoryGap={8}>
@@ -401,7 +365,7 @@ export const OverviewBlock: React.FC<{ list: WeeklyChannel[] }> = ({ list }) => 
                   content={({ active, payload }) => {
                     const p = active ? (payload?.[0]?.payload as (typeof rows)[number] | undefined) : undefined;
                     if (!p) return null;
-                    return <div style={tooltipBox}><p className="font-bold">{p.name}</p><p>Target tới nay: <b>{fmtVndFull(p.target)}</b></p><p>Thực đạt: <b>{fmtVndFull(p.actual)}</b></p><p>Đạt: <b>{pctStr(p.pct)}</b></p></div>;
+                    return <div style={tooltipBox}><p className="font-bold">{p.name}</p><p>Target tổng: <b>{fmtVndFull(p.target)}</b></p><p>Thực đạt: <b>{fmtVndFull(p.actual)}</b></p><p>Đạt: <b>{pctStr(p.pct)}</b></p></div>;
                   }}
                 />
                 <Bar dataKey="target" fill={C.target} fillOpacity={0.35} radius={[0, 4, 4, 0]} barSize={12} isAnimationActive={false} />
@@ -412,7 +376,7 @@ export const OverviewBlock: React.FC<{ list: WeeklyChannel[] }> = ({ list }) => 
           <ul className="grid sm:grid-cols-2 gap-x-4 gap-y-1">
             {rows.map((p) => <li key={p.name} className="flex justify-between gap-2 text-xs border-b border-[var(--border-muted)] py-1"><span className="text-[var(--text)]">{p.name}</span><span className="tabular-nums text-[var(--text-muted)]">{fmtVndShort(p.actual)} / {fmtVndShort(p.target)} · <b style={{ color: levelColor(p.pct) }}>{pctStr(p.pct)}</b></span></li>)}
           </ul>
-          <Legend items={[{ swatch: C.target, label: "Target tới nay" }, { swatch: C.good, label: "≥ 100%" }, { swatch: C.warn, label: `${WEEKLY_THRESHOLDS.near * 100}–99%` }, { swatch: C.bad, label: `< ${WEEKLY_THRESHOLDS.near * 100}%` }]} />
+          <Legend items={[{ swatch: C.target, label: "Target tổng" }, { swatch: C.good, label: "≥ 100%" }, { swatch: C.warn, label: `${WEEKLY_THRESHOLDS.near * 100}–99%` }, { swatch: C.bad, label: `< ${WEEKLY_THRESHOLDS.near * 100}%` }]} />
         </Card>
       )}
     </div>
@@ -446,7 +410,7 @@ export const WeeklyReport: React.FC<WeeklyReportProps> = ({ platform, today, bra
       cards
         .filter((c) => c.state !== "off")
         .map((card) => buildWeeklyChannel({ card, sessions: sessions.filter((s) => s.brandId === card.brandId && platformOf(s) === card.platform), from: bounds.from, to: bounds.to, today }))
-        .sort((a, b) => b.range.targetToDate - a.range.targetToDate || b.range.actual - a.range.actual),
+        .sort((a, b) => b.range.target - a.range.target || b.range.actual - a.range.actual),
     [cards, sessions, bounds, today]
   );
   const brandOf = useMemo(() => new Map(brands.map((b) => [b.id, b])), [brands]);
@@ -455,9 +419,9 @@ export const WeeklyReport: React.FC<WeeklyReportProps> = ({ platform, today, bra
     const num = (v: number | null) => (v == null || Number.isNaN(v) ? "" : Math.round(v * 1000) / 1000);
     downloadSheetsAsXlsx(
       [
-        { name: "Tong quan", rows: channels.map((w) => ({ Account: w.name, "Sàn": w.platform, "Từ": w.from, "Đến": w.to, "Target tới nay": w.range.targetToDate, "Thực đạt": w.range.actual, "% target": num(w.range.pct), "Chênh": w.range.gap, "Giờ live": num(w.range.hours), "GMV/giờ": num(w.range.gmvPerHour), "Ca có số": w.range.sessions, "Ca chưa có số": w.range.waiting, "Ca huỷ": w.range.cancelled, "Target tháng": w.monthTotal.target, "Giữ nhịp cuối tháng": num(w.monthTotal.keepPace) })) },
+        { name: "Tong quan", rows: channels.map((w) => ({ Account: w.name, "Sàn": w.platform, "Từ": w.from, "Đến": w.to, "Target tổng": w.range.target, "Thực đạt": w.range.actual, "% target tổng": num(w.range.pct), "Chênh": w.range.gap, "Giờ live": num(w.range.hours), "GMV/giờ": num(w.range.gmvPerHour), "Ca có số": w.range.sessions, "Ca chưa có số": w.range.waiting, "Ca huỷ": w.range.cancelled, "Target tháng": w.monthTotal.target, "Giữ nhịp cuối tháng": num(w.monthTotal.keepPace) })) },
         { name: "Theo ngay", rows: channels.flatMap((w) => w.days.map((d) => ({ Account: w.name, "Ngày": d.date, "Loại ngày": CAMP_DAY_BUCKET_LABEL[d.bucket], Target: d.target, "Thực đạt": d.state === "done" ? d.actual : "", "% target": num(d.pct), "Số ca": d.sessions, "Trạng thái": d.state === "done" ? "có số" : d.state === "waiting" ? "chưa có số" : "chưa tới" }))) },
-        { name: "Theo dot", rows: channels.flatMap((w) => [...w.events.map((e) => ({ Account: w.name, "Đợt": `${CAMP_DAY_BUCKET_LABEL[e.bucket]} ${e.from}→${e.to}`, "Target cả đợt": e.target, "Target tới nay": e.targetToDate, "Thực đạt": e.actual, "% target": num(e.pct) })), { Account: w.name, "Đợt": "Ngày thường", "Target cả đợt": w.daily.target, "Target tới nay": w.daily.targetToDate, "Thực đạt": w.daily.actual, "% target": num(w.daily.pct) }]) },
+        { name: "Theo dot", rows: channels.flatMap((w) => [...w.events.map((e) => ({ Account: w.name, "Đợt": `${CAMP_DAY_BUCKET_LABEL[e.bucket]} ${e.from}→${e.to}`, "Target cả đợt": e.target, "Thực đạt": e.actual, "% target": num(e.pct) })), { Account: w.name, "Đợt": "Ngày thường", "Target cả đợt": w.daily.target, "Thực đạt": w.daily.actual, "% target": num(w.daily.pct) }]) },
         { name: "Ca luu y va tot", rows: channels.flatMap((w) => [...w.weak.map((n) => ["Đáng lưu ý", n] as const), ...w.strong.map((n) => ["Tốt", n] as const)].map(([kind, n]) => ({ Account: w.name, Loại: kind, "Ngày": n.session.date, "Giờ": `${n.session.startTime.slice(0, 5)}-${n.session.endTime.slice(0, 5)}`, Host: n.session.hostName, Target: n.target, "Thực đạt": n.actual, "% target": num(n.pct), "GMV/giờ": num(n.gmvPerHour), "Chỉ số lệch nền": (kind === "Tốt" ? n.wins : n.breaks).map((m) => m.text).join("; ") }))) }
       ],
       `BaoCaoTuan_${platform}_${bounds.from}_${bounds.to}.xlsx`
@@ -469,7 +433,7 @@ export const WeeklyReport: React.FC<WeeklyReportProps> = ({ platform, today, bra
       <PageHeader
         icon={CalendarRange}
         title="Báo Cáo Tuần"
-        description={<>Mỗi account một mục: target tới nay, target/thực đạt từng ngày (ngày Campaign tô riêng), tổng từng đợt, ca đáng lưu ý và gãy ở chỉ số nào, ca tốt vì sao. Số lấy từ cùng Kế Hoạch Tháng đã chốt và run-rate của Dashboard — không tính lần thứ hai.</>}
+        description={<>Mỗi account một mục: target tổng, target/thực đạt từng ngày (ngày Campaign tô riêng), tổng từng đợt, ca đáng lưu ý và gãy ở chỉ số nào, ca tốt vì sao. Số lấy từ cùng Kế Hoạch Tháng đã chốt và run-rate của Dashboard — không tính lần thứ hai.</>}
         actions={
           <button onClick={exportXlsx} disabled={channels.length === 0} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] text-xs font-bold text-[var(--text-muted)] hover:text-[var(--text)] disabled:opacity-40">
             <Download className="w-3.5 h-3.5" /> Tải Excel

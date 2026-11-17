@@ -1,7 +1,8 @@
 // Báo Cáo Tuần (agency) — lib/performance/weeklyReport.ts
 // Chạy: npx vitest run tests/weeklyReport.test.ts
 import { describe, expect, test } from "vitest";
-import { buildWeeklyChannel, paceLevel, prevRange, rollupChannels, weeklyBounds } from "../src/lib/performance/weeklyReport";
+import { buildWeeklyChannel, paceLevel, prevRange, rollupChannels, shiftWeeklyAnchor, weeklyBounds } from "../src/lib/performance/weeklyReport";
+import { buildAccountRunRate } from "../src/lib/performance/runRateUpdate";
 import { planRunRate } from "../src/lib/performance/planRunRate";
 import { isoWeekStart } from "../src/lib/dateUtils";
 import { resolveCampBucketType } from "../src/lib/campaignDays";
@@ -57,9 +58,11 @@ describe("buildWeeklyChannel", () => {
     // target ≤ 10/11: 100+100+100+80+70+200 = 650M (ca huỷ GIỮ target); thực đạt 90+20+130+150 = 390M
     expect(w.range.targetToDate).toBe(650e6);
     expect(w.range.actual).toBe(390e6);
-    expect(w.range.pct).toBeCloseTo(0.6, 5);
-    expect(w.level).toBe("behind");
     expect(w.range.target).toBe(750e6); // ca ngày 14 còn tương lai
+    // % = thực đạt ÷ target TỔNG của kỳ (không phải target tới nay): 390 ÷ 750
+    expect(w.range.pct).toBeCloseTo(0.52, 5);
+    expect(w.range.gap).toBe(390e6 - 750e6);
+    expect(w.level).toBe("behind");
     expect(w.targetSource).toBe("plan");
   });
 
@@ -121,6 +124,41 @@ describe("buildWeeklyChannel", () => {
     expect(at("2026-11-30").cumTarget).toBe(750e6);
   });
 
+  test("so kỳ trước CÙNG SỐ NGÀY: kỳ chưa hết chỉ so với đúng bấy nhiêu ngày trước đó", () => {
+    const { card, sessions } = fixture();
+    const w = buildWeeklyChannel({ card, sessions, from: "2026-11-01", to: "2026-11-30", today: "2026-11-12" });
+    // số tới 10/11 ⇒ 10 ngày (01–10/11) so với 22–31/10: 4 ca × 50M (ca 20–21/10 nằm ngoài, không lẫn vào)
+    expect(w.range.prevActual).toBe(200e6);
+    expect(w.range.prevDelta).toBeCloseTo(390 / 200 - 1, 5);
+  });
+
+  test("tới nay khớp Dashboard: ngày cuối mới có một phần ca chỉ lấy target các ca đã có số", () => {
+    const d10 = ca("2026-11-10", 150e6);
+    const d11 = ca("2026-11-11", 60e6, { startTime: "14:00", endTime: "17:00" });
+    const sessions = [d10, d11];
+    const shifts = [shift("d", "2026-11-10", d10.id), shift("e", "2026-11-11", d11.id), shift("f", "2026-11-11", undefined, "open" as ShiftSlot["status"])];
+    const slots = [plan("p1", "2026-11-10", 200e6, "d"), plan("p2", "2026-11-11", 100e6, "e"), plan("p3", "2026-11-11", 100e6, "f")];
+    const rr = planRunRate("2026-11", slots, shifts, sessions, "2026-11-12");
+    const report = buildAccountRunRate(rr, rr.through, "2026-11-10");
+    const base = { key: "vera|TikTok", brandId: "vera", brandName: "VERA", platform: "TikTok", name: "VERA", month: "2026-11", rr, bucketOf: (d: string) => resolveCampBucketType(d) };
+    const range = { from: "2026-11-01", to: "2026-11-30", today: "2026-11-12" };
+    const live = buildWeeklyChannel({ card: { ...base, report } as unknown as ChannelCard, sessions, ...range });
+    // 10/11: 200M; 11/11 chỉ ca 14h có số: 100M ⇒ mẫu số 300M (không phải 400M của cả hai ngày)
+    expect(live.range.targetToDate).toBe(300e6);
+    expect(live.range.actual).toBe(210e6);
+    expect(live.range.targetToDate).toBe(report.total.targetToDate); // mẫu số run-rate vẫn khớp Dashboard "Tháng này" (không còn hiện ra ngoài)
+    // % hiển thị = ÷ target tổng cả tháng (400M): 210 ÷ 400
+    expect(live.range.target).toBe(400e6);
+    expect(live.range.pct).toBeCloseTo(0.525, 5);
+    expect(live.monthTotal.pct).toBeCloseTo(0.525, 5);
+    expect(live.days.find((d) => d.date === "2026-11-11")!.pct).toBeCloseTo(0.3, 5); // 60M ÷ 200M target cả ngày
+    // đợt/ngày thường cộng lại cũng đi theo mẫu số này
+    expect(live.events.reduce((a, e) => a + e.targetToDate, 0) + live.daily.targetToDate).toBe(300e6);
+    // không truyền report: rơi về luật cũ (target cả ngày)
+    const legacy = buildWeeklyChannel({ card: base as unknown as ChannelCard, sessions, ...range });
+    expect(legacy.range.targetToDate).toBe(400e6);
+  });
+
   test("kênh chưa chốt kế hoạch: rơi về target của ca và ghi nguồn", () => {
     const { card, sessions } = fixture();
     const noPlan = { ...card, rr: null } as unknown as ChannelCard;
@@ -147,13 +185,34 @@ describe("helpers", () => {
   test("prevRange cùng độ dài", () => {
     expect(prevRange("2026-11-09", "2026-11-15")).toEqual({ from: "2026-11-02", to: "2026-11-08" });
   });
+  test("đi tuần lùi/tiến không bỏ ngày nào, kể cả tuần vắt hai tháng (01/11 là Chủ nhật của tuần 26/10)", () => {
+    expect(shiftWeeklyAnchor("week", "2026-11-02", -1, isoWeekStart)).toBe("2026-11-01");
+    expect(weeklyBounds("week", "2026-11-01", isoWeekStart)).toMatchObject({ from: "2026-11-01", to: "2026-11-01" });
+    expect(shiftWeeklyAnchor("week", "2026-11-01", -1, isoWeekStart)).toBe("2026-10-31");
+    expect(shiftWeeklyAnchor("week", "2026-11-01", 1, isoWeekStart)).toBe("2026-11-02");
+    // Đi hết tháng 11 từ trên xuống: các đoạn liền nhau, phủ đủ 30 ngày, không đoạn nào qua tháng khác.
+    const seen: string[] = [];
+    let anchor = "2026-11-01";
+    for (let i = 0; i < 8; i++) {
+      const b = weeklyBounds("week", anchor, isoWeekStart);
+      expect(b.month).toBe("2026-11");
+      seen.push(`${b.from}..${b.to}`);
+      const nxt = shiftWeeklyAnchor("week", anchor, 1, isoWeekStart);
+      if (nxt.slice(0, 7) !== "2026-11") break;
+      anchor = nxt;
+    }
+    expect(seen).toEqual(["2026-11-01..2026-11-01", "2026-11-02..2026-11-08", "2026-11-09..2026-11-15", "2026-11-16..2026-11-22", "2026-11-23..2026-11-29", "2026-11-30..2026-11-30"]);
+    expect(shiftWeeklyAnchor("mtd", "2026-11-17", -1, isoWeekStart)).toBe("2026-10-01");
+    expect(shiftWeeklyAnchor("mtd", "2026-12-01", -1, isoWeekStart)).toBe("2026-11-01");
+  });
   test("rollupChannels cộng cùng sàn và đếm mức", () => {
     const { card, sessions } = fixture();
     const w = buildWeeklyChannel({ card, sessions, from: "2026-11-01", to: "2026-11-30", today: "2026-11-12" });
     const r = rollupChannels([w, w]);
     expect(r.actual).toBe(780e6);
     expect(r.behind).toBe(2);
-    expect(r.pct).toBeCloseTo(0.6, 5);
+    expect(r.target).toBe(1500e6);
+    expect(r.pct).toBeCloseTo(0.52, 5);
   });
 });
 
@@ -163,7 +222,9 @@ describe("channelHeadline", () => {
     const { card, sessions } = fixture();
     const w = buildWeeklyChannel({ card, sessions, from: "2026-11-01", to: "2026-11-30", today: "2026-11-12" });
     const lines = channelHeadline(w);
-    expect(lines[0]).toContain("60%");
+    expect(lines[0]).toContain("52%");
+    expect(lines[0]).toContain("target tổng");
+    expect(lines[0]).not.toContain("tới nay");
     expect(lines.join("\n")).toMatch(/D-Day/);
     expect(lines.join("\n")).toMatch(/Ca đáng lưu ý nhất: .*20% target/);
     expect(lines.join("\n")).toMatch(/Ca tốt nhất: .*130% target/);
