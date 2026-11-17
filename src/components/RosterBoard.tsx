@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SwapApprovalQueue } from "./shiftSwap/SwapApprovalQueue";
-import { ChevronDown, ChevronLeft, ChevronRight, ClipboardList, FileSpreadsheet, Send, X } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, ClipboardList, Send, X } from "lucide-react";
 import type { Brand, BrandChannel, BrandStudio, LiveSession, ShiftRegistration, ShiftSlot, Studio, Talent, TalentRateHistoryEntry, UserRole } from "../types";
 import { PageHeader } from "./common/PageHeader";
 import { useToast } from "../hooks/useToast";
@@ -10,8 +10,6 @@ import { fmtVndShort } from "../lib/format";
 import { talentShortName } from "../lib/talentName";
 import { addDays, getTodayDate, isoWeekStart } from "../lib/dateUtils";
 import { sumGmvByPlatform } from "../lib/platforms/perf";
-import { halfRange } from "../lib/roster/milestones";
-import { suggestNextShift } from "../lib/scheduling/nextShift";
 import { updateOpenSlotTime } from "../lib/db/shiftSlots";
 import {
   fetchRosterChanges,
@@ -36,20 +34,22 @@ import {
 import type { BrandTalentRule } from "../lib/commercial/terms";
 import { inferRoleRows, type TalentBrandRole } from "../lib/roster/talentBrandRoles";
 import { analyzeRoster, buildBrandRuleIndex, buildRosterShifts, channelKeyOf, DEFAULT_ROSTER_RULES, shiftHours, type RosterRole, type RosterRules, type RosterShift } from "../lib/roster/rules";
-import { autofillWeek, buildFamiliarity, famOf, planCostCut, shiftCost, type CostMove, type RankContext, type RankMode } from "../lib/roster/candidates";
+import { buildFamiliarity, famOf, planCostCut, shiftCost, type CostMove, type RankContext, type RankMode } from "../lib/roster/candidates";
 import { ShiftPanel, dayLabel } from "./roster/ShiftPanel";
 import { AbsencePanel, ChangeLogPanel, ChecksPanel, HoursCostPanel, MatrixPanel, RulesPanel, WeekGrid, type ChannelRow } from "./roster/panels";
-import { NextDesk, NowDesk, nextMonthOf, useRosterDesk, type NowChannel } from "./roster/MonthDesk";
+import { NextDesk, nextMonthOf, useRosterDesk } from "./roster/MonthDesk";
 import { MonthStrip, fmtWhen, type MonthAction, type MonthCard } from "./roster/MonthStrip";
 import { monthStatus } from "../lib/roster/monthStatus";
 import { OpenMonthWizard } from "./roster/OpenMonthWizard";
 import { BrandScheduleExportDialog } from "./roster/BrandScheduleExportDialog";
 import { MonthPlanPanel } from "./roster/MonthPlanPanel";
+import { PersonBar } from "./roster/PersonBar";
+import { MoreMenu } from "./ui/MoreMenu";
+import { buildPersonRows, defaultRole, personLoad, planPersonBulk, registrationCounts, type BulkPlan } from "../lib/roster/byPerson";
 import { buildPersonColors } from "../lib/roster/personColor";
 import { WorkloadTable } from "./roster/WorkloadTable";
 import { MonthReviewPanel } from "./roster/MonthReviewPanel";
-import { DEFAULT_BOUNDS, GOALS, GOAL_HINT, GOAL_LABEL, applyPlanRows, buildHostChannelGmv, buildHostPerformance, daysInMonth, planMonth, releaseAutoFilled, releaseRoleViolations, type AutoFill, type MonthBounds, type PlanGoal } from "../lib/roster/monthPlanner";
-import { platformOf } from "../lib/reportPlatform";
+import { DEFAULT_BOUNDS, GOALS, GOAL_HINT, GOAL_LABEL, applyPlanRows, buildHostChannelGmv, buildHostPerformance, daysInMonth, personBounds, planMonth, releaseAutoFilled, releaseRoleViolations, type AutoFill, type MonthBounds, type PlanGoal } from "../lib/roster/monthPlanner";
 import type { EngineParams } from "../lib/scheduling/engineParams";
 import type { ReportPlatform } from "../lib/reportPlatform";
 import { FeatureOffNote } from "./common/FeatureOffNote";
@@ -95,7 +95,7 @@ interface Props {
 // Tháng này / Tháng sau / Tuần và 6 tab con. Một màn: dải trạng thái theo tháng (MonthStrip) + "Việc cần làm" (mỗi việc một nút)
 // + lưới tuần có giờ tháng cạnh mỗi kênh. Các màn phụ (Kiểm lịch, Báo nghỉ theo người, Ma trận kênh, Giờ & chi phí, Luật & nhật
 // ký, giờ từng kênh tháng này, mở lịch tháng sau) mở dưới lưới từ menu "Thêm" hoặc từ nút của thẻ tháng.
-type Section = "plan" | "now" | "next" | "checks" | "absence" | "matrix" | "hours" | "review" | "rules";
+type Section = "plan" | "next" | "checks" | "absence" | "matrix" | "hours" | "review" | "rules";
 const MORE: { id: Section; label: string }[] = [
   { id: "plan", label: "Xếp cả tháng theo mục tiêu" },
   { id: "checks", label: "Kiểm lịch (mọi lỗi + cảnh báo)" },
@@ -104,12 +104,10 @@ const MORE: { id: Section; label: string }[] = [
   { id: "hours", label: "Giờ & chi phí" },
   { id: "review", label: "Tổng kết tháng (cast & GMV từng người)" },
   { id: "rules", label: "Luật & nhật ký" },
-  { id: "now", label: "Giờ từng kênh tháng này" },
   { id: "next", label: "Mở lịch tháng sau (từng kênh)" }
 ];
 const SECTION_TITLE: Record<Section, string> = {
   plan: "Xếp cả tháng theo mục tiêu",
-  now: "Giờ từng kênh tháng này",
   next: "Mở lịch tháng sau",
   checks: "Kiểm lịch",
   absence: "Báo nghỉ theo người",
@@ -118,14 +116,6 @@ const SECTION_TITLE: Record<Section, string> = {
   review: "Tổng kết tháng theo người",
   rules: "Luật & nhật ký"
 };
-
-interface Todo {
-  key: string;
-  tone: "bad" | "warn";
-  text: string;
-  sub?: string;
-  action?: { label: string; run: () => void };
-}
 
 const STAFF: UserRole[] = ["ceo", "admin", "operations", "trainer"];
 const loadMode = (): RankMode => {
@@ -189,6 +179,11 @@ export const RosterBoard: React.FC<Props> = (p) => {
   const [monthsNonce, setMonthsNonce] = useState(0);
   const [mode, setMode] = useState<RankMode>(loadMode);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  // "Xếp theo người" (17/11): làm ngay trên lưới tuần — chọn người + vai ⇒ lưới tô sáng, bấm ô để xếp / bỏ. Không có danh sách ca riêng.
+  const [moreStats, setMoreStats] = useState(false);
+  const [personOn, setPersonOn] = useState(false);
+  const [personId, setPersonId] = useState("");
+  const [personRole, setPersonRole] = useState<RosterRole | null>(null);
   // Lọc lưới theo brand (mặc định Tất cả). Chỉ ảnh hưởng cách hiển thị lưới, giờ/luật vẫn tính mọi brand.
   const [brandView, setBrandView] = useState<string>("all");
   const [busy, setBusy] = useState(false);
@@ -303,12 +298,18 @@ export const RosterBoard: React.FC<Props> = (p) => {
     [shifts, rules, weekStart, fam, p.talents, p.talentRateHistory, mode, nameOf, brandRules, hostPerf, hostChGmv]
   );
   const wk = useMemo(() => shifts.filter((s) => s.date >= weekStart && s.date <= weekEnd), [shifts, weekStart, weekEnd]);
+  // "Theo người": cả tháng đang xem (+ 7 ngày trước để bắt khoảng nghỉ / chuỗi ngày, + 1 ngày sau cho ca qua đêm).
+  const monthShifts = useMemo(
+    () => (personOn ? buildRosterShifts(p.sessions, p.shiftSlots, drafts, p.shiftRegistrations, addDays(`${viewMonth}-01`, -7), addDays(`${viewMonth}-${String(daysInMonth(viewMonth)).padStart(2, "0")}`, 1)) : []),
+    [personOn, p.sessions, p.shiftSlots, drafts, p.shiftRegistrations, viewMonth]
+  );
 
   const brandNameById = useMemo(() => new Map(p.brands.map((b) => [b.id, b.name])), [p.brands]);
   const channels: ChannelRow[] = useMemo(() => {
     const rows = new Map<string, ChannelRow>();
     for (const c of p.brandChannels) {
-      if (c.status !== "active") continue;
+      // Brand không còn trong danh sách hiển thị (đã ẩn / ngừng hợp tác) ⇒ không vẽ dòng kênh không tên.
+      if (c.status !== "active" || !brandNameById.has(c.brandId)) continue;
       rows.set(channelKeyOf(c.brandId, c.platform), { key: channelKeyOf(c.brandId, c.platform), brandId: c.brandId, brandName: brandNameById.get(c.brandId) ?? "", platform: c.platform });
     }
     for (const s of wk) if (!rows.has(s.channelKey)) rows.set(s.channelKey, { key: s.channelKey, brandId: s.brandId, brandName: s.brandName, platform: s.platform });
@@ -608,19 +609,68 @@ export const RosterBoard: React.FC<Props> = (p) => {
       if (ok) showToast(`Đã thêm ca mở ${ch.brandName} ${dayLabel(date)} ${start}–${end}. Kênh đã chốt kế hoạch thì đây là ca tăng cường (không cộng target tháng).`);
     });
 
-  const doAutofill = () =>
+  /** "Xếp tất cả ca hợp lệ" ở màn Theo người: ghi nháp những ô `planPersonBulk` đã chọn. */
+  const applyPersonBulk = (plan: BulkPlan, name: string) =>
     run(async () => {
-      const res = autofillWeek(ctx);
-      if (res.assignments.length === 0) {
-        showToast(res.missed ? `Không xếp được ${res.missed} chỗ: không ai rảnh, quen kênh và không phạm luật` : "Tuần này không còn ca mở trống người");
-        return;
+      const rows = new Map<string, RosterDraft>();
+      for (const pl of plan.placed) {
+        const s = plan.shifts.find((x) => x.key === pl.shiftKey)!;
+        rows.set(pl.slotId, { slotId: pl.slotId, hostId: s.hostId, coHostId: s.coHostId, noAssistant: s.coHostId ? undefined : s.noAssistant });
       }
-      const bySlot = new Map<string, RosterDraft>();
-      for (const s of res.shifts) if (s.kind === "open" && s.slotId && res.assignments.some((a) => a.slotId === s.slotId)) bySlot.set(s.slotId, { slotId: s.slotId, hostId: s.hostId, coHostId: s.coHostId, noAssistant: s.noAssistant });
-      await saveRosterDrafts([...bySlot.values()], p.currentUserId);
-      setDrafts((prev) => [...prev.filter((d) => !bySlot.has(d.slotId)), ...bySlot.values()]);
-      showToast(`Đã xếp ${res.assignments.length} chỗ vào nháp${res.missed ? `, còn ${res.missed} chỗ không ai đủ điều kiện` : ""}`);
+      await saveRosterDrafts([...rows.values()], p.currentUserId);
+      setDrafts((prev) => [...prev.filter((d) => !rows.has(d.slotId)), ...rows.values()]);
+      showToast(`Đã xếp ${name} vào ${plan.placed.length} ca (nháp)${plan.skipped ? `, bỏ qua ${plan.skipped} ca` : ""}`);
     });
+
+  const personTalent = personOn && personId ? talentById.get(personId) : undefined;
+  const monthCtx = useMemo(() => ({ ...ctx, shifts: monthShifts }), [ctx, monthShifts]);
+  const personCounts = useMemo(() => (personOn ? registrationCounts(monthShifts, viewMonth) : new Map<string, { registered: number; placed: number }>()), [personOn, monthShifts, viewMonth]);
+  const personPeople = useMemo(
+    () =>
+      p.talents
+        .filter((t) => personCounts.has(t.id))
+        .map((t) => ({ talent: t, registered: personCounts.get(t.id)!.registered }))
+        .sort((a, b) => b.registered - a.registered || talentShortName(a.talent).localeCompare(talentShortName(b.talent), "vi")),
+    [p.talents, personCounts]
+  );
+  const roleNow: RosterRole = personRole ?? (personTalent ? defaultRole(personTalent, { hostId: undefined, coHostId: undefined, noAssistant: false } as RosterShift) : "host");
+  const personRows = useMemo(() => (personTalent ? buildPersonRows(monthShifts, personTalent, viewMonth, monthCtx, roleNow).filter((r) => r.shift.date >= today) : []), [personTalent, monthShifts, viewMonth, monthCtx, roleNow, today]);
+  const personBulk = useMemo(() => (personTalent ? planPersonBulk(monthShifts, personTalent, viewMonth, monthCtx, roleNow) : null), [personTalent, monthShifts, viewMonth, monthCtx, roleNow]);
+  const personHours = useMemo(() => {
+    if (!personTalent || !personBulk) return undefined;
+    const l = personLoad(monthShifts, personTalent.id, viewMonth);
+    const b = personBounds(personTalent, bounds, rules, viewMonth);
+    const add = personBulk.placed.reduce((sum, pl) => sum + shiftHours(monthShifts.find((x) => x.key === pl.shiftKey)!), 0);
+    return { placed: l.host + l.co, min: b.min, max: b.max, addIfAll: add };
+  }, [personTalent, personBulk, monthShifts, viewMonth, bounds, rules]);
+
+  /** Bấm ô trên lưới. Đang chọn người: ô họ đăng ký ⇒ xếp (hỏi nếu cảnh báo / thay người); ô họ đã xếp ⇒ hỏi rồi bỏ; ô khác ⇒ mở chi tiết ca như thường. */
+  const onGridSelect = async (key: string) => {
+    const row = personTalent ? personRows.find((r) => r.shift.key === key) : undefined;
+    if (!personTalent || !row) return setSelectedKey(key);
+    if (readOnly) return showToast("Bạn chỉ có quyền xem lịch.");
+    const nm = nameOf(personTalent.id);
+    const label = `${row.shift.brandName} ${dayLabel(row.shift.date)} ${row.shift.startTime}`;
+    if (row.holds) {
+      if (await confirm(`Bỏ ${nm} khỏi ca ${label}?`, { confirmLabel: "Bỏ khỏi ca" })) await assign(row.shift, row.holds, undefined);
+      return;
+    }
+    if (row.blocked) return showToast(`Không xếp được: ${row.blocked}`);
+    if (row.noCo) return showToast("Ca này gắn No Asst — không có chỗ trợ.");
+    const rl = row.role === "host" ? "Host" : "Trợ";
+    if (row.takenBy) {
+      if (!(await confirm(`Thay ${nameOf(row.takenBy)} bằng ${nm} (${rl}) — ${label}? ${nameOf(row.takenBy)} vẫn giữ lượt đăng ký ca này.`, { confirmLabel: "Thay người" }))) return;
+    } else if (row.issues.length > 0) {
+      if (!(await confirm(`${nm} vào ca ${label} sẽ có cảnh báo: ${row.issues.join("; ")}. Vẫn xếp?`, { confirmLabel: "Vẫn xếp" }))) return;
+    }
+    await assign(row.shift, row.role, personTalent.id);
+  };
+  const bulkPerson = async () => {
+    if (!personTalent || !personBulk || personBulk.placed.length === 0) return;
+    const h = personHours?.addIfAll ?? 0;
+    if (!(await confirm(`Xếp ${nameOf(personTalent.id)} làm ${roleNow === "host" ? "Host" : "Trợ"} vào ${personBulk.placed.length} ca (${Math.round(h * 10) / 10} giờ) trong NHÁP — chỉ ca còn trống, không trùng giờ, không cảnh báo. Talent chưa thấy cho tới khi công bố.`, { confirmLabel: `Xếp ${personBulk.placed.length} ca` }))) return;
+    await applyPersonBulk(personBulk, nameOf(personTalent.id));
+  };
 
   const applyCost = () =>
     run(async () => {
@@ -822,32 +872,6 @@ export const RosterBoard: React.FC<Props> = (p) => {
       showToast("Trình duyệt chặn chép — thử lại bằng Chrome/Safari bản mới");
     }
   };
-  /** Thêm ca cho kênh thiếu giờ: ca tốt nhất còn trống theo bộ xếp ca của Kế Hoạch Tháng (06/11); kênh chưa có lịch sử thì như cũ —
-   *  ngày còn lại kênh ít ca nhất, giờ 19:00. Người dùng vẫn sửa giờ trước khi tạo. */
-  const addShiftFor = (r: NowChannel) => {
-    const ch = { key: channelKeyOf(r.brandId, r.platform), brandId: r.brandId, brandName: r.brandName, platform: r.platform as ChannelRow["platform"] };
-    const next = suggestNextShift(p.sessions, p.shiftSlots, r.brandId, r.platform as ReportPlatform, m0, today, p.engineParams);
-    if (next) {
-      goWeekOf(next.date);
-      void addShift(ch, next.date, { start: next.startTime, end: next.endTime, note: `Gợi ý: ${next.startTime}–${next.endTime} — khung còn trống hiệu quả nhất theo lịch sử kênh (dự báo ~${fmtVndShort(next.expectedGmv)}).` });
-      return;
-    }
-    const end = `${m0}-${String(monthEndDay(m0)).padStart(2, "0")}`;
-    let best: string | null = null;
-    let bestN = Infinity;
-    for (let d = today; d <= end; d = addDays(d, 1)) {
-      const n =
-        p.sessions.filter((s) => s.brandId === r.brandId && platformOf(s) === r.platform && s.date === d && s.status !== "Cancelled").length +
-        p.shiftSlots.filter((sl) => sl.brandId === r.brandId && platformOf(sl) === r.platform && sl.date === d && sl.status === "open" && !sl.sessionId).length;
-      if (n < bestN) {
-        best = d;
-        bestN = n;
-      }
-    }
-    if (!best) return;
-    goWeekOf(best);
-    void addShift(ch, best);
-  };
   const nudge = (month: string) => {
     const st = statusOf(month);
     const missing = p.talents.filter((t) => t.profileId && (t.role === "Host" || t.role === "Assistant") && !st.signedIds.has(t.id)).map((t) => talentShortName(t));
@@ -859,8 +883,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
     void copyText(text, `Đã chép tin nhắc ${missing.length} người chưa đăng ký — dán vào nhóm Zalo`);
   };
   const onMonthAction = (kind: MonthAction, month: string) => {
-    if (kind === "now") openSection("now");
-    else if (kind === "next") {
+    if (kind === "next") {
       if (month === m1) openWizard();
       else openSection("next");
     }
@@ -882,90 +905,14 @@ export const RosterBoard: React.FC<Props> = (p) => {
     }
   };
 
-  const todos: Todo[] = [];
-  if (blocks.length > 0)
-    todos.push({ key: "blocks", tone: "bad", text: `${blocks.length} lỗi chặn công bố ở tuần đang xem.`, sub: blocks[0].text, action: { label: "Xem ca", run: () => setSelectedKey(blocks[0].shiftKey) } });
-  const mNext = `tháng ${Number(m1.slice(5))}`;
-  if (st1.phase === "none" && !desk.loading)
-    todos.push({ key: "next", tone: "bad", text: `${mNext[0].toUpperCase()}${mNext.slice(1)} bắt đầu sau ${daysToNext} ngày, chưa mở ca nào.`, sub: `${noCommitNext}/${desk.nextRows.length} kênh chưa có giờ cam kết.`, action: { label: `Mở lịch ${mNext}`, run: openWizard } });
-  else if (st1.phase === "no_deadline")
-    todos.push({ key: "next", tone: "warn", text: `${mNext[0].toUpperCase()}${mNext.slice(1)} đang nhận đăng ký (chưa đặt hạn): ${st1.slotsWithSignup}/${st1.openSlots} ca có người báo rảnh.`, sub: `${st1.noHost} ca chưa có host.`, action: { label: "Đặt hạn (không bắt buộc)", run: openWizard } });
-  else if (st1.phase === "signup")
-    todos.push({ key: "next", tone: "warn", text: `${mNext[0].toUpperCase()}${mNext.slice(1)} đang nhận đăng ký tới ${fmtWhen(st1.deadline!)}: ${st1.slotsWithSignup}/${st1.openSlots} ca có người báo rảnh.`, action: { label: "Chép tin nhắc người chưa đăng ký", run: () => nudge(m1) } });
-  else if (st1.phase === "staff")
-    todos.push({ key: "next", tone: "bad", text: `${mNext[0].toUpperCase()}${mNext.slice(1)}: còn ${st1.noHost} ca mở chưa có host.`, sub: `${st1.noHostWithSignup} ca có người báo rảnh. Mỗi tuần bấm Tự xếp người rồi Công bố.`, action: { label: "Tới tuần còn trống", run: () => onMonthAction("staff", m1) } });
-  else if (st1.phase === "publish")
-    todos.push({ key: "next", tone: "warn", text: `${mNext[0].toUpperCase()}${mNext.slice(1)}: ${st1.weeksToPublish.length} tuần có ca nháp chưa công bố.`, action: { label: "Tới tuần chưa công bố", run: () => onMonthAction("publish", m1) } });
-  // Mốc chốt lịch từng đợt (0200, user chốt 06/11: chốt ca 1–15 ngày 15, ca 16–cuối ngày 25 tháng trước). Nhắc từ 2 ngày trước mốc.
-  for (const h of st1.halves) {
-    if (!h.publishBy || (h.noHost === 0 && h.toPublish === 0 && h.needCo === 0) || addDays(h.publishBy, -2) > today) continue;
-    const when = h.publishBy < today ? `đã quá hạn chốt ${dayLabel(h.publishBy)}` : h.publishBy === today ? "hôm nay phải chốt" : `chốt trước ${dayLabel(h.publishBy)}`;
-    const firstWeek = h.weeksToPublish[0];
-    todos.push({
-      key: `half-${h.half}`,
-      tone: h.publishBy <= today ? "bad" : "warn",
-      text: `Lịch đợt ${h.half} ${mNext} (ca ${halfRange(m1, h.half)}) ${when}: ${[h.noHost > 0 ? `${h.noHost} ca chưa có host` : "", h.needCo > 0 ? `${h.needCo} ca chờ trợ / No Asst` : "", h.toPublish > 0 ? `${h.toPublish} ca nháp chưa công bố` : ""].filter(Boolean).join(", ")}.`,
-      action: h.noHost > 0 && h.firstNoHostDate ? { label: "Tới tuần còn trống", run: () => goWeekOf(h.firstNoHostDate!) } : firstWeek ? { label: "Tới tuần chưa công bố", run: () => goWeekOf(firstWeek) } : undefined
-    });
-  }
-  for (const r of short.slice(0, 3))
-    todos.push({
-      key: `short-${r.brandId}-${r.platform}`,
-      tone: "bad",
-      text: `${r.brandName} ${r.platform} ${r.verdict!.text} tháng này.`,
-      sub: r.committed > 0 ? `Để đủ ${Math.round(r.committed)} giờ cam kết, đã gồm phòng hờ.` : "Không cam kết giờ; Dashboard dự báo thêm giờ là kịp target.",
-      action: !readOnly && daysLeft > 0 ? { label: "Thêm ca", run: () => addShiftFor(r) } : undefined
-    });
-  if (short.length > 3) todos.push({ key: "short-more", tone: "warn", text: `Và ${short.length - 3} kênh khác thiếu giờ tháng này.`, action: { label: "Xem giờ từng kênh", run: () => openSection("now") } });
-  for (const s of wk.filter((x) => x.kind === "session" && !x.hostId && x.date >= today).slice(0, 3))
-    todos.push({ key: `hole-${s.key}`, tone: "bad", text: `${s.brandName} ${s.platform} ${dayLabel(s.date)} ${s.startTime} chưa có host.`, action: { label: "Chọn host", run: () => setSelectedKey(s.key) } });
-  const seenClash = new Set<string>();
-  for (const i of weekIssues.filter((x) => x.code === "clash" && x.severity === "warn")) {
-    const s = wk.find((x) => x.key === i.shiftKey);
-    const k = `${i.talentId}|${s?.date}`;
-    if (!s || seenClash.has(k) || seenClash.size >= 2) continue;
-    seenClash.add(k);
-    todos.push({ key: `clash-${i.shiftKey}-${i.talentId}`, tone: "warn", text: `${s.brandName} ${s.platform} ${dayLabel(s.date)} ${s.startTime}: ${i.text.replace(" — ca đã lên lịch từ trước, không chặn công bố", "")}.`, sub: "Lịch nhập từ Sheet nên không chặn. Đổi một ca nếu không cố ý.", action: { label: "Xem ca", run: () => setSelectedKey(s.key) } });
-  }
-  const noCoShifts = wk.filter((s) => s.kind === "session" && s.hostId && !s.coHostId && !s.noAssistant && s.date >= today && !s.segmented);
-  if (noCoShifts.length > 0)
-    todos.push({ key: "noco", tone: "warn", text: `${noCoShifts.length} ca tuần này chưa có trợ live.`, sub: "Ca không có trợ thì OP giao ca. Bấm để xếp lần lượt.", action: { label: "Xếp ca đầu tiên", run: () => setSelectedKey(noCoShifts[0].key) } });
-  const openNoHost = openShifts.filter((s) => !s.hostId).length;
-  if (openNoHost > 0 && !(viewMonth === m1 && st1.phase === "signup"))
-    todos.push({ key: "open", tone: "warn", text: `${openNoHost} ca mở tuần này chưa có người.`, sub: "Tự xếp ưu tiên người đã báo rảnh, rồi người quen kênh, giờ tuần thấp.", action: readOnly ? undefined : { label: "Tự xếp người vào chỗ trống", run: doAutofill } });
-  if (draftedCount > 0 && blocks.length === 0)
-    todos.push({ key: "pub", tone: "warn", text: `${draftedCount} ca nháp tuần này chưa công bố.`, sub: "Công bố xong mỗi host/trợ nhận một tin.", action: readOnly ? undefined : { label: "Công bố", run: publish } });
-  if (holdCoShifts.length > 0)
-    todos.push({ key: "co-hold", tone: "warn", text: `${holdCoShifts.length} ca đã có host nhưng chưa có trợ / No Asst — chưa được công bố.`, sub: "Chọn trợ live, hoặc gắn No Asst nếu ca chủ ý không trợ.", action: { label: "Xếp ca đầu tiên", run: () => setSelectedKey(holdCoShifts[0].key) } });
-  // Ô tự fill có người đã rút đăng ký sau đó (talent bấm huỷ đăng ký): nháp còn giữ người không còn rảnh.
-  const staleAuto = Object.entries(auto).filter(([slotId, a]) => {
-    const d = drafts.find((x) => x.slotId === slotId);
-    if (!d || !p.shiftSlots.some((sl) => sl.id === slotId && sl.status === "open" && !sl.sessionId)) return false;
-    const regs = p.shiftRegistrations.filter((r) => r.slotId === slotId).map((r) => r.talentId);
-    return (!!a.hostId && d.hostId === a.hostId && !regs.includes(a.hostId)) || (!!a.coHostId && d.coHostId === a.coHostId && !regs.includes(a.coHostId));
-  }).length;
-  if (staleAuto > 0)
-    todos.push({ key: "stale-auto", tone: "warn", text: `${staleAuto} ca nháp tự fill có người đã rút đăng ký.`, sub: `Bấm để xếp lại theo mục tiêu ${GOAL_LABEL[goal]} (ô bạn xếp tay không đổi).`, action: readOnly ? undefined : { label: "Xếp lại", run: () => void pickGoal(goal) } });
-  const cannot = desk.nowRows.filter((r) => r.row.rescue.kind === "cannot" && r.row.rescue.needRate != null && r.row.rescue.nowRate != null);
-  if (cannot.length > 0) {
-    const lines = cannot.map((r) => `${r.brandName} ${r.platform} cần ${fmtVndShort(r.row.rescue.needRate!)}/giờ, đang ${fmtVndShort(r.row.rescue.nowRate!)}/giờ`);
-    todos.push({
-      key: "boss",
-      tone: "warn",
-      text: `${cannot.map((r) => `${r.brandName} ${r.platform}`).join(", ")}: thêm giờ cũng không kịp target tháng này.`,
-      sub: "Giờ cam kết vẫn xếp đủ; báo quản lý để nói với brand.",
-      action: { label: "Chép tin báo quản lý", run: () => void copyText(`Dự báo hụt target tháng ${Number(m0.slice(5))} dù thêm giờ: ${lines.join("; ")}.`, "Đã chép tin — dán vào Zalo cho quản lý") }
-    });
-  }
-
-  const publishLabel = blocks.length > 0 ? `Công bố · ${blocks.length} lỗi` : draftedCount > 0 ? `Công bố ${draftedCount} ca nháp` : "Không có nháp";
+  const publishLabel = blocks.length > 0 ? `Công bố tuần này · ${blocks.length} lỗi` : draftedCount > 0 ? `Công bố tuần này · ${draftedCount} ca` : "Tuần này không có nháp";
 
   return (
     <div className="space-y-4">
       <PageHeader
         icon={ClipboardList}
         title="Điều Phối Lịch Live"
-        description="Một màn cho lịch live mọi brand: trạng thái từng tháng, việc cần làm, lịch tuần với giờ tháng cạnh mỗi kênh."
+        description="Một màn cho lịch live mọi brand: trạng thái từng tháng và lịch tuần với giờ tháng cạnh mỗi kênh."
         actions={
           <>
             <div className="flex items-center gap-1 rounded-xl border border-[var(--border)] bg-[var(--surface-base)] p-1">
@@ -982,9 +929,6 @@ export const RosterBoard: React.FC<Props> = (p) => {
             <button type="button" disabled={readOnly || busy || blocks.length > 0 || draftedCount === 0} onClick={publish} title={blocks.length > 0 ? "Còn lỗi chặn — bấm ca viền đỏ để sửa" : draftedCount === 0 ? "Chỉ ca nháp mới cần công bố" : undefined} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--accent)] text-[var(--accent-contrast)] text-xs font-black disabled:opacity-40">
               <Send className="w-4 h-4" /> {publishLabel}
             </button>
-            <button type="button" onClick={() => setExportOpen(true)} title="Tải lịch cả tháng ra Excel để gửi brand xác nhận" className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[var(--border)] text-xs font-bold text-[var(--text)] hover:bg-[var(--surface-hover)]">
-              <FileSpreadsheet className="w-4 h-4" /> Xuất lịch gửi brand
-            </button>
             <details ref={moreRef} className="relative">
               <summary className="list-none [&::-webkit-details-marker]:hidden cursor-pointer flex items-center gap-1 px-3 py-2 rounded-xl border border-[var(--border)] text-xs font-bold text-[var(--text)]">
                 Thêm <ChevronDown className="w-3.5 h-3.5" />
@@ -996,6 +940,9 @@ export const RosterBoard: React.FC<Props> = (p) => {
                     {m.id === "checks" && blocks.length + warns.length > 0 && <span className="ml-1.5 text-2xs tabular-nums text-[var(--text-faint)]">{blocks.length} lỗi · {warns.length} cảnh báo</span>}
                   </button>
                 ))}
+                <button type="button" onClick={() => { if (moreRef.current) moreRef.current.open = false; setExportOpen(true); }} title="Tải lịch cả tháng ra Excel để gửi brand xác nhận" className="block w-full text-left px-3 py-2 rounded-lg text-sm text-[var(--text-muted)] hover:bg-[var(--surface-hover)]">
+                  Xuất lịch gửi brand (Excel)
+                </button>
               </div>
             </details>
           </>
@@ -1008,13 +955,53 @@ export const RosterBoard: React.FC<Props> = (p) => {
 
       {canWrite && <SwapApprovalQueue sessions={p.sessions} />}
 
-      <MonthStrip cards={monthCards} viewMonth={viewMonth} today={today} onAction={onMonthAction} />
+      <MonthStrip
+        cards={monthCards}
+        viewMonth={viewMonth}
+        today={today}
+        onAction={onMonthAction}
+        onPick={(m) => {
+          const [y1, m1] = viewMonth.split("-").map(Number);
+          const [y2, m2] = m.split("-").map(Number);
+          if (m !== viewMonth) goMonth((y2 - y1) * 12 + (m2 - m1));
+        }}
+      />
 
       <div className="space-y-3">
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-2 sm:p-3 min-w-0">
-          <div className="mb-3 space-y-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface-base)] px-3 py-2" aria-label="Tự fill nháp theo mục tiêu">
+          {/* Gọn 17/11: "chọn xem gì" (tuần + brand) MỘT hàng, đặt trước "xếp gì" (Tự fill / Xếp theo người). */}
+          <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs" aria-label="Chọn tuần và brand">
+            <div className="flex flex-wrap items-center gap-2" aria-label="Tuần trong tháng">
+              <span className="font-black text-[var(--text)]">Tuần</span>
+              <div className="flex flex-wrap items-center rounded-xl border border-[var(--border)] bg-[var(--surface-base)] p-1 font-bold" role="group">
+                {monthWeeks.map((w) => (
+                  <button key={w.start} type="button" aria-pressed={weekStart === w.start} onClick={() => goWeekOf(w.start < `${viewMonth}-01` ? `${viewMonth}-01` : w.start)} className={`px-2.5 py-1 rounded-lg tabular-nums ${weekStart === w.start ? "seg-on" : "text-[var(--text-muted)] hover:text-[var(--text)]"}`}>
+                    {w.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {gridBrands.length > 1 && (
+              <div className="flex flex-wrap items-center gap-2" aria-label="Brand">
+                <span className="font-black text-[var(--text)]">Brand</span>
+                <div className="flex flex-wrap items-center rounded-xl border border-[var(--border)] bg-[var(--surface-base)] p-1 font-bold" role="group">
+                  {[{ id: "all", name: "Tất cả" }, ...gridBrands].map((b) => (
+                    <button key={b.id} type="button" aria-pressed={brandView === b.id} onClick={() => setBrandView(b.id)} className={`px-2.5 py-1 rounded-lg ${brandView === b.id ? "seg-on" : "text-[var(--text-muted)] hover:text-[var(--text)]"}`}>
+                      {b.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {!monthWeeks.some((w) => w.start === weekStart) && <span className="text-amber-300">Tuần {dayLabel(weekStart)} – {dayLabel(weekEnd)} không thuộc tháng này — chọn một tuần.</span>}
+          </div>
+          {/* Gọn 17/11 ("rút gọn chỗ này"): MỘT hàng — phạm vi, 3 mục tiêu, Xếp theo người, ⋯ (gỡ tự fill, so sánh), Công bố. Câu hướng dẫn vào ⓘ. */}
+          <div className="mb-3 rounded-xl border border-[var(--border)] bg-[var(--surface-base)] px-3 py-2" aria-label="Tự fill nháp theo mục tiêu">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs">
-              <span className="font-black text-[var(--text)]">Tự fill nháp</span>
+              <span className="font-black text-[var(--text)]">
+                Tự fill nháp
+                <InfoDot label="Tự fill nháp">Bấm một mục tiêu là ghi NHÁP ngay, talent chưa thấy. Chỉ lấy người đã đăng ký đúng ca, giữ giờ tối thiểu/tối đa và luật lịch. Ô bạn tự xếp không bị ghi đè.</InfoDot>
+              </span>
               <div className="flex items-center rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1 font-bold" role="group" aria-label="Phạm vi theo mốc chốt">
                 {(
                   [
@@ -1027,7 +1014,6 @@ export const RosterBoard: React.FC<Props> = (p) => {
                   </button>
                 ))}
               </div>
-              <span className="text-[var(--text-muted)]">tháng {Number(viewMonth.slice(5))} · mục tiêu</span>
               <div className="flex items-center gap-1" role="group" aria-label="Mục tiêu">
                 {GOALS.map((g) => (
                   <button
@@ -1043,42 +1029,36 @@ export const RosterBoard: React.FC<Props> = (p) => {
                   </button>
                 ))}
               </div>
-              <button type="button" disabled={readOnly || busy || rangeWeeks.length === 0} onClick={() => void publishRange()} title="Công bố lần lượt mọi tuần có nháp trong phạm vi đang chọn, chỉ một hộp xác nhận" className="ml-auto px-2.5 py-1 rounded-lg bg-[var(--accent)] text-[var(--accent-contrast)] font-black disabled:opacity-40">
-                {rangeWeeks.length > 0 ? `Công bố ${rangeWeeks.length} tuần` : "Không có nháp để công bố"}
+              <button type="button" aria-pressed={personOn} onClick={() => { setPersonOn((v) => !v); setSelectedKey(null); }} title="Chọn một talent, lưới tô sáng ca họ đã đăng ký, bấm ô để xếp" className={`px-3 py-1.5 rounded-lg border font-bold ${personOn ? "border-[var(--accent)] bg-[var(--accent)]/15 text-[var(--text)]" : "border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]"}`}>
+                Xếp theo người
               </button>
-              <button type="button" disabled={readOnly || busy || Object.keys(auto).length === 0} onClick={() => void clearAuto()} title="Gỡ người do bộ xếp đã fill trong phạm vi đang chọn; ô bạn xếp tay được giữ" className="px-2.5 py-1 rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] disabled:opacity-40">
-                Gỡ phần tự fill
-              </button>
-              <button type="button" onClick={() => openSection("plan")} className="px-2.5 py-1 rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]">
-                So sánh 3 mục tiêu
+              <MoreMenu
+                className="ml-auto"
+                items={[
+                  { label: "So sánh 3 mục tiêu", onClick: () => openSection("plan") },
+                  { label: "Gỡ phần tự fill", onClick: () => void clearAuto(), disabled: readOnly || busy || Object.keys(auto).length === 0 }
+                ]}
+              />
+              <button type="button" disabled={readOnly || busy || rangeWeeks.length === 0} onClick={() => void publishRange()} title="Công bố lần lượt mọi tuần có nháp trong phạm vi đang chọn, chỉ một hộp xác nhận" className="px-2.5 py-1 rounded-lg bg-[var(--accent)] text-[var(--accent-contrast)] font-black disabled:opacity-40">
+                {rangeWeeks.length > 0 ? `Công bố ${rangeWeeks.length} tuần` : "Chưa có nháp"}
               </button>
             </div>
-            <p className="text-2xs text-[var(--text-muted)]">
-            {planNote ?? <>Bấm là ghi NHÁP ngay, talent chưa thấy.<InfoDot label="Tự xếp theo luật nào">Chỉ lấy người đã đăng ký đúng ca, giữ giờ tối thiểu/tối đa và luật lịch. Ô bạn tự xếp không bị ghi đè.</InfoDot></>}
-          </p>
+            {planNote && <p className="mt-1.5 text-2xs text-[var(--text-muted)]">{planNote}</p>}
           </div>
-          <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs" aria-label="Tuần trong tháng">
-            <span className="font-black text-[var(--text)]">Tháng {Number(viewMonth.slice(5))} · tuần</span>
-            <div className="flex flex-wrap items-center rounded-xl border border-[var(--border)] bg-[var(--surface-base)] p-1 font-bold" role="group">
-              {monthWeeks.map((w) => (
-                <button key={w.start} type="button" aria-pressed={weekStart === w.start} onClick={() => goWeekOf(w.start < `${viewMonth}-01` ? `${viewMonth}-01` : w.start)} className={`px-2.5 py-1 rounded-lg tabular-nums ${weekStart === w.start ? "seg-on" : "text-[var(--text-muted)] hover:text-[var(--text)]"}`}>
-                  {w.label}
-                </button>
-              ))}
-            </div>
-            {!monthWeeks.some((w) => w.start === weekStart) && <span className="text-amber-300">Tuần {dayLabel(weekStart)} – {dayLabel(weekEnd)} không thuộc tháng này — chọn một tuần.</span>}
-          </div>
-          {gridBrands.length > 1 && (
-            <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs" aria-label="Brand">
-              <span className="font-black text-[var(--text)]">Brand</span>
-              <div className="flex flex-wrap items-center rounded-xl border border-[var(--border)] bg-[var(--surface-base)] p-1 font-bold" role="group">
-                {[{ id: "all", name: "Tất cả" }, ...gridBrands].map((b) => (
-                  <button key={b.id} type="button" aria-pressed={brandView === b.id} onClick={() => setBrandView(b.id)} className={`px-2.5 py-1 rounded-lg ${brandView === b.id ? "seg-on" : "text-[var(--text-muted)] hover:text-[var(--text)]"}`}>
-                    {b.name}
-                  </button>
-                ))}
-              </div>
-            </div>
+          {personOn && (
+            <PersonBar
+              people={personPeople}
+              personId={personId}
+              role={roleNow}
+              onPerson={setPersonId}
+              onRole={setPersonRole}
+              hours={personHours}
+              bulkCount={personBulk?.placed.length ?? 0}
+              readOnly={readOnly}
+              busy={busy}
+              onBulk={() => void bulkPerson()}
+              onClose={() => setPersonOn(false)}
+            />
           )}
           <div className="mb-2 flex flex-wrap items-center gap-x-5 gap-y-1 rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-2 text-xs tabular-nums" aria-label="Chỉ số tuần">
             <span className="font-black text-[var(--text)]">{brandView === "all" ? "Tất cả brand" : gridBrands.find((b) => b.id === brandView)?.name ?? "Tất cả brand"}</span>
@@ -1094,17 +1074,24 @@ export const RosterBoard: React.FC<Props> = (p) => {
                 {brandStats.missing > 0 && <span className="text-amber-300"> (thiếu giá {brandStats.missing} ca)</span>}
               </span>
             )}
+            <button type="button" aria-expanded={moreStats} onClick={() => setMoreStats((v) => !v)} className="text-2xs font-bold text-[var(--accent-text)] hover:underline">
+              {moreStats ? "Ẩn số liệu khác" : "Số liệu khác"}
+            </button>
+            {moreStats && (
+              <>
             {(["TikTok", "Shopee"] as const).filter((pl) => brandStats.gmv[pl] > 0).map((pl) => (
-              <span key={pl} title="Ước tính theo GMV/giờ của kênh 28 ngày gần nhất × giờ đã xếp, sai số ~20%. Không tính theo người; không cộng hai sàn.">
-                GMV ước tính {pl} <b className="text-[var(--text)]">{fmtVndShort(brandStats.gmv[pl] * 0.8)}–{fmtVndShort(brandStats.gmv[pl] * 1.2)}</b>
+                <span key={pl} title="Ước tính theo GMV/giờ của kênh 28 ngày gần nhất × giờ đã xếp, sai số ~20%. Không tính theo người; không cộng hai sàn.">
+                  GMV ước tính {pl} <b className="text-[var(--text)]">{fmtVndShort(brandStats.gmv[pl] * 0.8)}–{fmtVndShort(brandStats.gmv[pl] * 1.2)}</b>
+                </span>
+              ))}
+              {brandStats.noRate > 0 && <span className="text-amber-300">{brandStats.noRate} ca chưa có lịch sử để ước tính</span>}
+              <span title="Tỷ lệ giờ tuần dồn vào 1 / 3 người nhiều giờ nhất">
+                Tập trung giờ: top 1 <b className="text-[var(--text)]">{brandStats.top1}%</b> · top 3 <b className="text-[var(--text)]">{brandStats.top3}%</b> ({brandStats.people} người)
               </span>
-            ))}
-            {brandStats.noRate > 0 && <span className="text-amber-300">{brandStats.noRate} ca chưa có lịch sử để ước tính</span>}
-            <span title="Tỷ lệ giờ tuần dồn vào 1 / 3 người nhiều giờ nhất">
-              Tập trung giờ: top 1 <b className="text-[var(--text)]">{brandStats.top1}%</b> · top 3 <b className="text-[var(--text)]">{brandStats.top3}%</b> ({brandStats.people} người)
-            </span>
+              </>
+            )}
           </div>
-          <WeekGrid weekStart={weekStart} month={viewMonth} channels={gridChannels} shifts={wk} analysis={analysis} nameOf={nameOf} roleOf={(id) => talentById.get(id)?.role} colorOf={(id) => personColors.get(id)} selectedKey={selectedKey} canAdd={!readOnly} onSelect={setSelectedKey} onAdd={addShift} channelMeta={channelMeta} />
+          <WeekGrid weekStart={weekStart} month={viewMonth} channels={gridChannels} shifts={wk} analysis={analysis} nameOf={nameOf} roleOf={(id) => talentById.get(id)?.role} colorOf={(id) => personColors.get(id)} selectedKey={selectedKey} canAdd={!readOnly} onSelect={(k) => void onGridSelect(k)} onAdd={addShift} channelMeta={channelMeta} focus={personTalent ? { talentId: personTalent.id, name: nameOf(personTalent.id) } : null} />
         </div>
         <details className="group bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 space-y-2" aria-label="Khối lượng nhân sự">
           {/* Gập mặc định (trainer: Điều Phối rối mắt) — chỉ mở khi cần cân giờ. */}
@@ -1132,26 +1119,6 @@ export const RosterBoard: React.FC<Props> = (p) => {
             })}
           </div>
         </details>
-        <aside className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 space-y-2" aria-label="Việc cần làm">
-          <h2 className="flex items-baseline justify-between gap-2 text-sm font-black text-[var(--text)]">
-            Việc cần làm
-            <span className="text-2xs font-medium text-[var(--text-muted)]">{desk.loading ? "đang tính…" : todos.length ? `${todos.length} việc` : "không còn việc"}</span>
-          </h2>
-          {todos.length === 0 && !desk.loading && <p className="text-xs text-[var(--text-muted)]">Tuần đang xem và tháng sau không còn việc gì cần làm.</p>}
-          <div className="grid gap-2 sm:grid-cols-2 max-h-[232px] overflow-y-auto pr-1">
-          {todos.map((t) => (
-            <div key={t.key} className={`rounded-xl border border-[var(--border)] border-l-[3px] ${t.tone === "bad" ? "border-l-rose-500" : "border-l-amber-400"} bg-[var(--surface-base)] px-3 py-2 space-y-1.5`}>
-              <p className="text-xs text-[var(--text)]">{t.text}</p>
-              {t.sub && <p className="text-2xs text-[var(--text-muted)]">{t.sub}</p>}
-              {t.action && (
-                <button type="button" disabled={busy} onClick={t.action.run} className="text-xs font-bold px-2.5 py-1 rounded-lg border border-[var(--accent)]/60 bg-[var(--accent)]/10 text-[var(--text)] hover:bg-[var(--accent)]/20 disabled:opacity-40">
-                  {t.action.label}
-                </button>
-              )}
-            </div>
-          ))}
-          </div>
-        </aside>
       </div>
 
       {section && (
@@ -1195,7 +1162,6 @@ export const RosterBoard: React.FC<Props> = (p) => {
                 showCost={showCost}
               />
             )}
-            {section === "now" && <NowDesk {...deskProps} />}
             {section === "next" && <NextDesk {...deskProps} registrations={p.shiftRegistrations} drafts={drafts} weeks={weeks} />}
             {section === "checks" && <ChecksPanel analysis={analysis} shifts={wk} onSelect={setSelectedKey} />}
             {section === "absence" && <AbsencePanel key={weekStart} weekStart={weekStart} shifts={shifts} analysis={analysis} ctx={ctx} talents={p.talents} showCost={showCost} readOnly={readOnly} busy={busy} onAssign={assign} />}

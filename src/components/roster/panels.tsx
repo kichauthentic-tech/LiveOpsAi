@@ -48,7 +48,9 @@ export const WeekGrid: React.FC<{
   onAdd: (channel: ChannelRow, date: string) => void;
   /** Bản gọn 25/10: giờ tháng + một kết luận dưới tên kênh (thay chế độ "Tháng này"). */
   channelMeta?: (channel: ChannelRow) => React.ReactNode;
-}> = ({ weekStart, month, channels, shifts, analysis, nameOf, roleOf, colorOf, selectedKey, canAdd, onSelect, onAdd, channelMeta }) => {
+  /** "Xếp theo người": người đang chọn — ca họ đã xếp tô viền xanh lá, ca mở họ đã đăng ký viền xanh dương, ca còn lại mờ đi. */
+  focus?: { talentId: string; name: string } | null;
+}> = ({ weekStart, month, channels, shifts, analysis, nameOf, roleOf, colorOf, selectedKey, canAdd, onSelect, onAdd, channelMeta, focus }) => {
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)).filter((d) => !month || d.slice(0, 7) === month);
   const labelW = channelMeta ? 168 : 140;
   return (
@@ -74,14 +76,18 @@ export const WeekGrid: React.FC<{
                   <div key={d} className="p-1.5 border-b border-r border-[var(--border)] space-y-2 min-w-0">
                     {list.map((s) => {
                       const sev = worstSeverity(analysis.byShift.get(s.key)) ?? "ok";
+                      const mine = !!focus && (s.hostId === focus.talentId || s.coHostId === focus.talentId);
+                      const asked = !!focus && !mine && s.kind === "open" && s.registrants.includes(focus.talentId);
+                      const focusCls = !focus ? "" : mine ? "ring-2 ring-emerald-400" : asked ? "ring-2 ring-sky-400" : "opacity-40";
                       return (
                         <button
                           key={s.key}
                           type="button"
+                          data-shift-key={s.key}
                           onClick={() => onSelect(s.key)}
                           // Bố cục 19/10: thẻ ca chỉ còn vạch màu bên trái (đỏ/vàng/xanh) + nền nhạt — trước mỗi thẻ thêm viền đủ 4 cạnh
                           // trong ô lưới cũng có viền (~90 hộp lồng một tuần). Ca mở vẫn viền đứt để khác ca đã có người.
-                          className={`block w-full text-left rounded-lg border px-1.5 py-1.5 text-2xs leading-snug shadow-sm hover:bg-[var(--surface-hover)] ${CARD_WASH[sev]} ${selectedKey === s.key ? "ring-2 ring-[var(--accent)]" : ""} ${s.kind === "open" ? "border-dashed border-[var(--text-faint)]" : "border-solid border-[var(--border)]"}`}
+                          className={`block w-full text-left rounded-lg border px-1.5 py-1.5 text-2xs leading-snug shadow-sm hover:bg-[var(--surface-hover)] ${CARD_WASH[sev]} ${selectedKey === s.key ? "ring-2 ring-[var(--accent)]" : ""} ${focusCls} ${s.kind === "open" ? "border-dashed border-[var(--text-faint)]" : "border-solid border-[var(--border)]"}`}
                         >
                           <span className="mb-1 flex items-center gap-1 whitespace-nowrap border-b border-[var(--border)] px-0.5 pb-1 font-mono text-xs font-bold text-[var(--text)]">
                             {s.startTime}–{s.endTime}
@@ -117,6 +123,13 @@ export const WeekGrid: React.FC<{
           ))}
         </div>
       </div>
+      {focus && (
+        <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-2xs font-bold text-[var(--text)]">
+          <span className="rounded-md ring-2 ring-emerald-400 px-1.5">đã xếp {focus.name} (bấm để bỏ)</span>
+          <span className="rounded-md ring-2 ring-sky-400 px-1.5">{focus.name} đã đăng ký (bấm để xếp)</span>
+          <span className="text-[var(--text-muted)] font-medium">ca mờ = {focus.name} không đăng ký</span>
+        </p>
+      )}
       <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-2xs text-[var(--text-muted)]">
         <span>Viền đỏ = chặn công bố</span>
         <span>vàng = cảnh báo</span>

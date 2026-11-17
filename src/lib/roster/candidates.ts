@@ -147,7 +147,7 @@ const SOFT_WEEK_CAP = 36;
 const fmtH = (h: number) => (Math.round(h * 10) / 10).toString().replace(".", ",");
 
 /** Những gì sẽ xảy ra nếu xếp `talentId` vào ca: trùng (chặn), quá giờ tuần (chặn), nghỉ ngắn / chạy phòng / quá giờ ngày (cảnh báo). */
-function whatIf(shift: RosterShift, talentId: string, role: RosterRole, ctx: RankContext, an: RosterAnalysis): { blocked?: string; issues: string[]; weekHours: number } {
+function whatIf(shift: RosterShift, talentId: string, role: RosterRole, ctx: RankContext, an: Pick<RosterAnalysis, "entries">): { blocked?: string; issues: string[]; weekHours: number } {
   const violation = brandRuleViolation(ctx.brandRules, shift.brandId, talentId, role, shift.platform);
   if (violation) return { blocked: violation.text[0].toUpperCase() + violation.text.slice(1), issues: [], weekHours: 0 };
   const want = { date: shift.date, startTime: shift.startTime, endTime: shift.endTime };
@@ -193,6 +193,11 @@ function whatIf(shift: RosterShift, talentId: string, role: RosterRole, ctx: Ran
   }
   if (after > ctx.rules.warnWeekHours) issues.push(`${fmtH(after)}h tuần`);
   return { issues, weekHours: curWeek };
+}
+
+/** Luật khi xếp MỘT người cụ thể vào MỘT vai của một ca (màn "Theo người"): `ctx.weekStart` phải là tuần chứa ca. */
+export function checkPlacement(shift: RosterShift, talentId: string, role: RosterRole, ctx: RankContext, entries: RosterAnalysis["entries"]): { blocked?: string; issues: string[]; weekHours: number } {
+  return whatIf(shift, talentId, role, ctx, { entries });
 }
 
 /** Xếp hạng người cho một vai của một ca. Người đang ở vai kia của ca, hoặc đang ở đúng vai này, không vào danh sách. */
