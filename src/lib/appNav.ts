@@ -27,6 +27,7 @@ export const TAB_CHANNEL_SCOPE: Record<string, "all" | "one"> = {
   agency_overview: "one",
   sessions: "all",
   host_performance: "all",
+  weekly_report: "all",
   brands_overview: "all",
   month_plan: "one",
   brand_dashboard: "one",
@@ -152,6 +153,8 @@ export function agencyNavGroups(currentRole: UserRole): NavGroup[] {
           {
             label: "Phân tích",
             items: [
+              // Báo Cáo Tuần (17/11): mỗi account một mục cho buổi báo cáo — target tới nay, target/thực đạt từng ngày, đợt, ca đáng lưu ý/tốt.
+              { id: "weekly_report", label: "Báo Cáo Tuần", icon: CalendarRange, perm: "manage_sessions" as PermissionKey },
               { id: "host_performance", label: "Hiệu Suất Host", icon: TrendingUp, perm: "manage_sessions" as PermissionKey },
               // Leader Board (06/11): ba giải host/trợ live theo từng account (Ca đạt target, Host hiệu suất, Trợ live xuất sắc).
               { id: "leaderboard", label: "Leader Board", icon: Trophy, perm: "manage_sessions" as PermissionKey },
