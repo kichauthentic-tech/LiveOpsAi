@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import type { Talent } from "../../types";
+import SearchSelect from "../ui/SearchSelect";
 import { InfoDot } from "../common/InfoDot";
 import type { MonthCommitments } from "../../hooks/useMonthCommitments";
 import { parseCommitmentSheet, type ParsedCommitment } from "../../lib/roster/commitmentSheet";
@@ -74,14 +75,7 @@ export const CommitmentsEditor: React.FC<{ month: string; talents: readonly Tale
         <span className="font-bold text-[var(--text)]">Ngoại lệ giờ cam kết {month.slice(5)}/{month.slice(0, 4)}</span>
         <InfoDot label="Ngoại lệ giờ cam kết">Không cần nhập cho từng người: ai cũng có trần tự suy từ giờ trung bình 3 tháng đã qua (tỷ lệ dư chỉnh ở AI Training). Chỉ nhập ở đây cho người rate cao hoặc theo chiến lược riêng. Xếp ngày 1–15 thì mỗi người chỉ nhận tới trần × tỷ lệ giờ của nửa đầu; ô “nửa đầu” ghi đè nếu muốn chốt số.</InfoDot>
         <span className="text-2xs text-[var(--text-muted)]">{Object.keys(autoCaps).length} người đã có trần tự suy</span>
-        <select value={pick} onChange={(e) => setPick(e.target.value)} aria-label="Chọn người đặt trần" className={numInput}>
-          <option value="">Thêm người…</option>
-          {people.map((t) => (
-            <option key={t.id} value={t.id}>
-              {nameOf(t.id)}
-            </option>
-          ))}
-        </select>
+        <SearchSelect value={pick} onChange={setPick} ariaLabel="Chọn người đặt trần" emptyLabel="Thêm người…" options={people.map((t) => ({ value: t.id, label: nameOf(t.id) }))} className={numInput} />
         <button
           type="button"
           disabled={!pick}
