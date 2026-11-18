@@ -1,5 +1,4 @@
 import type { Talent } from "../../types";
-import { parseRuleText, type ParsedRule } from "./placementRules";
 
 // Dán từ sheet "TỶ LỆ LỊCH" của chị Trainer: mỗi dòng có tên host và một ô giờ cam kết kiểu "50h /tháng (6-7-CN, camp)", "35-40h/tháng",
 // "35/tháng". Hàm thuần: tách dòng, rút giờ (khoảng "35-40" lấy số lớn = trần), ghép tên với talent (chỉ khi KHỚP DUY NHẤT).
@@ -9,10 +8,8 @@ export interface ParsedCommitment {
   line: number;
   nameRaw: string;
   hours: number;
-  /** Phần trong ngoặc (6-7-CN, camp, ca đêm…), giữ nguyên chữ để Trainer đối chiếu. */
+  /** Phần trong ngoặc (6-7-CN, camp, ca đêm…) — chỉ để Trainer đọc, bộ xếp chưa dùng. */
   note: string;
-  /** Luật đặt giờ đọc từ cả ô (chỉ có khi truyền danh sách brand). */
-  rule?: ParsedRule;
   status: MatchStatus;
   talentId?: string;
   /** Ứng viên khi tên trùng nhiều người. */
@@ -39,7 +36,7 @@ export const normName = (s: string) =>
 const HOURS = /(\d+(?:[.,]\d+)?)(?:\s*[-–]\s*(\d+(?:[.,]\d+)?))?\s*(?:h\b|giờ|\/\s*tháng)/i;
 const num = (s: string) => Number(s.replace(",", "."));
 
-export function parseCommitmentSheet(text: string, talents: readonly Talent[], brands?: readonly { id: string; name: string }[]): ParseResult {
+export function parseCommitmentSheet(text: string, talents: readonly Talent[]): ParseResult {
   const byFull = new Map<string, Talent[]>();
   const add = (k: string, t: Talent) => {
     if (!k) return;
@@ -79,9 +76,7 @@ export function parseCommitmentSheet(text: string, talents: readonly Talent[], b
       skipped += 1;
       return;
     }
-    const rest = hoursCell.replace(HOURS, " ").replace(/^\s*\/?\s*tháng/i, " ").trim();
-    const note = hoursCell.match(/\(([^)]*)\)/)?.[1]?.trim() ?? rest;
-    const rule = brands ? parseRuleText(hoursCell, brands) : undefined;
+    const note = hoursCell.match(/\(([^)]*)\)/)?.[1]?.trim() ?? "";
     // Tên = ô chữ đầu tiên không phải số thứ tự / tiền / ô giờ.
     const nameRaw = cells.find((c) => c !== hoursCell && /\p{L}/u.test(c) && !/^[\d.,\s]+$/.test(c)) ?? "";
     const key = normName(nameRaw);
@@ -91,7 +86,7 @@ export function parseCommitmentSheet(text: string, talents: readonly Talent[], b
     const talentId = hit.length === 1 ? hit[0].id : undefined;
     const duplicate = !!talentId && seen.has(talentId);
     if (talentId) seen.add(talentId);
-    rows.push({ line: i + 1, nameRaw, hours, note, rule, status, talentId, candidates: hit.map((t) => t.id), duplicate });
+    rows.push({ line: i + 1, nameRaw, hours, note, status, talentId, candidates: hit.map((t) => t.id), duplicate });
   });
   return { rows, skipped };
 }

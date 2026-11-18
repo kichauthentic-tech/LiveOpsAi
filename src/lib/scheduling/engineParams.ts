@@ -88,7 +88,6 @@ export interface EngineParams {
   rosterRangeTolerance: number; // dung sai trần giờ khi chỉ xếp một phần tháng (0.1 = +10%)
   rosterPeakBandRatio: number; // khung giờ có GMV/giờ ≥ X × trung vị kênh = cao điểm
   rosterLaneWeight: number; // làn host (peak/regular/balanced): điểm thưởng khi cơ cấu giờ host khớp làn; 0 = tắt
-  rosterRuleMissPenalty: number; // ca ngoài luật đặt giờ của người (loại ngày / brand / ca đêm): điểm bị trừ khi xếp; 0 = tắt
   rosterAutoCapSlack: number; // trần giờ TỰ SUY cho mọi người = giờ TB 3 tháng đã qua × (1 + X); 0 = tắt
 }
 
@@ -161,7 +160,6 @@ export const DEFAULT_ENGINE_PARAMS: EngineParams = {
   rosterRangeTolerance: 0.1,
   rosterPeakBandRatio: 1.15,
   rosterLaneWeight: 0,
-  rosterRuleMissPenalty: 2,
   rosterAutoCapSlack: 0.15
 };
 
@@ -256,7 +254,6 @@ export const ENGINE_PARAM_META: EngineParamMeta[] = [
   { key: "rosterRangeTolerance", group: "roster", label: "Dung sai trần giờ khi chỉ xếp nửa tháng", help: "Người có trần giờ riêng (vd 40h/tháng) khi xếp ngày 1–15 chỉ được tới trần × tỷ lệ giờ của nửa đầu × (1 + X), phần còn lại chừa cho nửa sau.", kind: "number", min: 0, max: 0.5, step: 0.05 },
   { key: "rosterPeakBandRatio", group: "roster", label: "Khung giờ cao điểm: GMV/giờ ≥ X × trung vị kênh", help: "Đo trên 90 ngày gần nhất theo kênh × khung (sáng / chiều / tối / khuya), cần ≥ 5 ca mỗi khung.", kind: "number", min: 1, max: 2, step: 0.05 },
   { key: "rosterLaneWeight", group: "roster", label: "Làn host: điểm thưởng khi giờ khớp làn", help: "Mỗi host có một làn: cao điểm (nhận chủ yếu ca Campaign và khung mạnh), ca thường (Daily, thấp điểm) hoặc cân bằng (theo cơ cấu giờ của tháng). Bộ xếp cộng điểm khi cơ cấu giờ của host sau ca này gần làn của họ. 0 = tắt (mặc định, chờ so thử trên tháng đã qua).", kind: "number", min: 0, max: 1, step: 0.05 },
-  { key: "rosterRuleMissPenalty", group: "roster", label: "Luật đặt giờ từng người: điểm trừ khi ca ngoài luật", help: "Chị Trainer đặt luật cho từng người ở Điều Phối → Luật đặt giờ từng người (loại ngày, brand, ca đêm). Ca nằm ngoài luật của người đó bị trừ chừng này điểm; đủ lớn để gần như luôn chọn người khác, nhưng vẫn lấp ca khi không còn ai. 0 = bỏ qua luật.", kind: "number", min: 0, max: 5, step: 0.25 },
   { key: "rosterAutoCapSlack", group: "roster", label: "Trần giờ tự suy: dư trên giờ trung bình", help: "Người nào cũng có trần giờ tháng mà không cần nhập: giờ trung bình các tháng đã qua (tối đa 3, cần ≥ 2 tháng có làm) × (1 + X), kẹp giữa giờ tối thiểu và tối đa của vai. Dùng để chia giờ theo đợt khi xếp nửa tháng (không hạ giờ tối đa tháng). Cam kết nhập tay ghi đè. 0 = tắt.", kind: "number", min: 0, max: 1, step: 0.05 }
 ];
 

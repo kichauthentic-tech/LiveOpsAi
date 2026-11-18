@@ -1,5 +1,4 @@
 import type { LiveSession, Talent, TalentRateHistoryEntry } from "../../types";
-import { ruleFit, type PersonRule } from "./placementRules";
 import { addDays, isoWeekStart } from "../dateUtils";
 import { getCampaignDayInfo } from "../campaignDays";
 import type { EngineParams } from "../scheduling/engineParams";
@@ -206,12 +205,9 @@ export interface PlanTuning {
     | "rosterRangeTolerance"
     | "rosterPeakBandRatio"
     | "rosterAutoCapSlack"
-    | "rosterRuleMissPenalty"
     | "rosterLaneWeight"
   >;
   personCaps?: Readonly<Record<string, PersonCap>>;
-  /** Quy luật đặt giờ từng người (placementRules.ts): ca ngoài luật bị trừ `rosterRuleMissPenalty` điểm. */
-  personRules?: Readonly<Record<string, PersonRule>>;
   bandStrength?: ReadonlyMap<string, number>;
   /** Làn host (lanes.ts): peak = nghiêng ca Campaign/cao điểm, regular = nghiêng ca thường, balanced = theo cơ cấu giờ của tháng. Chỉ có tác dụng khi rosterLaneWeight > 0. */
   lanes?: Readonly<Record<string, HostLane>>;
@@ -310,8 +306,6 @@ export interface PersonLoad {
   shifts: number;
   /** Số ca mở trong tháng người đó đã báo rảnh (khả năng nhận thêm). */
   registered: number;
-  /** Tổng giờ của các ca mở người đó đã báo rảnh. */
-  registeredHours: number;
   cost: number;
   costMissing: boolean;
   perf?: HostPerf;
@@ -470,11 +464,7 @@ export function planMonth(input: PlanInput): MonthPlan {
   const targets = input.reportOnly ? [] : monthOpen.filter((s) => s.date >= today && inRange(s.date));
   const loadTo = input.loadTo ?? `${month}-31`;
   const registeredIn = new Map<string, number>(); // talentId → số ca mở trong tháng đã báo rảnh
-  const registeredHoursIn = new Map<string, number>(); // talentId → tổng giờ các ca đó
-  for (const s of monthOpen) for (const t of s.registrants) {
-    registeredIn.set(t, (registeredIn.get(t) ?? 0) + 1);
-    registeredHoursIn.set(t, (registeredHoursIn.get(t) ?? 0) + shiftHours(s));
-  }
+  for (const s of monthOpen) for (const t of s.registrants) registeredIn.set(t, (registeredIn.get(t) ?? 0) + 1);
 
   const rateCache = new Map<string, number>();
   const costOf = (id: string, role: RosterRole, shift: RosterShift) => plannedCost(talentById.get(id), history, role, shift.date, shiftHours(shift));
@@ -565,8 +555,7 @@ export function planMonth(input: PlanInput): MonthPlan {
       const castCap = role === "host" && P ? { Shopee: P.rosterShopeeCastCap, TikTok: tier === "regular" ? P.rosterRegularCastCap : 0 }[shift.platform] : 0;
       const hrs = shiftHours(shift);
       const frac = inMonth(shift.date, month) ? Number(shift.date.slice(8, 10)) / daysInMonth(month) : 1;
-      const lateShift = roster.isLate(absRange(shift)[1], shift.date);
-      const night = role === "co_host" && lateShift;
+      const night = role === "co_host" && roster.isLate(absRange(shift)[1], shift.date);
       const scored = ok.map((c) => {
         const t = talentById.get(c.id)!;
         const f = famOf(fam, c.id, shift.channelKey);
@@ -600,8 +589,6 @@ export function planMonth(input: PlanInput): MonthPlan {
               extra += P.rosterLaneWeight * (1 - Math.min(1, Math.abs(after - want)));
             }
           }
-          const rule = input.tuning?.personRules?.[c.id];
-          if (rule && P.rosterRuleMissPenalty > 0 && !ruleFit(rule, { date: shift.date, brandId: shift.brandId, night: lateShift }).ok) extra -= P.rosterRuleMissPenalty;
           if (castCap > 0 && c.cost / Math.max(hrs, 0.25) > castCap + 1) extra -= P.rosterCastOverPenalty;
           if (role === "co_host" && isMale(t.gender)) extra += (SPORT_BRAND_PATTERN.test(shift.brandName) ? P.rosterMaleAsstSport : 0) + (night ? P.rosterMaleAsstNight : 0);
         }
@@ -638,7 +625,7 @@ export function planMonth(input: PlanInput): MonthPlan {
       const main = primaryRole(t) === role;
       const own = boundsWithCap(t, { host: input.bounds.host, co_host: input.bounds.co_host }, rules, month, caps[id]);
       const b = main ? { min: own.min * minScale, max: own.max } : { min: 0, max: Math.min(input.bounds[role].max, Math.round((rules.maxWeekHours * daysInMonth(month)) / 7)) };
-      l = { talentId: id, role, fixedHours: 0, draftHours: 0, plannedHours: 0, hours: 0, min: b.min, max: b.max, shifts: 0, registered: main ? registeredIn.get(id) ?? 0 : 0, registeredHours: main ? registeredHoursIn.get(id) ?? 0 : 0, cost: 0, costMissing: false, perf: role === "host" ? perf.get(id) : undefined, status: "ok" };
+      l = { talentId: id, role, fixedHours: 0, draftHours: 0, plannedHours: 0, hours: 0, min: b.min, max: b.max, shifts: 0, registered: main ? registeredIn.get(id) ?? 0 : 0, cost: 0, costMissing: false, perf: role === "host" ? perf.get(id) : undefined, status: "ok" };
       load.set(key, l);
     }
     return l;
@@ -758,8 +745,6 @@ function rebalance(
         const holderMin = bounds.get(a.talentId)?.min ?? 0;
         if (holderLoad - h < holderMin - 1e-6 || holderLoad <= n.load + h) continue;
         if (brandRuleViolation(input.brandRules, s.brandId, n.t.id, a.role, s.platform)) continue;
-        const nRule = input.tuning?.personRules?.[n.t.id];
-        if (nRule && (input.tuning?.params.rosterRuleMissPenalty ?? 0) > 0 && !ruleFit(nRule, { date: s.date, brandId: s.brandId, night: roster.isLate(absRange(s)[1], s.date) }).ok) continue;
         roster.remove(a.talentId, a.shiftKey, a.role);
         if (roster.blocked(n.t.id, s, n.b.max, month, a.role)) {
           roster.add(a.talentId, s, a.role, true);

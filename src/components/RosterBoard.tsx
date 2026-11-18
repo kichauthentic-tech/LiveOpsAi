@@ -44,9 +44,6 @@ import { OpenMonthWizard } from "./roster/OpenMonthWizard";
 import { BrandScheduleExportDialog } from "./roster/BrandScheduleExportDialog";
 import { MonthPlanPanel } from "./roster/MonthPlanPanel";
 import { useMonthCommitments } from "../hooks/useMonthCommitments";
-import { useScheduleRules } from "../hooks/useScheduleRules";
-import { PersonRulesDesk } from "./roster/PersonRulesDesk";
-import { hasRule } from "../lib/roster/placementRules";
 import { inferAutoCaps } from "../lib/roster/autoCaps";
 import { PersonBar } from "./roster/PersonBar";
 import { MoreMenu } from "./ui/MoreMenu";
@@ -100,10 +97,9 @@ interface Props {
 // Tháng này / Tháng sau / Tuần và 6 tab con. Một màn: dải trạng thái theo tháng (MonthStrip) + "Việc cần làm" (mỗi việc một nút)
 // + lưới tuần có giờ tháng cạnh mỗi kênh. Các màn phụ (Kiểm lịch, Báo nghỉ theo người, Ma trận kênh, Giờ & chi phí, Luật & nhật
 // ký, giờ từng kênh tháng này, mở lịch tháng sau) mở dưới lưới từ menu "Thêm" hoặc từ nút của thẻ tháng.
-type Section = "plan" | "people" | "next" | "checks" | "absence" | "matrix" | "hours" | "rules";
+type Section = "plan" | "next" | "checks" | "absence" | "matrix" | "hours" | "rules";
 const MORE: { id: Section; label: string }[] = [
   { id: "plan", label: "Xếp cả tháng theo mục tiêu" },
-  { id: "people", label: "Luật đặt giờ từng người" },
   { id: "checks", label: "Kiểm lịch (mọi lỗi + cảnh báo)" },
   { id: "absence", label: "Báo nghỉ theo người" },
   { id: "matrix", label: "Ma trận kênh" },
@@ -113,7 +109,6 @@ const MORE: { id: Section; label: string }[] = [
 ];
 const SECTION_TITLE: Record<Section, string> = {
   plan: "Xếp cả tháng theo mục tiêu",
-  people: "Luật đặt giờ từng người",
   next: "Mở lịch tháng sau",
   checks: "Kiểm lịch",
   absence: "Báo nghỉ theo người",
@@ -174,15 +169,13 @@ export const RosterBoard: React.FC<Props> = (p) => {
   });
   // Giờ cam kết = trần giờ của tháng đang xem (0223; chưa chạy migration thì lưu theo trình duyệt).
   const commitments = useMonthCommitments(viewMonth);
-  // Quy luật đặt giờ từng người (0224): loại ngày / brand / ca đêm, áp mọi tháng.
-  const scheduleRules = useScheduleRules();
   const bandStrength = useMemo(() => buildBandStrength(p.sessions, getTodayDate()), [p.sessions]);
   // Mặc định mọi người có trần giờ TỰ SUY từ 3 tháng đã qua (để chia đợt); cam kết nhập tay (ngoại lệ) ghi đè.
   const autoCaps = useMemo(() => inferAutoCaps(p.sessions, p.talents, getTodayDate(), bounds, p.engineParams.rosterAutoCapSlack), [p.sessions, p.talents, bounds, p.engineParams.rosterAutoCapSlack]);
   const tuning = useMemo<PlanTuning>(() => {
     const soft = Object.fromEntries(Object.entries(autoCaps).map(([id, c]) => [id, { monthMax: c.monthMax, soft: true }]));
-    return { params: p.engineParams, personCaps: { ...soft, ...commitments.caps }, personRules: scheduleRules.byTalent, bandStrength };
-  }, [p.engineParams, autoCaps, commitments.caps, scheduleRules.byTalent, bandStrength]);
+    return { params: p.engineParams, personCaps: { ...soft, ...commitments.caps }, bandStrength };
+  }, [p.engineParams, autoCaps, commitments.caps, bandStrength]);
   // Ô nháp do bộ xếp tự fill (slotId → người). Ô Trainer đã đổi tay khác giá trị này nên không bị ghi đè lần sau. Lưu theo trình duyệt.
   const [auto, setAuto] = useState<AutoFill>(() => {
     try {
@@ -1052,7 +1045,6 @@ export const RosterBoard: React.FC<Props> = (p) => {
               <MoreMenu
                 className="ml-auto"
                 items={[
-                  { label: "Luật đặt giờ từng người", onClick: () => openSection("people") },
                   { label: "So sánh 3 mục tiêu", onClick: () => openSection("plan") },
                   { label: "Gỡ phần tự fill", onClick: () => void clearAuto(), disabled: readOnly || busy || Object.keys(auto).length === 0 }
                 ]}
@@ -1172,8 +1164,6 @@ export const RosterBoard: React.FC<Props> = (p) => {
                 tuning={tuning}
                 commitments={commitments}
                 autoCaps={autoCaps}
-                ruleCount={scheduleRules.rules.filter(hasRule).length}
-                onOpenRules={() => openSection("people")}
                 auto={auto}
                 scopeLabel={planScopeLabel}
                 today={today}
@@ -1189,7 +1179,6 @@ export const RosterBoard: React.FC<Props> = (p) => {
                 showCost={showCost}
               />
             )}
-            {section === "people" && <PersonRulesDesk month={viewMonth} talents={p.talents} brands={p.brands} nameOf={nameOf} commitments={commitments} scheduleRules={scheduleRules} autoCaps={autoCaps} readOnly={readOnly} />}
             {section === "next" && <NextDesk {...deskProps} registrations={p.shiftRegistrations} drafts={drafts} weeks={weeks} />}
             {section === "checks" && <ChecksPanel analysis={analysis} shifts={wk} onSelect={setSelectedKey} />}
             {section === "absence" && <AbsencePanel key={weekStart} weekStart={weekStart} shifts={shifts} analysis={analysis} ctx={ctx} talents={p.talents} showCost={showCost} readOnly={readOnly} busy={busy} onAssign={assign} />}
