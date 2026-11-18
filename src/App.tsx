@@ -108,6 +108,7 @@ const FinanceHr = lazyNamed(() => import("./components/FinanceHr"), "FinanceHr")
 const Accounting = lazyNamed(() => import("./components/Accounting"), "Accounting");
 const UserRoleSettings = lazyNamed(() => import("./components/UserRoleSettings"), "UserRoleSettings");
 const AiTrainingCenter = lazyNamed(() => import("./components/AiTrainingCenter"), "AiTrainingCenter");
+const AiTrainingHub = lazyNamed(() => import("./components/AiTrainingHub"), "AiTrainingHub");
 const EngineTrainingPanel = lazyNamed(() => import("./components/EngineTrainingPanel"), "EngineTrainingPanel");
 const LogicRegistryCard = lazyNamed(() => import("./components/LogicRegistryCard"), "LogicRegistryCard");
 const RuleComplianceCard = lazyNamed(() => import("./components/RuleComplianceCard"), "RuleComplianceCard");
@@ -168,7 +169,7 @@ const TAB_CHUNKS: Record<string, { preload: () => void }[]> = {
   tiktok_api: [TikTokApiAutomation],
   finance: [FinanceHr],
   accounting: [Accounting],
-  ai_training: [AiTrainingCenter, LogicRegistryCard, RuleComplianceCard, LaneMixCard, EngineTrainingPanel],
+  ai_training: [AiTrainingHub, AiTrainingCenter, LogicRegistryCard, RuleComplianceCard, LaneMixCard, EngineTrainingPanel],
   user_settings: [UserRoleSettings],
   account_settings: [AccountSettings]
 };
@@ -2691,32 +2692,43 @@ export default function App() {
                 )}
 
                 {activeTab === "ai_training" && currentRole === "admin" && (
-                  <div className="space-y-8">
-                    <AiTrainingCenter
-                      prompts={aiAgentPrompts}
-                      loading={aiAgentPromptsLoading}
-                      error={aiAgentPromptsError}
-                      onUpdate={handleUpdateAiAgentPrompt}
-                    />
-                    <LogicRegistryCard params={engineParams} />
-                    <RuleComplianceCard sessions={visibleSessions} talents={talents} history={talentRateHistory} brands={visibleBrands} params={engineParams} />
-                    <LaneMixCard sessions={visibleSessions} talents={talents} history={talentRateHistory} brands={visibleBrands} params={engineParams} />
-                    <EngineTrainingPanel
-                      brands={visibleBrands}
-                      sessions={visibleSessions}
-                      shiftSlots={shiftSlots}
-                      promoSchemes={promoSchemes}
-                      params={engineParams}
-                      updatedAt={engineParamsUpdatedAt}
-                      loading={engineParamsLoading}
-                      error={engineParamsError}
-                      onSave={async (p) => {
-                        const r = await saveEngineParams(p, activeUser.id);
-                        setEngineParams(r.params);
-                        setEngineParamsUpdatedAt(r.updatedAt);
-                      }}
-                    />
-                  </div>
+                  <AiTrainingHub
+                    agentCount={aiAgentPrompts.length}
+                    panels={{
+                      prompts: (
+                        <AiTrainingCenter
+                          prompts={aiAgentPrompts}
+                          loading={aiAgentPromptsLoading}
+                          error={aiAgentPromptsError}
+                          onUpdate={handleUpdateAiAgentPrompt}
+                        />
+                      ),
+                      logic: <LogicRegistryCard params={engineParams} />,
+                      check: (
+                        <>
+                          <RuleComplianceCard sessions={visibleSessions} talents={talents} history={talentRateHistory} brands={visibleBrands} params={engineParams} />
+                          <LaneMixCard sessions={visibleSessions} talents={talents} history={talentRateHistory} brands={visibleBrands} params={engineParams} />
+                        </>
+                      ),
+                      engine: (
+                        <EngineTrainingPanel
+                          brands={visibleBrands}
+                          sessions={visibleSessions}
+                          shiftSlots={shiftSlots}
+                          promoSchemes={promoSchemes}
+                          params={engineParams}
+                          updatedAt={engineParamsUpdatedAt}
+                          loading={engineParamsLoading}
+                          error={engineParamsError}
+                          onSave={async (p) => {
+                            const r = await saveEngineParams(p, activeUser.id);
+                            setEngineParams(r.params);
+                            setEngineParamsUpdatedAt(r.updatedAt);
+                          }}
+                        />
+                      ),
+                    }}
+                  />
                 )}
 
                 {activeTab === "user_settings" && (

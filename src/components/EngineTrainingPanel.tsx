@@ -43,6 +43,7 @@ export const EngineTrainingPanel: React.FC<Props> = ({ brands, sessions, shiftSl
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [showHelp, setShowHelp] = useState(false);
+  const [leftView, setLeftView] = useState<"forecast" | "alloc" | "learned" | "eval">("forecast");
   const [events, setEvents] = useState<CalendarEventRow[]>([]);
   const [lockedSlots, setLockedSlots] = useState<BrandMonthPlanSlot[]>([]);
   const today = todayVn();
@@ -128,9 +129,14 @@ export const EngineTrainingPanel: React.FC<Props> = ({ brands, sessions, shiftSl
       <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
         {/* Nửa trái: engine đã học gì */}
         <div className="xl:col-span-2 space-y-4">
-          {brandId && <ForecastTrainingCard brandId={brandId} sessions={sessions} params={draft} today={today} schemes={schemes} />}
-          {brandId && <AllocationTrainingCard brandId={brandId} sessions={sessions} params={draft} today={today} />}
-          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 space-y-3">
+          <div role="tablist" className="flex flex-wrap gap-1.5">
+            {([["forecast", "Dự báo GMV"], ["alloc", "Chia target"], ["learned", "Engine đã học"], ["eval", "KH vs thực tế"]] as const).map(([k, label]) => (
+              <button key={k} type="button" role="tab" aria-selected={leftView === k} onClick={() => setLeftView(k)} className={`min-h-6 px-3 py-1.5 rounded-lg text-xs font-bold border transition ${leftView === k ? "seg-on" : "border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]"}`}>{label}</button>
+            ))}
+          </div>
+          {leftView === "forecast" && brandId && <ForecastTrainingCard brandId={brandId} sessions={sessions} params={draft} today={today} schemes={schemes} />}
+          {leftView === "alloc" && brandId && <AllocationTrainingCard brandId={brandId} sessions={sessions} params={draft} today={today} />}
+          {leftView === "learned" && <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 space-y-3">
             <div className="flex items-center justify-between gap-2">
               <h3 data-section="Engine đã học" className="text-sm font-bold text-[var(--text)] flex items-center gap-1.5"><BrainCircuit className="w-4 h-4 text-[var(--accent-text)]" /> Engine đã học gì</h3>
               <div className="flex gap-1.5">
@@ -185,9 +191,9 @@ export const EngineTrainingPanel: React.FC<Props> = ({ brands, sessions, shiftSl
                 </div>
               </div>
             )}
-          </div>
+          </div>}
 
-          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 space-y-2">
+          {leftView === "eval" && <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 space-y-2">
             <h3 data-section="KH vs thực tế" className="text-sm font-bold text-[var(--text)]">Kế hoạch vs thực tế (tự hiệu chỉnh)</h3>
             {!evaluation ? (
               <p className="text-xs text-[var(--text-muted)]">Brand chưa có kế hoạch tháng nào đã chốt → chưa có gì để so. Sau tháng đầu tiên chốt kế hoạch và đối soát, engine tự chỉnh {platformText("GMV/giờ", histPlatform)} từng ô theo sai số.</p>
@@ -207,13 +213,13 @@ export const EngineTrainingPanel: React.FC<Props> = ({ brands, sessions, shiftSl
                 </div>
               </div>
             )}
-          </div>
+          </div>}
         </div>
 
         {/* Nửa phải: tham số */}
         <div className="xl:col-span-3 bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 space-y-4">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-sm font-bold text-[var(--text)] flex-1">Tham số</h3>
+            <h3 data-section="Tham số" className="text-sm font-bold text-[var(--text)] flex-1">Tham số</h3>
             {/* Mô tả 38 tham số chiếm ~70 dòng — ẩn mặc định, rê chuột lên tên tham số vẫn đọc được từng dòng. */}
             <button onClick={() => setShowHelp((v) => !v)} aria-pressed={showHelp} className={`px-3 py-1.5 rounded-lg border text-xs font-bold ${showHelp ? "seg-on" : "border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]"}`}>
               {showHelp ? "Ẩn giải thích" : "Hiện giải thích"}
@@ -222,11 +228,18 @@ export const EngineTrainingPanel: React.FC<Props> = ({ brands, sessions, shiftSl
             <button onClick={resetAll} className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-xs font-bold text-[var(--text)] flex items-center gap-1.5"><RotateCcw className="w-3.5 h-3.5" /> Về mặc định tất cả</button>
             <button onClick={save} disabled={saving || !dirty} className="px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs font-bold disabled:opacity-40 flex items-center gap-1.5"><Save className="w-3.5 h-3.5" /> {saving ? "Đang lưu…" : "Lưu tham số"}</button>
           </div>
-          {GROUPS.map((g) => (
-            <div key={g}>
-              <p className="text-xs font-bold text-[var(--text-muted)] mb-1.5">{ENGINE_GROUP_LABEL[g]}</p>
+          {GROUPS.map((g) => {
+            const metas = ENGINE_PARAM_META.filter((m) => m.group === g);
+            const diff = metas.filter((m) => draft[m.key] !== DEFAULT_ENGINE_PARAMS[m.key]).length;
+            return (
+            <details key={g} open={diff > 0} className="group">
+              <summary className="cursor-pointer list-none flex items-baseline gap-2 text-xs font-bold text-[var(--text-muted)] hover:text-[var(--text)] mb-1.5">
+                <span className="text-[var(--text-faint)] group-open:rotate-90 transition-transform">▸</span>
+                {ENGINE_GROUP_LABEL[g]}
+                <span className="text-2xs font-normal text-[var(--text-faint)]">{metas.length} tham số{diff > 0 ? <> · <b className="text-sky-400">{diff} khác mặc định</b></> : ""}</span>
+              </summary>
               <div className="divide-y divide-[var(--border)] border border-[var(--border)] rounded-xl overflow-hidden">
-                {ENGINE_PARAM_META.filter((m) => m.group === g).map((m) => {
+                {metas.map((m) => {
                   const v = draft[m.key];
                   const def = DEFAULT_ENGINE_PARAMS[m.key];
                   const isDef = v === def;
@@ -251,8 +264,9 @@ export const EngineTrainingPanel: React.FC<Props> = ({ brands, sessions, shiftSl
                   );
                 })}
               </div>
-            </div>
-          ))}
+            </details>
+            );
+          })}
         </div>
       </div>
     </div>

@@ -1,10 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { BrainCircuit, RefreshCw, RotateCcw, Save, ShieldAlert, CheckCircle2 } from "lucide-react";
+import { RefreshCw, RotateCcw, Save, ShieldAlert, CheckCircle2 } from "lucide-react";
 import { AiAgentPrompt } from "../types";
 import { errorMessage } from "../lib/errorMessage";
 import { useToast } from "../hooks/useToast";
-import { PageHeader } from "./common/PageHeader";
-import { SectionNav } from "./common/SectionNav";
 
 interface AiTrainingCenterProps {
   prompts: AiAgentPrompt[];
@@ -61,21 +59,6 @@ export const AiTrainingCenter: React.FC<AiTrainingCenterProps> = ({ prompts, loa
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        icon={BrainCircuit}
-        title="AI Training Center"
-        description="Cấu hình system prompt riêng cho từng AI Agent thật đang chạy trong hệ thống. Chỉ tài khoản Admin thấy và sửa được tab này."
-        actions={
-          <div className="text-right">
-            <div className="flex items-center justify-end gap-2 text-xs font-bold text-[var(--text)]">
-              <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-              <span>{prompts.length} Agent</span>
-            </div>
-            <p className="text-2xs text-[var(--text-faint)]">Thay đổi có hiệu lực ngay ở lần gọi AI tiếp theo</p>
-          </div>
-        }
-      />
-      <SectionNav />
 
       {loading && (
         <div className="bg-[var(--surface)] p-8 rounded-2xl border border-[var(--border)] text-center text-[var(--text-muted)] text-sm flex items-center justify-center gap-2">
