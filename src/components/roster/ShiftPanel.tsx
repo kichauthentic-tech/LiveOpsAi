@@ -195,7 +195,7 @@ export const ShiftPanel: React.FC<Props> = ({ shift, analysis, ctx, talents, his
             items={[
               ...(canMove ? [{ label: moving ? "Ẩn dời ca" : "Dời ca", onClick: () => setMoving((v) => !v) }] : []),
               ...(!readOnly && !past && !shift.hasData && (shift.kind === "session" || !shift.planId)
-                ? [{ label: shift.kind === "open" ? "Bỏ ca này (ca thêm, chưa có người)" : "Huỷ ca (ghi lý do)", onClick: () => onRemove(shift), danger: true, disabled: busy }]
+                ? [{ label: shift.kind === "open" ? "Bỏ ca này (ca thêm, chưa có người)" : "Huỷ ca — vẫn hiện gạch ngang trên lịch gửi brand", onClick: () => onRemove(shift), danger: true, disabled: busy }]
                 : [])
             ]}
           />

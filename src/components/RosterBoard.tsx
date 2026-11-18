@@ -33,7 +33,7 @@ import {
 } from "../lib/db/roster";
 import type { BrandTalentRule } from "../lib/commercial/terms";
 import { inferRoleRows, type TalentBrandRole } from "../lib/roster/talentBrandRoles";
-import { analyzeRoster, buildBrandRuleIndex, buildRosterShifts, channelKeyOf, DEFAULT_ROSTER_RULES, shiftHours, type RosterRole, type RosterRules, type RosterShift } from "../lib/roster/rules";
+import { analyzeRoster, buildBrandRuleIndex, buildCancelledShifts, buildRosterShifts, channelKeyOf, DEFAULT_ROSTER_RULES, shiftHours, type RosterRole, type RosterRules, type RosterShift } from "../lib/roster/rules";
 import { buildFamiliarity, famOf, planCostCut, shiftCost, type CostMove, type RankContext, type RankMode } from "../lib/roster/candidates";
 import { ShiftPanel, dayLabel } from "./roster/ShiftPanel";
 import { AbsencePanel, ChangeLogPanel, ChecksPanel, HoursCostPanel, MatrixPanel, RulesPanel, WeekGrid, type ChannelRow } from "./roster/panels";
@@ -44,6 +44,9 @@ import { OpenMonthWizard } from "./roster/OpenMonthWizard";
 import { BrandScheduleExportDialog } from "./roster/BrandScheduleExportDialog";
 import { MonthPlanPanel } from "./roster/MonthPlanPanel";
 import { useMonthCommitments } from "../hooks/useMonthCommitments";
+import { useScheduleRules } from "../hooks/useScheduleRules";
+import { PersonRulesDesk } from "./roster/PersonRulesDesk";
+import { hasRule } from "../lib/roster/placementRules";
 import { inferAutoCaps } from "../lib/roster/autoCaps";
 import { PersonBar } from "./roster/PersonBar";
 import { MoreMenu } from "./ui/MoreMenu";
@@ -97,9 +100,10 @@ interface Props {
 // Tháng này / Tháng sau / Tuần và 6 tab con. Một màn: dải trạng thái theo tháng (MonthStrip) + "Việc cần làm" (mỗi việc một nút)
 // + lưới tuần có giờ tháng cạnh mỗi kênh. Các màn phụ (Kiểm lịch, Báo nghỉ theo người, Ma trận kênh, Giờ & chi phí, Luật & nhật
 // ký, giờ từng kênh tháng này, mở lịch tháng sau) mở dưới lưới từ menu "Thêm" hoặc từ nút của thẻ tháng.
-type Section = "plan" | "next" | "checks" | "absence" | "matrix" | "hours" | "rules";
+type Section = "plan" | "people" | "next" | "checks" | "absence" | "matrix" | "hours" | "rules";
 const MORE: { id: Section; label: string }[] = [
   { id: "plan", label: "Xếp cả tháng theo mục tiêu" },
+  { id: "people", label: "Luật đặt giờ từng người" },
   { id: "checks", label: "Kiểm lịch (mọi lỗi + cảnh báo)" },
   { id: "absence", label: "Báo nghỉ theo người" },
   { id: "matrix", label: "Ma trận kênh" },
@@ -109,6 +113,7 @@ const MORE: { id: Section; label: string }[] = [
 ];
 const SECTION_TITLE: Record<Section, string> = {
   plan: "Xếp cả tháng theo mục tiêu",
+  people: "Luật đặt giờ từng người",
   next: "Mở lịch tháng sau",
   checks: "Kiểm lịch",
   absence: "Báo nghỉ theo người",
@@ -169,13 +174,15 @@ export const RosterBoard: React.FC<Props> = (p) => {
   });
   // Giờ cam kết = trần giờ của tháng đang xem (0223; chưa chạy migration thì lưu theo trình duyệt).
   const commitments = useMonthCommitments(viewMonth);
+  // Quy luật đặt giờ từng người (0224): loại ngày / brand / ca đêm, áp mọi tháng.
+  const scheduleRules = useScheduleRules();
   const bandStrength = useMemo(() => buildBandStrength(p.sessions, getTodayDate()), [p.sessions]);
   // Mặc định mọi người có trần giờ TỰ SUY từ 3 tháng đã qua (để chia đợt); cam kết nhập tay (ngoại lệ) ghi đè.
   const autoCaps = useMemo(() => inferAutoCaps(p.sessions, p.talents, getTodayDate(), bounds, p.engineParams.rosterAutoCapSlack), [p.sessions, p.talents, bounds, p.engineParams.rosterAutoCapSlack]);
   const tuning = useMemo<PlanTuning>(() => {
     const soft = Object.fromEntries(Object.entries(autoCaps).map(([id, c]) => [id, { monthMax: c.monthMax, soft: true }]));
-    return { params: p.engineParams, personCaps: { ...soft, ...commitments.caps }, bandStrength };
-  }, [p.engineParams, autoCaps, commitments.caps, bandStrength]);
+    return { params: p.engineParams, personCaps: { ...soft, ...commitments.caps }, personRules: scheduleRules.byTalent, bandStrength };
+  }, [p.engineParams, autoCaps, commitments.caps, scheduleRules.byTalent, bandStrength]);
   // Ô nháp do bộ xếp tự fill (slotId → người). Ô Trainer đã đổi tay khác giá trị này nên không bị ghi đè lần sau. Lưu theo trình duyệt.
   const [auto, setAuto] = useState<AutoFill>(() => {
     try {
@@ -293,6 +300,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
     () => buildRosterShifts(p.sessions, p.shiftSlots, drafts, p.shiftRegistrations, addDays(weekStart, -7), addDays(weekEnd, 1)),
     [p.sessions, p.shiftSlots, drafts, p.shiftRegistrations, weekStart, weekEnd]
   );
+  const cancelledWk = useMemo(() => buildCancelledShifts(p.sessions, weekStart, weekEnd), [p.sessions, weekStart, weekEnd]);
   const personColors = useMemo(() => buildPersonColors(p.talents), [p.talents]);
   const inferredRoles = useMemo(() => inferRoleRows(p.sessions), [p.sessions]);
   const brandRules = useMemo(
@@ -321,9 +329,9 @@ export const RosterBoard: React.FC<Props> = (p) => {
       if (c.status !== "active" || !brandNameById.has(c.brandId)) continue;
       rows.set(channelKeyOf(c.brandId, c.platform), { key: channelKeyOf(c.brandId, c.platform), brandId: c.brandId, brandName: brandNameById.get(c.brandId) ?? "", platform: c.platform });
     }
-    for (const s of wk) if (!rows.has(s.channelKey)) rows.set(s.channelKey, { key: s.channelKey, brandId: s.brandId, brandName: s.brandName, platform: s.platform });
+    for (const s of [...wk, ...cancelledWk]) if (!rows.has(s.channelKey)) rows.set(s.channelKey, { key: s.channelKey, brandId: s.brandId, brandName: s.brandName, platform: s.platform });
     return [...rows.values()].sort((a, b) => a.brandName.localeCompare(b.brandName) || (a.platform === b.platform ? 0 : a.platform.toLowerCase() === "tiktok" ? -1 : b.platform.toLowerCase() === "tiktok" ? 1 : a.platform.localeCompare(b.platform)));
-  }, [p.brandChannels, brandNameById, wk]);
+  }, [p.brandChannels, brandNameById, wk, cancelledWk]);
 
   const gridChannels = useMemo(() => (brandView === "all" || !channels.some((c) => c.brandId === brandView) ? channels : channels.filter((c) => c.brandId === brandView)), [channels, brandView]);
   const gridBrands = useMemo(() => {
@@ -1044,6 +1052,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
               <MoreMenu
                 className="ml-auto"
                 items={[
+                  { label: "Luật đặt giờ từng người", onClick: () => openSection("people") },
                   { label: "So sánh 3 mục tiêu", onClick: () => openSection("plan") },
                   { label: "Gỡ phần tự fill", onClick: () => void clearAuto(), disabled: readOnly || busy || Object.keys(auto).length === 0 }
                 ]}
@@ -1100,7 +1109,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
               </>
             )}
           </div>
-          <WeekGrid weekStart={weekStart} month={viewMonth} channels={gridChannels} shifts={wk} analysis={analysis} nameOf={nameOf} roleOf={(id) => talentById.get(id)?.role} colorOf={(id) => personColors.get(id)} selectedKey={selectedKey} canAdd={!readOnly} onSelect={(k) => void onGridSelect(k)} onAdd={addShift} channelMeta={channelMeta} focus={personTalent ? { talentId: personTalent.id, name: nameOf(personTalent.id) } : null} />
+          <WeekGrid weekStart={weekStart} month={viewMonth} channels={gridChannels} shifts={wk} cancelled={cancelledWk} analysis={analysis} nameOf={nameOf} roleOf={(id) => talentById.get(id)?.role} colorOf={(id) => personColors.get(id)} selectedKey={selectedKey} canAdd={!readOnly} onSelect={(k) => void onGridSelect(k)} onAdd={addShift} channelMeta={channelMeta} focus={personTalent ? { talentId: personTalent.id, name: nameOf(personTalent.id) } : null} />
         </div>
         <details className="group bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 space-y-2" aria-label="Khối lượng nhân sự">
           {/* Gập mặc định (trainer: Điều Phối rối mắt) — chỉ mở khi cần cân giờ. */}
@@ -1163,6 +1172,8 @@ export const RosterBoard: React.FC<Props> = (p) => {
                 tuning={tuning}
                 commitments={commitments}
                 autoCaps={autoCaps}
+                ruleCount={scheduleRules.rules.filter(hasRule).length}
+                onOpenRules={() => openSection("people")}
                 auto={auto}
                 scopeLabel={planScopeLabel}
                 today={today}
@@ -1178,6 +1189,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
                 showCost={showCost}
               />
             )}
+            {section === "people" && <PersonRulesDesk month={viewMonth} talents={p.talents} brands={p.brands} nameOf={nameOf} commitments={commitments} scheduleRules={scheduleRules} autoCaps={autoCaps} readOnly={readOnly} />}
             {section === "next" && <NextDesk {...deskProps} registrations={p.shiftRegistrations} drafts={drafts} weeks={weeks} />}
             {section === "checks" && <ChecksPanel analysis={analysis} shifts={wk} onSelect={setSelectedKey} />}
             {section === "absence" && <AbsencePanel key={weekStart} weekStart={weekStart} shifts={shifts} analysis={analysis} ctx={ctx} talents={p.talents} showCost={showCost} readOnly={readOnly} busy={busy} onAssign={assign} />}

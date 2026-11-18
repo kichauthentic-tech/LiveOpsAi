@@ -20,7 +20,6 @@ import {
 } from "../../lib/roster/monthPlanner";
 import { dayLabel } from "./ShiftPanel";
 import { InfoDot } from "../common/InfoDot";
-import { CommitmentsEditor } from "./CommitmentsEditor";
 import type { AutoCap } from "../../lib/roster/autoCaps";
 import type { MonthCommitments } from "../../hooks/useMonthCommitments";
 
@@ -52,6 +51,9 @@ interface Props {
   commitments: MonthCommitments;
   /** Trần tự suy của mọi người (chỉ để hiển thị). */
   autoCaps: Readonly<Record<string, AutoCap>>;
+  /** Số người có luật ngày / brand / ca đêm (Điều Phối → Luật đặt giờ từng người). */
+  ruleCount: number;
+  onOpenRules: () => void;
   /** Phần nháp do bộ xếp tự fill — gỡ ra để so sánh "nếu xếp lại" cho đúng. */
   auto: AutoFill;
   scopeLabel: string;
@@ -158,7 +160,15 @@ export const MonthPlanPanel: React.FC<Props> = (p) => {
               </span>
       </div>
 
-      <CommitmentsEditor month={p.month} talents={p.talents} nameOf={p.nameOf} commitments={p.commitments} autoCaps={p.autoCaps} />
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-base)] px-3 py-2 text-xs" data-testid="rules-pointer">
+        <span className="font-bold text-[var(--text)]">Giờ & luật từng người</span>
+        <span className="text-[var(--text-muted)]">
+          {p.commitments.rows.length} người có giờ cam kết · {p.ruleCount} người có luật ngày / brand / ca đêm · {Object.keys(p.autoCaps).length} người có trần tự suy
+        </span>
+        <button type="button" onClick={p.onOpenRules} className="min-h-6 rounded-md border border-[var(--border)] px-2 font-bold text-[var(--text)] hover:bg-[var(--surface-hover)]">
+          Mở bảng luật
+        </button>
+      </div>
 
       {noOpen ? (
         <p className="text-sm text-[var(--text-muted)]">Chưa có ca mở nào trong phạm vi này để xếp. Mở lịch ở “Mở lịch tháng sau” trước.</p>

@@ -54,6 +54,10 @@ export interface RosterShift {
   noAssistant?: boolean;
   /** Ca đã công bố: id ca chờ đăng ký (shift_slots) đã sinh ra nó — để bật/tắt thẻ No Asst. Ca nối / nhập từ Sheet không có. */
   finalSlotId?: string;
+  /** Ca đã HUỶ (status Cancelled, 0097) — chỉ có trong `buildCancelledShifts` để vẽ gạch ngang trên lưới + file gửi brand; KHÔNG bao giờ lẫn vào
+   *  `buildRosterShifts` (bộ xếp/kiểm lịch/giờ/chi phí đều coi ca huỷ là không tồn tại). */
+  cancelled?: boolean;
+  cancelReason?: string;
   /** Ca mở đã có người nháp (chưa công bố). */
   drafted: boolean;
   /** Ca đã chia đoạn người (0138) — đổi người ở Cửa sổ Ca Live, không ở Điều Phối Lịch Live. */
@@ -72,6 +76,34 @@ export interface DraftAssignment {
   hostId?: string;
   coHostId?: string;
   noAssistant?: boolean;
+}
+
+/** Ca đã huỷ trong [from, to] — chỉ để HIỂN THỊ (gạch ngang trên lịch, file gửi brand). Không đưa vào phân tích/xếp người. */
+export function buildCancelledShifts(sessions: readonly LiveSession[], from: string, to: string): RosterShift[] {
+  const out: RosterShift[] = [];
+  for (const s of sessions) {
+    if (s.status !== "Cancelled" || s.date < from || s.date > to) continue;
+    out.push({
+      key: `x:${s.id}`,
+      kind: "session",
+      sessionId: s.id,
+      brandId: s.brandId,
+      brandName: s.brandName,
+      platform: s.platform,
+      channelKey: channelKeyOf(s.brandId, s.platform),
+      date: s.date,
+      startTime: s.startTime,
+      endTime: s.endTime,
+      studioName: s.studioName ?? "",
+      cancelled: true,
+      cancelReason: s.cancelReason || undefined,
+      drafted: false,
+      segmented: false,
+      hasData: false,
+      registrants: []
+    });
+  }
+  return out;
 }
 
 /** Ca thật (chưa huỷ) + ca mở chưa chốt trong [from, to], gắn người nháp và người đã báo rảnh. */

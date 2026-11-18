@@ -1,5 +1,5 @@
 import type { LiveSession, ShiftSlot } from "../../types";
-import { buildRosterShifts, shiftHours, type RosterShift } from "./rules";
+import { buildCancelledShifts, buildRosterShifts, shiftHours, type RosterShift } from "./rules";
 
 // Xuất lịch live gửi brand xác nhận (09/11). Sau khi chốt lịch + mở ca đăng ký, ops cần 1 file Excel dạng lịch tháng
 // (T2…CN, mỗi tuần một hàng ngày + các khung giờ xếp dọc, bảng Khung giờ / Số ca / Số giờ bên phải) cho từng brand.
@@ -16,7 +16,7 @@ export interface ScheduleChannel {
   brandId: string;
   brandName: string;
   platform: ExportPlatform;
-  /** Ca đã lên lịch + ca mở (đã trừ ca huỷ) trong tháng, đã sắp theo ngày/giờ. */
+  /** Ca đã lên lịch + ca mở trong tháng + ca HUỶ (`cancelled`, vẫn hiện gạch ngang cho brand; không tính vào số ca/giờ). */
   shifts: RosterShift[];
   shiftCount: number;
   hours: number;
@@ -27,6 +27,8 @@ export interface CalendarWeek {
   dates: (string | null)[];
   /** Các hàng khung giờ; mỗi hàng 7 ô (chuỗi "10:00 - 13:00" hoặc null). Ít nhất 1 hàng. */
   rows: (string | null)[][];
+  /** Song song với `rows`: true = ca đã huỷ (gạch ngang). */
+  struck: boolean[][];
 }
 
 export interface CalendarSummaryRow {
@@ -40,6 +42,8 @@ export interface ChannelCalendar {
   summary: CalendarSummaryRow[];
   totalCount: number;
   totalHours: number;
+  /** Có ít nhất 1 ca huỷ trong lịch ⇒ file ghi chú "gạch ngang = ca huỷ". */
+  hasCancelled: boolean;
 }
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -72,7 +76,7 @@ export function monthBounds(month: string): { from: string; to: string } {
 /** Mọi kênh (brand × sàn) có ít nhất 1 ca trong tháng — TikTok trước Shopee, brand theo tên. */
 export function collectScheduleChannels(sessions: readonly LiveSession[], slots: readonly ShiftSlot[], month: string): ScheduleChannel[] {
   const { from, to } = monthBounds(month);
-  const shifts = buildRosterShifts(sessions, slots, [], [], from, to);
+  const shifts = [...buildRosterShifts(sessions, slots, [], [], from, to), ...buildCancelledShifts(sessions, from, to)];
   const by = new Map<string, ScheduleChannel>();
   for (const s of shifts) {
     const key = `${s.brandId}|${s.platform}`;
@@ -82,6 +86,7 @@ export function collectScheduleChannels(sessions: readonly LiveSession[], slots:
       by.set(key, ch);
     }
     ch.shifts.push(s);
+    if (s.cancelled) continue;
     ch.shiftCount += 1;
     ch.hours += shiftHours(s);
   }
@@ -89,18 +94,23 @@ export function collectScheduleChannels(sessions: readonly LiveSession[], slots:
 }
 
 /** Dựng bố cục lịch tháng của 1 kênh. `month` = "YYYY-MM". */
-export function buildChannelCalendar(shifts: readonly Pick<RosterShift, "date" | "startTime" | "endTime">[], month: string): ChannelCalendar {
+export function buildChannelCalendar(shifts: readonly (Pick<RosterShift, "date" | "startTime" | "endTime"> & { cancelled?: boolean })[], month: string): ChannelCalendar {
   const { from, to } = monthBounds(month);
-  const byDate = new Map<string, { frame: string; start: string }[]>();
+  const byDate = new Map<string, { frame: string; start: string; cancelled: boolean }[]>();
   const summary = new Map<string, CalendarSummaryRow & { start: string }>();
   let totalCount = 0;
   let totalHours = 0;
+  let hasCancelled = false;
   for (const s of shifts) {
     if (s.date < from || s.date > to) continue;
     const frame = fmtFrame(s.startTime, s.endTime);
     const list = byDate.get(s.date) ?? [];
-    list.push({ frame, start: s.startTime });
+    list.push({ frame, start: s.startTime, cancelled: !!s.cancelled });
     byDate.set(s.date, list);
+    if (s.cancelled) {
+      hasCancelled = true;
+      continue; // ca huỷ chỉ hiện gạch ngang, không vào bảng khung giờ / tổng
+    }
     const h = shiftHours(s);
     const row = summary.get(frame) ?? { frame, count: 0, hours: 0, start: s.startTime };
     row.count += 1;
@@ -122,14 +132,15 @@ export function buildChannelCalendar(shifts: readonly Pick<RosterShift, "date" |
     const height = Math.max(1, ...dates.map((d) => (d ? (byDate.get(d)?.length ?? 0) : 0)));
     const rows: (string | null)[][] = [];
     for (let r = 0; r < height; r++) rows.push(dates.map((d) => (d ? (byDate.get(d)?.[r]?.frame ?? null) : null)));
-    weeks.push({ dates, rows });
+    const struck = rows.map((_, r) => dates.map((d) => (d ? !!byDate.get(d)?.[r]?.cancelled : false)));
+    weeks.push({ dates, rows, struck });
     cursor = addDaysIso(cursor, 7);
   }
 
   const summaryRows = [...summary.values()]
     .sort((a, b) => a.start.localeCompare(b.start) || a.frame.localeCompare(b.frame))
     .map(({ frame, count, hours }) => ({ frame, count, hours }));
-  return { weeks, summary: summaryRows, totalCount, totalHours };
+  return { weeks, summary: summaryRows, totalCount, totalHours, hasCancelled };
 }
 
 /** "TTS VERA" cho TikTok, "SHOPEE VERA" cho Shopee — như tiêu đề file mẫu ("TTS VERA THÁNG 10 - 2026"). */
@@ -186,11 +197,12 @@ function renderSheet(ws: Sheet, cal: ChannelCalendar, title: string, month: stri
     }
     ws.getRow(r).height = 20;
     r += 1;
-    for (const row of w.rows) {
+    for (const [ri, row] of w.rows.entries()) {
       for (let c = 0; c < 7; c++) {
         const cell = ws.getCell(r, c + 1);
         cell.value = row[c];
-        cell.font = { name: "Arial", bold: true, size: 12 };
+        const struck = w.struck[ri][c];
+        cell.font = struck ? { name: "Arial", bold: true, size: 12, strike: true, color: { argb: "FFFF0000" } } : { name: "Arial", bold: true, size: 12 };
         cell.alignment = center;
         cell.border = box;
       }
@@ -222,6 +234,11 @@ function renderSheet(ws: Sheet, cal: ChannelCalendar, title: string, month: stri
       c.border = box;
     }
     sr += 1;
+  }
+  if (cal.hasCancelled) {
+    const note = ws.getCell(sr + 3, 8);
+    note.value = "Gạch ngang đỏ = ca đã huỷ";
+    note.font = { name: "Arial", italic: true, size: 11, strike: true, color: { argb: "FFFF0000" } };
   }
   const tot = [ws.getCell(sr + 1, 9), ws.getCell(sr + 1, 10)];
   tot[0].value = cal.totalCount;

@@ -50,7 +50,9 @@ export const WeekGrid: React.FC<{
   channelMeta?: (channel: ChannelRow) => React.ReactNode;
   /** "Xếp theo người": người đang chọn — ca họ đã xếp tô viền xanh lá, ca mở họ đã đăng ký viền xanh dương, ca còn lại mờ đi. */
   focus?: { talentId: string; name: string } | null;
-}> = ({ weekStart, month, channels, shifts, analysis, nameOf, roleOf, colorOf, selectedKey, canAdd, onSelect, onAdd, channelMeta, focus }) => {
+  /** Ca đã huỷ: vẫn hiện (gạch ngang, không bấm được) để trainer thấy đúng cái sẽ gửi brand. */
+  cancelled?: RosterShift[];
+}> = ({ weekStart, month, channels, shifts, analysis, nameOf, roleOf, colorOf, selectedKey, canAdd, onSelect, onAdd, channelMeta, focus, cancelled }) => {
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)).filter((d) => !month || d.slice(0, 7) === month);
   const labelW = channelMeta ? 168 : 140;
   return (
@@ -111,6 +113,12 @@ export const WeekGrid: React.FC<{
                         </button>
                       );
                     })}
+                    {(cancelled ?? []).filter((s) => s.channelKey === ch.key && s.date === d).map((s) => (
+                      <div key={s.key} title={s.cancelReason ? `Ca đã huỷ — ${s.cancelReason}` : "Ca đã huỷ"} className="rounded-lg border border-dashed border-red-400/50 px-1.5 py-1.5 text-red-300/80">
+                        <span className="flex items-center gap-1 whitespace-nowrap font-mono text-xs font-bold line-through">{s.startTime}–{s.endTime}</span>
+                        <span className="text-2xs font-bold">Đã huỷ{s.cancelReason ? ` · ${s.cancelReason}` : ""}</span>
+                      </div>
+                    ))}
                     {canAdd && (
                       <button type="button" onClick={() => onAdd(ch, d)} className="w-full min-h-6 flex items-center justify-center gap-1 rounded-md py-1 text-2xs text-[var(--text-faint)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]/60" aria-label={`Thêm ca ${ch.brandName} ${dayLabel(d)}`}>
                         <Plus className="w-3 h-3" /> ca
@@ -134,6 +142,7 @@ export const WeekGrid: React.FC<{
         <span>Viền đỏ = chặn công bố</span>
         <span>vàng = cảnh báo</span>
         <span>đứt = ca mở</span>
+        <span className="line-through text-red-300/80">gạch = ca huỷ (vẫn gửi brand)</span>
         <InfoDot label="Chú giải viền ca">
           Viền đỏ: lỗi chặn công bố hoặc ca thiếu host. Chip &quot;cần trợ&quot;: chưa công bố tới khi có trợ live hoặc gắn No Asst.
           Viền đứt: ca mở (nháp / chưa xếp), talent chưa thấy tên người.

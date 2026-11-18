@@ -209,3 +209,46 @@ describe("một host không hai ca cùng brand + sàn trong một ngày (chị T
     expect(hit[0].severity).toBe("warn");
   });
 });
+
+describe("quy luật đặt giờ từng người (placementRules)", () => {
+  // w rẻ hơn nên bình thường thắng cả hai ca; luật 6-7-CN + camp ⇒ ca thứ 3 thường nhường người khác, ca thứ 7 vẫn của w.
+  const talents = [tal("w", "Host", 120000), tal("o", "Host", 200000)];
+  const slots = [slot("tue", day(3)), slot("sat", day(21))];
+  const regs = slots.flatMap((s) => [reg(s.id, "w"), reg(s.id, "o")]);
+  const rule = { w: { talentId: "w", clauses: [{ days: ["weekend", "camp"] as ("weekend" | "camp")[] }], night: false } };
+  const t = (over: Partial<typeof DEFAULT_ENGINE_PARAMS> = {}) => ({ ...tuning(over), personRules: rule });
+
+  test("ca ngoài luật nhường người khác, ca trong luật vẫn của người đó", () => {
+    const base = run({ slots, talents, regs, tuning: tuning() });
+    expect(hostOf(base, "tue")).toBe("w");
+    const plan = run({ slots, talents, regs, tuning: t() });
+    expect(hostOf(plan, "tue")).toBe("o");
+    expect(hostOf(plan, "sat")).toBe("w");
+  });
+
+  test("luật là mềm: không còn ai khác thì vẫn lấp ca", () => {
+    const plan = run({ slots: [slot("tue", day(3))], talents: [talents[0]], regs: [reg("tue", "w")], tuning: t() });
+    expect(hostOf(plan, "tue")).toBe("w");
+  });
+
+  test("phạt = 0 thì bỏ qua luật", () => {
+    const plan = run({ slots, talents, regs, tuning: t({ rosterRuleMissPenalty: 0 }) });
+    expect(hostOf(plan, "tue")).toBe("w");
+  });
+
+  test("brand: JK camp, daily crocs — host chỉ nhận brand/loại ngày đúng", () => {
+    const jk = (id: string, date: string) => slot(id, date, { brandId: "j", brandName: "JOCKEY" });
+    const cr = (id: string, date: string) => slot(id, date, { brandId: "c", brandName: "CROCS" });
+    const s2 = [jk("jkReg", day(3)), cr("crReg", day(4)), jk("jkCamp", day(13))];
+    const regs2 = s2.flatMap((s) => [reg(s.id, "w"), reg(s.id, "o")]);
+    const plan = run({
+      slots: s2,
+      talents,
+      regs: regs2,
+      tuning: { ...tuning(), personRules: { w: { talentId: "w", clauses: [{ brandId: "j", days: ["camp"] }, { brandId: "c", days: ["regular"] }], night: false } } }
+    });
+    expect(hostOf(plan, "jkReg")).toBe("o"); // Jockey ngày thường: ngoài luật
+    expect(hostOf(plan, "crReg")).toBe("w"); // Crocs ngày thường: trong luật
+    expect(hostOf(plan, "jkCamp")).toBe("w"); // Jockey ngày Campaign: trong luật
+  });
+});

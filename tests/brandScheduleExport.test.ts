@@ -42,4 +42,15 @@ describe("brandScheduleExport", () => {
     expect(cal.weeks.every((w) => w.rows.length === 1)).toBe(true);
     expect(cal.totalCount).toBe(0);
   });
+
+  it("ca huỷ vẫn hiện (gạch ngang) nhưng không tính vào số ca / giờ / bảng khung giờ", () => {
+    const cal = buildChannelCalendar([sh("2026-10-05", "10:00", "13:00"), { ...sh("2026-10-05", "19:00", "22:00"), cancelled: true }], "2026-10");
+    const w = cal.weeks[1];
+    expect(w.rows.map((r) => r[0])).toEqual(["10:00 - 13:00", "19:00 - 22:00"]);
+    expect(w.struck.map((r) => r[0])).toEqual([false, true]);
+    expect(cal.hasCancelled).toBe(true);
+    expect(cal.totalCount).toBe(1);
+    expect(cal.totalHours).toBe(3);
+    expect(cal.summary).toEqual([{ frame: "10:00 - 13:00", count: 1, hours: 3 }]);
+  });
 });
