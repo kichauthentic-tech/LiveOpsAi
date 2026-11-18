@@ -66,6 +66,7 @@ export const LOGIC_MODULES: LogicModule[] = [
       { kind: "soft", text: "Ca Daily / thấp điểm: ưu tiên người cast thấp", help: "Host vượt trần cast bị trừ điểm (luật mềm, không chặn).", keys: ["rosterRegularCostAdd", "rosterRegularCastCap", "rosterCastOverPenalty"] },
       { kind: "soft", text: "Mọi ca Shopee: host vượt trần cast bị trừ điểm", help: "Trần Shopee thay trần Daily vì host Shopee phần lớn 170–200K.", keys: ["rosterShopeeCastCap"] },
       { kind: "soft", text: "Người đăng ký ít ca được ưu tiên lấp ca trước", keys: ["rosterScarcityWeight"] },
+      { kind: "soft", text: "Luật đặt giờ từng người: loại ngày, brand, ca đêm", help: "Trainer đặt ở Điều Phối → Luật đặt giờ từng người (thay phần chữ trong ngoặc ở sheet TỶ LỆ LỊCH: 6-7-CN, camp, daily, JK, crocs, ca đêm). Ca ngoài luật bị trừ điểm, không còn ai khác thì vẫn lấp.", keys: ["rosterRuleMissPenalty"], where: "Điều Phối → Thêm → Luật đặt giờ từng người" },
       { kind: "soft", text: "Làn host: cao điểm / ca thường / cân bằng (mặc định tắt)", help: "Làn gợi ý từ rate và PFM ở thẻ Cơ cấu giờ & làn host. Chỉ chạy khi điểm thưởng làn > 0.", keys: ["rosterLaneWeight"] },
       { kind: "soft", text: "Giờ rải đều cả tháng: người vượt tiến độ bị trừ điểm", keys: ["rosterPaceWeight"] },
       { kind: "soft", text: "Trợ nam ưu tiên nhẹ ở Franklin, CROCS và ca đêm", help: "Brand thể thao nhận biết theo tên chứa Franklin hoặc CROCS. Ca đêm vì an toàn cho bạn nữ. Dùng giới tính ở hồ sơ talent.", keys: ["rosterMaleAsstSport", "rosterMaleAsstNight"] },

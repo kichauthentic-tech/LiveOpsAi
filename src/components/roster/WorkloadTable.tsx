@@ -23,8 +23,8 @@ export const WorkloadTable: React.FC<{ load: readonly PersonLoad[]; nameOf: (id:
           <tr>
             <th className="px-3 py-2 text-left font-bold">Người</th>
             <th className="px-3 py-2 text-left font-bold w-[36%]">Giờ trong tháng</th>
-            <th className="px-3 py-2 text-right font-bold">Số ca</th>
-            <th className="px-3 py-2 text-right font-bold">Đăng ký</th>
+            <th className="px-3 py-2 text-right font-bold">Giờ xếp</th>
+            <th className="px-3 py-2 text-right font-bold">Giờ đăng ký</th>
             <th className="px-3 py-2 text-right font-bold">Chi phí</th>
             <th className="px-3 py-2 text-right font-bold">Chỉ số</th>
             <th className="px-3 py-2 text-left font-bold">Tình trạng</th>
@@ -50,8 +50,8 @@ export const WorkloadTable: React.FC<{ load: readonly PersonLoad[]; nameOf: (id:
                     {draft > 0 && <span className="text-[var(--text-faint)]"> · {fmtH(draft)}h nháp</span>}
                   </div>
                 </td>
-                <td className="px-3 py-1.5 text-right tabular-nums">{l.shifts}</td>
-                <td className="px-3 py-1.5 text-right tabular-nums">{l.registered}</td>
+                <td className="px-3 py-1.5 text-right tabular-nums" title={`${l.shifts} ca`}>{fmtH(l.hours)}h</td>
+                <td className="px-3 py-1.5 text-right tabular-nums" title={`${l.registered} ca đăng ký`}>{fmtH(l.registeredHours)}h</td>
                 <td className="px-3 py-1.5 text-right tabular-nums">{showCost ? (l.costMissing ? "thiếu rate" : fmtVndShort(l.cost)) : "—"}</td>
                 <td className="px-3 py-1.5 text-right tabular-nums" title={l.perf ? `${l.perf.n} ca làm căn cứ` : "Chưa có ca host có GMV trong 90 ngày"}>
                   {l.role === "host" ? (l.perf ? `${fmtFixed(l.perf.index, 2)} (${l.perf.n})` : "—") : "—"}
