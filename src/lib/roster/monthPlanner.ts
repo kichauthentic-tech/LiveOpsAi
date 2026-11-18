@@ -1,5 +1,7 @@
 import type { LiveSession, Talent, TalentRateHistoryEntry } from "../../types";
 import { addDays, isoWeekStart } from "../dateUtils";
+import { getCampaignDayInfo } from "../campaignDays";
+import type { EngineParams } from "../scheduling/engineParams";
 import { hasStaffSegments } from "../staffSegments";
 import { canHost, famOf, hostAllowedAt, hostChannelKey, plannedCost, type FamiliarityMap, type HostChannelGmv } from "./candidates";
 import { absRange, brandRuleViolation, personEntries, shiftHours, type BrandRuleIndex, type RosterRole, type RosterRules, type RosterShift } from "./rules";
@@ -79,7 +81,22 @@ const median = (xs: number[]) => {
  * Chỉ ca host một người (không chia đoạn), có GMV và giờ. KHÔNG loại ca nạp bù: phần lớn lịch T8–T10 nạp từ Sheet, loại đi là mất gần hết căn cứ.
  */
 export function buildHostPerformance(sessions: readonly LiveSession[], refDate: string, days = PERF_WINDOW_DAYS): Map<string, HostPerf> {
-  const from = addDays(refDate, -days);
+  return perfBetween(sessions, addDays(refDate, -days), refDate);
+}
+
+/**
+ * PFM THÁNG TRƯỚC (17/11, brief chị Trainer): chỉ số host tính trên tháng dương lịch ngay trước tháng đang xếp, tới hôm nay nếu tháng đó chưa hết
+ * (xếp T12 ngày 17/11 ⇒ 1–16/11). Cùng cách tính và độ co như `buildHostPerformance` — chỉ đổi cửa sổ; người ít ca vẫn bị kéo về 1,00.
+ */
+export function buildHostPerformancePrevMonth(sessions: readonly LiveSession[], month: string, today: string): Map<string, HostPerf> {
+  const y = Number(month.slice(0, 4));
+  const m = Number(month.slice(5, 7));
+  const prev = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
+  const monthStart = `${month}-01`;
+  return perfBetween(sessions, `${prev}-01`, today < monthStart ? today : monthStart);
+}
+
+function perfBetween(sessions: readonly LiveSession[], from: string, refDate: string): Map<string, HostPerf> {
   const rows: { host: string; ch: string; band: string; rate: number }[] = [];
   for (const s of sessions) {
     if (s.status === "Cancelled" || s.date < from || s.date >= refDate || !s.hostId || hasStaffSegments(s)) continue;
@@ -133,6 +150,84 @@ export function buildHostChannelGmv(sessions: readonly LiveSession[], refDate: s
   return out;
 }
 
+/** Sức mạnh khung giờ: GMV/giờ trung vị của (kênh × khung) ÷ trung vị cả kênh, 90 ngày. Khung ít hơn 5 ca không có số (coi là bình thường). */
+export function buildBandStrength(sessions: readonly LiveSession[], refDate: string, days = PERF_WINDOW_DAYS): Map<string, number> {
+  const from = addDays(refDate, -days);
+  const byCell = new Map<string, number[]>();
+  const byCh = new Map<string, number[]>();
+  for (const s of sessions) {
+    if (s.status === "Cancelled" || s.date < from || s.date >= refDate || hasStaffSegments(s)) continue;
+    const h = shiftHours(s);
+    if (h <= 0 || !(s.actualGmv > 0)) continue;
+    const ch = `${s.brandId}|${s.platform}`;
+    const rate = s.actualGmv / h;
+    for (const [m, k] of [
+      [byCell, `${ch}|${band(s.startTime)}`],
+      [byCh, ch]
+    ] as const) {
+      const l = m.get(k) ?? [];
+      l.push(rate);
+      m.set(k, l);
+    }
+  }
+  const out = new Map<string, number>();
+  for (const [k, v] of byCell) {
+    if (v.length < 5) continue;
+    const chMed = median(byCh.get(k.split("|").slice(0, 2).join("|")) ?? []);
+    if (chMed > 0) out.set(k, median(v) / chMed);
+  }
+  return out;
+}
+
+/** Trần giờ riêng của một người (người có rate cao / chiến lược riêng của Trainer). Người không có dòng = giới hạn mặc định chung. */
+export interface PersonCap {
+  /** Trần giờ cả tháng (thay giờ tối đa mặc định của vai). */
+  monthMax: number;
+  /** Ghi đè trần cho đợt ngày 1–15 (mặc định: monthMax × tỷ lệ giờ của nửa đầu, cộng dung sai). */
+  firstHalfMax?: number;
+  /** Trần TỰ SUY (autoCaps.ts): chỉ dùng để chia đợt và đo nhịp giờ, KHÔNG hạ giờ tối đa tháng của người đó. Cam kết nhập tay thì không "soft". */
+  soft?: boolean;
+}
+
+/** Mọi đầu vào chỉnh được của luật tự fill (Điều Phối Lịch Live): tham số ở AI Training + trần giờ riêng + sức mạnh khung giờ. */
+export interface PlanTuning {
+  params: Pick<
+    EngineParams,
+    | "rosterPeakPerfAdd"
+    | "rosterRegularCostAdd"
+    | "rosterRegularCastCap"
+    | "rosterShopeeCastCap"
+    | "rosterCastOverPenalty"
+    | "rosterScarcityWeight"
+    | "rosterPaceWeight"
+    | "rosterMaleAsstSport"
+    | "rosterMaleAsstNight"
+    | "rosterRangeTolerance"
+    | "rosterPeakBandRatio"
+    | "rosterAutoCapSlack"
+    | "rosterLaneWeight"
+  >;
+  personCaps?: Readonly<Record<string, PersonCap>>;
+  bandStrength?: ReadonlyMap<string, number>;
+  /** Làn host (lanes.ts): peak = nghiêng ca Campaign/cao điểm, regular = nghiêng ca thường, balanced = theo cơ cấu giờ của tháng. Chỉ có tác dụng khi rosterLaneWeight > 0. */
+  lanes?: Readonly<Record<string, HostLane>>;
+}
+export type HostLane = "peak" | "regular" | "balanced";
+/** Tỷ lệ giờ cao điểm mong muốn của từng làn (balanced = cơ cấu giờ cần xếp của tháng). */
+export const LANE_HI_SHARE: Record<Exclude<HostLane, "balanced">, number> = { peak: 0.8, regular: 0.2 };
+
+/** Brand thể thao được ưu tiên trợ nam nhẹ (chị Trainer): tên chứa Franklin hoặc CROCS. */
+export const SPORT_BRAND_PATTERN = /franklin|crocs/i;
+const isMale = (g: string | undefined) => ["nam", "male", "m"].includes((g ?? "").trim().toLowerCase());
+
+export type ShiftTier = "peak" | "regular";
+/** Ca Campaign (D-Day / Mid-Month / Pay Day) hoặc khung giờ GMV/giờ cao ⇒ "peak"; còn lại (Daily, thấp điểm) ⇒ "regular". */
+export function shiftTier(shift: RosterShift, tuning: PlanTuning | undefined): ShiftTier {
+  if (getCampaignDayInfo(shift.date)) return "peak";
+  const ratio = tuning?.bandStrength?.get(`${shift.channelKey}|${band(shift.startTime)}`);
+  return ratio !== undefined && ratio >= (tuning?.params.rosterPeakBandRatio ?? 1.15) ? "peak" : "regular";
+}
+
 // ---------------------------------------------------------------------------------------------------------------------------
 // Bộ xếp
 // ---------------------------------------------------------------------------------------------------------------------------
@@ -172,6 +267,8 @@ export interface PlanInput {
   reportOnly?: boolean;
   /** Báo khối lượng tính đến hết ngày này (mốc chốt); mặc định hết tháng. */
   loadTo?: string;
+  /** Luật tự fill theo brief chị Trainer (tham số AI Training + trần giờ riêng). Thiếu = bộ xếp chạy như trước. */
+  tuning?: PlanTuning;
 }
 
 export interface PlannedAssignment {
@@ -247,6 +344,8 @@ const inMonth = (date: string, month: string) => date.slice(0, 7) === month;
 class Roster {
   private byPerson = new Map<string, Interval[]>();
   private lateMin: number;
+  /** Trần giờ của đợt đang xếp (người có trần riêng, chỉ khi xếp một phần tháng): tổng giờ trong tháng tới hết `to` không vượt `max`. */
+  rangeCaps = new Map<string, { to: string; max: number }>();
   constructor(
     private rules: RosterRules,
     seed: Map<string, ReturnType<typeof personEntries> extends Map<string, infer E> ? E : never>
@@ -271,6 +370,10 @@ class Roster {
   hoursInMonth(id: string, month: string) {
     return this.list(id).reduce((s, e) => s + (inMonth(e.date, month) ? e.hours : 0), 0);
   }
+  /** Giờ trong tháng từ đầu tháng tới hết ngày `to`. */
+  hoursThrough(id: string, month: string, to: string) {
+    return this.list(id).reduce((s, e) => s + (inMonth(e.date, month) && e.date <= to ? e.hours : 0), 0);
+  }
   /** Lý do KHÔNG xếp được (null = xếp được). Mọi luật ở đây là luật cứng của bộ xếp, chặt hơn DB (DB chỉ chặn trùng + quá giờ tuần). */
   blocked(id: string, shift: RosterShift, max: number, month: string): string | null {
     const [a, b] = absRange(shift);
@@ -278,6 +381,8 @@ class Roster {
     const list = this.list(id);
     for (const e of list) if (e.start < b && e.end > a) return "trùng ca khác";
     if (this.hoursInMonth(id, month) + (inMonth(shift.date, month) ? h : 0) > max) return "vượt giờ tối đa tháng";
+    const rc = this.rangeCaps.get(id);
+    if (rc && inMonth(shift.date, month) && shift.date <= rc.to && this.hoursThrough(id, month, rc.to) + h > rc.max + 1e-6) return "đủ trần giờ nửa đầu, chừa cho nửa sau";
     const ws = isoWeekStart(shift.date);
     const we = addDays(ws, 6);
     const week = list.filter((e) => e.date >= ws && e.date <= we).reduce((s, e) => s + e.hours, 0);
@@ -306,17 +411,47 @@ class Roster {
   }
 }
 
+/** Giờ tối thiểu/tối đa của một người, có tính trần giờ riêng (nếu có): trần thay giờ tối đa mặc định của vai, vẫn bị luật giờ/tuần chặn. */
+function boundsWithCap(t: Talent, base: MonthBounds, rules: Pick<RosterRules, "maxWeekHours">, month: string, cap: PersonCap | undefined): HourBounds {
+  const b = personBounds(t, base, rules, month);
+  if (!cap || !(cap.monthMax > 0) || cap.soft) return b;
+  const max = Math.min(cap.monthMax, Math.round((rules.maxWeekHours * daysInMonth(month)) / 7));
+  return { min: Math.min(b.min, max), max };
+}
+
 export function planMonth(input: PlanInput): MonthPlan {
   const { shifts, month, today, goal, rules, talents, history, fam, perf } = input;
   const talentById = new Map(talents.map((t) => [t.id, t]));
   const minScale = input.minScale ?? 1;
+  const P = input.tuning?.params;
+  const caps = input.tuning?.personCaps ?? {};
   const bounds = new Map(
     talents.map((t) => {
-      const b = personBounds(t, input.bounds, rules, month);
+      const b = boundsWithCap(t, input.bounds, rules, month, caps[t.id]);
       return [t.id, { min: b.min * minScale, max: b.max }] as const;
     })
   );
   const roster = new Roster(rules, personEntries(shifts));
+  // Trần giờ theo đợt: xếp ngày 1–15 thì người có trần riêng chỉ được tới trần × tỷ lệ GIỜ CA của nửa đầu (+ dung sai), phần còn lại chừa cho nửa sau.
+  const monthEnd = `${month}-${String(daysInMonth(month)).padStart(2, "0")}`;
+  if (input.range && input.range.to < monthEnd && !input.reportOnly) {
+    const to = input.range.to;
+    let all = 0;
+    let upTo = 0;
+    for (const s of shifts) {
+      if (!inMonth(s.date, month)) continue;
+      const h = shiftHours(s);
+      all += h;
+      if (s.date <= to) upTo += h;
+    }
+    const share = all > 0 ? upTo / all : 1;
+    const tol = P?.rosterRangeTolerance ?? 0;
+    for (const [id, cap] of Object.entries(caps)) {
+      if (!(cap.monthMax > 0)) continue;
+      const half = Number(to.slice(8, 10)) <= 15 && cap.firstHalfMax && cap.firstHalfMax > 0 ? cap.firstHalfMax : null;
+      roster.rangeCaps.set(id, { to, max: half ?? cap.monthMax * share * (1 + tol) });
+    }
+  }
 
   // Pool đăng ký theo ca.
   const monthShifts = shifts.filter((s) => inMonth(s.date, month));
@@ -361,6 +496,21 @@ export function planMonth(input: PlanInput): MonthPlan {
   // Ca ít người đăng ký xếp trước (khó nhất trước), rồi theo ngày.
   const order = [...targets].sort((a, b) => a.registrants.length - b.registrants.length || a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
   const W = WEIGHTS[goal];
+  // Làn host: cơ cấu giờ cần xếp (tỷ lệ giờ Campaign/cao điểm) và giờ cao điểm đã xếp của từng host trong lượt này.
+  const laneOn = (P?.rosterLaneWeight ?? 0) > 0 && !!input.tuning?.lanes;
+  let demandHi = 0;
+  let demandAll = 0;
+  if (laneOn) {
+    for (const s of targets) {
+      const h = shiftHours(s);
+      demandAll += h;
+      if (shiftTier(s, input.tuning) === "peak") demandHi += h;
+    }
+  }
+  const demandShare = demandAll > 0 ? demandHi / demandAll : 0.5;
+  const laneAcc = new Map<string, { hi: number; all: number }>();
+  const regCounts = [...registeredIn.values()];
+  const avgReg = regCounts.length > 0 ? regCounts.reduce((a, b) => a + b, 0) / regCounts.length : 0;
 
   for (const shift of order) {
     for (const role of ["host", "co_host"] as const) {
@@ -394,6 +544,14 @@ export function planMonth(input: PlanInput): MonthPlan {
       const costs = ok.map((c) => c.cost);
       const lo = Math.min(...costs);
       const hi = Math.max(...costs);
+      const tier = shiftTier(shift, input.tuning);
+      const perfW = W.perf + (tier === "peak" ? P?.rosterPeakPerfAdd ?? 0 : 0);
+      const costW = W.cost + (tier === "regular" ? P?.rosterRegularCostAdd ?? 0 : 0);
+      // Trần cast theo sàn (Record, không rẽ nhánh theo tên sàn): Shopee = trần Shopee ở mọi ca; TikTok = trần Daily chỉ ở ca thường.
+      const castCap = role === "host" && P ? { Shopee: P.rosterShopeeCastCap, TikTok: tier === "regular" ? P.rosterRegularCastCap : 0 }[shift.platform] : 0;
+      const hrs = shiftHours(shift);
+      const frac = inMonth(shift.date, month) ? Number(shift.date.slice(8, 10)) / daysInMonth(month) : 1;
+      const night = role === "co_host" && roster.isLate(absRange(shift)[1], shift.date);
       const scored = ok.map((c) => {
         const t = talentById.get(c.id)!;
         const f = famOf(fam, c.id, shift.channelKey);
@@ -406,11 +564,41 @@ export function planMonth(input: PlanInput): MonthPlan {
         const room = c.b.max > 0 ? Math.max(0, 1 - c.load / c.b.max) : 0;
         const mismatch = role === "co_host" && t.role === "Host" ? 0.15 : 0;
         const pref = input.brandRules?.preferred.has(`${shift.brandId}|${c.id}`) ? 0.1 : 0;
-        return { c, score: W.perf * perf01 + W.cost * cost01 + W.fam * fam01 + W.need * need + W.room * room - mismatch + pref };
+        let extra = 0;
+        if (P) {
+          // Ít đăng ký ⇒ ưu tiên lấp ca cho họ (so với mức trung bình của người đã đăng ký).
+          const reg = registeredIn.get(c.id) ?? 0;
+          if (avgReg > 0 && reg > 0) extra += P.rosterScarcityWeight * Math.max(0, Math.min(1, 1 - reg / avgReg));
+          // Nhịp giờ: giờ đã xếp tới ngày của ca so với tiến độ (trần riêng, hoặc giờ tối thiểu cả tháng).
+          const target = caps[c.id]?.monthMax ?? personBounds(t, input.bounds, rules, month).min;
+          if (target > 0) {
+            const upTo = roster.hoursThrough(c.id, month, shift.date);
+            const ahead = upTo / Math.max(1, target * frac);
+            extra -= P.rosterPaceWeight * Math.max(0, Math.min(1, ahead - 1));
+          }
+          if (laneOn && role === "host") {
+            const lane = input.tuning!.lanes![c.id];
+            if (lane) {
+              const want = lane === "balanced" ? demandShare : LANE_HI_SHARE[lane];
+              const a = laneAcc.get(c.id) ?? { hi: 0, all: 0 };
+              const after = (a.hi + (tier === "peak" ? hrs : 0)) / (a.all + hrs);
+              extra += P.rosterLaneWeight * (1 - Math.min(1, Math.abs(after - want)));
+            }
+          }
+          if (castCap > 0 && c.cost / Math.max(hrs, 0.25) > castCap + 1) extra -= P.rosterCastOverPenalty;
+          if (role === "co_host" && isMale(t.gender)) extra += (SPORT_BRAND_PATTERN.test(shift.brandName) ? P.rosterMaleAsstSport : 0) + (night ? P.rosterMaleAsstNight : 0);
+        }
+        return { c, score: perfW * perf01 + costW * cost01 + W.fam * fam01 + W.need * need + W.room * room - mismatch + pref + extra };
       });
       scored.sort((x, y) => y.score - x.score || x.c.cost - y.c.cost);
       const pick = scored[0].c;
       roster.add(pick.id, shift, role, true);
+      if (laneOn && role === "host") {
+        const a = laneAcc.get(pick.id) ?? { hi: 0, all: 0 };
+        a.all += hrs;
+        if (tier === "peak") a.hi += hrs;
+        laneAcc.set(pick.id, a);
+      }
       cur[role] = pick.id;
       assignments.push({ shiftKey: shift.key, slotId: shift.slotId!, role, talentId: pick.id, source: "plan" });
     }
@@ -431,7 +619,7 @@ export function planMonth(input: PlanInput): MonthPlan {
     let l = load.get(key);
     if (!l) {
       const main = primaryRole(t) === role;
-      const own = personBounds(t, { host: input.bounds.host, co_host: input.bounds.co_host }, rules, month);
+      const own = boundsWithCap(t, { host: input.bounds.host, co_host: input.bounds.co_host }, rules, month, caps[id]);
       const b = main ? { min: own.min * minScale, max: own.max } : { min: 0, max: Math.min(input.bounds[role].max, Math.round((rules.maxWeekHours * daysInMonth(month)) / 7)) };
       l = { talentId: id, role, fixedHours: 0, draftHours: 0, plannedHours: 0, hours: 0, min: b.min, max: b.max, shifts: 0, registered: main ? registeredIn.get(id) ?? 0 : 0, cost: 0, costMissing: false, perf: role === "host" ? perf.get(id) : undefined, status: "ok" };
       load.set(key, l);

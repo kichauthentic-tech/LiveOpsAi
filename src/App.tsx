@@ -109,6 +109,9 @@ const Accounting = lazyNamed(() => import("./components/Accounting"), "Accountin
 const UserRoleSettings = lazyNamed(() => import("./components/UserRoleSettings"), "UserRoleSettings");
 const AiTrainingCenter = lazyNamed(() => import("./components/AiTrainingCenter"), "AiTrainingCenter");
 const EngineTrainingPanel = lazyNamed(() => import("./components/EngineTrainingPanel"), "EngineTrainingPanel");
+const LogicRegistryCard = lazyNamed(() => import("./components/LogicRegistryCard"), "LogicRegistryCard");
+const RuleComplianceCard = lazyNamed(() => import("./components/RuleComplianceCard"), "RuleComplianceCard");
+const LaneMixCard = lazyNamed(() => import("./components/LaneMixCard"), "LaneMixCard");
 const OpsBoard = lazyNamed(() => import("./components/OpsBoard"), "OpsBoard");
 const TodoPanel = lazyNamed(() => import("./components/TodoPanel"), "TodoPanel");
 const GlossaryDialog = lazyNamed(() => import("./components/GlossaryDialog"), "GlossaryDialog");
@@ -165,7 +168,7 @@ const TAB_CHUNKS: Record<string, { preload: () => void }[]> = {
   tiktok_api: [TikTokApiAutomation],
   finance: [FinanceHr],
   accounting: [Accounting],
-  ai_training: [AiTrainingCenter, EngineTrainingPanel],
+  ai_training: [AiTrainingCenter, LogicRegistryCard, RuleComplianceCard, LaneMixCard, EngineTrainingPanel],
   user_settings: [UserRoleSettings],
   account_settings: [AccountSettings]
 };
@@ -2695,6 +2698,9 @@ export default function App() {
                       error={aiAgentPromptsError}
                       onUpdate={handleUpdateAiAgentPrompt}
                     />
+                    <LogicRegistryCard params={engineParams} />
+                    <RuleComplianceCard sessions={visibleSessions} talents={talents} history={talentRateHistory} brands={visibleBrands} params={engineParams} />
+                    <LaneMixCard sessions={visibleSessions} talents={talents} history={talentRateHistory} brands={visibleBrands} params={engineParams} />
                     <EngineTrainingPanel
                       brands={visibleBrands}
                       sessions={visibleSessions}

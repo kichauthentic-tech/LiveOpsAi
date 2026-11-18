@@ -43,13 +43,15 @@ import { monthStatus } from "../lib/roster/monthStatus";
 import { OpenMonthWizard } from "./roster/OpenMonthWizard";
 import { BrandScheduleExportDialog } from "./roster/BrandScheduleExportDialog";
 import { MonthPlanPanel } from "./roster/MonthPlanPanel";
+import { useMonthCommitments } from "../hooks/useMonthCommitments";
+import { inferAutoCaps } from "../lib/roster/autoCaps";
 import { PersonBar } from "./roster/PersonBar";
 import { MoreMenu } from "./ui/MoreMenu";
 import { buildPersonRows, defaultRole, personLoad, planPersonBulk, registrationCounts, type BulkPlan } from "../lib/roster/byPerson";
 import { buildPersonColors } from "../lib/roster/personColor";
 import { WorkloadTable } from "./roster/WorkloadTable";
 import { MonthReviewPanel } from "./roster/MonthReviewPanel";
-import { DEFAULT_BOUNDS, GOALS, GOAL_HINT, GOAL_LABEL, applyPlanRows, buildHostChannelGmv, buildHostPerformance, daysInMonth, personBounds, planMonth, releaseAutoFilled, releaseRoleViolations, type AutoFill, type MonthBounds, type PlanGoal } from "../lib/roster/monthPlanner";
+import { DEFAULT_BOUNDS, GOALS, GOAL_HINT, GOAL_LABEL, applyPlanRows, buildBandStrength, buildHostChannelGmv, buildHostPerformance, buildHostPerformancePrevMonth, daysInMonth, personBounds, planMonth, releaseAutoFilled, releaseRoleViolations, type AutoFill, type MonthBounds, type PlanGoal, type PlanTuning } from "../lib/roster/monthPlanner";
 import type { EngineParams } from "../lib/scheduling/engineParams";
 import type { ReportPlatform } from "../lib/reportPlatform";
 import { FeatureOffNote } from "./common/FeatureOffNote";
@@ -167,6 +169,15 @@ export const RosterBoard: React.FC<Props> = (p) => {
     }
     return DEFAULT_BOUNDS;
   });
+  // Giờ cam kết = trần giờ của tháng đang xem (0223; chưa chạy migration thì lưu theo trình duyệt).
+  const commitments = useMonthCommitments(viewMonth);
+  const bandStrength = useMemo(() => buildBandStrength(p.sessions, getTodayDate()), [p.sessions]);
+  // Mặc định mọi người có trần giờ TỰ SUY từ 3 tháng đã qua (để chia đợt); cam kết nhập tay (ngoại lệ) ghi đè.
+  const autoCaps = useMemo(() => inferAutoCaps(p.sessions, p.talents, getTodayDate(), bounds, p.engineParams.rosterAutoCapSlack), [p.sessions, p.talents, bounds, p.engineParams.rosterAutoCapSlack]);
+  const tuning = useMemo<PlanTuning>(() => {
+    const soft = Object.fromEntries(Object.entries(autoCaps).map(([id, c]) => [id, { monthMax: c.monthMax, soft: true }]));
+    return { params: p.engineParams, personCaps: { ...soft, ...commitments.caps }, bandStrength };
+  }, [p.engineParams, autoCaps, commitments.caps, bandStrength]);
   // Ô nháp do bộ xếp tự fill (slotId → người). Ô Trainer đã đổi tay khác giá trị này nên không bị ghi đè lần sau. Lưu theo trình duyệt.
   const [auto, setAuto] = useState<AutoFill>(() => {
     try {
@@ -718,7 +729,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
       const freed0 = releaseAutoFilled(buildRosterShifts(p.sessions, p.shiftSlots, drafts, p.shiftRegistrations, addDays(`${viewMonth}-01`, -7), addDays(monthEnd, 7)), auto, planRange);
       // Nháp đang đứng sai vai (theo cài đặt vai hoặc tự suy từ lịch sử) cũng được gỡ để xếp lại, kể cả ô xếp tay / nháp cũ.
       const { shifts: freed, released: wrongRole } = releaseRoleViolations(freed0, brandRules, planRange);
-      const plan = planMonth({ shifts: freed, month: viewMonth, today, goal: g, bounds, guaranteeMin: true, rules, talents: p.talents, history: p.talentRateHistory, fam, perf: buildHostPerformance(p.sessions, today), brandRules, range: planRange, minScale: planMinScale });
+      const plan = planMonth({ shifts: freed, month: viewMonth, today, goal: g, bounds, guaranteeMin: true, rules, talents: p.talents, history: p.talentRateHistory, fam, perf: buildHostPerformancePrevMonth(p.sessions, viewMonth, today), brandRules, range: planRange, minScale: planMinScale, tuning });
       const { rows, nextAuto } = applyPlanRows(plan, freed, auto, planRange);
       // Ô bị gỡ vì sai vai mà lần này không ai lấp được ⇒ vẫn phải ghi dòng rỗng để xoá nháp cũ.
       for (const w of wrongRole) {
@@ -804,8 +815,8 @@ export const RosterBoard: React.FC<Props> = (p) => {
   // Khối lượng từng người theo lịch + nháp HIỆN CÓ (không xếp thêm), tính tới hết phạm vi đang chọn (1–15 hoặc cả tháng).
   const workload = useMemo(() => {
     const monthShifts = buildRosterShifts(p.sessions, p.shiftSlots, drafts, p.shiftRegistrations, addDays(`${viewMonth}-01`, -7), addDays(`${viewMonth}-31`, 7));
-    return planMonth({ shifts: monthShifts, month: viewMonth, today, goal, bounds, guaranteeMin: false, rules, talents: p.talents, history: p.talentRateHistory, fam: new Map(), perf: buildHostPerformance(p.sessions, today), brandRules, minScale: planMinScale, reportOnly: true, loadTo: planRange.to });
-  }, [p.sessions, p.shiftSlots, p.shiftRegistrations, drafts, viewMonth, today, goal, bounds, rules, p.talents, p.talentRateHistory, brandRules, planMinScale, planRange.to]);
+    return planMonth({ shifts: monthShifts, month: viewMonth, today, goal, bounds, guaranteeMin: false, rules, talents: p.talents, history: p.talentRateHistory, fam: new Map(), perf: buildHostPerformancePrevMonth(p.sessions, viewMonth, today), brandRules, minScale: planMinScale, reportOnly: true, loadTo: planRange.to, tuning });
+  }, [p.sessions, p.shiftSlots, p.shiftRegistrations, drafts, viewMonth, today, goal, bounds, rules, p.talents, p.talentRateHistory, brandRules, planMinScale, planRange.to, tuning]);
   const clearAuto = () =>
     run(async () => {
       const freed = releaseAutoFilled(buildRosterShifts(p.sessions, p.shiftSlots, drafts, p.shiftRegistrations, `${viewMonth}-01`, planRange.to), auto, planRange);
@@ -1147,6 +1158,9 @@ export const RosterBoard: React.FC<Props> = (p) => {
                 minScale={planMinScale}
                 bounds={bounds}
                 onBounds={changeBounds}
+                tuning={tuning}
+                commitments={commitments}
+                autoCaps={autoCaps}
                 auto={auto}
                 scopeLabel={planScopeLabel}
                 today={today}

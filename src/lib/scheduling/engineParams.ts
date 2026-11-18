@@ -75,6 +75,20 @@ export interface EngineParams {
   calibrationMax: number;
   // --- Host ---
   fatigueWeekHours: number; // > X giờ/tuần → cảnh mệt, đẩy xuống cuối hàng khi chốt hàng loạt
+  // --- Tự fill lịch live (Điều Phối Lịch Live, lib/roster/monthPlanner.ts; brief chị Trainer 17/11) ---
+  rosterPeakPerfAdd: number; // ca Campaign / cao điểm: cộng thêm vào trọng số Performance của host
+  rosterRegularCostAdd: number; // ca Daily / thấp điểm: cộng thêm vào trọng số chi phí (ưu tiên cast thấp)
+  rosterRegularCastCap: number; // trần cast host/giờ ca Daily/thấp điểm TikTok; vượt thì trừ điểm. 0 = tắt
+  rosterShopeeCastCap: number; // trần cast host/giờ mọi ca Shopee, thay trần Daily cho ca Shopee. 0 = tắt
+  rosterCastOverPenalty: number; // điểm trừ khi host vượt trần cast
+  rosterScarcityWeight: number; // thưởng người đăng ký ít ca hơn trung bình (fill đủ ca cho họ trước)
+  rosterPaceWeight: number; // thưởng nhịp giờ đều: người đã vượt tiến độ tháng bị trừ
+  rosterMaleAsstSport: number; // điểm cộng trợ nam ở brand thể thao (Franklin, CROCS)
+  rosterMaleAsstNight: number; // điểm cộng trợ nam ở ca đêm (an toàn cho bạn nữ)
+  rosterRangeTolerance: number; // dung sai trần giờ khi chỉ xếp một phần tháng (0.1 = +10%)
+  rosterPeakBandRatio: number; // khung giờ có GMV/giờ ≥ X × trung vị kênh = cao điểm
+  rosterLaneWeight: number; // làn host (peak/regular/balanced): điểm thưởng khi cơ cấu giờ host khớp làn; 0 = tắt
+  rosterAutoCapSlack: number; // trần giờ TỰ SUY cho mọi người = giờ TB 3 tháng đã qua × (1 + X); 0 = tắt
 }
 
 export const DEFAULT_ENGINE_PARAMS: EngineParams = {
@@ -133,17 +147,31 @@ export const DEFAULT_ENGINE_PARAMS: EngineParams = {
   calibrationK: 3,
   calibrationMin: 0.5,
   calibrationMax: 1.6,
-  fatigueWeekHours: 24
+  fatigueWeekHours: 24,
+  rosterPeakPerfAdd: 0.25,
+  rosterRegularCostAdd: 0.25,
+  rosterRegularCastCap: 150000,
+  rosterShopeeCastCap: 200000,
+  rosterCastOverPenalty: 0.3,
+  rosterScarcityWeight: 0.15,
+  rosterPaceWeight: 0.15,
+  rosterMaleAsstSport: 0.05,
+  rosterMaleAsstNight: 0.1,
+  rosterRangeTolerance: 0.1,
+  rosterPeakBandRatio: 1.15,
+  rosterLaneWeight: 0,
+  rosterAutoCapSlack: 0.15
 };
 
-export type EngineParamGroup = "history" | "camp" | "schedule" | "target" | "calibration" | "host";
+export type EngineParamGroup = "history" | "camp" | "schedule" | "target" | "calibration" | "host" | "roster";
 export const ENGINE_GROUP_LABEL: Record<EngineParamGroup, string> = {
   history: "Học từ lịch sử",
   camp: "Khuôn ngày Campaign",
   schedule: "Xếp lịch",
   target: "Target",
   calibration: "Hiệu chỉnh kế hoạch vs thực tế",
-  host: "Host"
+  host: "Host",
+  roster: "Tự fill lịch live (Điều Phối Lịch Live)"
 };
 
 export interface EngineParamMeta {
@@ -213,7 +241,20 @@ export const ENGINE_PARAM_META: EngineParamMeta[] = [
   { key: "calibrationK", group: "calibration", label: "Kéo hệ số hiệu chỉnh về 1", help: "Ô có ít ca kế hoạch đã có thực tế bị kéo về 1 (không hiệu chỉnh). k lớn = thận trọng hơn.", kind: "number", min: 0, max: 20, step: 1 },
   { key: "calibrationMin", group: "calibration", label: "Hệ số hiệu chỉnh — sàn", help: "", kind: "number", min: 0.1, max: 1, step: 0.05 },
   { key: "calibrationMax", group: "calibration", label: "Hệ số hiệu chỉnh — trần", help: "", kind: "number", min: 1, max: 5, step: 0.1 },
-  { key: "fatigueWeekHours", group: "host", label: "Ngưỡng quá tải (giờ/tuần)", help: "Host/trợ đã xếp quá X giờ trong tuần (T2–CN, tính cả ca sắp tới và ca vừa gán trong lô) bị cảnh báo và đẩy xuống cuối hàng khi chốt hàng loạt.", kind: "number", min: 1, max: 80, step: 1 }
+  { key: "fatigueWeekHours", group: "host", label: "Ngưỡng quá tải (giờ/tuần)", help: "Host/trợ đã xếp quá X giờ trong tuần (T2–CN, tính cả ca sắp tới và ca vừa gán trong lô) bị cảnh báo và đẩy xuống cuối hàng khi chốt hàng loạt.", kind: "number", min: 1, max: 80, step: 1 },
+  { key: "rosterPeakPerfAdd", group: "roster", label: "Ca Campaign / cao điểm: cộng trọng số Performance", help: "Ca rơi vào ngày D-Day/Mid-Month/Pay Day hoặc khung giờ có GMV/giờ cao: trọng số Performance của host = trọng số theo mục tiêu + X. Performance = PFM THÁNG TRƯỚC (chỉ số GMV/giờ ÷ kỳ vọng cùng kênh × khung giờ, co về 1,00 theo số ca).", kind: "number", min: 0, max: 1, step: 0.05 },
+  { key: "rosterRegularCostAdd", group: "roster", label: "Ca Daily / thấp điểm: cộng trọng số chi phí", help: "Ca không phải Campaign và không phải cao điểm: trọng số chi phí = trọng số theo mục tiêu + X ⇒ ưu tiên người cast thấp trong số đã đăng ký.", kind: "number", min: 0, max: 1, step: 0.05 },
+  { key: "rosterRegularCastCap", group: "roster", label: "Trần cast host/giờ — ca Daily/thấp điểm TikTok", help: "Host có cast/giờ cao hơn mức này ở ca Daily/thấp điểm TikTok bị trừ điểm (luật mềm, không chặn). Chị Trainer: 150K. 0 = tắt.", kind: "number", min: 0, max: 1000000, step: 10000 },
+  { key: "rosterShopeeCastCap", group: "roster", label: "Trần cast host/giờ — mọi ca Shopee", help: "Áp cho MỌI ca Shopee (thay trần Daily, vì host Shopee phần lớn 170–200K). Chị Trainer: 200K. 0 = tắt.", kind: "number", min: 0, max: 1000000, step: 10000 },
+  { key: "rosterCastOverPenalty", group: "roster", label: "Điểm trừ khi host vượt trần cast", help: "Trừ thẳng vào điểm người đó ở ca đang xét. Tổng các trọng số khoảng 1 nên 0,3 đủ đẩy sang người khác nhưng vẫn xếp được nếu họ là người duy nhất.", kind: "number", min: 0, max: 1, step: 0.05 },
+  { key: "rosterScarcityWeight", group: "roster", label: "Thưởng người đăng ký ít ca", help: "Người đăng ký ít ca hơn mức trung bình được cộng tới X điểm ⇒ các ca họ chịu làm được lấp trước, tránh họ trắng giờ.", kind: "number", min: 0, max: 1, step: 0.05 },
+  { key: "rosterPaceWeight", group: "roster", label: "Thưởng nhịp giờ đều", help: "So giờ đã xếp tới ngày của ca với tiến độ tháng (trần giờ riêng, hoặc giờ tối thiểu nếu không đặt trần). Người đã vượt tiến độ mất tới X điểm ⇒ giờ rải đều cả tháng thay vì dồn đầu tháng.", kind: "number", min: 0, max: 1, step: 0.05 },
+  { key: "rosterMaleAsstSport", group: "roster", label: "Trợ nam ở brand thể thao (Franklin, CROCS)", help: "Cộng nhẹ cho trợ nam ở brand có tên chứa Franklin hoặc CROCS. Chị Trainer: chỉ hơi ưu tiên.", kind: "number", min: 0, max: 0.5, step: 0.01 },
+  { key: "rosterMaleAsstNight", group: "roster", label: "Trợ nam ở ca đêm", help: "Cộng cho trợ nam ở ca kết thúc từ giờ khuya trong luật Điều Phối (mặc định 23:00) hoặc qua nửa đêm — an toàn cho bạn nữ. Dùng giới tính ở hồ sơ talent.", kind: "number", min: 0, max: 0.5, step: 0.01 },
+  { key: "rosterRangeTolerance", group: "roster", label: "Dung sai trần giờ khi chỉ xếp nửa tháng", help: "Người có trần giờ riêng (vd 40h/tháng) khi xếp ngày 1–15 chỉ được tới trần × tỷ lệ giờ của nửa đầu × (1 + X), phần còn lại chừa cho nửa sau.", kind: "number", min: 0, max: 0.5, step: 0.05 },
+  { key: "rosterPeakBandRatio", group: "roster", label: "Khung giờ cao điểm: GMV/giờ ≥ X × trung vị kênh", help: "Đo trên 90 ngày gần nhất theo kênh × khung (sáng / chiều / tối / khuya), cần ≥ 5 ca mỗi khung.", kind: "number", min: 1, max: 2, step: 0.05 },
+  { key: "rosterLaneWeight", group: "roster", label: "Làn host: điểm thưởng khi giờ khớp làn", help: "Mỗi host có một làn: cao điểm (nhận chủ yếu ca Campaign và khung mạnh), ca thường (Daily, thấp điểm) hoặc cân bằng (theo cơ cấu giờ của tháng). Bộ xếp cộng điểm khi cơ cấu giờ của host sau ca này gần làn của họ. 0 = tắt (mặc định, chờ so thử trên tháng đã qua).", kind: "number", min: 0, max: 1, step: 0.05 },
+  { key: "rosterAutoCapSlack", group: "roster", label: "Trần giờ tự suy: dư trên giờ trung bình", help: "Người nào cũng có trần giờ tháng mà không cần nhập: giờ trung bình các tháng đã qua (tối đa 3, cần ≥ 2 tháng có làm) × (1 + X), kẹp giữa giờ tối thiểu và tối đa của vai. Dùng để chia giờ theo đợt khi xếp nửa tháng (không hạ giờ tối đa tháng). Cam kết nhập tay ghi đè. 0 = tắt.", kind: "number", min: 0, max: 1, step: 0.05 }
 ];
 
 // Trộn phần admin đã đổi với mặc định; bỏ khoá lạ, bỏ giá trị không hợp kiểu.

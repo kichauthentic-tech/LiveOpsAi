@@ -19,8 +19,9 @@ const HIDDEN_PROP = /\b(description|info|hint|help|tooltip|title|placeholder|ari
 const HIDDEN_PROP_OPEN = /\b(description|info|hint|help|tooltip|title|note|desc|summary)\s*=\s*\{\s*$/;
 
 const SKIP_DIR = /^(server|shims)$/;
+// `logicRegistry.ts` là danh bạ tra cứu của trang AI Training (admin, đọc khi cần kiểm soát logic) — nội dung là sản phẩm, không phải chữ thừa.
 // `askContext.ts` là prompt gửi model AI, không phải chữ trên màn (§5.2: prompt không bị canh thuật ngữ).
-const SKIP_PATH = /^(server\/|lib\/dataraw\/|lib\/db\/|shims\/|lib\/performance\/askContext\.ts$)/;
+const SKIP_PATH = /^(server\/|lib\/dataraw\/|lib\/db\/|shims\/|lib\/performance\/askContext\.ts$|lib\/logicRegistry\.ts$)/;
 /** Từ điển cố ý: Glossary + tên/công thức chỉ số. Không phải chữ thừa. */
 const DICTIONARY = /(GlossaryDialog|metricGlossary)/;
 /** Câu Insight gửi brand trong Report Tháng — là hàng gửi khách, không cắt. */

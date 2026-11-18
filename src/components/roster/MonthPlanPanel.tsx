@@ -8,17 +8,21 @@ import { buildRosterShifts, shiftHours, type BrandRuleIndex, type RosterRules, t
 import {
   GOALS,
   GOAL_LABEL,
-  buildHostPerformance,
+  buildHostPerformancePrevMonth,
   daysInMonth,
   releaseAutoFilled,
   planMonth,
   type AutoFill,
   type MonthBounds,
   type MonthPlan,
-  type PlanGoal
+  type PlanGoal,
+  type PlanTuning
 } from "../../lib/roster/monthPlanner";
 import { dayLabel } from "./ShiftPanel";
 import { InfoDot } from "../common/InfoDot";
+import { CommitmentsEditor } from "./CommitmentsEditor";
+import type { AutoCap } from "../../lib/roster/autoCaps";
+import type { MonthCommitments } from "../../hooks/useMonthCommitments";
 
 // Xếp cả tháng theo mục tiêu (01/11): ba nút Performance / Chi phí / Cân bằng, lịch cả tháng của agency với host + trợ gợi ý (chỉ từ
 // pool đã đăng ký đúng ca), và khối khối lượng từng người so với giờ tối thiểu / tối đa. Kết quả tính sống, chỉ ghi DB khi bấm
@@ -42,6 +46,12 @@ interface Props {
   minScale: number;
   bounds: MonthBounds;
   onBounds: (b: MonthBounds) => void;
+  /** Luật tự fill (tham số AI Training + trần giờ riêng + khung cao điểm). */
+  tuning: PlanTuning;
+  /** Giờ cam kết (trần giờ) của tháng: lưu DB (0223) hoặc theo trình duyệt nếu chưa chạy migration. */
+  commitments: MonthCommitments;
+  /** Trần tự suy của mọi người (chỉ để hiển thị). */
+  autoCaps: Readonly<Record<string, AutoCap>>;
   /** Phần nháp do bộ xếp tự fill — gỡ ra để so sánh "nếu xếp lại" cho đúng. */
   auto: AutoFill;
   scopeLabel: string;
@@ -58,6 +68,7 @@ interface Props {
   showCost: boolean;
 }
 
+
 export const MonthPlanPanel: React.FC<Props> = (p) => {
   const { goal, bounds } = p;
   const [guaranteeMin, setGuaranteeMin] = useState(true);
@@ -73,14 +84,14 @@ export const MonthPlanPanel: React.FC<Props> = (p) => {
     [p.sessions, p.shiftSlots, p.drafts, p.registrations, monthStart, monthEnd, p.auto, p.range]
   );
   const fam = useMemo(() => buildFamiliarity(p.sessions, monthStart), [p.sessions, monthStart]);
-  const perf = useMemo(() => buildHostPerformance(p.sessions, p.today), [p.sessions, p.today]);
+  const perf = useMemo(() => buildHostPerformancePrevMonth(p.sessions, p.month, p.today), [p.sessions, p.month, p.today]);
 
   // Tính cả ba mục tiêu một lượt để trainer so sánh trước khi chọn (rẻ: vài trăm ca × vài chục người).
   const plans = useMemo(() => {
     const out = {} as Record<PlanGoal, MonthPlan>;
-    for (const g of GOALS) out[g] = planMonth({ shifts, month: p.month, today: p.today, goal: g, bounds, guaranteeMin, rules: p.rules, talents: p.talents, history: p.history, fam, perf, brandRules: p.brandRules, range: p.range, minScale: p.minScale });
+    for (const g of GOALS) out[g] = planMonth({ shifts, month: p.month, today: p.today, goal: g, bounds, guaranteeMin, rules: p.rules, talents: p.talents, history: p.history, fam, perf, brandRules: p.brandRules, range: p.range, minScale: p.minScale, tuning: p.tuning });
     return out;
-  }, [shifts, p.month, p.today, bounds, guaranteeMin, p.rules, p.talents, p.history, fam, perf, p.brandRules, p.range, p.minScale]);
+  }, [shifts, p.month, p.today, bounds, guaranteeMin, p.rules, p.talents, p.history, fam, perf, p.brandRules, p.range, p.minScale, p.tuning]);
   const plan = plans[goal];
 
   const monthShifts = useMemo(() => shifts.filter((s) => s.date.slice(0, 7) === p.month), [shifts, p.month]);
@@ -146,6 +157,8 @@ export const MonthPlanPanel: React.FC<Props> = (p) => {
                 <InfoDot label="Mặc định lấy từ đâu">Đo giờ live thật T8–T10: tối thiểu ≈ phân vị 25, tối đa ≈ phân vị 90 của người có ca.</InfoDot>
               </span>
       </div>
+
+      <CommitmentsEditor month={p.month} talents={p.talents} nameOf={p.nameOf} commitments={p.commitments} autoCaps={p.autoCaps} />
 
       {noOpen ? (
         <p className="text-sm text-[var(--text-muted)]">Chưa có ca mở nào trong phạm vi này để xếp. Mở lịch ở “Mở lịch tháng sau” trước.</p>

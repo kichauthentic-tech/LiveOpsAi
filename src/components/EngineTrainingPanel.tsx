@@ -34,7 +34,7 @@ interface Props {
 }
 
 const WD = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
-const GROUPS: EngineParamGroup[] = ["history", "camp", "schedule", "target", "calibration", "host"];
+const GROUPS: EngineParamGroup[] = ["history", "camp", "schedule", "target", "calibration", "host", "roster"];
 const fmtM = (v: number) => fmtVndShort(Math.round(v));
 
 export const EngineTrainingPanel: React.FC<Props> = ({ brands, sessions, shiftSlots, promoSchemes, params, updatedAt, loading, error, onSave }) => {
