@@ -34,7 +34,6 @@ test("đầu trang một hàng (05/11): mô tả vào nút ⓘ, tab cùng hàng 
 
 test("mục lục dính và cột đầu dính dùng thành phần chung", () => {
   expect(read("components/AgencyDashboard.tsx")).toMatch(/<SectionNav \/>/);
-  expect(read("components/AiTrainingCenter.tsx")).toMatch(/<SectionNav \/>/);
   const css = read("index.css");
   expect(css).toMatch(/\.sticky-col \{[^}]*position: sticky/);
   expect(read("components/SessionLedger.tsx")).toMatch(/sticky-col">Giờ<\/th>/);

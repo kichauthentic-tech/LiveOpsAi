@@ -242,6 +242,8 @@ interface Interval {
   /** Ca do bộ xếp thêm (được phép gỡ khi cân lại). */
   planned: boolean;
   key: string;
+  /** Kênh = brand × sàn (`channelKey`): luật "một host không hai ca cùng kênh trong một ngày". */
+  channel: string;
 }
 
 export interface PlanInput {
@@ -355,7 +357,7 @@ class Roster {
     for (const [id, list] of seed)
       this.byPerson.set(
         id,
-        list.map((e) => ({ start: e.start, end: e.end, date: e.shift.date, hours: e.minutes / 60, role: e.role, late: this.isLate(e.end, e.shift.date), planned: false, key: e.shift.key }))
+        list.map((e) => ({ start: e.start, end: e.end, date: e.shift.date, hours: e.minutes / 60, role: e.role, late: this.isLate(e.end, e.shift.date), planned: false, key: e.shift.key, channel: e.shift.channelKey }))
       );
   }
   private dayStart(d: string) {
@@ -375,11 +377,13 @@ class Roster {
     return this.list(id).reduce((s, e) => s + (inMonth(e.date, month) && e.date <= to ? e.hours : 0), 0);
   }
   /** Lý do KHÔNG xếp được (null = xếp được). Mọi luật ở đây là luật cứng của bộ xếp, chặt hơn DB (DB chỉ chặn trùng + quá giờ tuần). */
-  blocked(id: string, shift: RosterShift, max: number, month: string): string | null {
+  blocked(id: string, shift: RosterShift, max: number, month: string, role?: RosterRole): string | null {
     const [a, b] = absRange(shift);
     const h = shiftHours(shift);
     const list = this.list(id);
     for (const e of list) if (e.start < b && e.end > a) return "trùng ca khác";
+    // Chị Trainer 18/11: không xếp một host hai ca cùng brand × sàn trong một ngày (host khác brand/sàn cùng ngày vẫn được).
+    if (role === "host") for (const e of list) if (e.role === "host" && e.date === shift.date && e.channel === shift.channelKey && e.key !== shift.key) return "đã có ca host cùng brand + sàn trong ngày";
     if (this.hoursInMonth(id, month) + (inMonth(shift.date, month) ? h : 0) > max) return "vượt giờ tối đa tháng";
     const rc = this.rangeCaps.get(id);
     if (rc && inMonth(shift.date, month) && shift.date <= rc.to && this.hoursThrough(id, month, rc.to) + h > rc.max + 1e-6) return "đủ trần giờ nửa đầu, chừa cho nửa sau";
@@ -400,7 +404,7 @@ class Roster {
   add(id: string, shift: RosterShift, role: RosterRole, planned: boolean) {
     const [a, b] = absRange(shift);
     const list = this.byPerson.get(id) ?? [];
-    list.push({ start: a, end: b, date: shift.date, hours: shiftHours(shift), role, late: this.isLate(b, shift.date), planned, key: shift.key });
+    list.push({ start: a, end: b, date: shift.date, hours: shiftHours(shift), role, late: this.isLate(b, shift.date), planned, key: shift.key, channel: shift.channelKey });
     this.byPerson.set(id, list);
   }
   remove(id: string, key: string, role: RosterRole) {
@@ -531,7 +535,7 @@ export function planMonth(input: PlanInput): MonthPlan {
       const cands: { id: string; why: string | null; cost: number; load: number; b: HourBounds }[] = pool.map((id) => {
         const b = bounds.get(id)!;
         const violation = brandRuleViolation(input.brandRules, shift.brandId, id, role, shift.platform);
-        return { id, why: violation ? violation.text : roster.blocked(id, shift, b.max, month), cost: costNum(id, role, shift), load: roster.hoursInMonth(id, month), b };
+        return { id, why: violation ? violation.text : roster.blocked(id, shift, b.max, month, role), cost: costNum(id, role, shift), load: roster.hoursInMonth(id, month), b };
       });
       const ok = cands.filter((c) => !c.why);
       if (ok.length === 0) {
@@ -742,7 +746,7 @@ function rebalance(
         if (holderLoad - h < holderMin - 1e-6 || holderLoad <= n.load + h) continue;
         if (brandRuleViolation(input.brandRules, s.brandId, n.t.id, a.role, s.platform)) continue;
         roster.remove(a.talentId, a.shiftKey, a.role);
-        if (roster.blocked(n.t.id, s, n.b.max, month)) {
+        if (roster.blocked(n.t.id, s, n.b.max, month, a.role)) {
           roster.add(a.talentId, s, a.role, true);
           continue;
         }

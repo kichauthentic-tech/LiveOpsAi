@@ -216,7 +216,7 @@ export function personEntries(shifts: readonly RosterShift[]): Map<string, Perso
   return out;
 }
 
-export type IssueCode = "clash" | "week_over" | "draft_no_host" | "no_host" | "co_pending" | "no_co" | "week_warn" | "rest" | "room" | "day" | "streak" | "new_channel" | "brand_blocked" | "brand_exclusive" | "brand_role";
+export type IssueCode = "clash" | "week_over" | "draft_no_host" | "no_host" | "co_pending" | "no_co" | "week_warn" | "rest" | "room" | "day" | "streak" | "new_channel" | "brand_blocked" | "brand_exclusive" | "brand_role" | "same_brand_day";
 /** block = DB/công bố sẽ chặn; hole = ca còn trống vai (thiếu host, hoặc có host mà chưa trợ / No Asst — không công bố, giữ là ca mở); warn = cảnh báo. */
 export type IssueSeverity = "block" | "hole" | "warn";
 
@@ -235,7 +235,8 @@ export const ISSUE_SEVERITY: Record<IssueCode, IssueSeverity> = {
   new_channel: "warn",
   brand_blocked: "warn",
   brand_exclusive: "warn",
-  brand_role: "warn"
+  brand_role: "warn",
+  same_brand_day: "warn"
 };
 
 /**
@@ -280,7 +281,7 @@ export function buildBrandRuleIndex(
 }
 
 /** Lý do host KHÔNG hợp với brand này theo điều khoản (undefined = hợp lệ). Một chỗ cho cảnh báo lịch và danh sách gợi ý. */
-export function brandRuleViolation(idx: BrandRuleIndex | undefined, brandId: string, talentId: string, role?: RosterRole, platform?: string): { code: "brand_blocked" | "brand_exclusive" | "brand_role"; text: string } | undefined {
+export function brandRuleViolation(idx: BrandRuleIndex | undefined, brandId: string, talentId: string, role?: RosterRole, platform?: string): { code: "brand_blocked" | "brand_exclusive" | "brand_role" | "same_brand_day"; text: string } | undefined {
   if (!idx) return undefined;
   const kind = role ? idx.roleKind(brandId, platform, talentId) : undefined;
   if (role && kind && kind !== "both" && (kind === "host" ? "host" : "co_host") !== role) {
@@ -359,6 +360,18 @@ export function analyzeRoster(
       } else if (gap < rules.minRestHours * 60 && isLateEnd(prev, rules.lateEndTime)) {
         add("rest", cur.shift, `${name} tan ca ${prev.shift.endTime} (${ddmm(prev.shift.date)}), chỉ nghỉ ${fmtH(gap / 60)} giờ trước ca này`, tid);
       }
+    }
+    // Một host hai ca cùng brand × sàn trong một ngày (chị Trainer 18/11): cảnh báo ở ca thứ hai trở đi. Host khác brand/sàn cùng ngày không tính.
+    const hostByDayChannel = new Map<string, RosterShift[]>();
+    for (const e of list) {
+      if (e.role !== "host") continue;
+      const k = `${e.shift.date}|${e.shift.channelKey}`;
+      const g = hostByDayChannel.get(k) ?? [];
+      if (!g.some((x) => x.key === e.shift.key)) g.push(e.shift);
+      hostByDayChannel.set(k, g);
+    }
+    for (const g of hostByDayChannel.values()) {
+      for (let i = 1; i < g.length; i++) add("same_brand_day", g[i], `${name} đã có ca host ${g[0].startTime}–${g[0].endTime} cùng ${g[i].brandName} ${g[i].platform} ngày ${ddmm(g[i].date)}`, tid);
     }
     // Giờ theo ngày + chuỗi ngày làm liền.
     const byDay = new Map<string, { h: number; first: RosterShift }>();

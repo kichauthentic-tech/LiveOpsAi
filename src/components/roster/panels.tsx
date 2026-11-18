@@ -156,6 +156,7 @@ const RULE_ORDER: [IssueCode, string][] = [
   ["day", "Quá giờ trong một ngày"],
   ["streak", "Làm nhiều ngày liền"],
   ["week_warn", "Gần tới giờ tối đa/tuần"],
+  ["same_brand_day", "Một host hai ca cùng brand + sàn trong ngày"],
   ["new_channel", "Host chưa quen kênh (0 ca trong 90 ngày)"]
 ];
 

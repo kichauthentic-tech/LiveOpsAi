@@ -173,3 +173,39 @@ describe("PFM tháng trước", () => {
     expect(m.has("star")).toBe(false);
   });
 });
+
+describe("một host không hai ca cùng brand + sàn trong một ngày (chị Trainer 18/11)", () => {
+  const talents = [tal("x", "Host", 100000), tal("y", "Host", 100000)];
+  const twoSameChannel = [slot("s1", day(5), { startTime: "10:00", endTime: "12:00" }), slot("s2", day(5), { startTime: "19:00", endTime: "21:00" })];
+
+  test("người duy nhất đăng ký hai ca cùng kênh cùng ngày: chỉ nhận một ca, ca kia để trống kèm lý do", () => {
+    const plan = run({ slots: twoSameChannel, talents, regs: twoSameChannel.map((s) => reg(s.id, "x")) });
+    expect(hours(plan, "x")).toBe(2);
+    expect(plan.unfilled.some((u) => u.role === "host" && u.detail.includes("cùng brand + sàn"))).toBe(true);
+  });
+
+  test("có người thứ hai đăng ký thì chia mỗi người một ca", () => {
+    const plan = run({ slots: twoSameChannel, talents, regs: twoSameChannel.flatMap((s) => [reg(s.id, "x"), reg(s.id, "y")]) });
+    expect(new Set([hostOf(plan, "s1"), hostOf(plan, "s2")]).size).toBe(2);
+  });
+
+  test("khác sàn hoặc khác brand cùng ngày vẫn xếp được cho một người", () => {
+    const slots = [slot("a", day(5), { startTime: "10:00", endTime: "12:00" }), slot("b", day(5), { startTime: "19:00", endTime: "21:00", platform: "Shopee" }), slot("c", day(5), { startTime: "14:00", endTime: "16:00", brandId: "b2", brandName: "ADIDAS" })];
+    const plan = run({ slots, talents, regs: slots.map((s) => reg(s.id, "x")) });
+    expect(hours(plan, "x")).toBe(6);
+  });
+
+  test("cùng kênh khác ngày vẫn xếp được", () => {
+    const slots = [slot("a", day(5)), slot("b", day(6))];
+    const plan = run({ slots, talents, regs: slots.map((s) => reg(s.id, "x")) });
+    expect(hours(plan, "x")).toBe(6);
+  });
+
+  test("lịch tuần: ca xếp tay vi phạm hiện cảnh báo same_brand_day ở ca thứ hai", () => {
+    const shifts = R.buildRosterShifts([] as LiveSession[], twoSameChannel, [{ slotId: "s1", hostId: "x" }, { slotId: "s2", hostId: "x" }], [], day(1), day(30));
+    const a = R.analyzeRoster(shifts, R.DEFAULT_ROSTER_RULES, "2026-11-02", (id) => id);
+    const hit = a.issues.filter((i) => i.code === "same_brand_day");
+    expect(hit).toHaveLength(1);
+    expect(hit[0].severity).toBe("warn");
+  });
+});

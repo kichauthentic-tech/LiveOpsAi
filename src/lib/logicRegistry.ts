@@ -58,6 +58,7 @@ export const LOGIC_MODULES: LogicModule[] = [
     rules: [
       { kind: "hard", text: "Chỉ chọn người đã đăng ký đúng ca mở", help: "Ca không ai đăng ký để trống và báo lý do; không bốc người ngoài danh sách đăng ký.", where: "Trong code" },
       { kind: "hard", text: "Không trùng ca; giờ/tuần, giờ/ngày, nghỉ sau ca khuya", where: "Điều Phối → Luật" },
+      { kind: "hard", text: "Một host không nhận hai ca cùng brand + sàn trong một ngày", help: "Host khác brand hoặc khác sàn cùng ngày vẫn được. Chỉ áp cho vai host. Ca xếp tay vi phạm thì hiện cảnh báo ở Kiểm lịch.", where: "roster/monthPlanner.ts (Roster.blocked)" },
       { kind: "hard", text: "Vai được xếp theo brand × sàn (host / trợ / cả hai)", where: "Talent Pool → hồ sơ talent" },
       { kind: "hard", text: "Giờ tối đa cả tháng, kể cả trần giờ riêng từng người", help: "Xếp ngày 1–15 thì người có trần riêng chỉ nhận tới trần × tỷ lệ giờ của nửa đầu + dung sai; phần còn lại chừa cho nửa sau.", keys: ["rosterRangeTolerance"], where: "Điều Phối → So sánh mục tiêu (lưu theo trình duyệt)" },
       { kind: "hard", text: "Mọi người có trần giờ tự suy để chia đợt", help: "Trung bình giờ 3 tháng đã qua × (1 + dư), cần ≥ 2 tháng có làm. Xếp nửa tháng thì không ai nhận quá phần của nửa đó. Cam kết nhập tay ghi đè.", keys: ["rosterAutoCapSlack"] },
@@ -146,6 +147,7 @@ export const LOGIC_MODULES_MORE: LogicModule[] = [
       { kind: "hard", text: "Một người không thể là host hoặc trợ của hai ca chồng giờ; một phòng không chứa hai ca chồng giờ", help: "Tính cả ca qua đêm hôm trước và ca chờ đăng ký còn mở đang giữ phòng.", where: "scheduling/conflicts.ts + DB 0143" },
       { kind: "soft", text: "Giờ/tuần, giờ/ngày, nghỉ sau ca khuya, chuỗi ngày làm liền: chỉ CẢNH BÁO", help: "Từ 09/11 quá giờ tuần cũng chỉ cảnh báo (lịch sheet đã có người vượt 48h).", where: "Điều Phối → Luật (bảng roster_rules)" },
       { kind: "hard", text: "Đổi/nhường ca: lịch mỗi người không phát sinh chồng giờ MỚI", consts: [{ label: "Số đoạn tối đa mỗi vai", value: String(SWAP_MAX_SEGMENTS_PER_ROLE) }], where: "shiftSwap/swap.ts (DB kiểm lại)" },
+      { kind: "soft", text: "Một host hai ca cùng brand + sàn trong ngày: CẢNH BÁO ở Kiểm lịch (bộ xếp tự động thì chặn hẳn)", where: "roster/rules.ts (same_brand_day)" },
       { kind: "soft", text: "Ca có host mà chưa trợ / chưa đánh 'No Asst' thì không công bố", where: "roster/rules.ts (0207)" }
     ]
   },
