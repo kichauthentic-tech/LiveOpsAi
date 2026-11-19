@@ -73,9 +73,10 @@ export default function TalentShiftSignup({ mode, onOpenTab, brands, shiftSlots,
   }, [today]);
   // Hạn theo ĐỢT của ngày ca (0200: ca 1–15 / 16–cuối có hạn riêng) hoặc hạn riêng của ca bổ sung.
   const deadlineOf = (slot: ShiftSlot) => signupDeadlineOf(slot, rosterMonths, weeks, isoWeekStart);
+  // 0226: qua hạn chỉ khoá SỬA/HUỶ ca mình đã đăng ký; ca còn mở thiếu người vẫn đăng ký thêm được.
   const closed = (slot: ShiftSlot) => {
     const d = deadlineOf(slot);
-    return !!d && new Date(d) <= new Date();
+    return !!d && new Date(d) <= new Date() && mineBySlot.has(slot.id);
   };
 
   const mineBySlot = useMemo(
@@ -253,7 +254,7 @@ export default function TalentShiftSignup({ mode, onOpenTab, brands, shiftSlots,
               {nextDeadline && (
                 <p className="flex items-center gap-1.5 text-sm text-[var(--text)]">
                   <Clock3 className="w-4 h-4 shrink-0 text-amber-300" />
-                  Hạn đăng ký: <b>{deadlineText(nextDeadline)}</b>
+                  Hạn sửa đăng ký: <b>{deadlineText(nextDeadline)}</b>
                 </p>
               )}
             </div>

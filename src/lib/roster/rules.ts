@@ -249,13 +249,13 @@ export function personEntries(shifts: readonly RosterShift[]): Map<string, Perso
 }
 
 export type IssueCode = "clash" | "week_over" | "draft_no_host" | "no_host" | "co_pending" | "no_co" | "week_warn" | "rest" | "room" | "day" | "streak" | "new_channel" | "brand_blocked" | "brand_exclusive" | "brand_role" | "same_brand_day";
-/** block = DB/công bố sẽ chặn; hole = ca còn trống vai (thiếu host, hoặc có host mà chưa trợ / No Asst — không công bố, giữ là ca mở); warn = cảnh báo. */
+/** block = DB/công bố sẽ chặn; hole = ca còn trống vai (thiếu host ⇒ giữ là ca mở; thiếu trợ vẫn công bố, chốt sau); warn = cảnh báo. */
 export type IssueSeverity = "block" | "hole" | "warn";
 
 export const ISSUE_SEVERITY: Record<IssueCode, IssueSeverity> = {
   clash: "block",
   week_over: "warn",
-  draft_no_host: "block",
+  draft_no_host: "hole",
   no_host: "hole",
   co_pending: "hole",
   no_co: "warn",
@@ -438,12 +438,12 @@ export function analyzeRoster(
       if (v) add(v.code, sh, `${nameOf(tid)}: ${v.text}`, tid);
     }
     if (!sh.hostId) {
-      if (sh.kind === "open" && sh.drafted) add("draft_no_host", sh, "Nháp có trợ live nhưng chưa có host — công bố sẽ bị chặn");
+      if (sh.kind === "open" && sh.drafted) add("draft_no_host", sh, "Nháp có trợ live nhưng chưa có host — ca này vẫn mở, chưa công bố");
       else add("no_host", sh, "Ca chưa có host");
     }
     // 0207: ca CHỦ Ý không trợ (thẻ No Asst) không phải thiếu. Ca mở đã có host mà chưa trợ / No Asst thì công bố sẽ bỏ qua ca đó.
     if (!sh.coHostId && !sh.noAssistant) {
-      if (sh.kind === "open" && sh.hostId) add("co_pending", sh, "Cần trợ live — chọn trợ hoặc gắn No Asst, nếu không ca này chưa được công bố");
+      if (sh.kind === "open" && sh.hostId) add("co_pending", sh, "Chưa có trợ live — vẫn công bố được, chốt trợ (hoặc No Asst) sau");
       else add("no_co", sh, "Ca chưa có trợ live");
     }
     if (sh.hostId && familiar && familiar(sh.hostId, sh.channelKey) === 0) {

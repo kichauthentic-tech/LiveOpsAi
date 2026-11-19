@@ -19,6 +19,7 @@ import {
   fetchRosterWeeks,
   isRosterBackendMissing,
   publishRosterWeek,
+  publishRosterRange,
   rosterMoveSession,
   rosterReassign,
   saveRosterDraft,
@@ -348,7 +349,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
   const openShifts = wk.filter((s) => s.kind === "open");
   // 0207: nháp có host mà chưa trợ / No Asst KHÔNG công bố (RPC bỏ qua, ca vẫn mở cho talent đăng ký trợ) ⇒ đếm riêng.
   const holdCoShifts = openShifts.filter((s) => s.drafted && !!s.hostId && !s.coHostId && !s.noAssistant);
-  const publishableShifts = openShifts.filter((s) => s.drafted && (!s.hostId || !!s.coHostId || !!s.noAssistant));
+  const publishableShifts = openShifts.filter((s) => s.drafted && !!s.hostId);
   const draftedCount = publishableShifts.length;
   const outsideDrafts = publishableShifts.filter((s) => s.date.slice(0, 7) !== viewMonth).length;
   const weekCost = wk.reduce((s, x) => s + shiftCost(x, p.talents, p.talentRateHistory).amount, 0);
@@ -760,7 +761,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
     const byWeek = new Map<string, number>();
     for (const sl of p.shiftSlots) {
       if (sl.status !== "open" || sl.sessionId || sl.date < planRange.from || sl.date > planRange.to) continue;
-      if (!drafts.some((d) => d.slotId === sl.id && d.hostId && (d.coHostId || d.noAssistant))) continue;
+      if (!drafts.some((d) => d.slotId === sl.id && d.hostId)) continue;
       const w = isoWeekStart(sl.date);
       byWeek.set(w, (byWeek.get(w) ?? 0) + 1);
     }
@@ -770,11 +771,6 @@ export const RosterBoard: React.FC<Props> = (p) => {
   const publishRange = () =>
     run(async () => {
       const weekEndOf = (w: string) => addDays(w, 6);
-      const noHost = p.shiftSlots.filter((sl) => sl.status === "open" && !sl.sessionId && rangeWeeks.some(([w]) => sl.date >= w && sl.date <= weekEndOf(w)) && drafts.some((d) => d.slotId === sl.id && !d.hostId));
-      if (noHost.length > 0) {
-        showToast(`Còn ${noHost.length} ca nháp chỉ có trợ, chưa có host (${noHost.slice(0, 3).map((sl) => `${sl.brandName} ${dayLabel(sl.date)}`).join(", ")}). Xếp host hoặc gỡ nháp ca đó rồi công bố lại.`);
-        return;
-      }
       const total = rangeWeeks.reduce((n, [, c]) => n + c, 0);
       const people = new Set<string>();
       for (const d of drafts) if (p.shiftSlots.some((sl) => sl.id === d.slotId && rangeWeeks.some(([w]) => sl.date >= w && sl.date <= weekEndOf(w)))) [d.hostId, d.coHostId].forEach((x) => x && people.add(x));
@@ -784,27 +780,29 @@ export const RosterBoard: React.FC<Props> = (p) => {
           .issues.filter((i) => i.code === "week_over")
           .map((i) => `tuần ${dayLabel(w)}: ${i.text.replace(/ có (.+) trong tuần.*/, " $1")}`)
       );
+      const inRange = p.shiftSlots.filter((sl) => sl.status === "open" && !sl.sessionId && sl.date >= planRange.from && sl.date <= planRange.to);
+      const hostOf = (id: string) => drafts.find((d) => d.slotId === id)?.hostId;
+      const noHostN = inRange.filter((sl) => !hostOf(sl.id)).length;
+      const noCoN = inRange.filter((sl) => { const d = drafts.find((x) => x.slotId === sl.id); return !!d?.hostId && !d.coHostId && !d.noAssistant; }).length;
       const msg = [
-        `Công bố ${rangeWeeks.length} tuần (${rangeWeeks.map(([w]) => `${dayLabel(w)}–${dayLabel(weekEndOf(w))}`).join("; ")})?`,
-        `${total}+ ca nháp thành ca thật; khoảng ${people.size} host/trợ nhận tin (mỗi người một tin cho mỗi tuần).`,
+        `Công bố lịch ${dayLabel(planRange.from)} – ${dayLabel(planRange.to)} một lần?`,
+        `${total}+ ca có host thành ca thật; khoảng ${people.size} host/trợ nhận tin (mỗi người một tin cho mỗi tuần).`,
+        noCoN > 0 ? `${noCoN} ca chưa có trợ vẫn được chốt — thêm trợ (hoặc No Asst) sau.` : "",
+        noHostN > 0 ? `${noHostN} ca chưa có host giữ là ca mở, talent thấy "Cần host" và đăng ký thêm.` : "",
         "Tuần vắt qua cuối phạm vi vẫn được công bố trọn tuần.",
         overLines.length > 0 ? `⚠ Quá ${rules.maxWeekHours} giờ/tuần (không chặn): ${overLines.join("; ")}.` : ""
       ]
         .filter(Boolean)
         .join("\n");
-      if (!(await confirm(msg, { confirmLabel: `Công bố ${rangeWeeks.length} tuần` }))) return;
+      if (!(await confirm(msg, { confirmLabel: `Công bố ${total}+ ca` }))) return;
       let published = 0;
       let notified = 0;
-      for (const [w] of rangeWeeks) {
-        try {
-          const r = await publishRosterWeek(w);
-          published += r.published;
-          notified += r.notified;
-        } catch (e) {
-          await Promise.all([p.onScheduleChanged(), reloadRoster()]);
-          showToast(`Dừng ở tuần ${dayLabel(w)}: ${errorMessage(e)}. Đã công bố ${published} ca của các tuần trước đó.`);
-          return;
-        }
+      try {
+        ({ published, notified } = await publishRosterRange(planRange.from, planRange.to, rangeWeeks.map(([w]) => w)));
+      } catch (e) {
+        await Promise.all([p.onScheduleChanged(), reloadRoster()]);
+        showToast(`Chưa công bố được: ${errorMessage(e)}`);
+        return;
       }
       await Promise.all([p.onScheduleChanged(), reloadRoster()]);
       persistAuto(
@@ -816,7 +814,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
         )
       );
       setPlanNote(null);
-      showToast(`Đã công bố ${published} ca của ${rangeWeeks.length} tuần, gửi ${notified} tin cho host/trợ`);
+      showToast(`Đã công bố ${published} ca (${dayLabel(planRange.from)}–${dayLabel(planRange.to)}), gửi ${notified} tin cho host/trợ${noCoN > 0 ? ` · ${noCoN} ca chờ chốt trợ` : ""}${noHostN > 0 ? ` · ${noHostN} ca chờ host` : ""}`);
     });
   // Khối lượng từng người theo lịch + nháp HIỆN CÓ (không xếp thêm), tính tới hết phạm vi đang chọn (1–15 hoặc cả tháng).
   const workload = useMemo(() => {
@@ -843,7 +841,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
         `${draftedCount} ca nháp sẽ thành ca thật, mỗi host/trợ nhận MỘT tin liệt kê ca của mình.`,
         outsideDrafts > 0 ? `Gồm cả ${outsideDrafts} ca nháp ngoài tháng ${Number(viewMonth.slice(5))}.` : "",
         holes > 0 ? `${holes} ca mở chưa có host sẽ vẫn mở (không công bố).` : "",
-        holdCoShifts.length > 0 ? `${holdCoShifts.length} ca đã có host nhưng chưa có trợ / No Asst sẽ chưa công bố, vẫn mở cho talent đăng ký trợ: ${holdCoShifts.slice(0, 4).map((s) => `${s.brandName} ${dayLabel(s.date)} ${s.startTime}`).join(", ")}${holdCoShifts.length > 4 ? "…" : ""}.` : "",
+        holdCoShifts.length > 0 ? `${holdCoShifts.length} ca đã có host nhưng chưa có trợ vẫn được chốt — thêm trợ (hoặc No Asst) sau: ${holdCoShifts.slice(0, 4).map((s) => `${s.brandName} ${dayLabel(s.date)} ${s.startTime}`).join(", ")}${holdCoShifts.length > 4 ? "…" : ""}.` : "",
         // 0206: quá giờ tuần chỉ cảnh báo — nêu đích danh để người công bố nhìn thấy trước khi bấm.
         overWeek.length > 0 ? `⚠ Quá ${rules.maxWeekHours} giờ/tuần (không chặn): ${overWeek.map((i) => i.text.replace(/ có (.+) trong tuần.*/, " $1")).join("; ")}.` : "",
         warns.length - overWeek.length > 0 ? `Còn ${warns.length - overWeek.length} cảnh báo khác (không chặn).` : ""
@@ -853,7 +851,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
       if (!(await confirm(msg, { confirmLabel: "Công bố" }))) return;
       const r = await publishRosterWeek(weekStart);
       await Promise.all([p.onScheduleChanged(), reloadRoster()]);
-      showToast(`Đã công bố ${r.published} ca, gửi ${r.notified} tin cho host/trợ${holdCoShifts.length > 0 ? ` · còn ${holdCoShifts.length} ca chờ trợ` : ""}`);
+      showToast(`Đã công bố ${r.published} ca, gửi ${r.notified} tin cho host/trợ${holdCoShifts.length > 0 ? ` · ${holdCoShifts.length} ca chờ chốt trợ` : ""}`);
     });
 
   const saveRules = (r: RosterRules) =>
@@ -1057,8 +1055,8 @@ export const RosterBoard: React.FC<Props> = (p) => {
                   { label: "Gỡ phần tự fill", onClick: () => void clearAuto(), disabled: readOnly || busy || Object.keys(auto).length === 0 }
                 ]}
               />
-              <button type="button" disabled={readOnly || busy || rangeWeeks.length === 0} onClick={() => void publishRange()} title="Công bố lần lượt mọi tuần có nháp trong phạm vi đang chọn, chỉ một hộp xác nhận" className="px-2.5 py-1 rounded-lg bg-[var(--accent)] text-[var(--accent-contrast)] font-black disabled:opacity-40">
-                {rangeWeeks.length > 0 ? `Công bố ${rangeWeeks.length} tuần` : "Chưa có nháp"}
+              <button type="button" disabled={readOnly || busy || rangeWeeks.length === 0} onClick={() => void publishRange()} title="Công bố một lần mọi ca có host trong phạm vi đang chọn; ca thiếu trợ vẫn chốt, ca thiếu host giữ mở" className="px-2.5 py-1 rounded-lg bg-[var(--accent)] text-[var(--accent-contrast)] font-black disabled:opacity-40">
+                {rangeWeeks.length > 0 ? `Công bố ${scope === "half" ? "15 ngày" : "cả tháng"}` : "Chưa có nháp"}
               </button>
             </div>
             {planNote && <p className="mt-1.5 text-2xs text-[var(--text-muted)]">{planNote}</p>}

@@ -8,7 +8,6 @@ import { talentShortName } from "../../lib/talentName";
 import { shiftHours, type RosterAnalysis, type RosterRole, type RosterShift } from "../../lib/roster/rules";
 import { rankCandidates, shiftCost, type Candidate, type RankContext, type RankMode } from "../../lib/roster/candidates";
 import { getTodayDate } from "../../lib/dateUtils";
-import { extraSignupDeadline } from "../../lib/roster/milestones";
 
 // Ngăn chi tiết một ca của Điều Phối Lịch Live: lỗi/cảnh báo, người đã báo rảnh, gợi ý người cho từng vai (kèm lý do + chi phí), dời giờ, bỏ ca.
 // Ca mở ⇒ ghi NHÁP (talent chưa thấy). Ca đã lên lịch ⇒ đổi người / dời giờ phải có lý do (RPC ghi nhật ký, DB báo người liên quan).
@@ -239,19 +238,6 @@ export const ShiftPanel: React.FC<Props> = ({ shift, analysis, ctx, talents, his
         )}
         {roleBlock(roleTab)}
 
-        {onReopenSignup && !readOnly && !past && shift.kind === "open" && (!shift.hostId || (!shift.coHostId && !shift.noAssistant)) && (() => {
-          const dl = extraSignupDeadline(shift.date, shift.startTime, new Date());
-          return (
-            <div className="rounded-xl border border-[var(--border)] px-3 py-2.5 space-y-1.5">
-              <p className="text-xs text-[var(--text-muted)]">
-                Ca còn thiếu {!shift.hostId ? "host" : "trợ live"}. Hết hạn đăng ký của tháng/đợt thì talent không báo rảnh được nữa — đặt hạn riêng cho ca này để họ đăng ký thêm.
-              </p>
-              <button type="button" disabled={busy || !dl} onClick={() => dl && onReopenSignup(shift, dl)} className="text-xs font-bold px-3 py-1.5 rounded-lg border border-[var(--border)] text-[var(--text)] hover:bg-[var(--surface-hover)] disabled:opacity-50">
-                {dl ? `Mở đăng ký thêm tới ${dl.getHours()}:${String(dl.getMinutes()).padStart(2, "0")} ${dl.getDate()}/${dl.getMonth() + 1}` : "Ca sát giờ — không còn thời gian mở đăng ký"}
-              </button>
-            </div>
-          );
-        })()}
 
         {canMove && moving && (
           <section className="space-y-2 border-t border-[var(--border)] pt-4">

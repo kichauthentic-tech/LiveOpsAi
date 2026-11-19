@@ -101,7 +101,7 @@ export function monthStatus(x: MonthStatusInput): MonthStatus {
   const noHostSlots = open.filter((sl) => !draftBy.get(sl.id)?.hostId);
   // 0207: nháp có host mà chưa trợ, chưa No Asst thì công bố bỏ qua ⇒ chưa tính là "sẵn sàng công bố".
   const needCoSlots = withHost.filter((sl) => !draftBy.get(sl.id)?.coHostId && !draftBy.get(sl.id)?.noAssistant);
-  const readySlots = withHost.filter((sl) => !!draftBy.get(sl.id)?.coHostId || !!draftBy.get(sl.id)?.noAssistant);
+  const readySlots = withHost; // 0225: thiếu trợ vẫn công bố được
   const published = new Set(x.weeks.filter((w) => w.publishedAt).map((w) => w.weekStart));
   const weeksToPublish = [...new Set(readySlots.map((sl) => isoWeekStart(sl.date)).filter((w) => !published.has(w)))].sort();
   const dl = (sl: ShiftSlot) => slotDeadline(sl.date, x.milestones, undefined, sl.signupDeadline);
@@ -134,7 +134,6 @@ export function monthStatus(x: MonthStatusInput): MonthStatus {
   else if (noHostSlots.length > 0 && noHostDl.some((d) => !d)) phase = "no_deadline";
   else if (noHostSlots.length > 0 && future.length > 0) phase = "signup";
   else if (noHostSlots.length > 0) phase = "staff";
-  else if (needCoSlots.length > 0) phase = "staff";
   else if (weeksToPublish.length > 0) phase = "publish";
   else phase = "done";
 

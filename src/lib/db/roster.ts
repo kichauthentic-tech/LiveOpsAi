@@ -273,6 +273,24 @@ export async function publishRosterWeek(weekStart: string): Promise<{ published:
   return { published: Number(d.published ?? 0), notified: Number(d.notified ?? 0) };
 }
 
+/** 0225: công bố một lần cả khoảng ngày (một giao dịch). DB chưa có 0225 ⇒ lùi về công bố từng tuần. */
+export async function publishRosterRange(from: string, to: string, weekStarts: string[]): Promise<{ published: number; notified: number }> {
+  const { data, error } = await supabase.rpc("publish_roster_range", { p_from: from, p_to: to });
+  if (!error) {
+    const d = (data ?? {}) as { published?: number; notified?: number };
+    return { published: Number(d.published ?? 0), notified: Number(d.notified ?? 0) };
+  }
+  if (error.code !== "PGRST202" && error.code !== "42883") throw error;
+  let published = 0;
+  let notified = 0;
+  for (const w of weekStarts) {
+    const r = await publishRosterWeek(w);
+    published += r.published;
+    notified += r.notified;
+  }
+  return { published, notified };
+}
+
 /** Đổi người của ca đã lên lịch (bắt buộc lý do; DB chặn quá giờ/tuần, trùng người, ca đã chia đoạn). */
 export async function rosterReassign(sessionId: string, hostId: string, coHostId: string | null, reason: string): Promise<LiveSession> {
   const { error } = await supabase.rpc("roster_reassign", { p_session_id: sessionId, p_host_id: hostId, p_co_host_id: coHostId, p_reason: reason });

@@ -97,7 +97,7 @@ test("2 đợt (0200): ca 16–cuối theo hạn đợt 2; đợt 1 đã đóng 
   expect(extra.deadline).toBe("2026-10-27T10:00:00.000Z");
 });
 
-test("No Asst (0207): nháp có host mà chưa trợ / No Asst = chờ trợ, chưa tính là sẵn sàng công bố; gắn thẻ hoặc có trợ thì công bố được", () => {
+test("0225: nháp có host mà chưa trợ vẫn công bố được (chốt trợ sau); chỉ ca chưa host giữ ở bước xếp người", () => {
   const slots = [slot("a", "2026-11-02"), slot("b", "2026-11-03"), slot("c", "2026-11-04"), slot("d", "2026-11-18")];
   const milestones = { month: "2026-11", signupDeadline: "2026-10-20T10:00:00.000Z" }; // hạn đã qua so với now
   const drafts = [
@@ -109,13 +109,12 @@ test("No Asst (0207): nháp có host mà chưa trợ / No Asst = chờ trợ, ch
   const st = monthStatus(base({ slots, drafts, milestones }));
   expect(st.drafted).toBe(4);
   expect(st.needCo).toBe(2);
-  expect(st.phase).toBe("staff"); // còn ca chờ trợ ⇒ chưa sang "Công bố"
+  expect(st.phase).toBe("publish"); // thiếu trợ không chặn công bố
   expect(st.halves[0].needCo).toBe(1);
-  expect(st.halves[0].toPublish).toBe(2); // b + c
+  expect(st.halves[0].toPublish).toBe(3); // a + b + c
   expect(st.halves[1].needCo).toBe(1);
-  expect(st.halves[1].toPublish).toBe(0);
-  // Hết ca chờ trợ thì mới sang "publish".
-  const ready = monthStatus(base({ slots, drafts: drafts.map((d) => (d.coHostId || d.noAssistant ? d : { ...d, noAssistant: true })), milestones }));
-  expect(ready.needCo).toBe(0);
-  expect(ready.phase).toBe("publish");
+  expect(st.halves[1].toPublish).toBe(1);
+  // Còn ca chưa host thì vẫn ở bước xếp người.
+  const hole = monthStatus(base({ slots, drafts: drafts.slice(0, 3), milestones }));
+  expect(hole.phase).toBe("staff");
 });
