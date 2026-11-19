@@ -756,7 +756,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
       const empty = plan.unfilled.filter((u) => u.reason === "no_registrant").length;
       setPlanNote(`${GOAL_LABEL[g]} · ${planScopeLabel}: lấp ${plan.totals.plannedCount} chỗ vào nháp, còn ${plan.unfilled.length} chỗ trống${empty ? ` (${empty} chỗ chưa ai đăng ký)` : ""}.${wrongRole.length ? ` Đã gỡ ${wrongRole.length} ô đang sai vai (${[...new Set(wrongRole.map((w) => nameOf(w.talentId)))].slice(0, 4).join(", ")}${new Set(wrongRole.map((w) => w.talentId)).size > 4 ? "…" : ""}) để xếp lại.` : ""} Nháp, talent chưa thấy.`);
     });
-  // Tuần (Thứ 2) có nháp trong phạm vi đang chọn. Tuần nằm vắt qua ngày 15/cuối tháng được công bố TRỌN tuần (RPC công bố theo tuần).
+  // Tuần (Thứ 2) có nháp trong phạm vi đang chọn. Từ 0227 chỉ công bố đúng khoảng ngày (không kéo cả tuần vắt biên).
   const rangeWeeks = useMemo(() => {
     const byWeek = new Map<string, number>();
     for (const sl of p.shiftSlots) {
@@ -786,15 +786,15 @@ export const RosterBoard: React.FC<Props> = (p) => {
       const noCoN = inRange.filter((sl) => { const d = drafts.find((x) => x.slotId === sl.id); return !!d?.hostId && !d.coHostId && !d.noAssistant; }).length;
       const msg = [
         `Công bố lịch ${dayLabel(planRange.from)} – ${dayLabel(planRange.to)} một lần?`,
-        `${total}+ ca có host thành ca thật; khoảng ${people.size} host/trợ nhận tin (mỗi người một tin cho mỗi tuần).`,
+        `${total} ca có host thành ca thật; khoảng ${people.size} host/trợ nhận tin (mỗi người một tin cho mỗi tuần).`,
         noCoN > 0 ? `${noCoN} ca chưa có trợ vẫn được chốt — thêm trợ (hoặc No Asst) sau.` : "",
         noHostN > 0 ? `${noHostN} ca chưa có host giữ là ca mở, talent thấy "Cần host" và đăng ký thêm.` : "",
-        "Tuần vắt qua cuối phạm vi vẫn được công bố trọn tuần.",
+        `Chỉ công bố ca trong ${dayLabel(planRange.from)} – ${dayLabel(planRange.to)}, ca ngoài khoảng này giữ nguyên nháp.`,
         overLines.length > 0 ? `⚠ Quá ${rules.maxWeekHours} giờ/tuần (không chặn): ${overLines.join("; ")}.` : ""
       ]
         .filter(Boolean)
         .join("\n");
-      if (!(await confirm(msg, { confirmLabel: `Công bố ${total}+ ca` }))) return;
+      if (!(await confirm(msg, { confirmLabel: `Công bố ${total} ca` }))) return;
       let published = 0;
       let notified = 0;
       try {
