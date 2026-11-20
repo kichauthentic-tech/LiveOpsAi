@@ -6,6 +6,13 @@ import { profileOf } from "../../lib/platforms/profiles";
 // phòng (VERA TTS / VERA SPE), còn ca Franklin Shopee không có phòng thì không đoán được. Màu cố định theo sàn (hồ sơ sàn)
 // để nhận ra không cần đọc chữ.
 export function PlatformChip({ platform, className = "" }: { platform: LiveSession["platform"] | undefined; className?: string }) {
+  if (platform === "Website") {
+    return (
+      <span className={`inline-flex items-center text-2xs font-bold px-1.5 py-0.5 rounded border whitespace-nowrap bg-sky-950 text-sky-300 border-sky-800 ${className}`} title="Sàn: Website">
+        Website
+      </span>
+    );
+  }
   const p = profileOf({ platform });
   return (
     <span className={`inline-flex items-center text-2xs font-bold px-1.5 py-0.5 rounded border whitespace-nowrap ${p.chipClass} ${className}`} title={`Sàn: ${p.label}`}>

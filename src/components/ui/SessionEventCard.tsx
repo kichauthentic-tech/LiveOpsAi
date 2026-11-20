@@ -181,12 +181,12 @@ export const SessionEventCard: React.FC<SessionEventCardProps> = ({
             {title && <span className="sc-title">{title}</span>}
             {!!targetGmv && (
               pctBadge ? (
-                <span className="sc-pill sc-pill-split" title={`${pctBadge.title} · ${platformText("Target GMV", platform)}: ${fmtVndFull(targetGmv)}`}>
+                <span className="sc-pill sc-pill-split" title={`${pctBadge.title} · ${platformText("Target GMV", platform === "Website" ? null : platform)}: ${fmtVndFull(targetGmv)}`}>
                   <b data-level={pctBadge.level}>{pctBadge.label}</b>
                   <i>{fmtVndShort(targetGmv)}</i>
                 </span>
               ) : (
-                <span className="sc-pill" title={`${platformText("Target GMV", platform)}: ${fmtVndFull(targetGmv)}`}>
+                <span className="sc-pill" title={`${platformText("Target GMV", platform === "Website" ? null : platform)}: ${fmtVndFull(targetGmv)}`}>
                   {fmtVndShort(targetGmv)}
                 </span>
               )

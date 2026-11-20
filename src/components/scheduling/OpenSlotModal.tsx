@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { Brand, BrandChannel, BrandStudio, LiveSession, ShiftSlot, Studio } from "../../types";
-import { platformsOfBrand } from "../../lib/channels";
-import { platformOf, type ReportPlatform } from "../../lib/reportPlatform";
+import { schedulePlatformsOfBrand } from "../../lib/channels";
+import { schedulePlatformOf, type SchedulePlatform } from "../../lib/reportPlatform";
 import { AlertTriangle, CalendarClock, X } from "lucide-react";
 import { dateTimeRangesOverlap, getTodayDate } from "../../lib/dateUtils";
 import { fmtDateVn } from "../../lib/format";
@@ -21,7 +21,7 @@ interface OpenSlotModalProps {
   /** Kênh brand × sàn (0149): ca mở thuộc một kênh đang chạy — trước 07/10 form ghi cứng TikTok. */
   channels: BrandChannel[];
   /** Brand workspace: sàn của workspace, chọn sẵn. */
-  initialPlatform?: ReportPlatform;
+  initialPlatform?: SchedulePlatform;
   studios: Studio[];
   brandStudios: BrandStudio[];
   sessions: LiveSession[];
@@ -64,12 +64,12 @@ export const OpenSlotModal: React.FC<OpenSlotModalProps> = ({
   const [brandId, setBrandId] = useState(
     () => fixedBrand?.id ?? pickDefaultBrandId(brands, sessions, loadRememberedBrandId(), getTodayDate())
   );
-  const platformsFor = (id: string) => platformsOfBrand(channels, id, false);
-  const pickPlatform = (id: string, want?: ReportPlatform): ReportPlatform | null => {
+  const platformsFor = (id: string) => schedulePlatformsOfBrand(channels, id, false);
+  const pickPlatform = (id: string, want?: SchedulePlatform): SchedulePlatform | null => {
     const ps = platformsFor(id);
     return want && ps.includes(want) ? want : ps[0] ?? null;
   };
-  const [platform, setPlatform] = useState<ReportPlatform | null>(() => pickPlatform(brandId, initialPlatform));
+  const [platform, setPlatform] = useState<SchedulePlatform | null>(() => pickPlatform(brandId, initialPlatform));
   const [studioId, setStudioId] = useState(initialStudioId || (platform ? findBrandStudioId(brandStudios, brandId, platform) : "") || "");
   const [date, setDate] = useState(initialDate);
   const [start, setStart] = useState(initialStart ?? "19:00");
@@ -88,7 +88,7 @@ export const OpenSlotModal: React.FC<OpenSlotModalProps> = ({
     const def = p ? findBrandStudioId(brandStudios, id, p) : "";
     if (def) setStudioId(def);
   };
-  const pickPlatform2 = (p: ReportPlatform) => {
+  const pickPlatform2 = (p: SchedulePlatform) => {
     setPlatform(p);
     const def = findBrandStudioId(brandStudios, brandId, p);
     if (def) setStudioId(def);
@@ -109,8 +109,8 @@ export const OpenSlotModal: React.FC<OpenSlotModalProps> = ({
     const round30 = (t: string) => { const [h, m] = t.split(":").map(Number); const r = (Math.round((h * 60 + m) / 30) * 30) % (24 * 60); return `${`${Math.floor(r / 60)}`.padStart(2, "0")}:${`${r % 60}`.padStart(2, "0")}`; };
     const count = new Map<string, number>();
     const add = (st: string, en: string) => { const k = `${round30(st)}|${round30(en)}`; count.set(k, (count.get(k) ?? 0) + 1); };
-    for (const s of sessions) if (s.brandId === brandId && platformOf(s) === platform && s.status !== "Cancelled") add(s.startTime, s.endTime);
-    for (const sl of shiftSlots) if (sl.brandId === brandId && platformOf(sl) === platform && sl.status !== "cancelled") add(sl.startTime, sl.endTime);
+    for (const s of sessions) if (s.brandId === brandId && schedulePlatformOf(s) === platform && s.status !== "Cancelled") add(s.startTime, s.endTime);
+    for (const sl of shiftSlots) if (sl.brandId === brandId && schedulePlatformOf(sl) === platform && sl.status !== "cancelled") add(sl.startTime, sl.endTime);
     return [...count.entries()]
       .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
       .slice(0, 6)

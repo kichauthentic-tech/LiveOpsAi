@@ -7,6 +7,7 @@ import { fmtVndShort } from "../../lib/format";
 import { adsHistoryOf, benchAt, buildShiftBenchmark, checkShift, findHandoverSource, funnelChain, OPTIONAL_STEPS, subtractHandover, type BenchItem, type BenchZone, type CheckRow, type ShiftBenchmark, type ShiftCheck } from "../../lib/performance/shiftBenchmark";
 import { fetchAdsDaily } from "../../lib/db/adsDaily";
 import { readDashboard, type DashboardReading, type OcrWord } from "../../lib/ocr/dashboardReader";
+import { isScheduleOnly, platformOf, type ReportPlatform } from "../../lib/reportPlatform";
 
 // Bảng benchmark theo ca (01/11/2026) — đầu Bảng Vận Hành. Chỉ còn MỘT thứ để nhìn: phễu LIVE cùng bậc như Dashboard (TikTok: LIVE impressions → Views
 // → Product clicks → Orders; Shopee: Views → ATC → Orders), mỗi bậc và mỗi tỷ lệ có thang 4 vùng lấy từ lịch sử ca cùng brand × sàn × khung giờ.
@@ -24,18 +25,18 @@ const ZONE: Record<BenchZone, { label: string; text: string; chip: string }> = {
   ot: { label: "Có thể xin OT", text: "text-emerald-400", chip: "bg-emerald-500/15 text-emerald-300" }
 };
 /** Số tích luỹ điền vào ô theo khoá bậc phễu của từng sàn (Shopee: ATC để trống vì Dashboard không có). */
-const SHOT_COUNTS: Record<LiveSession["platform"], (r: DashboardReading, clicks: number | null) => Record<string, string>> = {
+const SHOT_COUNTS: Record<ReportPlatform, (r: DashboardReading, clicks: number | null) => Record<string, string>> = {
   TikTok: (r, clicks) => ({ imp: fromReading(r.impressions), views: fromReading(r.views), clicks: clicks != null ? String(clicks) : "", orders: fromReading(r.orders) }),
   Shopee: (r) => ({ views: fromReading(r.views), orders: fromReading(r.orders) })
 };
-const SHOT_NOTE: Record<LiveSession["platform"], string> = { TikTok: "", Shopee: "" };
+const SHOT_NOTE: Record<ReportPlatform, string> = { TikTok: "", Shopee: "" };
 /** Bậc chỉ có số thật, chưa có lịch sử để so (Shopee: Clicks suy từ CTR; CTR và Click to Order do Dashboard Shopee tự tính). Chèn sau bậc `after`. */
-const PLAIN_FUNNEL: Record<LiveSession["platform"], { after: string; step: string; left: string; right: string } | null> = {
+const PLAIN_FUNNEL: Record<ReportPlatform, { after: string; step: string; left: string; right: string } | null> = {
   TikTok: null,
   Shopee: { after: "views", step: "Clicks", left: "CTR", right: "Click to Order" }
 };
 /** Số mục đọc được của từng sàn (TikTok: 7; Shopee: 7 — Sales, Views, Orders, thời lượng live, CTR, Click to Order, Xem TB). */
-const SHOT_FIELDS: Record<LiveSession["platform"], number> = { TikTok: 7, Shopee: 7 };
+const SHOT_FIELDS: Record<ReportPlatform, number> = { TikTok: 7, Shopee: 7 };
 
 const HOURS = [1, 2, 3] as const;
 const pill = (on: boolean) => `px-3 py-1.5 rounded-lg border text-xs font-bold min-h-[32px] ${on ? "seg-on" : "border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]"}`;
@@ -169,16 +170,16 @@ const HandoverPanel: React.FC<{
 };
 
 /** Mỗi ca hôm nay là một nhóm (chip như trên lịch): mốc benchmark theo brand × sàn, còn số OP nhập/dán là của riêng từng ca. */
-export interface Group { key: string; brandId: string; brandName: string; platform: LiveSession["platform"]; live: boolean; start: string; session: LiveSession }
+export interface Group { key: string; brandId: string; brandName: string; platform: ReportPlatform; live: boolean; start: string; session: LiveSession }
 
 /** Các ca của một ngày (mặc định: hôm nay, hoặc ngày gần nhất còn ca). Bản tin target truyền `date` để bấm chip ca ngày mai / ngày chọn cũng ra phễu. */
 export function todayGroups(sessions: LiveSession[], today: string, date?: string): Group[] {
-  const live = sessions.filter((s) => s.status !== "Cancelled" && !s.excludedFromReports);
+  const live = sessions.filter((s) => s.status !== "Cancelled" && !s.excludedFromReports && !isScheduleOnly(s));
   const days = live.filter((s) => s.date >= today).map((s) => s.date).sort();
   const day = date ?? (days.includes(today) ? today : days[0]);
   if (!day) return [];
   return live.filter((x) => x.date === day).sort((a, b) => a.startTime.localeCompare(b.startTime))
-    .map((s) => ({ key: s.id, brandId: s.brandId, brandName: s.brandName, platform: s.platform, live: s.status === "Live Now", start: s.startTime, session: s }));
+    .map((s) => ({ key: s.id, brandId: s.brandId, brandName: s.brandName, platform: platformOf(s), live: s.status === "Live Now", start: s.startTime, session: s }));
 }
 
 /** Ca mặc định của phễu: ca đang live, không thì ca sớm nhất của ngày. */
@@ -270,7 +271,7 @@ const Body: React.FC<{ groups: Group[]; g: Group; sessions: LiveSession[]; today
   useEffect(() => {
     let off = false;
     clearAll();
-    Promise.all(monthsBack(today, 4).map((m) => fetchAdsDaily(g.brandId, m, g.platform).catch(() => [])))
+    Promise.all(monthsBack(today, 4).map((m) => fetchAdsDaily(g.brandId, m, platformOf(g)).catch(() => [])))
       .then((all) => { if (!off) setRows(all.flat().map((r) => ({ date: r.date, live: r.actual?.live ?? null }))); });
     return () => { off = true; };
   }, [g.brandId, g.platform, today, g.key]); // eslint-disable-line react-hooks/exhaustive-deps

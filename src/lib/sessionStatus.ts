@@ -1,5 +1,6 @@
 import { LiveSession, LiveSessionReport } from "../types";
 import { dataSourceTier } from "./dataSource";
+import { isScheduleOnly } from "./reportPlatform";
 
 // Trạng thái HIỂN THỊ của ca theo giờ thật (audit N1, 0096). DB chỉ ghi 'Completed' khi có số liệu
 // hoặc job quét chạy; giữa hai lần đó client tự suy để Bảng Vận Hành / Ca Của Tôi / Sổ Ca không
@@ -67,6 +68,9 @@ export function hasSessionData(s: Pick<LiveSession, "dataSource" | "actualGmv" |
  * report nếu ca có diễn ra, hoặc huỷ ca nếu không.
  */
 export function hasLiveEvidence(s: LiveSession): boolean {
+  // Sàn chỉ lịch (Website, 20/11): không có file/số nào để làm bằng chứng — ca đã qua giờ (Completed) là đã diễn ra, công tính
+  // theo giờ kế hoạch. Có sai khác (đổi người, huỷ) thì sửa ở Cửa sổ ca như mọi ca khác.
+  if (isScheduleOnly(s)) return true;
   // Role brand, tháng chưa phát hành: số bị che ⇒ tin cờ của DB (0178), đừng suy từ số rỗng.
   if (s.monthPublished === false && s.liveEvidence !== undefined) return s.liveEvidence;
   return hasSessionData(s) || !!s.report || (s.liveDurationMinutes ?? 0) > 0 || !!s.isBackfill;

@@ -1,4 +1,5 @@
 import type { LiveSession, ShiftSlot } from "../../types";
+import type { SchedulePlatform } from "../reportPlatform";
 import { buildCancelledShifts, buildRosterShifts, shiftHours, type RosterShift } from "./rules";
 
 // Xuất lịch live gửi brand xác nhận (09/11). Sau khi chốt lịch + mở ca đăng ký, ops cần 1 file Excel dạng lịch tháng
@@ -7,10 +8,10 @@ import { buildCancelledShifts, buildRosterShifts, shiftHours, type RosterShift }
 // nhét brand khác vào file của brand này); bản gộp một file chỉ để xem nội bộ.
 // Tách 2 lớp: `buildChannelCalendar` thuần (có test) dựng bố cục; `exportBrandSchedules` mới đụng ExcelJS/JSZip (tải động).
 
-export type ExportPlatform = "TikTok" | "Shopee";
-const PLATFORM_ORDER: Record<ExportPlatform, number> = { TikTok: 0, Shopee: 1 };
+export type ExportPlatform = SchedulePlatform;
+const PLATFORM_ORDER: Record<ExportPlatform, number> = { TikTok: 0, Shopee: 1, Website: 2 };
 /** Tiền tố tiêu đề như file mẫu brand ("TTS VERA THÁNG 10 - 2026"). */
-const TITLE_PREFIX: Record<ExportPlatform, string> = { TikTok: "TTS", Shopee: "SHOPEE" };
+const TITLE_PREFIX: Record<ExportPlatform, string> = { TikTok: "TTS", Shopee: "SHOPEE", Website: "WEBSITE" };
 
 export interface ScheduleChannel {
   brandId: string;

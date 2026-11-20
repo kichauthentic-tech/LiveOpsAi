@@ -1,6 +1,6 @@
 import type { LiveSession, ShiftSlot } from "../../types";
 import { addDays, isoWeekStart } from "../dateUtils";
-import { platformOf, type ReportPlatform } from "../reportPlatform";
+import { schedulePlatformOf, type SchedulePlatform } from "../reportPlatform";
 import { sessionDurationHours } from "../pnl";
 
 // Điều Phối Lịch Live bản gọn — đợt 2 (25/10): "Mở lịch tháng sau" 3 bước ngay trong module (user chốt: tháng 11 lập lịch
@@ -36,7 +36,7 @@ export const daysOfMonth = (month: string): string[] => {
   return Array.from({ length: n }, (_, i) => `${month}-${String(i + 1).padStart(2, "0")}`);
 };
 
-const mine = (brandId: string, platform: ReportPlatform) => (r: { brandId?: string; platform?: string | null }) => r.brandId === brandId && platformOf(r) === platform;
+const mine = (brandId: string, platform: SchedulePlatform) => (r: { brandId?: string; platform?: string | null }) => r.brandId === brandId && schedulePlatformOf(r) === platform;
 const liveSession = (s: LiveSession) => s.status !== "Cancelled" && !s.excludedFromReports;
 
 export interface WeekPattern {
@@ -50,7 +50,7 @@ export interface WeekPattern {
  * lấy tuần đông nhất thì VERA TikTok rơi về tuần 14/09 — lịch đã khác). Khung giờ = mọi ca của tuần đó (ca thật chưa huỷ + ca
  * mở), bỏ trùng hệt (thứ, giờ bắt đầu, giờ kết thúc).
  */
-export function weekPattern(sessions: readonly LiveSession[], slots: readonly ShiftSlot[], brandId: string, platform: ReportPlatform, today: string): WeekPattern {
+export function weekPattern(sessions: readonly LiveSession[], slots: readonly ShiftSlot[], brandId: string, platform: SchedulePlatform, today: string): WeekPattern {
   const isMine = mine(brandId, platform);
   const lastFull = addDays(isoWeekStart(today), -7);
   const weeks: { weekStart: string; frames: TimeFrame[] }[] = [];
@@ -186,13 +186,13 @@ export function parsePastedSchedule(text: string, month: string): { frames: Time
  * "Chép khung giờ tuần trước": mọi ca (thật + mở) của tuần trước ⇒ khung giờ cùng thứ ở tuần đang xem, chỉ ngày từ hôm nay,
  * bỏ khung đè lên ca đã có của cùng kênh. Không chép người.
  */
-export function copyPrevWeekFrames(sessions: readonly LiveSession[], slots: readonly ShiftSlot[], weekStart: string, today: string): (TimeFrame & { brandId: string; platform: ReportPlatform; brandName: string })[] {
+export function copyPrevWeekFrames(sessions: readonly LiveSession[], slots: readonly ShiftSlot[], weekStart: string, today: string): (TimeFrame & { brandId: string; platform: SchedulePlatform; brandName: string })[] {
   const prevStart = addDays(weekStart, -7), prevEnd = addDays(weekStart, -1), end = addDays(weekStart, 6);
-  type Row = TimeFrame & { brandId: string; platform: ReportPlatform; brandName: string };
+  type Row = TimeFrame & { brandId: string; platform: SchedulePlatform; brandName: string };
   const rowOf = (x: { brandId: string; brandName: string; date: string; startTime: string; endTime: string; platform?: string | null }): Row => ({
     brandId: x.brandId,
     brandName: x.brandName,
-    platform: platformOf(x),
+    platform: schedulePlatformOf(x),
     date: x.date,
     startTime: hhmm(x.startTime),
     endTime: hhmm(x.endTime)

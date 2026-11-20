@@ -1,3 +1,4 @@
+import type { SchedulePlatform } from "./lib/reportPlatform";
 // Role 'moderator' đã bị gỡ khỏi app 2026-09-22 (audit role × workspace). Lý do: (1) nó chưa bao
 // giờ đăng nhập được — mặc định rơi vào tab "calendar" gate `manage_calendar` = false; (2) cột liên
 // kết của nó (`live_sessions.assistant_id`) không có luồng ghi nào nên luôn null; (3) "trợ live"
@@ -198,7 +199,7 @@ export interface LiveSession {
   staffSegments?: StaffSegment[];
   /** Số lúc đổi host giữa ca (0147). Vắng = chưa ai up ⇒ chia theo giờ. */
   staffCheckpoints?: StaffCheckpoint[];
-  platform: "TikTok" | "Shopee";
+  platform: SchedulePlatform;
   date: string;
   startTime: string;
   endTime: string;
@@ -498,7 +499,7 @@ export interface SessionFinance {
 export interface BrandPlatformRate {
   id: string;
   brandId: string;
-  platform: "TikTok" | "Shopee";
+  platform: SchedulePlatform;
   ratePerHour: number;
   // Tỷ lệ hoàn hủy (0-100), dùng để ước tính NMV = GMV × (1 - returnRate/100) cho brand
   // charge theo NMV thay vì GMV thô. Riêng theo platform (TikTok/Shopee có policy đổi trả khác nhau).
@@ -518,7 +519,7 @@ export interface BrandPlatformRate {
 export interface BrandChannel {
   id: string;
   brandId: string;
-  platform: "TikTok" | "Shopee";
+  platform: SchedulePlatform;
   /** Tên gian hàng trên sàn (vd "VERA Official"). */
   shopName: string;
   /** Mã shop / handle trên sàn — để đối chiếu file (Shop ID của Shopee, @handle TikTok). */
@@ -532,7 +533,7 @@ export interface BrandChannel {
 // form mở ca chọn sẵn. VERA có 2 phòng (TTS/SPE) vì live 2 nền tảng — nên không gắn thẳng lên Brand.
 export interface BrandStudio {
   brandId: string;
-  platform: "TikTok" | "Shopee";
+  platform: SchedulePlatform;
   studioId: string;
 }
 
@@ -596,7 +597,7 @@ export interface TalentRateHistoryEntry {
 export interface BrandPlatformRateHistoryEntry {
   id: string;
   brandId: string;
-  platform: "TikTok" | "Shopee";
+  platform: SchedulePlatform;
   ratePerHour: number;
   returnRate: number;
   commissionRate?: number;
@@ -631,7 +632,7 @@ export interface ShiftSlot {
   endTime: string;
   brandId?: string;
   brandName: string;
-  platform: "TikTok" | "Shopee";
+  platform: SchedulePlatform;
   studioId?: string;
   studioName: string;
   notes: string;
@@ -751,7 +752,7 @@ export interface BrandMonthPlan {
   brandId: string;
   month: string; // "YYYY-MM"
   /** Sàn của kế hoạch (0140) — mỗi brand × tháng × sàn một kế hoạch, target riêng. */
-  platform: "TikTok" | "Shopee";
+  platform: SchedulePlatform;
   status: "draft" | "locked";
   defaultSlotHours: number;
   liveWindowStart: string; // "HH:MM"

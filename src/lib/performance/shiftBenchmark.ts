@@ -1,6 +1,7 @@
 import type { LiveSession } from "../../types";
 import { METRIC } from "../metricGlossary";
 import { sumByPlatform } from "../platforms/perf";
+import type { ReportPlatform } from "../reportPlatform";
 
 // Benchmark theo ca cho OP (01/11/2026). OP đọc số trên TikTok/Shopee Dashboard rồi đối chiếu với thang này — app KHÔNG nhận số real-time
 // (user chốt: không nối API vì rủi ro lộ dữ liệu), nên đây là hàm thuần chỉ đọc lịch sử ca đã có số.
@@ -34,7 +35,7 @@ export interface BenchItem {
 
 export interface ShiftBenchmark {
   brandId: string;
-  platform: LiveSession["platform"];
+  platform: ReportPlatform;
   /** Cỡ mẫu hiệu dụng sau khi trọng số giảm dần ((Σw)²/Σw²); 0 khi không có `today` (mọi ca nặng như nhau). */
   ess: number;
   /** Ngày của ca gần nhất làm mốc. */
@@ -131,7 +132,7 @@ const SHOPEE_OUT: Def[] = [
   { key: "watch", label: "Xem TB (giây)", kind: "count", perHour: false, lead: false, value: (s) => (s.avgWatchTimeSeconds > 0 ? s.avgWatchTimeSeconds : null) }
 ];
 
-const DEFS: Record<LiveSession["platform"], { funnel: Def[]; rates: Def[]; outcomes: Def[] }> = {
+const DEFS: Record<ReportPlatform, { funnel: Def[]; rates: Def[]; outcomes: Def[] }> = {
   TikTok: { funnel: TIKTOK_FUNNEL, rates: TIKTOK_RATES, outcomes: TIKTOK_OUT },
   Shopee: { funnel: SHOPEE_FUNNEL, rates: SHOPEE_RATES, outcomes: SHOPEE_OUT }
 };
@@ -153,7 +154,7 @@ function items(defs: Def[], rows: { s: LiveSession; w: number }[]): BenchItem[] 
  * Benchmark của brand × sàn từ các ca đã xong, trọng số giảm dần theo tuổi so với `today` (YYYY-MM-DD); null nếu chưa đủ MIN_BENCH_N ca.
  * `history` là mọi ca của app (hàm tự lọc, bỏ ca sau `today`). Không truyền `today` ⇒ mọi ca nặng như nhau (dùng cho test).
  */
-export function buildShiftBenchmark(history: LiveSession[], brandId: string, platform: LiveSession["platform"], today?: string): ShiftBenchmark | null {
+export function buildShiftBenchmark(history: LiveSession[], brandId: string, platform: ReportPlatform, today?: string): ShiftBenchmark | null {
   const t0 = today ? dayNum(today) : null;
   const rows = history
     .filter((s) => s.brandId === brandId && s.platform === platform && isBenchHistory(s) && (t0 == null || dayNum(s.date) <= t0))
@@ -216,7 +217,7 @@ function spearman(x: number[], y: number[]): number {
 }
 
 /** Ads/giờ lịch sử của brand × sàn từ ads theo ngày + giờ live của chính các ca đã xong; null nếu < MIN_ADS_DAYS ngày. */
-export function adsHistoryOf(history: LiveSession[], adsByDate: { date: string; live: number | null }[], brandId: string, platform: LiveSession["platform"]): AdsHistory | null {
+export function adsHistoryOf(history: LiveSession[], adsByDate: { date: string; live: number | null }[], brandId: string, platform: ReportPlatform): AdsHistory | null {
   const byDay = new Map<string, LiveSession[]>();
   for (const s of history) {
     if (s.brandId !== brandId || s.platform !== platform || !isBenchHistory(s)) continue;
@@ -365,7 +366,7 @@ const ACTION: Record<string, string> = {
 
 const OUTCOME_LABEL = "kết quả";
 /** Mẫu số của GPM: TikTok = LIVE impressions, Shopee = Total Views (Shopee GPM = Sales trên 1.000 Views). */
-const GPM_DEN: Record<LiveSession["platform"], string> = { TikTok: "imp", Shopee: "views" };
+const GPM_DEN: Record<ReportPlatform, string> = { TikTok: "imp", Shopee: "views" };
 
 export function checkShift(bench: ShiftBenchmark, input: ShiftSnapshotInput, hist: AdsHistory | null): ShiftCheck | null {
   const hours = input.minutes / 60;
@@ -471,7 +472,7 @@ export interface HandoverSource {
  * Ca trước của cùng brand × sàn trong ngày `date` có báo cáo giao ca (có số cộng dồn), lấy ca kết thúc muộn nhất. Số phút lúc giao ca = từ lúc mở phòng
  * (ca đầu của chuỗi ca nối liền nhau, lệch ≤ 15 phút) đến giờ kết thúc ca đó. `null` khi không có ca nào có số cộng dồn.
  */
-export function findHandoverSource(sessions: LiveSession[], brandId: string, platform: LiveSession["platform"], date: string, funnelKeys: string[]): HandoverSource | null {
+export function findHandoverSource(sessions: LiveSession[], brandId: string, platform: ReportPlatform, date: string, funnelKeys: string[]): HandoverSource | null {
   const day = sessions.filter((s) => s.brandId === brandId && s.platform === platform && s.date === date && s.status !== "Cancelled" && !s.excludedFromReports);
   const withCum = day.filter((s) => s.report && (s.report.cumGmv != null || s.report.cumViews != null || s.report.cumOrders != null || s.report.cumAtc != null));
   if (!withCum.length) return null;

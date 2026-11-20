@@ -1,5 +1,5 @@
 import type { BrandChannel } from "../types";
-import { platformOf, REPORT_PLATFORMS, type ReportPlatform } from "./reportPlatform";
+import { platformOf, REPORT_PLATFORMS, SCHEDULE_PLATFORMS, type ReportPlatform, type SchedulePlatform } from "./reportPlatform";
 
 // Kênh = brand × sàn (0149). Mọi màn hỏi "brand này chạy sàn nào / có những kênh nào" đều đi qua đây, đọc từ bảng
 // brand_channels — KHÔNG suy từ ca/phòng/kế hoạch như trước (7 chỗ đoán theo 5 kiểu khác nhau, audit 07/10).
@@ -9,11 +9,18 @@ export function channelsOfBrand(channels: readonly BrandChannel[], brandId: stri
   return REPORT_PLATFORMS.flatMap((p) => channels.filter((c) => c.brandId === brandId && c.platform === p && (includePaused || c.status === "active")));
 }
 
+/** Như `channelsOfBrand` nhưng thêm sàn chỉ lịch (Website). CHỈ lịch/lương/CRM dùng — màn số liệu dùng `channelsOfBrand`. */
+export function scheduleChannelsOfBrand(channels: readonly BrandChannel[], brandId: string, includePaused = true): BrandChannel[] {
+  return SCHEDULE_PLATFORMS.flatMap((p) => channels.filter((c) => c.brandId === brandId && c.platform === p && (includePaused || c.status === "active")));
+}
+export const schedulePlatformsOfBrand = (channels: readonly BrandChannel[], brandId: string, includePaused = true): SchedulePlatform[] =>
+  scheduleChannelsOfBrand(channels, brandId, includePaused).map((c) => c.platform);
+
 /** Sàn brand đang có kênh, TikTok trước. Brand chưa có kênh nào ⇒ [] (màn tự nói "chưa có kênh", không đoán TikTok). */
 export const platformsOfBrand = (channels: readonly BrandChannel[], brandId: string, includePaused = true): ReportPlatform[] =>
-  channelsOfBrand(channels, brandId, includePaused).map((c) => c.platform);
+  channelsOfBrand(channels, brandId, includePaused).map((c) => c.platform as ReportPlatform);
 
-export const findChannel = (channels: readonly BrandChannel[], brandId: string, platform: ReportPlatform) =>
+export const findChannel = (channels: readonly BrandChannel[], brandId: string, platform: SchedulePlatform) =>
   channels.find((c) => c.brandId === brandId && c.platform === platform);
 
 /**

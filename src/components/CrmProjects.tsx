@@ -13,8 +13,9 @@ import type { TabPrefetchCtx } from "../lib/db/prefetch";
 import { findBrandStudioId } from "../lib/db/brandStudios";
 import { brandPriceLabel } from "../lib/brandPricing";
 import { contractCovering, monthKeyOf, todayVn } from "../lib/performance/brandCommitment";
-import { platformOf, REPORT_PLATFORMS, type ReportPlatform } from "../lib/reportPlatform";
-import { findChannel, platformsOfBrand } from "../lib/channels";
+import { platformOf, SCHEDULE_PLATFORMS, type SchedulePlatform } from "../lib/reportPlatform";
+import { findChannel, platformsOfBrand, schedulePlatformsOfBrand } from "../lib/channels";
+import { WebsiteChannelPanel } from "./WebsiteChannelPanel";
 import { takeCrmFocus } from "../lib/crmFocus";
 import { errorMessage } from "../lib/errorMessage";
 import { fmtMonth } from "../lib/format";
@@ -34,14 +35,14 @@ interface CrmProjectsProps {
   onSaveServiceScope?: (brandId: string, platform: "TikTok" | "Shopee", patch: ServiceScopePatch) => Promise<boolean>;
   studios: Studio[];
   brandStudios: BrandStudio[];
-  onSetBrandStudio: (brandId: string, platform: "TikTok" | "Shopee", studioId: string) => Promise<boolean>;
+  onSetBrandStudio: (brandId: string, platform: SchedulePlatform, studioId: string) => Promise<boolean>;
   /** Sang Kế Hoạch Tháng của brand × sàn (sửa cam kết một tháng). */
   onOpenMonthPlan?: (brandId: string, platform: "TikTok" | "Shopee") => void;
   /** Kênh brand × sàn (0149) — CRM là chỗ DUY NHẤT thêm / sửa / tạm dừng kênh. */
   channels: BrandChannel[];
   /** false = DB chưa có bảng kênh (0149 chưa chạy): ẩn nút thêm kênh. */
   channelsEditable: boolean;
-  onCreateChannel: (brandId: string, platform: ReportPlatform) => Promise<unknown>;
+  onCreateChannel: (brandId: string, platform: SchedulePlatform) => Promise<unknown>;
   onUpdateChannel: (id: string, patch: Partial<Pick<BrandChannel, "shopName" | "shopRef" | "status">>) => Promise<unknown>;
   /** Điều khoản hợp tác YFB × brand (0191) + dữ liệu để xem thử bảng tính phí tháng. */
   termPeriods: TermsPeriod[];
@@ -101,7 +102,7 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
   // Internal agency staff eligible to be KAM owners
   const staffUsers = users.filter((u) => u.role === "ceo" || u.role === "admin" || u.role === "operations");
   // "Hợp đồng & giá" — mở 1 brand × sàn tại 1 thời điểm. Nút "Sửa ở CRM" của màn khác bung sẵn đúng brand (crmFocus).
-  const [focus, setFocus] = useState<{ brandId: string; platform: ReportPlatform } | null>(() => takeCrmFocus());
+  const [focus, setFocus] = useState<{ brandId: string; platform: SchedulePlatform } | null>(() => takeCrmFocus());
   const [contracts, setContracts] = useState<BrandContract[]>([]);
   const [commitments, setCommitments] = useState<BrandMonthlyCommitment[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -127,10 +128,12 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
   };
 
   // Sàn hiện trên thẻ = kênh brand đã có (0149), kể cả kênh tạm dừng.
-  const platformsOf = (brandId: string) => platformsOfBrand(channels, brandId);
+  const platformsOf = (brandId: string) => schedulePlatformsOfBrand(channels, brandId);
+  // Chỉ các sàn có số liệu — khối hợp đồng & giá (BrandConfigPanel) không áp dụng cho Website.
+  const dataPlatformsOf = (brandId: string) => platformsOfBrand(channels, brandId);
   const [channelError, setChannelError] = useState<string | null>(null);
   const [addingChannel, setAddingChannel] = useState<string | null>(null);
-  const addChannel = async (brandId: string, platform: ReportPlatform) => {
+  const addChannel = async (brandId: string, platform: SchedulePlatform) => {
     setChannelError(null);
     setAddingChannel(`${brandId}|${platform}`);
     try {
@@ -306,6 +309,26 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
               {/* Tóm tắt hợp đồng & giá theo sàn — bấm để mở khối sửa (chỗ nhập duy nhất). */}
               <div className="space-y-1.5">
                 {platformsOf(b.id).map((p) => {
+                  if (p === "Website") {
+                    const wch = findChannel(channels, b.id, p);
+                    const wopen = focus?.brandId === b.id && focus.platform === p;
+                    const wstudio = studios.find((x) => x.id === findBrandStudioId(brandStudios, b.id, p));
+                    return (
+                      <button
+                        key={p}
+                        onClick={() => setFocus(wopen ? null : { brandId: b.id, platform: p })}
+                        aria-expanded={wopen}
+                        className={`w-full text-left text-2xs rounded-xl border px-2.5 py-2 transition-all ${wopen ? "border-blue-500/60 bg-blue-950/20" : "border-[var(--border)] hover:border-blue-500/40"}`}
+                      >
+                        <span className="font-bold text-[var(--text)] flex items-center gap-1.5">
+                          Kênh Website{wch?.shopName ? ` · ${wch.shopName}` : ""} — chỉ xếp lịch & tính công
+                          {wch?.status === "paused" && <span className="text-amber-300 font-bold">tạm dừng</span>}
+                          <span className="ml-auto font-normal text-[var(--accent-text)]">{wopen ? "Đóng" : canEdit ? "Sửa" : "Xem"}</span>
+                        </span>
+                        <span className="block text-[var(--text-muted)] mt-0.5">Phòng: {wstudio ? <b className="text-[var(--text)]">{wstudio.name}</b> : <span className="text-amber-300">chưa có</span>}</span>
+                      </button>
+                    );
+                  }
                   const contract = contractCovering(contracts, b.id, p, thisMonth);
                   // Giờ cam kết của tháng có thể gõ thẳng ở Kế Hoạch Tháng (không hợp đồng) — vẫn là cam kết thật mà Bảng Vận Hành /
                   // Toàn Cảnh Brand đang đo; ghi "chưa có" ở đây là nói ngược với các màn đó.
@@ -340,7 +363,7 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
                 {platformsOf(b.id).length === 0 && <p className="text-2xs text-amber-300">Brand chưa có kênh nào — thêm kênh để lập kế hoạch, mở ca, nhập giá.</p>}
                 {canEdit && channelsEditable && (
                   <div className="flex flex-wrap gap-1.5">
-                    {REPORT_PLATFORMS.filter((p) => !platformsOf(b.id).includes(p)).map((p) => (
+                    {SCHEDULE_PLATFORMS.filter((p) => !platformsOf(b.id).includes(p)).map((p) => (
                       <button
                         key={p}
                         onClick={() => void addChannel(b.id, p)}
@@ -372,10 +395,21 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
                 <X className="w-4 h-4" />
               </button>
             </div>
+            {focus.platform === "Website" ? (
+              <WebsiteChannelPanel
+                brand={b}
+                channel={findChannel(channels, b.id, "Website")}
+                studios={studios}
+                brandStudios={brandStudios}
+                canEdit={canEdit}
+                onUpdateChannel={channelsEditable ? onUpdateChannel : undefined}
+                onSetBrandStudio={onSetBrandStudio}
+              />
+            ) : (
             <BrandConfigPanel
               brand={b}
               platform={focus.platform}
-              platforms={platformsOf(b.id)}
+              platforms={dataPlatformsOf(b.id)}
               channel={findChannel(channels, b.id, focus.platform)}
               onUpdateChannel={channelsEditable ? onUpdateChannel : undefined}
               onPlatformChange={(p) => setFocus({ brandId: b.id, platform: p })}
@@ -404,6 +438,7 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
               talentRules={talentRules}
               onTalentRulesChanged={onTalentRulesChanged}
             />
+            )}
           </div>
         );
       })()}

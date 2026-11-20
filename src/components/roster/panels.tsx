@@ -4,6 +4,7 @@ import { platformText } from "../../lib/metricGlossary";
 import React, { useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import type { Talent, TalentRateHistoryEntry } from "../../types";
+import type { SchedulePlatform } from "../../lib/reportPlatform";
 import { PlatformChip } from "../common/PlatformChip";
 import { fmtFixed, fmtVndShort } from "../../lib/format";
 import { talentShortName } from "../../lib/talentName";
@@ -21,7 +22,7 @@ export interface ChannelRow {
   key: string;
   brandId: string;
   brandName: string;
-  platform: "TikTok" | "Shopee";
+  platform: SchedulePlatform;
 }
 
 const fmtH = (h: number) => (Math.round(h * 10) / 10).toString().replace(".", ",");

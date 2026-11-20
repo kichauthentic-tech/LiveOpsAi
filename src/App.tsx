@@ -64,7 +64,7 @@ import type { NewTalentAccountPayload } from "./components/TalentMatcher";
 import { saveEngineParams } from "./lib/db/engineParams";
 import { logTabView } from "./lib/db/tabViews";
 import { findBrandBySlug, parsePath, parsePlatformParam, routeToPath, withPlatformParam } from "./lib/routes";
-import { inChannelScope, LEGACY_PLATFORM, REPORT_PLATFORMS, resolveChannelScope, type ChannelScope, type ReportPlatform } from "./lib/reportPlatform";
+import { inChannelScope, isScheduleOnly, LEGACY_PLATFORM, REPORT_PLATFORMS, resolveChannelScope, type ChannelScope, type ReportPlatform, type SchedulePlatform } from "./lib/reportPlatform";
 import { deriveChannels, platformsOfBrand } from "./lib/channels";
 import { profileOf } from "./lib/platforms/profiles";
 import { createBrandChannel, updateBrandChannel } from "./lib/db/brandChannels";
@@ -590,13 +590,17 @@ export default function App() {
   // Hiệu Suất Host, cam kết giờ, P&L, Toàn Cảnh Brand…) nhận `activeSessions`, nên không màn nào
   // phải tự nhớ lọc — đúng loại lỗi sẽ quên ở màn thứ tư. Chỉ Sổ Ca nhận mảng thô (`sessions`) để
   // ops còn tìm lại và bỏ cờ; không có đường đó thì cờ là một chiều.
-  const activeSessions = useMemo(() => sessions.filter((s) => !s.excludedFromReports), [sessions]);
+  // Màn SỐ LIỆU đọc `activeSessions`/`visibleSessions`: bỏ ca Website (sàn chỉ lịch, 20/11) — nó không có GMV/target và `platformOf`
+  // sẽ coi nó là TikTok. Lịch + lương đọc `sessions`/`scheduleSessions`/`visibleRawSessions` (có Website).
+  const activeSessions = useMemo(() => sessions.filter((s) => !s.excludedFromReports && !isScheduleOnly(s)), [sessions]);
+  const scheduleSessions = useMemo(() => sessions.filter((s) => !s.excludedFromReports), [sessions]);
   // Brand đã ngừng hợp tác (CRM → trạng thái "Đã dừng"): ẩn khỏi mọi màn vận hành/số liệu chung, KHÔNG xoá dữ liệu. Các màn cần lịch sử
   // đầy đủ — hồ sơ host (TalentMatcher, MyTalentProfile), Hiệu Suất Host, Finance/Accounting (lương ca cũ), Sổ Ca, CRM (để bật lại) —
   // vẫn nhận `brands`/`activeSessions` nguyên vẹn.
   const hiddenBrandIds = useMemo(() => new Set(brands.filter((b) => b.contractStatus === "Completed").map((b) => b.id)), [brands]);
   const visibleBrands = useMemo(() => brands.filter((b) => !hiddenBrandIds.has(b.id)), [brands, hiddenBrandIds]);
   const visibleSessions = useMemo(() => activeSessions.filter((s) => !hiddenBrandIds.has(s.brandId)), [activeSessions, hiddenBrandIds]);
+  const visibleScheduleSessions = useMemo(() => scheduleSessions.filter((s) => !hiddenBrandIds.has(s.brandId)), [scheduleSessions, hiddenBrandIds]);
   const visibleRawSessions = useMemo(() => sessions.filter((s) => !hiddenBrandIds.has(s.brandId)), [sessions, hiddenBrandIds]);
   // Chỉ Sổ Ca nhận danh sách này (prop riêng, không trộn vào `sessions`) — xem SessionLedger.
   const excludedSessions = useMemo(() => sessions.filter((s) => s.excludedFromReports), [sessions]);
@@ -1429,7 +1433,7 @@ export default function App() {
   };
 
   // Kênh (0149): tạo / sửa ở CRM. Trả lỗi về form (không toast) để hiện tại chỗ.
-  const handleCreateChannel = async (brandId: string, platform: ReportPlatform): Promise<BrandChannel> => {
+  const handleCreateChannel = async (brandId: string, platform: SchedulePlatform): Promise<BrandChannel> => {
     const created = await createBrandChannel(brandId, platform);
     setBrandChannels((prev) => [...(prev ?? []).filter((c) => !(c.brandId === brandId && c.platform === platform)), created]);
     void pushAuditLog({ action: "Thêm kênh", details: `${brands.find((b) => b.id === brandId)?.name ?? brandId} · ${platform}`, category: "Role Update" });
@@ -1441,7 +1445,7 @@ export default function App() {
     return saved;
   };
 
-  const handleSetBrandStudio = async (brandId: string, platform: "TikTok" | "Shopee", studioId: string): Promise<boolean> => {
+  const handleSetBrandStudio = async (brandId: string, platform: SchedulePlatform, studioId: string): Promise<boolean> => {
     try {
       await setBrandStudio(brandId, platform, studioId);
       setBrandStudios((prev) => {
@@ -2126,7 +2130,7 @@ export default function App() {
                     onSessionUpdated={(saved) => setSessions((prev) => prev.map((x) => (x.id === saved.id ? saved : x)))}
                     onSlotUpdated={(saved) => setShiftSlots((prev) => prev.map((x) => (x.id === saved.id ? saved : x)))}
                     engineParams={engineParams}
-                    onOpenMonthPlan={(brandId, platform) => openMonthPlanFor(brandId, platform)}
+                    onOpenMonthPlan={(brandId, platform) => { if (platform !== "Website") openMonthPlanFor(brandId, platform); }}
                     onOpenCrm={checkPermission("manage_crm_projects") ? (brandId, platform) => { requestCrmFocus(brandId, platform); navigateTo("crm"); } : undefined}
                     canOpenMonthPlan={checkPermission("manage_month_plan")}
                   />
@@ -2242,7 +2246,7 @@ export default function App() {
                 {activeTab === "studio_calendar" && (
                   <LiveCalendar
                     channels={channels}
-                    sessions={visibleSessions}
+                    sessions={visibleScheduleSessions}
                     shiftSlots={shiftSlots}
                     shiftRegistrations={shiftRegistrations}
                     studios={activeStudios}
@@ -2271,7 +2275,7 @@ export default function App() {
 
                 {activeTab === "my_shifts" && currentRole === "talent" && (
                   <TalentToday
-                    sessions={visibleSessions}
+                    sessions={visibleScheduleSessions}
                     shiftSlots={shiftSlots}
                     brands={visibleBrands}
                     talents={activeTalents}
@@ -2289,7 +2293,7 @@ export default function App() {
                       <LiveCalendar
                         title="Lịch ca"
                         channels={channels}
-                        sessions={visibleSessions}
+                        sessions={visibleScheduleSessions}
                         shiftSlots={shiftSlots}
                         shiftRegistrations={shiftRegistrations}
                         studios={activeStudios}
@@ -2679,7 +2683,8 @@ export default function App() {
 
                 {activeTab === "accounting" && (currentRole === "ceo" || currentRole === "admin") && (
                   <Accounting
-                    sessions={sessions}
+                    // Website (sàn chỉ lịch) không có doanh thu/phí brand nên không vào kế toán brand; tiền công của nó nằm ở Finance & P&L.
+                    sessions={sessions.filter((s) => !isScheduleOnly(s))}
                     talents={talents}
                     brands={brands}
                     financeRecords={financeRecords}

@@ -2,6 +2,7 @@
 // Chỉ đọc `sessions` đã lọc ca loại khỏi báo cáo (activeSessions) — không tự lọc lại. Target cộng qua `planTargetOf`
 // (ca tăng cường không thuộc target tháng). Hai sàn KHÔNG cộng chung: mỗi kênh = brand × sàn một khối riêng.
 import type { LiveSession } from "../types";
+import { isScheduleOnly, platformOf, type ReportPlatform } from "./reportPlatform";
 import { planTargetOf } from "./performance/targetAllocation";
 import { fmtVndShort } from "./format";
 import { salesTerm } from "./metricGlossary";
@@ -9,7 +10,7 @@ import { salesTerm } from "./metricGlossary";
 export interface BriefChannel {
   key: string;
   brandName: string;
-  platform: LiveSession["platform"];
+  platform: ReportPlatform;
   sessions: LiveSession[];
   dayTarget: number;
   /** Target cả tháng của kênh (cộng các ca trong tháng, không tính ca huỷ). */
@@ -26,7 +27,7 @@ export interface DailyTargetBrief {
   channels: BriefChannel[];
   totalSessions: number;
   /** Tổng target ngày theo sàn — không cộng TikTok với Shopee. */
-  dayTargetByPlatform: Record<LiveSession["platform"], number>;
+  dayTargetByPlatform: Record<ReportPlatform, number>;
 }
 
 const live = (s: LiveSession) => s.status !== "Cancelled";
@@ -40,11 +41,11 @@ export function buildDailyTargetBrief(sessions: LiveSession[], date: string): Da
   let totalSessions = 0;
 
   for (const s of sessions) {
-    if (!live(s) || s.date.slice(0, 7) !== month) continue;
+    if (!live(s) || isScheduleOnly(s) || s.date.slice(0, 7) !== month) continue;
     const key = `${s.brandName}|${s.platform}`;
     let ch = map.get(key);
     if (!ch) {
-      ch = { key, brandName: s.brandName, platform: s.platform, sessions: [], dayTarget: 0, monthTarget: 0, monthActual: 0, remainingPlanned: 0, remainingDays };
+      ch = { key, brandName: s.brandName, platform: platformOf(s), sessions: [], dayTarget: 0, monthTarget: 0, monthActual: 0, remainingPlanned: 0, remainingDays };
       map.set(key, ch);
     }
     const t = planTargetOf(s);
@@ -54,7 +55,7 @@ export function buildDailyTargetBrief(sessions: LiveSession[], date: string): Da
     if (s.date === date) {
       ch.sessions.push(s);
       ch.dayTarget += t;
-      dayTargetByPlatform[s.platform] += t;
+      dayTargetByPlatform[platformOf(s)] += t;
       totalSessions++;
     }
   }

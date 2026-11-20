@@ -1,7 +1,7 @@
 import type { LiveSession, Talent, TalentRateHistoryEntry } from "../../types";
 import { fmtFixed } from "../format";
 import { computeSessionPnl, isPnlSession } from "../pnl";
-import { platformOf, REPORT_PLATFORMS, type ReportPlatform } from "../reportPlatform";
+import { isScheduleOnly, platformOf, REPORT_PLATFORMS, type ReportPlatform } from "../reportPlatform";
 import { personRoleMinutes, roleShares, segmentsOfRole, type StaffRole } from "../staffSegments";
 import { plannedCost } from "./candidates";
 
@@ -142,6 +142,8 @@ function collect(input: Pick<ReviewInput, "sessions" | "talents" | "history" | "
       if (p.missingRate) a.actualMissing = true;
       if (p.paidHourly && p.hours > 0) a.rates.push(Math.round(p.payout / p.hours / 100) * 100); // làm tròn 100đ: tránh "200K–200K" do sai số số thực
       else if (!p.missingRate) a.perSession = true;
+      // Website (sàn chỉ lịch) không có GMV: giờ/tiền đã vào tổng ở trên, không đưa vào cột "Cast/GMV theo sàn".
+      if (isScheduleOnly(s)) continue;
       const slot = a.byPlatform[platform];
       slot.cast += p.payout;
       slot.hours += p.hours;

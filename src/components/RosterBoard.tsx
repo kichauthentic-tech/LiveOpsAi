@@ -57,7 +57,7 @@ import { WorkloadTable } from "./roster/WorkloadTable";
 import { MonthReviewPanel } from "./roster/MonthReviewPanel";
 import { DEFAULT_BOUNDS, GOALS, GOAL_HINT, GOAL_LABEL, applyPlanRows, buildBandStrength, buildHostChannelGmv, buildHostPerformance, buildHostPerformancePrevMonth, daysInMonth, personBounds, planMonth, releaseAutoFilled, releaseRoleViolations, type AutoFill, type MonthBounds, type PlanGoal, type PlanTuning } from "../lib/roster/monthPlanner";
 import type { EngineParams } from "../lib/scheduling/engineParams";
-import type { ReportPlatform } from "../lib/reportPlatform";
+import { platformOf, type ReportPlatform, type SchedulePlatform } from "../lib/reportPlatform";
 import { FeatureOffNote } from "./common/FeatureOffNote";
 import { InfoDot } from "./common/InfoDot";
 
@@ -91,8 +91,8 @@ interface Props {
   onSessionUpdated: (s: LiveSession) => void;
   onSlotUpdated: (s: ShiftSlot) => void;
   engineParams: EngineParams;
-  onOpenMonthPlan?: (brandId: string, platform: ReportPlatform) => void;
-  onOpenCrm?: (brandId: string, platform: ReportPlatform) => void;
+  onOpenMonthPlan?: (brandId: string, platform: SchedulePlatform) => void;
+  onOpenCrm?: (brandId: string, platform: SchedulePlatform) => void;
   /** Quyền manage_month_plan (0180) — nút mở Kế Hoạch Tháng ở màn "Mở lịch tháng sau". */
   canOpenMonthPlan?: boolean;
 }
@@ -384,7 +384,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
     const out = new Map<string, number>();
     for (const [k, rows] of byCh) {
       // Mỗi nhóm là MỘT kênh brand × sàn nên cộng không lẫn hai sàn.
-      const gmv = sumGmvByPlatform(rows)[rows[0].platform];
+      const gmv = sumGmvByPlatform(rows)[rows[0].platform as ReportPlatform] ?? 0;
       const hrs = rows.map(shiftHours).reduce((u, v) => u + v, 0);
       if (hrs >= 10) out.set(k, gmv / hrs);
     }
@@ -400,7 +400,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
     for (const s of ws) {
       const h = shiftHours(s);
       const r = chGmvPerHour.get(s.channelKey);
-      if (r) gmv[s.platform] += r * h;
+      if (r) gmv[platformOf(s)] += r * h;
       else noRate++;
       for (const id of [s.hostId, s.coHostId]) if (id) hours.set(id, (hours.get(id) ?? 0) + h);
       if (s.hostId && (s.coHostId || s.noAssistant)) filled++;
@@ -421,7 +421,8 @@ export const RosterBoard: React.FC<Props> = (p) => {
   const m0 = desk.month, m1 = desk.next, m2 = nextMonthOf(m1);
   const wizardChannels = useMemo(
     () =>
-      desk.nextRows.map((r) => ({
+      // Website (sàn chỉ lịch) không có cam kết giờ / kế hoạch tháng nên không qua trình mở tháng: xếp bằng "Thêm ca mở" + lưới tuần.
+      desk.nextRows.filter((r): r is typeof r & { platform: ReportPlatform } => r.platform !== "Website").map((r) => ({
         brandId: r.brandId,
         platform: r.platform,
         brandName: r.brandName,

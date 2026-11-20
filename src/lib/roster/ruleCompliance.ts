@@ -105,8 +105,8 @@ export function buildComplianceReport(input: ComplianceInput): ComplianceReport 
         bucket.h += h;
       }
       // Theo sàn bằng Record (test platformProfiles cấm rẽ nhánh theo tên sàn).
-      const cap = { Shopee: params.rosterShopeeCastCap, TikTok: tier === "regular" ? params.rosterRegularCastCap : 0 }[s.platform];
-      const id: RuleLine["id"] | null = { Shopee: "cast_shopee" as const, TikTok: tier === "regular" ? ("cast_tiktok_regular" as const) : null }[s.platform];
+      const cap = { Shopee: params.rosterShopeeCastCap, TikTok: tier === "regular" ? params.rosterRegularCastCap : 0, Website: 0 }[s.platform];
+      const id: RuleLine["id"] | null = { Shopee: "cast_shopee" as const, TikTok: tier === "regular" ? ("cast_tiktok_regular" as const) : null, Website: null }[s.platform];
       if (id && cap > 0) {
         const c = plannedCost(host, history, "host", s.date, 1);
         const l = line(id);

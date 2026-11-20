@@ -32,6 +32,8 @@ export const DataSourceLegend: React.FC<{ className?: string }> = ({ className =
 );
 
 export const DataSourceBadge: React.FC<DataSourceBadgeProps> = ({ dataSource, platform = "TikTok", className = "", variant = "pill" }) => {
+  // Website (sàn chỉ lịch) không có file số liệu nên không có "nguồn số" để gắn nhãn.
+  if (platform === "Website") return null;
   const prof = profileOf({ platform });
   const shop = prof.shopLabel;
   const tier = dataSourceTier({ dataSource });

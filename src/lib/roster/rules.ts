@@ -1,4 +1,5 @@
 import type { LiveSession, ShiftRegistration, ShiftSlot } from "../../types";
+import type { SchedulePlatform } from "../reportPlatform";
 import { addDays, type DateTimeRange, dateTimeRangesOverlap } from "../dateUtils";
 import { hasStaffSegments, personRoleMinutes, personWindows } from "../staffSegments";
 import { hasSessionData } from "../sessionStatus";
@@ -41,7 +42,7 @@ export interface RosterShift {
   session?: LiveSession;
   brandId: string;
   brandName: string;
-  platform: "TikTok" | "Shopee";
+  platform: SchedulePlatform;
   channelKey: string;
   date: string;
   startTime: string;

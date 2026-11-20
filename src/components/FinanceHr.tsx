@@ -26,7 +26,7 @@ import { fmtDateVn, fmtMonth, fmtFixed } from "../lib/format";
 import { MonthPicker } from "./common/MonthPicker";
 import { PageHeader } from "./common/PageHeader";
 import { PlatformChip } from "./common/PlatformChip";
-import { platformOf, REPORT_PLATFORMS, type ReportPlatform } from "../lib/reportPlatform";
+import { isScheduleOnly, schedulePlatformOf, SCHEDULE_PLATFORMS, type SchedulePlatform } from "../lib/reportPlatform";
 import { InfoDot } from "./common/InfoDot";
 interface FinanceHrProps {
   sessions: LiveSession[];
@@ -127,7 +127,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
   );
   // Độ tin cậy của con số tiền: tổng P&L cộng từ GMV, mà GMV thì có 3 bậc nguồn. Màn tiền phải
   // nói rõ bao nhiêu phần là số chốt — ký duyệt trên số tự khai và số đã đối soát là hai việc khác.
-  const quality = useMemo(() => dataQuality(completedSessions), [completedSessions]);
+  const quality = useMemo(() => dataQuality(completedSessions.filter((s) => !isScheduleOnly(s))), [completedSessions]);
 
   const rows = useMemo(() => {
     return completedSessions.map((s) =>
@@ -142,9 +142,9 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
   // Bảng ca gập theo kênh brand × sàn (09/11). Tiền của nhóm chỉ cộng ca đủ dữ liệu (luật §4.5), ghi "x/y ca" khi thiếu.
   const [openGroups, setOpenGroups] = useState<Set<string>>(() => new Set());
   const rowGroups = useMemo(() => {
-    const m = new Map<string, { key: string; brandName: string; platform: ReportPlatform; rows: typeof rows; profit: number; complete: number; pending: number }>();
+    const m = new Map<string, { key: string; brandName: string; platform: SchedulePlatform; rows: typeof rows; profit: number; complete: number; pending: number }>();
     for (const r of rows) {
-      const p = platformOf(r.session);
+      const p = schedulePlatformOf(r.session);
       const k = `${r.session.brandId}|${p}`;
       const g = m.get(k) ?? { key: k, brandName: r.session.brandName, platform: p, rows: [], profit: 0, complete: 0, pending: 0 };
       g.rows.push(r);
@@ -179,9 +179,9 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
   // Lãi/lỗ THEO KÊNH (Bước 4 đa sàn, 07/10): tiền của agency cộng được qua mọi kênh (user chốt) — một bảng toàn agency, mỗi dòng
   // một kênh brand × sàn. Không có cột GMV: GMV hai sàn không cộng.
   const byChannel = useMemo(() => {
-    const m = new Map<string, { brandName: string; platform: ReportPlatform; n: number; nAll: number; rev: number; pay: number; profit: number }>();
+    const m = new Map<string, { brandName: string; platform: SchedulePlatform; n: number; nAll: number; rev: number; pay: number; profit: number }>();
     for (const r of rows) {
-      const p = platformOf(r.session);
+      const p = schedulePlatformOf(r.session);
       const k = `${r.session.brandId}|${p}`;
       const e = m.get(k) ?? { brandName: r.session.brandName, platform: p, n: 0, nAll: 0, rev: 0, pay: 0, profit: 0 };
       e.nAll += 1;
@@ -193,7 +193,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
       e.profit += r.netProfit;
       m.set(k, e);
     }
-    return [...m.values()].sort((a, b) => REPORT_PLATFORMS.indexOf(a.platform) - REPORT_PLATFORMS.indexOf(b.platform) || a.brandName.localeCompare(b.brandName));
+    return [...m.values()].sort((a, b) => SCHEDULE_PLATFORMS.indexOf(a.platform) - SCHEDULE_PLATFORMS.indexOf(b.platform) || a.brandName.localeCompare(b.brandName));
   }, [rows]);
 
   const totalMargin = totals.grossAgencyRev > 0 ? fmtFixed(((totals.netProfit / totals.grossAgencyRev) * 100), 1) : "0";

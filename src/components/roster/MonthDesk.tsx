@@ -13,7 +13,7 @@ import { commitmentsRead, contractsRead } from "../../lib/db/brandContracts";
 import { monthCommitmentOf } from "../../lib/performance/brandCommitment";
 import { accountRow, sortAccounts, type AccountRow, type RowTone } from "../../lib/performance/accountOverview";
 import { channelVerdict, type ChannelVerdict } from "../../lib/roster/monthStatus";
-import { brandPlatformKey, type ReportPlatform } from "../../lib/reportPlatform";
+import { brandPlatformKey, type SchedulePlatform } from "../../lib/reportPlatform";
 import { channelShrinkage, nextRow, nowActions, nowHours, shrinkSums, NEXT_STEPS, type ChannelShrinkage, type DeskTone, type NextRow, type NowHours } from "../../lib/roster/monthDesk";
 import { channelRefs, useChannelCards } from "../dashboard/useChannelCards";
 import { money, pct } from "../dashboard/shared";
@@ -59,8 +59,8 @@ interface DeskProps {
   brandChannels: BrandChannel[];
   engineParams: EngineParams;
   currentRole: UserRole;
-  onOpenMonthPlan?: (brandId: string, platform: ReportPlatform) => void;
-  onOpenCrm?: (brandId: string, platform: ReportPlatform) => void;
+  onOpenMonthPlan?: (brandId: string, platform: SchedulePlatform) => void;
+  onOpenCrm?: (brandId: string, platform: SchedulePlatform) => void;
   /** Quyền manage_month_plan (0180: ceo/admin/operations/trainer) — nút mở Kế Hoạch Tháng. */
   canOpenMonthPlan?: boolean;
   /** Ghi được (đặt hạn đăng ký): role xếp lịch + DB đã có 0176. */
@@ -108,7 +108,7 @@ const ShrinkCell: React.FC<{ s: ChannelShrinkage }> = ({ s }) => (
   </span>
 );
 
-const ChannelName: React.FC<{ name: string; platform: ReportPlatform }> = ({ name, platform }) => (
+const ChannelName: React.FC<{ name: string; platform: SchedulePlatform }> = ({ name, platform }) => (
   <span className="flex items-center gap-2 font-bold text-[var(--text)] whitespace-nowrap">
     {name} <PlatformChip platform={platform} />
   </span>
@@ -133,7 +133,7 @@ const HourBar: React.FC<{ h: NowHours }> = ({ h }) => {
 
 export interface NowChannel {
   brandId: string;
-  platform: ReportPlatform;
+  platform: SchedulePlatform;
   brandName: string;
   row: AccountRow;
   h: NowHours;
@@ -142,7 +142,7 @@ export interface NowChannel {
 }
 export interface NextChannel {
   brandId: string;
-  platform: ReportPlatform;
+  platform: SchedulePlatform;
   brandName: string;
   committedHours: number | null;
   /** Hao hụt áp cho kênh (đã kẹp 3–15%). */

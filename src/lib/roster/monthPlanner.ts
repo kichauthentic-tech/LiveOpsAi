@@ -562,7 +562,7 @@ export function planMonth(input: PlanInput): MonthPlan {
       const perfW = W.perf + (tier === "peak" ? P?.rosterPeakPerfAdd ?? 0 : 0);
       const costW = W.cost + (tier === "regular" ? P?.rosterRegularCostAdd ?? 0 : 0);
       // Trần cast theo sàn (Record, không rẽ nhánh theo tên sàn): Shopee = trần Shopee ở mọi ca; TikTok = trần Daily chỉ ở ca thường.
-      const castCap = role === "host" && P ? { Shopee: P.rosterShopeeCastCap, TikTok: tier === "regular" ? P.rosterRegularCastCap : 0 }[shift.platform] : 0;
+      const castCap = role === "host" && P ? { Shopee: P.rosterShopeeCastCap, TikTok: tier === "regular" ? P.rosterRegularCastCap : 0, Website: 0 }[shift.platform] : 0;
       const hrs = shiftHours(shift);
       const frac = inMonth(shift.date, month) ? Number(shift.date.slice(8, 10)) / daysInMonth(month) : 1;
       const lateShift = roster.isLate(absRange(shift)[1], shift.date);

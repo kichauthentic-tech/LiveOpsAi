@@ -2,7 +2,7 @@ import type { EarlyLeaveReason, LiveSession, ShiftRegistration, ShiftSlot } from
 import type { RosterDraft, RosterWeek } from "../db/roster";
 import type { AccountRow } from "../performance/accountOverview";
 import { isDelivered, isScheduled, plannedHoursOf, realLiveHoursOf } from "../performance/brandCommitment";
-import { brandPlatformKey, platformOf, type ReportPlatform } from "../reportPlatform";
+import { brandPlatformKey, schedulePlatformOf, type SchedulePlatform } from "../reportPlatform";
 import { addDays, isoWeekStart } from "../dateUtils";
 import { sessionDurationHours } from "../pnl";
 
@@ -47,7 +47,7 @@ export function shrinkSums(sessions: readonly LiveSession[], today: string, days
   const agency = { ...EMPTY };
   for (const s of sessions) {
     if (s.isBackfill || s.date < from || s.date >= today || s.status === "Upcoming" || s.status === "Live Now") continue;
-    const key = brandPlatformKey(s.brandId, platformOf(s));
+    const key = brandPlatformKey(s.brandId, schedulePlatformOf(s));
     const o = byChannel.get(key) ?? { ...EMPTY };
     const h = plannedHoursOf(s);
     for (const t of [o, agency]) {
@@ -118,11 +118,11 @@ export interface NowHours {
   shortByReason: Partial<Record<EarlyLeaveReason | "none", number>>;
 }
 
-export function nowHours(sessions: readonly LiveSession[], slots: readonly ShiftSlot[], brandId: string, platform: ReportPlatform, month: string, today: string, committed: number, shrink: number): NowHours {
+export function nowHours(sessions: readonly LiveSession[], slots: readonly ShiftSlot[], brandId: string, platform: SchedulePlatform, month: string, today: string, committed: number, shrink: number): NowHours {
   let delivered = 0, deliveredPlanned = 0, estimated = 0, scheduled = 0, open = 0;
   const shortByReason: NowHours["shortByReason"] = {};
   for (const s of sessions) {
-    if (s.brandId !== brandId || platformOf(s) !== platform || s.date.slice(0, 7) !== month) continue;
+    if (s.brandId !== brandId || schedulePlatformOf(s) !== platform || s.date.slice(0, 7) !== month) continue;
     if (isDelivered(s)) {
       const real = realLiveHoursOf(s);
       delivered += real ?? plannedHoursOf(s);
@@ -135,7 +135,7 @@ export function nowHours(sessions: readonly LiveSession[], slots: readonly Shift
     } else if (isScheduled(s)) scheduled += plannedHoursOf(s);
   }
   for (const sl of slots)
-    if (sl.brandId === brandId && platformOf(sl) === platform && sl.status === "open" && !sl.sessionId && sl.date.slice(0, 7) === month && sl.date >= today)
+    if (sl.brandId === brandId && schedulePlatformOf(sl) === platform && sl.status === "open" && !sl.sessionId && sl.date.slice(0, 7) === month && sl.date >= today)
       open += sessionDurationHours(sl.startTime, sl.endTime);
   const remaining = Math.max(0, committed - delivered);
   const needScheduled = hoursToSchedule(remaining, shrink);
@@ -193,7 +193,7 @@ export const NEXT_STEPS: { key: Exclude<NextStep, "done" | "lock">; label: strin
 
 export interface NextInput {
   brandId: string;
-  platform: ReportPlatform;
+  platform: SchedulePlatform;
   month: string;
   committedHours: number | null;
   committedGmv: number | null;
@@ -227,7 +227,7 @@ export interface NextRow {
 
 export function nextRow(x: NextInput): NextRow {
   const inMonth = (d: string) => d.slice(0, 7) === x.month;
-  const mine = <T extends { brandId?: string; platform?: string | null }>(r: T) => r.brandId === x.brandId && platformOf(r) === x.platform;
+  const mine = <T extends { brandId?: string; platform?: string | null }>(r: T) => r.brandId === x.brandId && schedulePlatformOf(r) === x.platform;
   let sessionHours = 0;
   for (const s of x.sessions) if (mine(s) && inMonth(s.date) && s.status !== "Cancelled") sessionHours += plannedHoursOf(s);
   const open = x.slots.filter((sl) => mine(sl) && inMonth(sl.date) && sl.status === "open" && !sl.sessionId);

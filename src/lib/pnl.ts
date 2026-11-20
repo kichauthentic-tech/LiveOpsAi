@@ -13,6 +13,7 @@ import { hasLiveEvidence } from "./sessionStatus";
 import { hasStaffSegments, segmentsOfRole, sessionMinutes, type StaffRole } from "./staffSegments";
 import { feeInputOf, sessionFee } from "./commercial/fees";
 import { feeOf, resolveTerms, type TermsPeriod } from "./commercial/terms";
+import { isScheduleOnly, platformOf } from "./reportPlatform";
 
 export const DEFAULT_FINANCE: Omit<SessionFinance, "sessionId"> = {
   agencyCommissionRate: 15,
@@ -186,7 +187,7 @@ export function computeSessionPnl(
   const hostFixRate = hostPaidHourly
     ? talentHourRate * billableHours
     : finance.hostFixRateOverride ?? talentRateAtDate?.ratePerSession ?? talent?.ratePerSession ?? 0;
-  const termsPeriod = termPeriods.length > 0 ? resolveTerms(termPeriods, session.brandId, session.platform, session.date) : undefined;
+  const termsPeriod = termPeriods.length > 0 ? resolveTerms(termPeriods, session.brandId, platformOf(session), session.date) : undefined;
   const termsHourly = termsPeriod ? feeOf(termsPeriod.terms, "per_hour") : undefined;
   const termsPct = termsPeriod ? feeOf(termsPeriod.terms, "pct_nmv") : undefined;
   const isHourly = termsPeriod ? !!termsHourly : brand?.billingModel === "hourly";
@@ -290,7 +291,9 @@ export function computeSessionPnl(
     : !!coHost && coHostFixRate <= 0 && coHostCommRate <= 0;
   if (hostRateMissing) missingInputs.push("host_rate");
   if (coHostRateMissing) missingInputs.push("cohost_rate");
-  if (termsPeriod) {
+  if (isScheduleOnly(session)) {
+    // Website (sàn chỉ lịch): chỉ có tiền công host/trợ — không có giá brand / hoa hồng để thiếu.
+  } else if (termsPeriod) {
     // Điều khoản đã khai rõ từng khoản: chỉ thiếu khi khoản theo giờ chưa có đơn giá. % = 0 là đã đặt (“không thu”).
     if (termsHourly && termsHourly.rate <= 0 && !termsPct) missingInputs.push("brand_rate");
   } else {

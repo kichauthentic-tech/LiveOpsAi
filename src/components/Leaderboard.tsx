@@ -8,7 +8,7 @@ import { effectiveCamp, type CampaignDayType } from "../lib/campaignDays";
 import { chartColor } from "./dashboard/shared";
 import { getTodayDate, getTodayMonth } from "../lib/dateUtils";
 import { fmtDateVn, fmtFixed, fmtMonth, fmtNum, fmtVndShort } from "../lib/format";
-import { brandPlatformKey, channelTitle } from "../lib/reportPlatform";
+import { brandPlatformKey, channelTitle, platformOf } from "../lib/reportPlatform";
 import { InfoDot } from "./common/InfoDot";
 import {
   MIN_AWARD_SHIFTS,
@@ -166,7 +166,7 @@ const ShiftCard: React.FC<{ sh: TargetShift; showAccount: boolean }> = ({ sh, sh
           {showAccount && (
             <p className="text-xs font-bold text-[var(--text)] flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full shrink-0" style={{ background: chartColor(s.brandName) }} />
-              {channelTitle(s.brandName, s.platform, true)}
+              {channelTitle(s.brandName, platformOf(s), true)}
             </p>
           )}
           <p className="text-2xs text-[var(--text-muted)] tabular-nums">
