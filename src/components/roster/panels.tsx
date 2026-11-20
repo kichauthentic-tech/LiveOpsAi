@@ -80,6 +80,8 @@ export const WeekGrid: React.FC<{
                     {list.map((s) => {
                       const sev = worstSeverity(analysis.byShift.get(s.key)) ?? "ok";
                       const mine = !!focus && (s.hostId === focus.talentId || s.coHostId === focus.talentId);
+                      // Ca mở chưa ai xếp (chưa nháp, chưa host, chưa trợ): chưa tới lượt xếp, không phải "thiếu".
+                      const unplanned = s.kind === "open" && !s.drafted && !s.hostId && !s.coHostId;
                       const asked = !!focus && !mine && s.kind === "open" && s.registrants.includes(focus.talentId);
                       const focusCls = !focus ? "" : mine ? "ring-2 ring-emerald-400" : asked ? "ring-2 ring-sky-400" : "opacity-40";
                       return (
@@ -102,11 +104,13 @@ export const WeekGrid: React.FC<{
                             })()}
                           </span>
                           <span className="grid grid-cols-2 items-center gap-1">
-                            {s.hostId ? <PersonPill name={nameOf(s.hostId)} color={colorOf?.(s.hostId)} /> : <span className="block whitespace-nowrap truncate rounded-full border border-red-400/70 px-1 py-0.5 text-center text-2xs font-bold tracking-tight text-red-300">THIẾU HOST</span>}
+                            {s.hostId ? <PersonPill name={nameOf(s.hostId)} color={colorOf?.(s.hostId)} /> : unplanned ? <span className="block whitespace-nowrap truncate rounded-full border border-dashed border-[var(--text-faint)] px-1 py-0.5 text-center text-2xs font-bold tracking-tight text-[var(--text-faint)]">CHƯA XẾP</span> : <span className="block whitespace-nowrap truncate rounded-full border border-red-400/70 px-1 py-0.5 text-center text-2xs font-bold tracking-tight text-red-300">THIẾU HOST</span>}
                             {s.coHostId ? (
                               <PersonPill name={nameOf(s.coHostId)} color={colorOf?.(s.coHostId)} />
                             ) : s.noAssistant ? (
                               <PersonPill name="No Ass" color={NO_ASSISTANT_COLOR} />
+                            ) : unplanned ? (
+                              <span className="block whitespace-nowrap truncate rounded-full border border-dashed border-[var(--text-faint)] px-1 py-0.5 text-center text-2xs font-bold tracking-tight text-[var(--text-faint)]">CHƯA XẾP</span>
                             ) : (
                               <span className="block whitespace-nowrap truncate rounded-full border border-dashed border-amber-400/70 px-1 py-0.5 text-center text-2xs font-bold tracking-tight text-amber-300">{s.kind === "open" && s.hostId ? "CẦN TRỢ" : "THIẾU TRỢ"}</span>
                             )}
