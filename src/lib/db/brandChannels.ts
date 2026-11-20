@@ -1,7 +1,7 @@
 import { supabase } from "../supabaseClient";
 import { assertAffected } from "./assertAffected";
 import type { BrandChannel } from "../../types";
-import { platformOf } from "../reportPlatform";
+import { schedulePlatformOf } from "../reportPlatform";
 
 // Kênh brand × sàn (0149). Đọc nhỏ (một dòng mỗi kênh), nạp một lần lúc đăng nhập cùng giá / phòng mặc định.
 
@@ -21,7 +21,7 @@ const COLS = "id, brand_id, platform, shop_name, shop_ref, status, started_on, n
 const fromDb = (r: DbBrandChannel): BrandChannel => ({
   id: r.id,
   brandId: r.brand_id,
-  platform: platformOf(r),
+  platform: schedulePlatformOf(r),
   shopName: r.shop_name ?? "",
   shopRef: r.shop_ref ?? "",
   status: r.status === "paused" ? "paused" : "active",

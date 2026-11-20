@@ -7,7 +7,7 @@ import { RetargetAuditRow, RetargetBatch, summarizeRetargetBatches } from "../sc
 import type { RebaseItem } from "../scheduling/rebase";
 import type { BoostFillItem } from "../scheduling/boost";
 import { BoostSlot, BrandMonthPlan, BrandMonthPlanSlot, CalendarEventRow, PlanCampRanges, PlanGroupTargets } from "../../types";
-import { platformOf, brandPlatformKey, type ReportPlatform } from "../reportPlatform";
+import { schedulePlatformOf, brandPlatformKey, type ReportPlatform } from "../reportPlatform";
 import { cleanReserve } from "../scheduling/reservePlan";
 import { featureOffError } from "../featureOff";
 
@@ -74,7 +74,7 @@ const planFromDb = (r: DbPlan): BrandMonthPlan => ({
   id: r.id,
   brandId: r.brand_id,
   month: r.month.slice(0, 7),
-  platform: platformOf(r),
+  platform: schedulePlatformOf(r),
   status: r.status,
   defaultSlotHours: Number(r.default_slot_hours),
   liveWindowStart: hhmm(r.live_window_start),
@@ -135,7 +135,7 @@ export async function fetchMonthPlan(
     groupTargetsColumn = "group_targets" in rows[0];
     reserveColumn = "reserve_slots" in rows[0];
   }
-  const data = rows.find((r) => platformOf(r) === platform);
+  const data = rows.find((r) => schedulePlatformOf(r) === platform);
   if (!data) return null;
   return { plan: planFromDb(data), slots: (data.brand_month_plan_slots ?? []).map(slotFromDb) };
 }
@@ -345,7 +345,7 @@ export async function fetchBrandLockedPlanSlots(brandId: string, platform: Repor
   return ((data as Row[]) ?? [])
     .filter((r) => {
       const plan = Array.isArray(r.plan) ? r.plan[0] : r.plan;
-      return platformOf(plan ?? {}) === platform;
+      return schedulePlatformOf(plan ?? {}) === platform;
     })
     .map(slotFromDb);
 }

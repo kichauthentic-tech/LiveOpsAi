@@ -1,5 +1,5 @@
 import type { BrandChannel } from "../types";
-import { platformOf, REPORT_PLATFORMS, SCHEDULE_PLATFORMS, type ReportPlatform, type SchedulePlatform } from "./reportPlatform";
+import { schedulePlatformOf, REPORT_PLATFORMS, SCHEDULE_PLATFORMS, type ReportPlatform, type SchedulePlatform } from "./reportPlatform";
 
 // Kênh = brand × sàn (0149). Mọi màn hỏi "brand này chạy sàn nào / có những kênh nào" đều đi qua đây, đọc từ bảng
 // brand_channels — KHÔNG suy từ ca/phòng/kế hoạch như trước (7 chỗ đoán theo 5 kiểu khác nhau, audit 07/10).
@@ -31,7 +31,7 @@ export function deriveChannels(rows: readonly { brandId?: string; platform?: str
   const seen = new Map<string, BrandChannel>();
   for (const r of rows) {
     if (!r.brandId) continue;
-    const platform = platformOf(r);
+    const platform = schedulePlatformOf(r);
     const key = `${r.brandId}|${platform}`;
     if (!seen.has(key)) seen.set(key, { id: `derived:${key}`, brandId: r.brandId, platform, shopName: "", shopRef: "", status: "active", note: "" });
   }
