@@ -76,7 +76,7 @@ export const ShiftPanel: React.FC<Props> = ({ shift, analysis, ctx, talents, his
     const full = rankCandidates(shift, role, ctx, analysis);
     const list = everyone ? full : full.filter((c) => c.registered);
     const unregistered = full.length - full.filter((c) => c.registered).length;
-    const ok = list.filter((c) => !c.blocked).slice(0, 8);
+    const ok = list.filter((c) => !c.blocked);
     const blocked = list.length - list.filter((c) => !c.blocked).length;
     return (
       <section className="space-y-2" aria-label={role === "host" ? "Host" : "Trợ live"}>
@@ -155,7 +155,20 @@ export const ShiftPanel: React.FC<Props> = ({ shift, analysis, ctx, talents, his
             )}
           </div>
         )}
-        {!lockedPeople && blocked > 0 && <p className="text-2xs text-[var(--text-faint)]">Ẩn {blocked} người đang bận ca trùng giờ.</p>}
+        {!lockedPeople && blocked > 0 && (
+          <details className="text-2xs text-[var(--text-faint)]">
+            <summary className="cursor-pointer">Ẩn {blocked} người không xếp được — xem lý do</summary>
+            <ul className="mt-1 space-y-0.5">
+              {list
+                .filter((c) => c.blocked)
+                .map((c) => (
+                  <li key={c.talentId}>
+                    <span className="font-semibold text-[var(--text-muted)]">{nm(c.talentId)}</span> · {c.blocked}
+                  </li>
+                ))}
+            </ul>
+          </details>
+        )}
         {!lockedPeople && (everyone || unregistered > 0) && (
           <button type="button" onClick={() => setEveryone((v) => !v)} className="text-2xs font-bold text-[var(--accent-text)] hover:underline">
             {everyone ? "Chỉ hiện người đã đăng ký" : `Xem cả ${unregistered} người chưa đăng ký`}
