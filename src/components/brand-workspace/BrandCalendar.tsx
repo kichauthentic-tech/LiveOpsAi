@@ -213,6 +213,8 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
         list.push(s);
         map.set(s.date, list);
       });
+    // Sớm ở trên, muộn xuống dưới: `brandSessions` đọc DB mới nhất trước nên ngày 14/11 từng hiện 20:00 trên 10:00.
+    for (const list of map.values()) list.sort((x, y) => x.startTime.localeCompare(y.startTime));
     return map;
   }, [brandSessions, month]);
 
