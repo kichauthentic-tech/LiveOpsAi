@@ -101,7 +101,9 @@ export default function TalentShiftSignup({ mode, onOpenTab, brands, shiftSlots,
 
   const inMonth = openSlots.filter((s) => s.date.startsWith(month));
   const byPart = (s: ShiftSlot) => part === "all" || dayPartOf(s.startTime) === part;
-  const byBrand = (s: ShiftSlot) => brandFilter === "all" || s.brandName === brandFilter;
+  // Website là sàn riêng (chỉ lịch): chip riêng "<brand> Website" để không lẫn với ca TikTok/Shopee của cùng brand.
+  const brandKeyOf = (s: ShiftSlot) => (s.platform === "Website" ? `${s.brandName}|Website` : s.brandName);
+  const byBrand = (s: ShiftSlot) => brandFilter === "all" || brandKeyOf(s) === brandFilter;
   const byWeek = (s: ShiftSlot) => weekPick === "all" || isoWeekStart(s.date) === weekPick;
   const monthWeeks = [...new Set(inMonth.map((s) => isoWeekStart(s.date)))].sort();
   const weekRange = (ws: string) => {
@@ -111,7 +113,7 @@ export default function TalentShiftSignup({ mode, onOpenTab, brands, shiftSlots,
     // Tuần chỉ dính một ngày của tháng (1/11 rơi vào CN): ghi "CN 1/11" thay vì "1/11 – 1/11".
     return from === to ? `${weekday(from).replace("Chủ nhật", "CN").replace("Thứ ", "T")} ${dm(from)}` : `${dm(from)} – ${dm(to)}`;
   };
-  const brandNames = [...new Set(inMonth.map((s) => s.brandName))].sort((a, b) => a.localeCompare(b, "vi"));
+  const brandNames = [...new Set(inMonth.map(brandKeyOf))].sort((a, b) => a.localeCompare(b, "vi"));
   const shown = inMonth.filter((s) => byWeek(s) && byPart(s) && byBrand(s));
   const dates = [...new Set(shown.map((s) => s.date))].sort();
 
@@ -285,21 +287,23 @@ export default function TalentShiftSignup({ mode, onOpenTab, brands, shiftSlots,
                   <button type="button" aria-pressed={brandFilter === "all"} onClick={() => setBrandFilter("all")} className={pill(brandFilter === "all")}>
                     Mọi brand
                   </button>
-                  {brandNames.map((name) => {
-                    const on = brandFilter === name;
+                  {brandNames.map((key) => {
+                    const isWeb = key.endsWith("|Website");
+                    const name = isWeb ? key.slice(0, -"|Website".length) : key;
+                    const on = brandFilter === key;
                     const th = getBrandTheme(name);
                     const b = brands.find((x) => x.name === name);
                     return (
                       <button
-                        key={name}
+                        key={key}
                         type="button"
                         aria-pressed={on}
-                        onClick={() => setBrandFilter(on ? "all" : name)}
+                        onClick={() => setBrandFilter(on ? "all" : key)}
                         style={on ? { background: th.primary, borderColor: th.primary, color: th.onPrimary } : { borderColor: th.primary }}
                         className={`shrink-0 min-h-9 pl-1.5 pr-3 rounded-full text-sm font-bold border-2 flex items-center gap-1.5 transition-colors ${on ? "" : "bg-[var(--surface)] text-[var(--text)] hover:bg-[var(--surface-elevated)]"}`}
                       >
                         <BrandLogo brand={b ?? { name, logo: "" }} size="sm" />
-                        {name}
+                        {isWeb ? `${name} Website` : name}
                       </button>
                     );
                   })}
