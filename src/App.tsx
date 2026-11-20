@@ -707,6 +707,8 @@ export default function App() {
     return { type: "agency" };
   }, [currentRole, workspace, activeUser.assignedBrandId, brandsLoaded, visibleBrands]);
   const currentBrandId = effectiveWorkspace.type === "brand" ? effectiveWorkspace.brandId : undefined;
+  // Workspace riêng của kênh Website (chỉ lịch + giờ công): cùng brand nhưng lịch/ca mở chỉ của Website, không số liệu.
+  const isWebsiteWs = effectiveWorkspace.type === "brand" && effectiveWorkspace.channel === "Website";
   const currentBrandName = brands.find((b) => b.id === currentBrandId)?.name || "Brand";
 
   // BỘ LỌC SÀN (Bước 3 lộ trình đa sàn, 07/10): sàn KHÔNG còn là workspace — một workspace Agency + một workspace mỗi brand,
@@ -750,10 +752,10 @@ export default function App() {
   const platformScope: ReportPlatform = resolveChannelScope(brandRawChoice, (currentBrandId && brandSingle[currentBrandId]) || brandPlatformsForTab[0], brandPlatformsForTab, "one") as ReportPlatform;
   const singlePlatform: ReportPlatform = platformScope;
   // Tab của workspace brand nhận ca/ca mở/studio của brand ĐÚNG phạm vi (brand khác giữ nguyên vì engine/OpsSupport đọc lịch toàn agency).
-  const inScope = (x: { brandId?: string; platform?: string | null }) => x.brandId !== currentBrandId || inChannelScope(x, brandScope);
-  const platformSessions = useMemo(() => (effectiveWorkspace.type === "brand" ? visibleSessions.filter(inScope) : visibleSessions), [effectiveWorkspace.type, activeSessions, currentBrandId, brandScope]); // eslint-disable-line react-hooks/exhaustive-deps
-  const platformSlots = useMemo(() => (effectiveWorkspace.type === "brand" ? shiftSlots.filter(inScope) : shiftSlots), [effectiveWorkspace.type, shiftSlots, currentBrandId, brandScope]); // eslint-disable-line react-hooks/exhaustive-deps
-  const platformBrandStudios = useMemo(() => (effectiveWorkspace.type === "brand" ? brandStudios.filter(inScope) : brandStudios), [effectiveWorkspace.type, brandStudios, currentBrandId, brandScope]); // eslint-disable-line react-hooks/exhaustive-deps
+  const inScope = (x: { brandId?: string; platform?: string | null }) => x.brandId !== currentBrandId || (isWebsiteWs ? isScheduleOnly(x) : !isScheduleOnly(x) && inChannelScope(x, brandScope));
+  const platformSessions = useMemo(() => (effectiveWorkspace.type === "brand" ? (isWebsiteWs ? visibleScheduleSessions : visibleSessions).filter(inScope) : visibleSessions), [effectiveWorkspace.type, isWebsiteWs, activeSessions, visibleScheduleSessions, currentBrandId, brandScope]); // eslint-disable-line react-hooks/exhaustive-deps
+  const platformSlots = useMemo(() => (effectiveWorkspace.type === "brand" ? shiftSlots.filter(inScope) : shiftSlots), [effectiveWorkspace.type, isWebsiteWs, shiftSlots, currentBrandId, brandScope]); // eslint-disable-line react-hooks/exhaustive-deps
+  const platformBrandStudios = useMemo(() => (effectiveWorkspace.type === "brand" ? brandStudios.filter(inScope) : brandStudios), [effectiveWorkspace.type, isWebsiteWs, brandStudios, currentBrandId, brandScope]); // eslint-disable-line react-hooks/exhaustive-deps
   const pickAgencyScope = (scope: ChannelScope) => {
     setAgencyChoice(scope);
     if (scope !== "all") setAgencySingle(scope);
@@ -766,7 +768,7 @@ export default function App() {
   // `scopeControl`), màn hẹp vẽ ở đầu nội dung kèm câu ghi chú (`withNote`). "Mỗi sàn một khối…" đã là mô tả của tiêu đề trang
   // ở chế độ Tất cả kênh (perPlatformBlocks) nên không lặp ở đây.
   const channelBar = (withNote: boolean): React.ReactNode => {
-    if (!tabScope) return null;
+    if (!tabScope || isWebsiteWs) return null;
     if (effectiveWorkspace.type === "brand") {
       if (brandPlatformsForTab.length < 2) return null;
       return (
@@ -795,6 +797,15 @@ export default function App() {
     () => Object.fromEntries(visibleBrands.map((b) => [b.id, platformsOfBrand(channels, b.id)])) as Record<string, ReportPlatform[]>,
     [brands, channels]
   );
+
+  // Brand có kênh Website (hoặc đã có ca/ca mở Website) ⇒ bộ chọn workspace hiện thêm "<brand> Website".
+  const websiteBrandIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const c of channels) if (c.platform === "Website") ids.add(c.brandId);
+    for (const x of sessions) if (isScheduleOnly(x) && x.brandId) ids.add(x.brandId);
+    for (const x of shiftSlots) if (isScheduleOnly(x) && x.brandId) ids.add(x.brandId);
+    return visibleBrands.filter((b) => ids.has(b.id)).map((b) => b.id);
+  }, [channels, sessions, shiftSlots, visibleBrands]);
 
   // Nạp trước lượt đọc riêng của tab đang mở — CHỈ trong lúc chờ đợt nạp chung (màn chưa mount nên chưa
   // ai `take`; sau đó màn mount ngay và tự đọc, nạp trước chỉ đẻ request thừa). Không đợi `profile`: đo
@@ -1560,8 +1571,10 @@ export default function App() {
   );
   // Yêu cầu đổi/nhường ca đã được người kia đồng ý, chờ trainer/OPs duyệt (0212): số đỏ ở mục nơi duyệt — thấy từ mọi màn, bấm vào là tới thẻ duyệt.
   const swapWaiting = isOpsRole || currentRole === "trainer" ? swaps.items.filter((r) => r.status === "pending_ops").length : 0;
+  // Workspace "<brand> Website" (sàn chỉ lịch, 20/11): chỉ có Lịch Vận Hành — không số liệu/report/hợp đồng.
+  const WEBSITE_NAV_GROUPS = BRAND_NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => i.id === "brand_calendar") })).filter((g) => g.items.length > 0);
   const baseNavGroups =
-    effectiveWorkspace.type === "brand" ? BRAND_NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => !hiddenBrandTabs.has(i.id)) })) : AGENCY_NAV_GROUPS;
+    isWebsiteWs ? WEBSITE_NAV_GROUPS : effectiveWorkspace.type === "brand" ? BRAND_NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => !hiddenBrandTabs.has(i.id)) })) : AGENCY_NAV_GROUPS;
   const navGroups = swapWaiting > 0 ? baseNavGroups.map((g) => ({ ...g, items: g.items.map((i) => (i.id === "calendar" || i.id === "roster" ? { ...i, count: swapWaiting } : i)) })) : baseNavGroups;
   // Brand có kênh trên một sàn — danh sách brand của màn số liệu agency theo sàn đó.
   const brandsOn = (p: ReportPlatform) => visibleBrands.filter((b) => (brandPlatformsMap[b.id] ?? []).includes(p));
@@ -1653,7 +1666,7 @@ export default function App() {
   const handleWorkspaceChange = (next: WorkspaceContext) => {
     setWorkspace(next);
     const nextGroups = next.type === "brand" ? BRAND_NAV_GROUPS : AGENCY_NAV_GROUPS;
-    const firstTab = nextGroups.flatMap((g) => g.items)[0]?.id;
+    const firstTab = next.type === "brand" && next.channel === "Website" ? "brand_calendar" : nextGroups.flatMap((g) => g.items)[0]?.id;
     if (firstTab) setActiveTab(firstTab);
   };
 
@@ -1882,6 +1895,7 @@ export default function App() {
               workspace={isOpsRole ? effectiveWorkspace : undefined}
               onWorkspaceChange={isOpsRole ? handleWorkspaceChange : undefined}
               brandPlatforms={brandPlatformsMap}
+              websiteBrandIds={websiteBrandIds}
               brands={visibleBrands}
               notifications={{
                 items: notifications.items,
@@ -2430,7 +2444,7 @@ export default function App() {
                     brandId={currentBrandId!}
                     brandName={currentBrandName}
                     sessions={platformSessions}
-                    platformScope={brandScope}
+                    platformScope={isWebsiteWs ? "Website" : brandScope}
                     shiftSlots={platformSlots}
                     shiftRegistrations={shiftRegistrations}
                     studios={activeStudios}

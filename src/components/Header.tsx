@@ -1,14 +1,14 @@
 import React, { useState } from "react";
 import { Brand, AppNotification } from "../types";
 import { NotificationBell } from "./NotificationBell";
-import { LogOut, Building2, ChevronDown, Check, Palette, HelpCircle } from "lucide-react";
+import { LogOut, Building2, ChevronDown, Check, Palette, HelpCircle, Globe } from "lucide-react";
 import { useTheme, THEME_OPTIONS, DENSITY_OPTIONS } from "../hooks/useTheme";
 import { BrandLogo } from "./ui/BrandLogo";
 import { profileOf } from "../lib/platforms/profiles";
 import { type ReportPlatform } from "../lib/reportPlatform";
 
 // Giai đoạn A (Workspace Agency ↔ Brand) — xem docs/WORKSPACE_HISTORY.md.
-export type WorkspaceContext = { type: "agency" } | { type: "brand"; brandId: string };
+export type WorkspaceContext = { type: "agency" } | { type: "brand"; brandId: string; /** "Website" = workspace riêng của kênh Website (sàn chỉ lịch) của brand. */ channel?: "Website" };
 
 interface HeaderProps {
   onSignOut?: () => void;
@@ -18,6 +18,8 @@ interface HeaderProps {
   onWorkspaceChange?: (next: WorkspaceContext) => void;
   /** Kênh của từng brand (0149) — ghi cạnh tên brand trong bộ chọn. */
   brandPlatforms?: Record<string, ReportPlatform[]>;
+  /** Brand có kênh Website (sàn chỉ lịch) — mỗi brand một workspace "<brand> Website" riêng trong bộ chọn. */
+  websiteBrandIds?: string[];
   brands?: Brand[];
   /** Mở "Từ điển và cách dùng" (GlossaryDialog). */
   onOpenHelp?: () => void;
@@ -39,10 +41,12 @@ const WorkspaceSwitcher: React.FC<{
   brands: Brand[];
   onChange: (next: WorkspaceContext) => void;
   brandPlatforms?: Record<string, ReportPlatform[]>;
-}> = ({ workspace, brands, onChange, brandPlatforms }) => {
+  websiteBrandIds?: string[];
+}> = ({ workspace, brands, onChange, brandPlatforms, websiteBrandIds }) => {
   const [open, setOpen] = useState(false);
   const currentBrand = workspace.type === "brand" ? brands.find((b) => b.id === workspace.brandId) : undefined;
-  const label = workspace.type === "agency" ? "Agency" : currentBrand?.name ?? "Brand";
+  const isWeb = workspace.type === "brand" && workspace.channel === "Website";
+  const label = workspace.type === "agency" ? "Agency" : `${currentBrand?.name ?? "Brand"}${isWeb ? " Website" : ""}`;
 
   return (
     <div className="relative">
@@ -80,10 +84,11 @@ const WorkspaceSwitcher: React.FC<{
             {brands.length === 0 && <p className="px-3 py-2 text-2xs text-[var(--text-faint)]">Chưa có Brand nào.</p>}
             {brands.map((b) => {
               const plats = brandPlatforms?.[b.id] ?? [];
-              const active = workspace.type === "brand" && workspace.brandId === b.id;
+              const active = workspace.type === "brand" && workspace.brandId === b.id && workspace.channel !== "Website";
+              const webActive = workspace.type === "brand" && workspace.brandId === b.id && workspace.channel === "Website";
               return (
+                <React.Fragment key={b.id}>
                 <button
-                  key={b.id}
                   onClick={() => {
                     onChange({ type: "brand", brandId: b.id });
                     setOpen(false);
@@ -103,6 +108,25 @@ const WorkspaceSwitcher: React.FC<{
                   </span>
                   {active && <Check className="w-3.5 h-3.5 text-blue-400" />}
                 </button>
+                {websiteBrandIds?.includes(b.id) && (
+                  <button
+                    onClick={() => {
+                      onChange({ type: "brand", brandId: b.id, channel: "Website" });
+                      setOpen(false);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-[var(--text)] hover:bg-[var(--surface-elevated)]/80 transition-colors"
+                  >
+                    <span className="w-6 h-6 shrink-0 rounded-md bg-[var(--surface-elevated)] flex items-center justify-center">
+                      <Globe className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+                    </span>
+                    <span className="flex-1 text-left truncate">
+                      {b.name} <span className="font-bold text-[var(--text-muted)]">Website</span>
+                      <span className="block text-2xs font-normal text-[var(--text-faint)]">Chỉ lịch + giờ công</span>
+                    </span>
+                    {webActive && <Check className="w-3.5 h-3.5 text-blue-400" />}
+                  </button>
+                )}
+                </React.Fragment>
               );
             })}
           </div>
@@ -186,6 +210,7 @@ export const Header: React.FC<HeaderProps> = ({
   workspace,
   onWorkspaceChange,
   brandPlatforms,
+  websiteBrandIds,
   brands = [],
   notifications,
   onOpenHelp,
@@ -196,7 +221,7 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Active Region & Live Status */}
       <div className="flex items-center gap-4 min-w-0">
         {workspace && onWorkspaceChange && (
-          <WorkspaceSwitcher workspace={workspace} brands={brands} onChange={onWorkspaceChange} brandPlatforms={brandPlatforms} />
+          <WorkspaceSwitcher workspace={workspace} brands={brands} onChange={onWorkspaceChange} brandPlatforms={brandPlatforms} websiteBrandIds={websiteBrandIds} />
         )}
         {scopeControl && <div className="hidden lg:flex items-center min-w-0">{scopeControl}</div>}
       </div>

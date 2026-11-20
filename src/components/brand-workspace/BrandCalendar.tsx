@@ -1,6 +1,11 @@
 import { platformText } from "../../lib/metricGlossary";
 import React, { useEffect, useMemo, useState } from "react";
-import { inChannelScope, platformOf, type ChannelScope } from "../../lib/reportPlatform";
+import { inChannelScope, platformOf, schedulePlatformOf, type ChannelScope } from "../../lib/reportPlatform";
+
+/** Phạm vi lịch: sàn có số liệu, "all", hoặc "Website" (sàn chỉ lịch — workspace riêng 20/11). */
+type CalendarScope = ChannelScope | "Website";
+const inCalendarScope = (x: { platform?: string | null }, scope: CalendarScope) =>
+  scope === "Website" ? schedulePlatformOf(x) === "Website" : schedulePlatformOf(x) !== "Website" && inChannelScope(x, scope);
 import { Brand, LiveSession, PromoScheme, ShiftSlot, ShiftRegistration, Studio, Talent, UserRole, BrandStudio, AuditLogEntry, BrandChannel } from "../../types";
 import { SessionWindow } from "../SessionWindow";
 import { Building2, CalendarIcon, ChevronLeft, ChevronRight, Plus, Tag } from "lucide-react";
@@ -38,7 +43,7 @@ interface BrandCalendarProps {
   shiftSlots?: ShiftSlot[];
   /** Sàn đang xem (bộ chuyển sàn) — chỉ lọc ca/slot CỦA BRAND hiện trên lịch; `sessions` gốc vẫn đi xuống modal để kiểm trùng người cả hai sàn. */
   /** "all" = mọi kênh của brand (lịch hiện ca cả hai sàn, chip sàn trên thẻ ca). */
-  platformScope: ChannelScope;
+  platformScope: CalendarScope;
   shiftRegistrations?: ShiftRegistration[];
   studios: Studio[];
   brandStudios?: BrandStudio[]; // phòng mặc định brand × nền tảng (0098) — form mở ca chọn sẵn
@@ -144,11 +149,11 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
   const canManage = canEdit && !!onUpdateSession && !!onCreateSlot;
   const [openSessionId, setOpenSessionId] = useState<string | null>(null);
   const openSession = openSessionId ? sessions.find((x) => x.id === openSessionId) ?? null : null;
-  const brandSessions = useMemo(() => sessions.filter((s) => s.brandId === brandId && inChannelScope(s, platformScope)), [sessions, brandId, platformScope]);
+  const brandSessions = useMemo(() => sessions.filter((s) => s.brandId === brandId && inCalendarScope(s, platformScope)), [sessions, brandId, platformScope]);
   const brandSchemes = useMemo(() => schemes.filter((s) => s.brandId === brandId), [schemes, brandId]);
   const canManageSchemes = canManage && !!onAddScheme && !!onUpdateScheme && !!onDeleteScheme;
   const brandOpenSlots = useMemo(
-    () => shiftSlots.filter((sl) => sl.brandId === brandId && sl.status === "open" && inChannelScope(sl, platformScope)),
+    () => shiftSlots.filter((sl) => sl.brandId === brandId && sl.status === "open" && inCalendarScope(sl, platformScope)),
     [shiftSlots, brandId, platformScope]
   );
 
@@ -170,6 +175,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
   );
   const progPlatforms = useMemo(() => {
     const set = new Set<"TikTok" | "Shopee">();
+    if (platformScope === "Website") return [] as ("TikTok" | "Shopee")[];
     if (platformScope !== "all") set.add(platformScope);
     else for (const c of channels) if (c.brandId === brandId && c.status === "active") set.add(platformOf(c));
     return (["TikTok", "Shopee"] as const).filter((pl) => set.has(pl));
