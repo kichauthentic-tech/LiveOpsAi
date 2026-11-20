@@ -1,5 +1,6 @@
 import type { LiveSession, Talent, TalentRateHistoryEntry } from "../../types";
 import { ruleFit, type PersonRule } from "./placementRules";
+import { hardBlock, hourCapsFor, softFit, type MonthRule } from "./monthRules";
 import { addDays, isoWeekStart } from "../dateUtils";
 import { getCampaignDayInfo } from "../campaignDays";
 import type { EngineParams } from "../scheduling/engineParams";
@@ -212,6 +213,8 @@ export interface PlanTuning {
   personCaps?: Readonly<Record<string, PersonCap>>;
   /** Quy luật đặt giờ từng người (placementRules.ts): ca ngoài luật bị trừ `rosterRuleMissPenalty` điểm. */
   personRules?: Readonly<Record<string, PersonRule>>;
+  /** Luật đặt giờ THEO THÁNG × người × vai (monthRules.ts, bảng 0229). CỨNG: brand/làn "x", trần giờ vai/brand/làn (ca để trống chứ không vượt). MỀM: loại ngày + ca đêm (trừ `rosterRuleMissPenalty`). */
+  monthRules?: Readonly<Record<string, Partial<Record<RosterRole, MonthRule>>>>;
   bandStrength?: ReadonlyMap<string, number>;
   /** Làn host (lanes.ts): peak = nghiêng ca Campaign/cao điểm, regular = nghiêng ca thường, balanced = theo cơ cấu giờ của tháng. Chỉ có tác dụng khi rosterLaneWeight > 0. */
   lanes?: Readonly<Record<string, HostLane>>;
@@ -357,6 +360,8 @@ class Roster {
   private lateMin: number;
   /** Trần giờ của đợt đang xếp (người có trần riêng, chỉ khi xếp một phần tháng): tổng giờ trong tháng tới hết `to` không vượt `max`. */
   rangeCaps = new Map<string, { to: string; max: number }>();
+  /** Luật tháng (0229) của từng người × vai — chỉ để kiểm các trần CỨNG trong `blocked`. */
+  monthRules?: Readonly<Record<string, Partial<Record<RosterRole, MonthRule>>>>;
   constructor(
     private rules: RosterRules,
     seed: Map<string, ReturnType<typeof personEntries> extends Map<string, infer E> ? E : never>
@@ -391,6 +396,19 @@ class Roster {
     const h = shiftHours(shift);
     const list = this.list(id);
     for (const e of list) if (e.start < b && e.end > a) return "trùng ca khác";
+    const mr = role ? this.monthRules?.[id]?.[role] : undefined;
+    if (mr) {
+      const hb = hardBlock(mr, { date: shift.date, brandId: shift.brandId, platform: shift.platform, night: false });
+      if (hb) return `luật tháng: ${hb}`;
+      if (inMonth(shift.date, month)) {
+        const caps = hourCapsFor(mr, shift);
+        const mine = list.filter((e) => e.role === role && inMonth(e.date, month));
+        const sum = (rows: typeof mine) => rows.reduce((t, e) => t + e.hours, 0);
+        if (caps.role !== null && sum(mine) + h > caps.role + 1e-6) return "vượt trần giờ của vai trong tháng";
+        if (caps.brand !== null && sum(mine.filter((e) => e.channel.split("|")[0] === shift.brandId)) + h > caps.brand + 1e-6) return "vượt trần giờ brand";
+        if (caps.lane !== null && sum(mine.filter((e) => e.channel === shift.channelKey)) + h > caps.lane + 1e-6) return "vượt trần giờ làn brand × sàn";
+      }
+    }
     // Chị Trainer 18/11: không xếp một host hai ca cùng brand × sàn trong một ngày (host khác brand/sàn cùng ngày vẫn được).
     if (role === "host") for (const e of list) if (e.role === "host" && e.date === shift.date && e.channel === shift.channelKey && e.key !== shift.key) return "đã có ca host cùng brand + sàn trong ngày";
     if (this.hoursInMonth(id, month) + (inMonth(shift.date, month) ? h : 0) > max) return "vượt giờ tối đa tháng";
@@ -445,6 +463,7 @@ export function planMonth(input: PlanInput): MonthPlan {
     })
   );
   const roster = new Roster(rules, personEntries(shifts));
+  roster.monthRules = input.tuning?.monthRules;
   // Trần giờ theo đợt: xếp ngày 1–15 thì người có trần riêng chỉ được tới trần × tỷ lệ GIỜ CA của nửa đầu (+ dung sai), phần còn lại chừa cho nửa sau.
   const monthEnd = `${month}-${String(daysInMonth(month)).padStart(2, "0")}`;
   if (input.range && input.range.to < monthEnd && !input.reportOnly) {
@@ -606,6 +625,8 @@ export function planMonth(input: PlanInput): MonthPlan {
           }
           const rule = input.tuning?.personRules?.[c.id];
           if (rule && P.rosterRuleMissPenalty > 0 && !ruleFit(rule, { date: shift.date, brandId: shift.brandId, night: lateShift }).ok) extra -= P.rosterRuleMissPenalty;
+          const mRule = input.tuning?.monthRules?.[c.id]?.[role];
+          if (mRule && P.rosterRuleMissPenalty > 0 && !softFit(mRule, { date: shift.date, brandId: shift.brandId, platform: shift.platform, night: lateShift }).ok) extra -= P.rosterRuleMissPenalty;
           if (castCap > 0 && c.cost / Math.max(hrs, 0.25) > castCap + 1) extra -= P.rosterCastOverPenalty;
           if (role === "co_host" && isMale(t.gender)) extra += (SPORT_BRAND_PATTERN.test(shift.brandName) ? P.rosterMaleAsstSport : 0) + (night ? P.rosterMaleAsstNight : 0);
         }
@@ -765,6 +786,8 @@ function rebalance(
         if (brandRuleViolation(input.brandRules, s.brandId, n.t.id, a.role, s.platform)) continue;
         const nRule = input.tuning?.personRules?.[n.t.id];
         if (nRule && (input.tuning?.params.rosterRuleMissPenalty ?? 0) > 0 && !ruleFit(nRule, { date: s.date, brandId: s.brandId, night: roster.isLate(absRange(s)[1], s.date) }).ok) continue;
+        const nMonth = input.tuning?.monthRules?.[n.t.id]?.[a.role];
+        if (nMonth && (input.tuning?.params.rosterRuleMissPenalty ?? 0) > 0 && !softFit(nMonth, { date: s.date, brandId: s.brandId, platform: s.platform, night: roster.isLate(absRange(s)[1], s.date) }).ok) continue;
         roster.remove(a.talentId, a.shiftKey, a.role);
         if (roster.blocked(n.t.id, s, n.b.max, month, a.role)) {
           roster.add(a.talentId, s, a.role, true);

@@ -44,10 +44,10 @@ import { monthStatus } from "../lib/roster/monthStatus";
 import { OpenMonthWizard } from "./roster/OpenMonthWizard";
 import { BrandScheduleExportDialog } from "./roster/BrandScheduleExportDialog";
 import { MonthPlanPanel } from "./roster/MonthPlanPanel";
-import { useMonthCommitments } from "../hooks/useMonthCommitments";
-import { useScheduleRules } from "../hooks/useScheduleRules";
-import { PersonRulesDesk } from "./roster/PersonRulesDesk";
-import { hasRule } from "../lib/roster/placementRules";
+import { useMonthRules } from "../hooks/useMonthRules";
+import { PersonRulesGrid } from "./roster/PersonRulesGrid";
+import { hasContent, plannerInputsFromRules } from "../lib/roster/monthRules";
+import { schedulePlatformsOfBrand } from "../lib/channels";
 import { inferAutoCaps } from "../lib/roster/autoCaps";
 import { PersonBar } from "./roster/PersonBar";
 import { MoreMenu } from "./ui/MoreMenu";
@@ -173,17 +173,16 @@ export const RosterBoard: React.FC<Props> = (p) => {
     }
     return DEFAULT_BOUNDS;
   });
-  // Giờ cam kết = trần giờ của tháng đang xem (0223; chưa chạy migration thì lưu theo trình duyệt).
-  const commitments = useMonthCommitments(viewMonth);
-  // Quy luật đặt giờ từng người (0224): loại ngày / brand / ca đêm, áp mọi tháng.
-  const scheduleRules = useScheduleRules();
+  // Luật đặt giờ THEO THÁNG × người × vai (0229): trần giờ tháng/nửa đầu/vai/brand/làn, loại ngày, ca đêm. Tháng đã qua tự khoá.
+  const monthRules = useMonthRules(viewMonth);
   const bandStrength = useMemo(() => buildBandStrength(p.sessions, getTodayDate()), [p.sessions]);
   // Mặc định mọi người có trần giờ TỰ SUY từ 3 tháng đã qua (để chia đợt); cam kết nhập tay (ngoại lệ) ghi đè.
   const autoCaps = useMemo(() => inferAutoCaps(p.sessions, p.talents, getTodayDate(), bounds, p.engineParams.rosterAutoCapSlack), [p.sessions, p.talents, bounds, p.engineParams.rosterAutoCapSlack]);
   const tuning = useMemo<PlanTuning>(() => {
     const soft = Object.fromEntries(Object.entries(autoCaps).map(([id, c]) => [id, { monthMax: c.monthMax, soft: true }]));
-    return { params: p.engineParams, personCaps: { ...soft, ...commitments.caps }, personRules: scheduleRules.byTalent, bandStrength };
-  }, [p.engineParams, autoCaps, commitments.caps, scheduleRules.byTalent, bandStrength]);
+    const fromRules = plannerInputsFromRules(monthRules.rules);
+    return { params: p.engineParams, personCaps: { ...soft, ...fromRules.personCaps }, monthRules: fromRules.monthRules, bandStrength };
+  }, [p.engineParams, autoCaps, monthRules.rules, bandStrength]);
   // Ô nháp do bộ xếp tự fill (slotId → người). Ô Trainer đã đổi tay khác giá trị này nên không bị ghi đè lần sau. Lưu theo trình duyệt.
   const [auto, setAuto] = useState<AutoFill>(() => {
     try {
@@ -340,6 +339,9 @@ export const RosterBoard: React.FC<Props> = (p) => {
     for (const c of channels) if (c.brandName) seen.set(c.brandId, c.brandName);
     return [...seen].map(([id, name]) => ({ id, name }));
   }, [channels]);
+
+  // Brand + sàn của từng brand cho lưới luật (nhóm cột theo brand).
+  const ruleBrands = useMemo(() => gridBrands.map((b) => ({ id: b.id, name: b.name, platforms: schedulePlatformsOfBrand(p.brandChannels, b.id, false) as string[] })).filter((b) => b.platforms.length > 0), [gridBrands, p.brandChannels]);
 
   const showCost = p.talents.some((t) => t.ratePerHour > 0 || t.assistantRatePerHour > 0 || t.ratePerSession > 0) || p.talentRateHistory.length > 0;
   const weekIssues = analysis.issues;
@@ -1204,9 +1206,9 @@ export const RosterBoard: React.FC<Props> = (p) => {
                 bounds={bounds}
                 onBounds={changeBounds}
                 tuning={tuning}
-                commitments={commitments}
+                hoursCount={monthRules.rules.filter((r) => r.maxHours !== null).length}
                 autoCaps={autoCaps}
-                ruleCount={scheduleRules.rules.filter(hasRule).length}
+                ruleCount={monthRules.rules.filter(hasContent).length}
                 onOpenRules={() => openSection("people")}
                 auto={auto}
                 scopeLabel={planScopeLabel}
@@ -1223,7 +1225,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
                 showCost={showCost}
               />
             )}
-            {section === "people" && <PersonRulesDesk month={viewMonth} talents={p.talents} brands={p.brands} nameOf={nameOf} commitments={commitments} scheduleRules={scheduleRules} autoCaps={autoCaps} readOnly={readOnly} />}
+            {section === "people" && <PersonRulesGrid month={viewMonth} onMonth={setViewMonth} today={getTodayDate()} talents={p.talents} brands={ruleBrands} nameOf={nameOf} rules={monthRules} autoCaps={autoCaps} readOnly={readOnly} />}
             {section === "next" && <NextDesk {...deskProps} registrations={p.shiftRegistrations} drafts={drafts} weeks={weeks} />}
             {section === "checks" && <ChecksPanel analysis={analysis} shifts={wk} onSelect={setSelectedKey} />}
             {section === "absence" && <AbsencePanel key={weekStart} weekStart={weekStart} shifts={shifts} analysis={analysis} ctx={ctx} talents={p.talents} showCost={showCost} readOnly={readOnly} busy={busy} onAssign={assign} />}

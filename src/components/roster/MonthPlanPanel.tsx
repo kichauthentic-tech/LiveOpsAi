@@ -21,7 +21,6 @@ import {
 import { dayLabel } from "./ShiftPanel";
 import { InfoDot } from "../common/InfoDot";
 import type { AutoCap } from "../../lib/roster/autoCaps";
-import type { MonthCommitments } from "../../hooks/useMonthCommitments";
 
 // Xếp cả tháng theo mục tiêu (01/11): ba nút Performance / Chi phí / Cân bằng, lịch cả tháng của agency với host + trợ gợi ý (chỉ từ
 // pool đã đăng ký đúng ca), và khối khối lượng từng người so với giờ tối thiểu / tối đa. Kết quả tính sống, chỉ ghi DB khi bấm
@@ -48,7 +47,8 @@ interface Props {
   /** Luật tự fill (tham số AI Training + trần giờ riêng + khung cao điểm). */
   tuning: PlanTuning;
   /** Giờ cam kết (trần giờ) của tháng: lưu DB (0223) hoặc theo trình duyệt nếu chưa chạy migration. */
-  commitments: MonthCommitments;
+  /** Số người có trần giờ tháng đặt tay (bảng luật 0229). */
+  hoursCount: number;
   /** Trần tự suy của mọi người (chỉ để hiển thị). */
   autoCaps: Readonly<Record<string, AutoCap>>;
   /** Số người có luật ngày / brand / ca đêm (Điều Phối → Luật đặt giờ từng người). */
@@ -163,7 +163,7 @@ export const MonthPlanPanel: React.FC<Props> = (p) => {
       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-base)] px-3 py-2 text-xs" data-testid="rules-pointer">
         <span className="font-bold text-[var(--text)]">Giờ & luật từng người</span>
         <span className="text-[var(--text-muted)]">
-          {p.commitments.rows.length} người có giờ cam kết · {p.ruleCount} người có luật ngày / brand / ca đêm · {Object.keys(p.autoCaps).length} người có trần tự suy
+          {p.hoursCount} người có giờ cam kết · {p.ruleCount} người có luật ngày / brand / ca đêm · {Object.keys(p.autoCaps).length} người có trần tự suy
         </span>
         <button type="button" onClick={p.onOpenRules} className="min-h-6 rounded-md border border-[var(--border)] px-2 font-bold text-[var(--text)] hover:bg-[var(--surface-hover)]">
           Mở bảng luật

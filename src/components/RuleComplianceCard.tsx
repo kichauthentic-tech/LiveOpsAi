@@ -3,7 +3,8 @@ import { ClipboardCheck } from "lucide-react";
 import type { Brand, LiveSession, Talent, TalentRateHistoryEntry } from "../types";
 import type { EngineParams } from "../lib/scheduling/engineParams";
 import { buildComplianceReport, type RuleLine } from "../lib/roster/ruleCompliance";
-import { useMonthCommitments } from "../hooks/useMonthCommitments";
+import { useMonthRules } from "../hooks/useMonthRules";
+import { plannerInputsFromRules } from "../lib/roster/monthRules";
 import { DEFAULT_ROSTER_RULES } from "../lib/roster/rules";
 import { fetchRosterRules } from "../lib/db/roster";
 import { addDays } from "../lib/dateUtils";
@@ -38,7 +39,7 @@ export const RuleComplianceCard: React.FC<Props> = ({ sessions, talents, history
   const today = todayVn();
   const months = useMemo(() => lastMonths(today, 4), [today]);
   const [month, setMonth] = useState(months[1] ?? months[0]);
-  const commitments = useMonthCommitments(month);
+  const monthRules = useMonthRules(month);
   const [lateEnd, setLateEnd] = useState(DEFAULT_ROSTER_RULES.lateEndTime);
   useEffect(() => {
     let alive = true;
@@ -51,7 +52,7 @@ export const RuleComplianceCard: React.FC<Props> = ({ sessions, talents, history
   }, []);
 
   const brandNames = useMemo(() => new Map(brands.map((b) => [b.id, b.name])), [brands]);
-  const caps = useMemo(() => Object.fromEntries(commitments.rows.map((r) => [r.talentId, { monthMax: r.maxHours, firstHalfMax: r.firstHalfMax, note: r.note }])), [commitments.rows]);
+  const caps = useMemo(() => plannerInputsFromRules(monthRules.rules).personCaps, [monthRules.rules]);
   const report = useMemo(() => buildComplianceReport({ month, sessions, talents, history, brandNames, params, lateEnd, caps }), [month, sessions, talents, history, brandNames, params, lateEnd, caps]);
   const nameOf = (id: string) => talentShortName(talents.find((t) => t.id === id), id);
   const ended = `${month}-31` < today;
