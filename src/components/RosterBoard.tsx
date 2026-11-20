@@ -163,7 +163,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
       return "balance";
     }
   });
-  const [scope, setScope] = useState<"half" | "full">(() => (Number(getTodayDate().slice(8, 10)) < 25 ? "half" : "full"));
+  const [scope, setScope] = useState<"half" | "half2" | "full">(() => (Number(getTodayDate().slice(8, 10)) < 16 ? "half" : Number(getTodayDate().slice(8, 10)) < 25 ? "half2" : "full"));
   const [bounds, setBounds] = useState<MonthBounds>(() => {
     try {
       const raw = JSON.parse(localStorage.getItem("roster.bounds") ?? "null");
@@ -705,9 +705,12 @@ export const RosterBoard: React.FC<Props> = (p) => {
       setCostPlan(null);
     });
 
-  const planRange = useMemo(() => ({ from: `${viewMonth}-01`, to: scope === "half" ? `${viewMonth}-15` : `${viewMonth}-${String(daysInMonth(viewMonth)).padStart(2, "0")}` }), [viewMonth, scope]);
-  const planMinScale = scope === "half" ? 15 / daysInMonth(viewMonth) : 1;
-  const planScopeLabel = `${scope === "half" ? "ngày 1–15" : "cả tháng"} tháng ${Number(viewMonth.slice(5))}`;
+  const planRange = useMemo(() => {
+    const last = `${viewMonth}-${String(daysInMonth(viewMonth)).padStart(2, "0")}`;
+    return scope === "half" ? { from: `${viewMonth}-01`, to: `${viewMonth}-15` } : scope === "half2" ? { from: `${viewMonth}-16`, to: last } : { from: `${viewMonth}-01`, to: last };
+  }, [viewMonth, scope]);
+  const planMinScale = scope === "full" ? 1 : (scope === "half" ? 15 : daysInMonth(viewMonth) - 15) / daysInMonth(viewMonth);
+  const planScopeLabel = `${scope === "half" ? "ngày 1–15" : scope === "half2" ? `ngày 16–${daysInMonth(viewMonth)}` : "cả tháng"} tháng ${Number(viewMonth.slice(5))}`;
   const persistAuto = (a: AutoFill) => {
     setAuto(a);
     try {
@@ -820,8 +823,27 @@ export const RosterBoard: React.FC<Props> = (p) => {
   // Khối lượng từng người theo lịch + nháp HIỆN CÓ (không xếp thêm), tính tới hết phạm vi đang chọn (1–15 hoặc cả tháng).
   const workload = useMemo(() => {
     const monthShifts = buildRosterShifts(p.sessions, p.shiftSlots, drafts, p.shiftRegistrations, addDays(`${viewMonth}-01`, -7), addDays(`${viewMonth}-31`, 7));
-    return planMonth({ shifts: monthShifts, month: viewMonth, today, goal, bounds, guaranteeMin: false, rules, talents: p.talents, history: p.talentRateHistory, fam: new Map(), perf: buildHostPerformancePrevMonth(p.sessions, viewMonth, today), brandRules, minScale: planMinScale, reportOnly: true, loadTo: planRange.to, tuning });
-  }, [p.sessions, p.shiftSlots, p.shiftRegistrations, drafts, viewMonth, today, goal, bounds, rules, p.talents, p.talentRateHistory, brandRules, planMinScale, planRange.to, tuning]);
+    return planMonth({ shifts: monthShifts, month: viewMonth, today, goal, bounds, guaranteeMin: false, rules, talents: p.talents, history: p.talentRateHistory, fam: new Map(), perf: buildHostPerformancePrevMonth(p.sessions, viewMonth, today), brandRules, minScale: planMinScale, reportOnly: true, loadFrom: planRange.from, loadTo: planRange.to, tuning });
+  }, [p.sessions, p.shiftSlots, p.shiftRegistrations, drafts, viewMonth, today, goal, bounds, rules, p.talents, p.talentRateHistory, brandRules, planMinScale, planRange.from, planRange.to, tuning]);
+  // "Giờ đăng ký" theo đúng phạm vi đang xem, đếm từ bảng đăng ký (còn nguyên cả khi ca đã công bố, không chỉ ca mở).
+  const regLoad = useMemo(() => {
+    const slotById = new Map(p.shiftSlots.map((sl) => [sl.id, sl] as const));
+    const hoursOf = (a: string, b: string) => {
+      const m = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+      const d = m(b) - m(a);
+      return (d <= 0 ? d + 1440 : d) / 60;
+    };
+    const out = new Map<string, { shifts: number; hours: number }>();
+    for (const r of p.shiftRegistrations) {
+      const sl = slotById.get(r.slotId);
+      if (!sl || sl.status === "cancelled" || sl.date < planRange.from || sl.date > planRange.to) continue;
+      const cur = out.get(r.talentId) ?? { shifts: 0, hours: 0 };
+      cur.shifts += 1;
+      cur.hours += hoursOf(sl.startTime, sl.endTime);
+      out.set(r.talentId, cur);
+    }
+    return out;
+  }, [p.shiftSlots, p.shiftRegistrations, planRange.from, planRange.to]);
   const clearAuto = () =>
     run(async () => {
       const freed = releaseAutoFilled(buildRosterShifts(p.sessions, p.shiftSlots, drafts, p.shiftRegistrations, `${viewMonth}-01`, planRange.to), auto, planRange);
@@ -1022,6 +1044,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
                 {(
                   [
                     ["half", "Ngày 1–15"],
+                    ["half2", "Ngày 16–cuối"],
                     ["full", "Cả tháng"]
                   ] as const
                 ).map(([k, l]) => (
@@ -1057,7 +1080,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
                 ]}
               />
               <button type="button" disabled={readOnly || busy || rangeWeeks.length === 0} onClick={() => void publishRange()} title="Công bố một lần mọi ca có host trong phạm vi đang chọn; ca thiếu trợ vẫn chốt, ca thiếu host giữ mở" className="px-2.5 py-1 rounded-lg bg-[var(--accent)] text-[var(--accent-contrast)] font-black disabled:opacity-40">
-                {rangeWeeks.length > 0 ? `Công bố ${scope === "half" ? "15 ngày" : "cả tháng"}` : "Chưa có nháp"}
+                {rangeWeeks.length > 0 ? `Công bố ${scope === "full" ? "cả tháng" : scope === "half" ? "ngày 1–15" : "ngày 16–cuối"}` : "Chưa có nháp"}
               </button>
             </div>
             {planNote && <p className="mt-1.5 text-2xs text-[var(--text-muted)]">{planNote}</p>}
@@ -1118,13 +1141,25 @@ export const RosterBoard: React.FC<Props> = (p) => {
               {workload.totals.below} dưới tối thiểu · {workload.totals.over} vượt tối đa · bấm để xem
             </span>
           </summary>
+          <div className="flex flex-wrap items-center gap-2 text-xs" role="group" aria-label="Phạm vi khối lượng">
+            <div className="flex items-center rounded-xl border border-[var(--border)] bg-[var(--surface-base)] p-1 font-bold">
+              {([["half", "Ngày 1–15"], ["half2", "Ngày 16–cuối"], ["full", "Cả tháng"]] as const).map(([k, l]) => (
+                <button key={k} type="button" aria-pressed={scope === k} onClick={() => setScope(k)} className={`px-2.5 py-1 rounded-lg ${scope === k ? "seg-on" : "text-[var(--text-muted)]"}`}>
+                  {l}
+                </button>
+              ))}
+            </div>
+            <span className="text-2xs text-[var(--text-muted)]">Tổng giờ và Giờ đăng ký đều tính riêng trong phạm vi này</span>
+          </div>
           <p className="text-2xs text-[var(--text-muted)]">
-            Đậm = đã lên lịch · nhạt = nháp · vạch đứng = giờ tối thiểu
+            Đậm nhất = đã live · đậm vừa = sắp tới · nhạt = nháp · vạch đứng = giờ tối thiểu
             <InfoDot label="Chú giải thanh giờ">Nháp là ca chưa công bố. Vạch đứng là giờ tối thiểu (đảm bảo thu nhập), cuối thanh là giờ tối đa.</InfoDot>
           </p>
           <div className="grid gap-3 xl:grid-cols-2">
             {(["host", "assistant"] as const).map((role) => {
-              const rows = workload.load.filter((l) => (role === "host" ? l.role === "host" : l.role !== "host"));
+              const rows = workload.load
+                .filter((l) => (role === "host" ? l.role === "host" : l.role !== "host"))
+                .map((l) => ({ ...l, registered: regLoad.get(l.talentId)?.shifts ?? 0, registeredHours: regLoad.get(l.talentId)?.hours ?? 0 }));
               return (
                 <div key={role} className="space-y-1.5 min-w-0">
                   <h3 className="text-xs font-black text-[var(--text)]">

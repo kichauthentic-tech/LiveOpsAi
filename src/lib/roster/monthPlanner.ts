@@ -272,6 +272,7 @@ export interface PlanInput {
   /** Chỉ báo khối lượng của lịch hiện có (ca + nháp), không xếp thêm ai. */
   reportOnly?: boolean;
   /** Báo khối lượng tính đến hết ngày này (mốc chốt); mặc định hết tháng. */
+  loadFrom?: string;
   loadTo?: string;
   /** Luật tự fill theo brief chị Trainer (tham số AI Training + trần giờ riêng). Thiếu = bộ xếp chạy như trước. */
   tuning?: PlanTuning;
@@ -302,6 +303,8 @@ export interface PersonLoad {
   fixedHours: number;
   /** Trong `fixedHours`: phần của ca MỞ đã có người nháp (chưa công bố). */
   draftHours: number;
+  /** Trong `fixedHours`: phần của ca thật đã diễn ra (ngày < hôm nay). Còn lại của ca thật = sắp tới. */
+  pastHours: number;
   /** Giờ do bộ xếp thêm. */
   plannedHours: number;
   hours: number;
@@ -469,6 +472,7 @@ export function planMonth(input: PlanInput): MonthPlan {
   const inRange = (d: string) => !input.range || (d >= input.range.from && d <= input.range.to);
   const targets = input.reportOnly ? [] : monthOpen.filter((s) => s.date >= today && inRange(s.date));
   const loadTo = input.loadTo ?? `${month}-31`;
+  const loadFrom = input.loadFrom ?? `${month}-01`;
   const registeredIn = new Map<string, number>(); // talentId → số ca mở trong tháng đã báo rảnh
   const registeredHoursIn = new Map<string, number>(); // talentId → tổng giờ các ca đó
   for (const s of monthOpen) for (const t of s.registrants) {
@@ -638,7 +642,7 @@ export function planMonth(input: PlanInput): MonthPlan {
       const main = primaryRole(t) === role;
       const own = boundsWithCap(t, { host: input.bounds.host, co_host: input.bounds.co_host }, rules, month, caps[id]);
       const b = main ? { min: own.min * minScale, max: own.max } : { min: 0, max: Math.min(input.bounds[role].max, Math.round((rules.maxWeekHours * daysInMonth(month)) / 7)) };
-      l = { talentId: id, role, fixedHours: 0, draftHours: 0, plannedHours: 0, hours: 0, min: b.min, max: b.max, shifts: 0, registered: main ? registeredIn.get(id) ?? 0 : 0, registeredHours: main ? registeredHoursIn.get(id) ?? 0 : 0, cost: 0, costMissing: false, perf: role === "host" ? perf.get(id) : undefined, status: "ok" };
+      l = { talentId: id, role, fixedHours: 0, draftHours: 0, pastHours: 0, plannedHours: 0, hours: 0, min: b.min, max: b.max, shifts: 0, registered: main ? registeredIn.get(id) ?? 0 : 0, registeredHours: main ? registeredHoursIn.get(id) ?? 0 : 0, cost: 0, costMissing: false, perf: role === "host" ? perf.get(id) : undefined, status: "ok" };
       load.set(key, l);
     }
     return l;
@@ -647,12 +651,13 @@ export function planMonth(input: PlanInput): MonthPlan {
   const plannedKeys = new Set(planned.map((a) => `${a.shiftKey}|${a.role}|${a.talentId}`));
   for (const [id, list] of personEntries(shifts)) {
     for (const e of list) {
-      if (!inMonth(e.shift.date, month) || e.shift.date > loadTo || plannedKeys.has(`${e.shift.key}|${e.role}|${id}`)) continue;
+      if (!inMonth(e.shift.date, month) || e.shift.date < loadFrom || e.shift.date > loadTo || plannedKeys.has(`${e.shift.key}|${e.role}|${id}`)) continue;
       const l = ensure(id, e.role);
       if (!l) continue;
       const h = e.minutes / 60;
       l.fixedHours += h;
       if (e.shift.kind === "open") l.draftHours += h;
+      else if (e.shift.date < today) l.pastHours += h;
       l.shifts += 1;
       const c = costOf(id, e.role, e.shift);
       l.cost += c.missing ? 0 : c.amount * (c.hourly ? h / shiftHours(e.shift) : 1);
@@ -662,7 +667,7 @@ export function planMonth(input: PlanInput): MonthPlan {
   for (const a of planned) {
     const l = ensure(a.talentId, a.role);
     const s = shiftByKey.get(a.shiftKey);
-    if (!l || !s || s.date > loadTo) continue;
+    if (!l || !s || s.date < loadFrom || s.date > loadTo) continue;
     const h = shiftHours(s);
     l.plannedHours += h;
     l.shifts += 1;

@@ -22,9 +22,12 @@ export const WorkloadTable: React.FC<{ load: readonly PersonLoad[]; nameOf: (id:
         <thead className="sticky top-0 bg-[var(--surface-base)] text-[var(--text-muted)]">
           <tr>
             <th className="px-3 py-2 text-left font-bold">Người</th>
-            <th className="px-3 py-2 text-left font-bold w-[36%]">Giờ trong tháng</th>
-            <th className="px-3 py-2 text-right font-bold">Giờ xếp</th>
-            <th className="px-3 py-2 text-right font-bold">Giờ đăng ký</th>
+            <th className="px-3 py-2 text-left font-bold w-[22%]" title="Giờ tối thiểu – tối đa; vạch đứng là mức tối thiểu">Mức giờ</th>
+            <th className="px-3 py-2 text-right font-bold" title="Ca thật đã diễn ra (ngày trước hôm nay)">Đã live</th>
+            <th className="px-3 py-2 text-right font-bold" title="Ca thật đã có trong lịch, từ hôm nay trở đi">Sắp tới</th>
+            <th className="px-3 py-2 text-right font-bold" title="Ca nháp, chưa công bố, talent chưa thấy">Nháp</th>
+            <th className="px-3 py-2 text-right font-bold">Tổng</th>
+            <th className="px-3 py-2 text-right font-bold" title="Giờ của các ca người này đã đăng ký trong phạm vi đang xem">Đăng ký</th>
             <th className="px-3 py-2 text-right font-bold">Chi phí</th>
             <th className="px-3 py-2 text-right font-bold">Chỉ số</th>
             <th className="px-3 py-2 text-left font-bold">Tình trạng</th>
@@ -32,7 +35,8 @@ export const WorkloadTable: React.FC<{ load: readonly PersonLoad[]; nameOf: (id:
         </thead>
         <tbody>
           {load.map((l) => {
-            const real = Math.max(0, l.fixedHours - l.draftHours);
+            const past = l.pastHours;
+            const upcoming = Math.max(0, l.fixedHours - l.draftHours - l.pastHours);
             const draft = l.draftHours + l.plannedHours;
             return (
               <tr key={l.talentId} className="border-t border-[var(--border)]">
@@ -41,17 +45,20 @@ export const WorkloadTable: React.FC<{ load: readonly PersonLoad[]; nameOf: (id:
                 </td>
                 <td className="px-3 py-1.5">
                   <div className="relative h-2.5 rounded-full bg-[var(--surface-base)] overflow-hidden" title={`${fmtH(l.hours)}h · tối thiểu ${fmtH(l.min)}h · tối đa ${fmtH(l.max)}h`}>
-                    <i className="absolute inset-y-0 left-0 bg-[var(--success)]" style={{ width: pct(real) }} />
-                    <i className="absolute inset-y-0 bg-[var(--success)] opacity-45" style={{ left: pct(real), width: pct(draft) }} />
+                    <i className="absolute inset-y-0 left-0 bg-[var(--success)]" style={{ width: pct(past) }} />
+                    <i className="absolute inset-y-0 bg-[var(--success)] opacity-70" style={{ left: pct(past), width: pct(upcoming) }} />
+                    <i className="absolute inset-y-0 bg-[var(--success)] opacity-30" style={{ left: pct(past + upcoming), width: pct(draft) }} />
                     <i className="absolute inset-y-0 w-px bg-[var(--text)]" style={{ left: pct(l.min) }} />
                   </div>
-                  <div className="mt-0.5 tabular-nums text-2xs text-[var(--text-muted)]">
-                    {fmtH(l.hours)}h <span className="text-[var(--text-faint)]">· {fmtH(l.min)}–{fmtH(l.max)}h</span>
-                    {draft > 0 && <span className="text-[var(--text-faint)]"> · {fmtH(draft)}h nháp</span>}
+                  <div className="mt-0.5 tabular-nums whitespace-nowrap text-2xs text-[var(--text-muted)]">
+                    {fmtH(l.min)}–{fmtH(l.max)}h
                   </div>
                 </td>
-                <td className="px-3 py-1.5 text-right tabular-nums" title={`${l.shifts} ca`}>{fmtH(l.hours)}h</td>
-                <td className="px-3 py-1.5 text-right tabular-nums" title={`${l.registered} ca đăng ký`}>{fmtH(l.registeredHours)}h</td>
+                {[past, upcoming, draft].map((h, i) => (
+                  <td key={i} className={`px-3 py-1.5 text-right tabular-nums ${h > 0 ? "text-[var(--text)]" : "text-[var(--text-faint)]"}`}>{h > 0 ? `${fmtH(h)}h` : "–"}</td>
+                ))}
+                <td className="px-3 py-1.5 text-right tabular-nums font-black text-[var(--text)]" title={`${l.shifts} ca`}>{fmtH(l.hours)}h</td>
+                <td className={`px-3 py-1.5 text-right tabular-nums ${l.registeredHours > 0 ? "text-[var(--text)]" : "text-[var(--text-faint)]"}`} title={`${l.registered} ca đăng ký`}>{l.registeredHours > 0 ? `${fmtH(l.registeredHours)}h` : "–"}</td>
                 <td className="px-3 py-1.5 text-right tabular-nums">{showCost ? (l.costMissing ? "thiếu rate" : fmtVndShort(l.cost)) : "—"}</td>
                 <td className="px-3 py-1.5 text-right tabular-nums" title={l.perf ? `${l.perf.n} ca làm căn cứ` : "Chưa có ca host có GMV trong 90 ngày"}>
                   {l.role === "host" ? (l.perf ? `${fmtFixed(l.perf.index, 2)} (${l.perf.n})` : "—") : "—"}
@@ -64,7 +71,7 @@ export const WorkloadTable: React.FC<{ load: readonly PersonLoad[]; nameOf: (id:
           })}
           {load.length === 0 && (
             <tr>
-              <td colSpan={7} className="px-3 py-3 text-[var(--text-muted)]">
+              <td colSpan={10} className="px-3 py-3 text-[var(--text-muted)]">
                 {emptyText}
               </td>
             </tr>
