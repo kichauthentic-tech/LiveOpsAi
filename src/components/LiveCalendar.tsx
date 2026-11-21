@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useContext } from "react";
 import SearchSelect from "./ui/SearchSelect";
-import { LiveSession, ShiftSlot, ShiftRegistration, Studio, Talent, Brand, PromoScheme, UserRole, BrandStudio, AuditLogEntry, BrandChannel } from "../types";
+import { LiveSession, ShiftSlot, ShiftRegistration, Studio, Talent, Brand, PromoScheme, UserRole, BrandStudio, AuditLogEntry } from "../types";
 import { planTargetOf } from "../lib/performance/targetAllocation";
 import { schemesForDate } from "../lib/schemeUtils";
 
@@ -22,14 +22,15 @@ import {
 } from "./ui/SessionEventCard";
 import { PlatformLogo } from "./ui/PlatformLogo";
 import { SlotDetailModal } from "./scheduling/SlotDetailModal";
-import { OpenSlotModal } from "./scheduling/OpenSlotModal";
 import { TalentLoadTimeline } from "./scheduling/TalentLoadTimeline";
 import { SessionWindow } from "./SessionWindow";
 import { Calendar as CalendarIcon, Building2, User, Plus, AlertTriangle, CheckCircle2, Search, X, ChevronLeft, ChevronRight, Tag, GripVertical, SlidersHorizontal } from "lucide-react";
 
 import { fmtDateVn, fmtVndShort } from "../lib/format";
 import { PageHeader } from "./common/PageHeader";
-import { useConfirm } from "../hooks/useConfirm";
+import { useConfirm, usePrompt } from "../hooks/useConfirm";
+import { SessionActionsContext } from "../lib/sessionActionsContext";
+import { planScheduledChange } from "../lib/scheduling/scheduledChange";
 import { talentRoleLabel } from "../lib/talentName";
 import { platformsWithValue, sumByPlatform } from "../lib/platforms/perf";
 interface LiveCalendarProps {
@@ -39,19 +40,17 @@ interface LiveCalendarProps {
   studios: Studio[];
   talents: Talent[];
   brands: Brand[];
-  brandStudios?: BrandStudio[]; // phòng mặc định brand × nền tảng (0098) — đổi brand trong form mở ca thì chọn sẵn phòng
-  /** Kênh brand × sàn (0149) — form mở ca chọn kênh. */
-  channels: BrandChannel[];
+  brandStudios?: BrandStudio[]; // phòng mặc định brand × nền tảng (0098) — thả ca vào phòng của sàn kia thì đổi sàn (0199)
   onUpdateSession?: (updatedSession: LiveSession) => Promise<boolean>;
   /** 0199 — thả ca vào phòng của brand ở sàn kia ⇒ đổi sàn của ca (DB tách/gắn kế hoạch tháng theo sàn). */
   onSwitchSessionPlatform?: (session: LiveSession, platform: LiveSession["platform"], studioId: string) => Promise<boolean>;
-  onCreateSlot?: (slot: ShiftSlot) => Promise<boolean>;
+  /** Mở ca lẻ chỉ còn ở Điều Phối Lịch Live (Đợt 1 gom việc trên ca, 21/11) — nút ở đây dẫn sang đó. */
+  onOpenRoster?: () => void;
   onDeleteSlot?: (id: string) => Promise<void>;
   onRegisterSlot?: (slotId: string, talentId: string) => Promise<boolean>;
   onUnregisterSlot?: (slotId: string, talentId: string) => Promise<boolean>;
   onFinalizeSlot?: (slot: ShiftSlot, hostId: string, coHostId: string | null) => Promise<boolean>;
   myTalentId?: string;
-  currentUserId?: string;
   currentRole?: UserRole;
   schemes?: PromoScheme[];
   // Cửa sổ Ca Live (2026-09-21): click ca → cùng một cửa sổ với Sổ Ca / Đăng Ký & Chốt Lịch.
@@ -91,16 +90,14 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   talents,
   brands,
   brandStudios = [],
-  channels,
   onUpdateSession,
   onSwitchSessionPlatform,
-  onCreateSlot,
+  onOpenRoster,
   onDeleteSlot,
   onRegisterSlot,
   onUnregisterSlot,
   onFinalizeSlot,
   myTalentId,
-  currentUserId,
   currentRole,
   schemes = [],
   onSessionsUpdated,
@@ -174,10 +171,22 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   const canManageSlots = currentRole === "ceo" || currentRole === "admin" || currentRole === "operations" || currentRole === "trainer";
   // Kéo-thả ghi thẳng vào ca — chỉ khi có quyền VÀ có đường ghi. Trước 11/10 thiếu `onUpdateSession` thì thả vẫn báo "Đã chuyển".
   const canEdit = canManageSlots && !!onUpdateSession;
-  // Q2: form duy nhất là "Mở ca chờ đăng ký" (OpenSlotModal); prefill ngày/phòng/giờ từ ô được bấm.
-  const [slotModal, setSlotModal] = useState<{ date: string; studioId?: string; start?: string; end?: string } | null>(null);
+  // Mở ca lẻ: một chỗ duy nhất là Điều Phối Lịch Live (21/11) — màn này chỉ dẫn sang, không còn form mở ca riêng.
 
   const confirm = useConfirm();
+  const prompt = usePrompt();
+  const sessionActions = useContext(SessionActionsContext);
+  // Kéo ca sang ngày khác = dời ca: cùng luật với Cửa sổ ca và Điều Phối (lib/scheduling/scheduledChange.ts) — ca chưa diễn ra phải ghi
+  // lý do và vào nhật ký đổi lịch chung. Trước 21/11 kéo thả ghi thẳng, không lý do, không nhật ký.
+  const moveToDay = async (session: LiveSession, targetDateStr: string): Promise<boolean> => {
+    const next = { date: targetDateStr, startTime: session.startTime, endTime: session.endTime, studioId: session.studioId, hostId: session.hostId, coHostId: session.coHostId };
+    if (planScheduledChange(session, next, getTodayDateString()).viaRoster && sessionActions.reschedule) {
+      const reason = await prompt(`Lý do dời ca ${session.brandName} ${session.startTime}–${session.endTime} sang ${fmtDateVn(targetDateStr)} (host/trợ được báo)`, { placeholder: "vd: Brand đổi khung live" });
+      if (!reason?.trim()) return false;
+      return sessionActions.reschedule(session, next, reason);
+    }
+    return onUpdateSession ? onUpdateSession({ ...session, date: targetDateStr }) : false;
+  };
 
   // Drag and Drop State
   const [draggedSessionId, setDraggedSessionId] = useState<string | null>(null);
@@ -302,10 +311,8 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
       setDraggedSessionId(null);
       return;
     }
-    const updatedSession: LiveSession = { ...session, date: targetDateStr };
     setDraggedSessionId(null);
-    if (!onUpdateSession) return;
-    const ok = await onUpdateSession(updatedSession);
+    const ok = await moveToDay(session, targetDateStr);
     if (ok) {
       showToast(
         `Đã chuyển phiên live "${session.brandName}" sang ngày ${targetDateStr}!`,
@@ -334,10 +341,8 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
       setDraggedSessionId(null);
       return;
     }
-    const updatedSession: LiveSession = { ...session, date: targetDateStr };
     setDraggedSessionId(null);
-    if (!onUpdateSession) return;
-    const ok = await onUpdateSession(updatedSession);
+    const ok = await moveToDay(session, targetDateStr);
     if (ok) {
       showToast(
         `Đã chuyển phiên live "${session.brandName}" sang ngày ${targetDateStr}!`,
@@ -761,12 +766,14 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                 </button>
               ))}
             </div>
-          ) : canManageSlots && onCreateSlot ? (
+          ) : canManageSlots && onOpenRoster ? (
           <button
-            onClick={() => setSlotModal({ date: selectedDate })}
-            className="w-full sm:w-auto bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-[var(--accent)]/20 transition-all active:scale-95"
+            type="button"
+            onClick={onOpenRoster}
+            title="Mở thêm ca làm ở một chỗ: Điều Phối Lịch Live"
+            className="w-full sm:w-auto border border-[var(--border)] text-[var(--text)] hover:border-[var(--accent)] font-bold px-4 py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 transition-all"
           >
-            <Plus className="w-4 h-4" /> Mở ca chờ đăng ký
+            <Plus className="w-4 h-4" /> Mở ca ở Điều Phối Lịch Live
           </button>
           ) : null}
           </>
@@ -1206,17 +1213,12 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                     )}
                     {daySessions.length === 0 && daySlots.length === 0 && canManageSlots && (
                       <div
-                        onClick={() => {
-                          setSelectedDate(wDay.dateStr);
-                          setSlotModal({ date: wDay.dateStr });
-                        }}
-                        className={`h-24 rounded-xl border border-dashed transition-all cursor-pointer flex flex-col items-center justify-center space-y-1 ${
+                        className={`h-24 rounded-xl border border-dashed transition-all flex flex-col items-center justify-center space-y-1 ${
                           isWeekHovered
                             ? "border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent-text)] font-bold"
-                            : "border-[var(--border)] hover:border-[var(--accent)]/60 text-[var(--text-faint)] hover:text-[var(--accent-text)]"
+                            : "border-[var(--border)] text-[var(--text-faint)]"
                         }`}
                       >
-                        <Plus className="w-4 h-4" />
                         <span className="text-2xs font-semibold">
                           {isWeekHovered ? "Thả vào đây" : "Trống"}
                         </span>
@@ -1374,8 +1376,6 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                       onDragOver={(e) => handleDragOver(e, rowKey)}
                       onDragLeave={(e) => handleDragLeave(e, rowKey)}
                       onDrop={(e) => handleDropOnStudioRow(e, std)}
-                      onDoubleClick={() => canManageSlots && setSlotModal({ date: selectedDate, studioId: std.id })}
-                      title={canManageSlots ? "Bấm đôi để mở ca chờ đăng ký ở phòng này" : undefined}
                     >
                       {hours.map((m) => (
                         <span key={m} className="absolute top-0 bottom-0 border-l border-[var(--border)]/40" style={{ left: `${((m - axisStart) / span) * 100}%` }} />
@@ -1421,23 +1421,6 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
         />
       )}
 
-      {slotModal && canManageSlots && onCreateSlot && (
-        <OpenSlotModal
-          brands={brands}
-          channels={channels}
-          studios={studios}
-          brandStudios={brandStudios}
-          sessions={sessions}
-          shiftSlots={shiftSlots}
-          initialDate={slotModal.date}
-          initialStudioId={slotModal.studioId}
-          initialStart={slotModal.start}
-          initialEnd={slotModal.end}
-          currentUserId={currentUserId}
-          onClose={() => setSlotModal(null)}
-          onCreateSlot={onCreateSlot}
-        />
-      )}
 
       {/* SESSION DETAIL MODAL */}
       {selectedSessionDetail && (

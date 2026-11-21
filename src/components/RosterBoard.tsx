@@ -43,6 +43,7 @@ import { MonthStrip, fmtWhen, type MonthAction, type MonthCard } from "./roster/
 import { monthStatus } from "../lib/roster/monthStatus";
 import { OpenMonthWizard } from "./roster/OpenMonthWizard";
 import { BrandScheduleExportDialog } from "./roster/BrandScheduleExportDialog";
+import { OpenSlotModal } from "./scheduling/OpenSlotModal";
 import { MonthPlanPanel } from "./roster/MonthPlanPanel";
 import { useMonthRules } from "../hooks/useMonthRules";
 import { PersonRulesGrid } from "./roster/PersonRulesGrid";
@@ -606,29 +607,15 @@ export const RosterBoard: React.FC<Props> = (p) => {
       if (await p.onCancelSession(shift.sessionId!, reason.trim(), false)) setSelectedKey(null);
     });
 
-  const addShift = (ch: ChannelRow, date: string, hint?: { start: string; end: string; note: string }) =>
-    run(async () => {
-      const start = await prompt(`Thêm ca ${ch.brandName} ${ch.platform} ${dayLabel(date)} — giờ bắt đầu${hint ? `\n${hint.note}` : ""}`, { inputType: "time", defaultValue: hint?.start ?? "19:00" });
-      if (!start) return;
-      const end = await prompt(`Giờ kết thúc (bắt đầu ${start})`, { inputType: "time", defaultValue: hint && start === hint.start ? hint.end : `${String((Number(start.slice(0, 2)) + 3) % 24).padStart(2, "0")}:${start.slice(3, 5)}` });
-      if (!end || end === start) return;
-      const studioId = p.brandStudios.find((b) => b.brandId === ch.brandId && b.platform === ch.platform)?.studioId;
-      const studio = p.studios.find((s) => s.id === studioId);
-      const ok = await p.onCreateSlot({
-        id: "",
-        date,
-        startTime: start,
-        endTime: end,
-        brandId: ch.brandId,
-        brandName: ch.brandName,
-        platform: ch.platform,
-        studioId: studio?.id,
-        studioName: studio?.name ?? "",
-        notes: "",
-        status: "open"
-      });
-      if (ok) showToast(`Đã thêm ca mở ${ch.brandName} ${dayLabel(date)} ${start}–${end}. Kênh đã chốt kế hoạch thì đây là ca tăng cường (không cộng target tháng).`);
-    });
+  // Mở ca lẻ (21/11, gom việc trên ca): Điều Phối là chỗ DUY NHẤT mở thêm một ca — Lịch & Studio / Lịch brand chỉ dẫn sang đây. Dùng
+  // chung form OpenSlotModal (trùng phòng, khung giờ hay dùng, cảnh báo ngày đã qua) thay hai ô hỏi giờ cũ không kiểm trùng phòng.
+  const [addFor, setAddFor] = useState<{ ch: ChannelRow; date: string } | null>(null);
+  const addShift = (ch: ChannelRow, date: string) => setAddFor({ ch, date });
+  const createExtraSlot = async (slot: ShiftSlot): Promise<boolean> => {
+    const ok = await p.onCreateSlot(slot);
+    if (ok) showToast(`Đã thêm ca mở ${slot.brandName} ${dayLabel(slot.date)} ${slot.startTime}–${slot.endTime}. Kênh đã chốt kế hoạch thì đây là ca tăng cường (không cộng target tháng).`);
+    return ok;
+  };
 
   /** "Xếp tất cả ca hợp lệ" ở màn Theo người: ghi nháp những ô `planPersonBulk` đã chọn. */
   const applyPersonBulk = (plan: BulkPlan, name: string) =>
@@ -1288,6 +1275,21 @@ export const RosterBoard: React.FC<Props> = (p) => {
       )}
 
       {exportOpen && <BrandScheduleExportDialog month={viewMonth} sessions={p.sessions} shiftSlots={p.shiftSlots} onClose={() => setExportOpen(false)} />}
+      {addFor && (
+        <OpenSlotModal
+          fixedBrand={{ id: addFor.ch.brandId, name: addFor.ch.brandName }}
+          channels={p.brandChannels}
+          initialPlatform={addFor.ch.platform}
+          studios={p.studios}
+          brandStudios={p.brandStudios}
+          sessions={p.sessions}
+          shiftSlots={p.shiftSlots}
+          initialDate={addFor.date}
+          currentUserId={p.currentUserId}
+          onClose={() => setAddFor(null)}
+          onCreateSlot={createExtraSlot}
+        />
+      )}
 
       {wizardOpen && (
         <OpenMonthWizard

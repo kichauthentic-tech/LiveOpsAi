@@ -12,6 +12,8 @@ import { createStudio, updateStudio, deleteStudio } from "./lib/db/studios";
 import { createEquipment, updateEquipment, deleteEquipment } from "./lib/db/equipments";
 import { fetchSessions, finalizeShiftSlot, updateSession, switchSessionPlatform, deleteSession, cancelSession, setSessionExcluded, setSessionStaffSegments } from "./lib/db/sessions";
 import { SessionActionsContext } from "./lib/sessionActionsContext";
+import { planScheduledChange, type ScheduleEdit } from "./lib/scheduling/scheduledChange";
+import { rosterMoveSession, rosterReassign } from "./lib/db/roster";
 import { CLOSED_MONTH_NOTICE, isSessionMonthClosed } from "./lib/closedMonth";
 import { createBrand, updateBrand, deleteBrand } from "./lib/db/brands";
 import { fetchUsers, updateUserProfile, inviteUser, deleteUserAccount, InviteUserPayload, setUserEmail, resetUserPassword } from "./lib/db/users";
@@ -755,7 +757,6 @@ export default function App() {
   const inScope = (x: { brandId?: string; platform?: string | null }) => x.brandId !== currentBrandId || (isWebsiteWs ? isScheduleOnly(x) : !isScheduleOnly(x) && inChannelScope(x, brandScope));
   const platformSessions = useMemo(() => (effectiveWorkspace.type === "brand" ? (isWebsiteWs ? visibleScheduleSessions : visibleSessions).filter(inScope) : visibleSessions), [effectiveWorkspace.type, isWebsiteWs, activeSessions, visibleScheduleSessions, currentBrandId, brandScope]); // eslint-disable-line react-hooks/exhaustive-deps
   const platformSlots = useMemo(() => (effectiveWorkspace.type === "brand" ? shiftSlots.filter(inScope) : shiftSlots), [effectiveWorkspace.type, isWebsiteWs, shiftSlots, currentBrandId, brandScope]); // eslint-disable-line react-hooks/exhaustive-deps
-  const platformBrandStudios = useMemo(() => (effectiveWorkspace.type === "brand" ? brandStudios.filter(inScope) : brandStudios), [effectiveWorkspace.type, isWebsiteWs, brandStudios, currentBrandId, brandScope]); // eslint-disable-line react-hooks/exhaustive-deps
   const pickAgencyScope = (scope: ChannelScope) => {
     setAgencyChoice(scope);
     if (scope !== "all") setAgencySingle(scope);
@@ -1258,6 +1259,37 @@ export default function App() {
       return true;
     } catch (e) {
       showToast(`Không thể lưu người theo đoạn giờ: ${errorMessage(e)}`);
+      return false;
+    }
+  };
+  // Đổi người / dời giờ ca chưa diễn ra — MỘT luật cho mọi cửa (Đợt 1 gom việc trên ca, 21/11): cùng RPC với Điều Phối Lịch Live,
+  // lý do bắt buộc, ghi sổ roster_changes. Mỗi bước thành công thì ghi state ngay — bước sau lỗi vẫn giữ đúng phần đã lưu.
+  const handleRescheduleSession = async (base: LiveSession, next: ScheduleEdit, reason: string): Promise<boolean> => {
+    if (isSessionMonthClosed(monthlyReports, base)) {
+      showToast(`Không thể đổi lịch ca: ${CLOSED_MONTH_NOTICE}`);
+      return false;
+    }
+    const why = reason.trim();
+    if (!why) {
+      showToast("Ghi lý do đổi lịch ca trước khi lưu.");
+      return false;
+    }
+    const plan = planScheduledChange(base, next, getTodayDate());
+    let cur = base;
+    const keep = (saved: LiveSession) => {
+      cur = saved;
+      setSessions((prev) => prev.map((x) => (x.id === saved.id ? saved : x)));
+    };
+    try {
+      if (plan.timeChanged) keep(await rosterMoveSession(base.id, next.date, next.startTime, next.endTime, why));
+      if (plan.peopleChanged) keep(await rosterReassign(base.id, next.hostId, next.coHostId || null, why));
+      if (plan.studioChanged) {
+        const st = studios.find((x) => x.id === next.studioId);
+        keep(await updateSession({ ...cur, studioId: next.studioId, studioName: st?.name ?? cur.studioName }, cur));
+      }
+      return true;
+    } catch (e) {
+      showToast(`Không đổi được lịch ca: ${errorMessage(e)}`);
       return false;
     }
   };
@@ -1824,7 +1856,7 @@ export default function App() {
   }
 
   return (
-    <SessionActionsContext.Provider value={{ setStaffSegments: handleSetStaffSegments, isMonthClosed: (s) => isSessionMonthClosed(monthlyReports, s), swap: swapActions }}>
+    <SessionActionsContext.Provider value={{ setStaffSegments: handleSetStaffSegments, reschedule: handleRescheduleSession, isMonthClosed: (s) => isSessionMonthClosed(monthlyReports, s), swap: swapActions }}>
     <div className="flex h-screen w-full bg-[var(--surface-base)] text-[var(--text)] overflow-hidden font-sans antialiased selection:bg-[var(--accent)] selection:text-white">
       {/* Left Sidebar Navigation */}
       <AppSidebar
@@ -2259,7 +2291,6 @@ export default function App() {
 
                 {activeTab === "studio_calendar" && (
                   <LiveCalendar
-                    channels={channels}
                     sessions={visibleScheduleSessions}
                     shiftSlots={shiftSlots}
                     shiftRegistrations={shiftRegistrations}
@@ -2269,13 +2300,12 @@ export default function App() {
                     brandStudios={brandStudios}
                     onUpdateSession={handleUpdateSession}
                     onSwitchSessionPlatform={handleSwitchSessionPlatform}
-                    onCreateSlot={handleCreateShiftSlot}
+                    onOpenRoster={checkPermission("manage_roster") ? () => navigateTo("roster") : undefined}
                     onDeleteSlot={handleDeleteShiftSlot}
                     onRegisterSlot={handleRegisterSlot}
                     onUnregisterSlot={handleUnregisterSlot}
                     onFinalizeSlot={handleFinalizeShiftSlot}
                     myTalentId={activeUser.assignedTalentId}
-                    currentUserId={activeUser.id}
                     currentRole={currentRole}
                     schemes={promoSchemes}
                     onSessionsUpdated={handleSessionsUpdated}
@@ -2306,7 +2336,6 @@ export default function App() {
                     calendar={
                       <LiveCalendar
                         title="Lịch ca"
-                        channels={channels}
                         sessions={visibleScheduleSessions}
                         shiftSlots={shiftSlots}
                         shiftRegistrations={shiftRegistrations}
@@ -2315,7 +2344,6 @@ export default function App() {
                         brands={visibleBrands}
                         brandStudios={brandStudios}
                         myTalentId={activeUser.assignedTalentId}
-                        currentUserId={activeUser.id}
                         currentRole={currentRole}
                         schemes={promoSchemes}
                         onSessionsUpdated={handleSessionsUpdated}
@@ -2448,13 +2476,11 @@ export default function App() {
                     shiftSlots={platformSlots}
                     shiftRegistrations={shiftRegistrations}
                     studios={activeStudios}
-                    brandStudios={platformBrandStudios}
                     talents={activeTalents}
                     schemes={promoSchemes}
                     onAddScheme={handleAddPromoScheme}
                     onUpdateScheme={handleUpdatePromoScheme}
                     onDeleteScheme={handleDeletePromoScheme}
-                    currentUserId={activeUser.id}
                     myTalentId={activeUser.assignedTalentId}
                     // P1 (0088): chỉ ops tạo/sửa ca — brand xem lịch, không có nút tạo (RLS 0035 đã gỡ).
                     canEdit={currentRole === "ceo" || currentRole === "operations" || currentRole === "admin"}
@@ -2465,7 +2491,7 @@ export default function App() {
                     onSetSessionExcluded={handleSetSessionExcluded}
                     onLogAudit={pushAuditLog}
                     onUpdateSession={handleUpdateSession}
-                    onCreateSlot={handleCreateShiftSlot}
+                    onOpenRoster={checkPermission("manage_roster") ? () => navigateTo("roster") : undefined}
                     onDeleteSlot={handleDeleteShiftSlot}
                     onRegisterSlot={handleRegisterSlot}
                     onUnregisterSlot={handleUnregisterSlot}

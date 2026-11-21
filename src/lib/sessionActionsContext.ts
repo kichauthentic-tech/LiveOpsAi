@@ -2,6 +2,7 @@ import { createContext } from "react";
 import type { LiveSession, StaffSegment, Talent } from "../types";
 import type { CreateSwapInput } from "./db/shiftSwaps";
 import type { ShiftSwapRequest } from "./shiftSwap/swap";
+import type { ScheduleEdit } from "./scheduling/scheduledChange";
 
 // Hành động trên MỘT ca mà cửa sổ ca (SessionWindow) cần nhưng không đi qua 4 màn trung gian (Sổ Ca, Bảng Vận Hành,
 // Lịch, Đăng Ký & Chốt Lịch). App cấp giá trị; SessionWindow đọc. Vắng giá trị = màn đó không cho sửa.
@@ -22,6 +23,9 @@ export interface SessionActions {
   setStaffSegments?: (session: LiveSession, segments: Pick<StaffSegment, "talentId" | "role" | "fromMin" | "toMin">[], reason: string) => Promise<boolean>;
   /** Tháng của ca đã phát hành Report cho brand (đóng sổ, 0133) — DB chặn mọi ghi; cửa sổ ca báo và khoá nút trước khi ops bấm Lưu. */
   isMonthClosed?: (session: LiveSession) => boolean;
+  /** Đổi người / dời giờ ca CHƯA diễn ra theo luật Điều Phối (lib/scheduling/scheduledChange.ts): RPC roster_move_session /
+   *  roster_reassign, lý do bắt buộc, ghi sổ roster_changes; đổi phòng kèm theo thì ghi sau. Chỉ gọi khi planScheduledChange().viaRoster. */
+  reschedule?: (base: LiveSession, next: ScheduleEdit, reason: string) => Promise<boolean>;
 }
 
 export const SessionActionsContext = createContext<SessionActions>({});

@@ -6,13 +6,12 @@ import { inChannelScope, platformOf, schedulePlatformOf, type ChannelScope } fro
 type CalendarScope = ChannelScope | "Website";
 const inCalendarScope = (x: { platform?: string | null }, scope: CalendarScope) =>
   scope === "Website" ? schedulePlatformOf(x) === "Website" : schedulePlatformOf(x) !== "Website" && inChannelScope(x, scope);
-import { Brand, LiveSession, PromoScheme, ShiftSlot, ShiftRegistration, Studio, Talent, UserRole, BrandStudio, AuditLogEntry, BrandChannel } from "../../types";
+import { Brand, LiveSession, PromoScheme, ShiftSlot, ShiftRegistration, Studio, Talent, UserRole, AuditLogEntry, BrandChannel } from "../../types";
 import { SessionWindow } from "../SessionWindow";
 import { Building2, CalendarIcon, ChevronLeft, ChevronRight, Plus, Tag } from "lucide-react";
 import { fmtDateVn, fmtMonth, fmtVndShort } from "../../lib/format";
 import { schemesForDate } from "../../lib/schemeUtils";
 import { CAMPAIGN_DAY_STYLES, getCampaignDayInfo } from "../../lib/campaignDays";
-import { OpenSlotModal } from "../scheduling/OpenSlotModal";
 import { SlotDetailModal } from "../scheduling/SlotDetailModal";
 import { PosterCalendarGrid, PosterDayCell } from "../ui/PosterCalendarGrid";
 import { PageHeader } from "../common/PageHeader";
@@ -46,7 +45,6 @@ interface BrandCalendarProps {
   platformScope: CalendarScope;
   shiftRegistrations?: ShiftRegistration[];
   studios: Studio[];
-  brandStudios?: BrandStudio[]; // phòng mặc định brand × nền tảng (0098) — form mở ca chọn sẵn
   /** Kênh brand × sàn (0149) — form mở ca chọn kênh. */
   channels: BrandChannel[];
   talents: Talent[];
@@ -54,11 +52,11 @@ interface BrandCalendarProps {
   onAddScheme?: (scheme: { title: string; description: string; startDate: string; endDate: string; brandId: string; category: string }) => Promise<void>;
   onUpdateScheme?: (id: string, patch: Partial<Pick<PromoScheme, "title" | "description" | "startDate" | "endDate" | "category">>) => Promise<void>;
   onDeleteScheme?: (id: string) => Promise<void>;
-  currentUserId?: string;
   myTalentId?: string;
   canEdit?: boolean;
   onUpdateSession?: (s: LiveSession) => Promise<boolean>;
-  onCreateSlot?: (s: ShiftSlot) => Promise<boolean>;
+  /** Mở ca lẻ chỉ còn ở Điều Phối Lịch Live (Đợt 1 gom việc trên ca, 21/11) — nút ở đây dẫn sang đó (workspace Agency). */
+  onOpenRoster?: () => void;
   onDeleteSlot?: (id: string) => Promise<void>;
   onRegisterSlot?: (slotId: string, talentId: string) => Promise<boolean>;
   onUnregisterSlot?: (slotId: string, talentId: string) => Promise<boolean>;
@@ -106,18 +104,16 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
   platformScope,
   shiftRegistrations = [],
   studios,
-  brandStudios = [],
   channels,
   talents,
   schemes = [],
   onAddScheme,
   onUpdateScheme,
   onDeleteScheme,
-  currentUserId,
   myTalentId,
   canEdit = true,
   onUpdateSession,
-  onCreateSlot,
+  onOpenRoster,
   onDeleteSlot,
   onRegisterSlot,
   onUnregisterSlot,
@@ -139,14 +135,10 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
     typeof window !== "undefined" && window.matchMedia("(max-width: 639px)").matches ? "day" : "month"
   );
   const [selectedDate, setSelectedDate] = useState(getTodayDateString());
-  const [modalState, setModalState] = useState<{ open: boolean; session: LiveSession | null; initialDate?: string }>({
-    open: false,
-    session: null
-  });
   const [selectedSlotDetail, setSelectedSlotDetail] = useState<ShiftSlot | null>(null);
   // Cả workspace này chỉ có 1 brand → 1 theme màu duy nhất, tính 1 lần thay vì mỗi card.
   const brandTheme = getBrandTheme(brandName);
-  const canManage = canEdit && !!onUpdateSession && !!onCreateSlot;
+  const canManage = canEdit && !!onUpdateSession;
   const [openSessionId, setOpenSessionId] = useState<string | null>(null);
   const openSession = openSessionId ? sessions.find((x) => x.id === openSessionId) ?? null : null;
   const brandSessions = useMemo(() => sessions.filter((s) => s.brandId === brandId && inCalendarScope(s, platformScope)), [sessions, brandId, platformScope]);
@@ -273,7 +265,6 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
         isToday={dateStr === getTodayDateString()}
         isWeekend={WEEKEND_COLUMNS.includes(columnIndex)}
         title={campaignDay?.label}
-        onClick={canManage ? () => setModalState({ open: true, session: null, initialDate: dateStr }) : undefined}
         minHeight={minHeight}
         toneClassName={campaignDay ? CAMPAIGN_DAY_STYLES[campaignDay.type].cell : undefined}
         ribbon={
@@ -406,12 +397,14 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
                 </button>
               </>
             )}
-            {canManage && (
+            {canManage && onOpenRoster && (
               <button
-                onClick={() => setModalState({ open: true, session: null, initialDate: undefined })}
-                className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-lg transition-all active:scale-95"
+                type="button"
+                onClick={onOpenRoster}
+                title="Mở thêm ca làm ở một chỗ: Điều Phối Lịch Live"
+                className="border border-[var(--border)] text-[var(--text)] hover:border-[var(--accent)] font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 transition-all"
               >
-                <Plus className="w-4 h-4" /> Mở ca chờ đăng ký
+                <Plus className="w-4 h-4" /> Mở ca ở Điều Phối Lịch Live
               </button>
             )}
           </>
@@ -604,14 +597,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
               <h3 className="font-bold text-[var(--text)] text-sm">
                 {getDayOfWeekName(selectedDate)}, {fmtDateVn(selectedDate)}
               </h3>
-              {canManage && (
-                <button
-                  onClick={() => setModalState({ open: true, session: null, initialDate: selectedDate })}
-                  className="flex items-center gap-1 text-xs font-bold text-[var(--accent-text)] hover:opacity-80"
-                >
-                  <Plus className="w-3.5 h-3.5" /> Thêm phiên
-                </button>
-              )}
+
             </div>
 
             {(() => {
@@ -704,21 +690,6 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
         />
       )}
 
-      {modalState.open && canManage && (
-        <OpenSlotModal
-          fixedBrand={{ id: brandId, name: brandName }}
-          channels={channels}
-          initialPlatform={platformScope === "all" ? undefined : platformScope}
-          studios={studios}
-          brandStudios={brandStudios}
-          sessions={sessions}
-          shiftSlots={shiftSlots}
-          initialDate={modalState.initialDate ?? selectedDate}
-          currentUserId={currentUserId}
-          onClose={() => setModalState({ open: false, session: null })}
-          onCreateSlot={onCreateSlot!}
-        />
-      )}
 
       {selectedSlotDetail && (
         <SlotDetailModal

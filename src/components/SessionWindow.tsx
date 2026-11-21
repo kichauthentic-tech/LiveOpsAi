@@ -42,6 +42,7 @@ import { METRIC, metricHint } from "../lib/metricGlossary";
 import { dataSourceTier } from "../lib/dataSource";
 import { InfoDot } from "./common/InfoDot";
 import { TrustBadge } from "./common/TrustBadge";
+import { planScheduledChange } from "../lib/scheduling/scheduledChange";
 
 // Cửa sổ Ca Live — MỘT cửa sổ chi tiết cho một ca, dùng chung cho mọi nơi click vào ca (Sổ Ca,
 // Lịch Vận Hành, Đăng Ký & Chốt Lịch, Sessions bên brand). Thay cho 3 "chi tiết ca" khác nhau
@@ -181,6 +182,9 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
   };
   const [changeReason, setChangeReason] = useState("");
   const peopleChanged = edit.hostId !== editBase.hostId || (edit.coHostId || "") !== (editBase.coHostId ?? "");
+  // Một luật với Điều Phối Lịch Live (21/11): đổi người / dời giờ ca CHƯA diễn ra ⇒ RPC Điều Phối, lý do bắt buộc, cùng một sổ thay đổi.
+  const changePlan = planScheduledChange(editBase, edit, today);
+  const viaRoster = changePlan.viaRoster && !!sessionActions.reschedule;
   useEffect(() => {
     setEditingHandover(false);
     setEditing(false);
@@ -262,6 +266,14 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
       coHostId: edit.coHostId || undefined,
       coHostName: coObj?.name || ""
     };
+    if (viaRoster) {
+      if (!changeReason.trim()) { showToast("Ghi lý do đổi lịch ca trước khi lưu."); return; }
+      setSaving(true);
+      const done = await sessionActions.reschedule!(editBase, edit, changeReason);
+      setSaving(false);
+      if (done) { setEditing(false); setChangeReason(""); }
+      return;
+    }
     setSaving(true);
     const ok = await onUpdateSession(updated, editBase);
     if (ok && peopleChanged && onLogAudit) {
@@ -516,15 +528,19 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                   {segOpen ? "Ẩn “Đổi người giữa ca”" : hasStaffSegments(s) ? "Sửa đổi người giữa ca" : "Đổi người giữa ca (vào thay / ra sớm)"}
                 </button>
               )}
-              {peopleChanged && (
-                <label className="block"><span className="font-bold text-amber-300 block mb-1">Lý do đổi người <span className="font-normal text-[var(--text-faint)]">(báo bận, đổi ca…) — ghi vào nhật ký, người mới/cũ được báo</span></span>
+              {viaRoster ? (
+                <label className="block"><span className="font-bold text-amber-300 block mb-1">Lý do {changePlan.peopleChanged && changePlan.timeChanged ? "đổi người và dời giờ" : changePlan.peopleChanged ? "đổi người" : "dời giờ"} <span className="font-normal text-[var(--text-faint)]">(bắt buộc) — ghi vào nhật ký đổi lịch chung với Điều Phối Lịch Live; host/trợ được báo</span></span>
+                  <input type="text" value={changeReason} onChange={(e) => setChangeReason(e.target.value)} placeholder="Vd: Host báo bận đột xuất" className={inputCls} />
+                </label>
+              ) : peopleChanged && (
+                <label className="block"><span className="font-bold text-amber-300 block mb-1">Lý do đổi người <span className="font-normal text-[var(--text-faint)]">({changePlan.directWhy || "báo bận, đổi ca…"}) — ghi vào nhật ký</span></span>
                   <input type="text" value={changeReason} onChange={(e) => setChangeReason(e.target.value)} placeholder="Vd: Host báo bận đột xuất" className={inputCls} />
                 </label>
               )}
               <p className="text-2xs text-[var(--text-faint)]">{platformText("Target GMV", platformOf(s))} của ca lấy từ Kế Hoạch Tháng đã chốt — không sửa ở đây.</p>
               <div className="flex justify-end gap-2 pt-1">
                 <button onClick={() => setEditing(false)} className="px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] text-[var(--text-muted)] font-bold text-2xs">Huỷ</button>
-                <button onClick={saveEdit} disabled={saving || personBlocked} title={personBlocked ? "Trùng người — đổi người hoặc giờ ca" : undefined} className="px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-60 text-white font-bold text-2xs">{saving ? "Đang lưu..." : "Lưu thay đổi"}</button>
+                <button onClick={saveEdit} disabled={saving || personBlocked || (viaRoster && !changeReason.trim())} title={personBlocked ? "Trùng người — đổi người hoặc giờ ca" : viaRoster && !changeReason.trim() ? "Ghi lý do trước khi lưu" : undefined} className="px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-60 text-white font-bold text-2xs">{saving ? "Đang lưu..." : "Lưu thay đổi"}</button>
               </div>
             </section>
           )}
