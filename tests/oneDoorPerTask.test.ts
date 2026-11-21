@@ -34,3 +34,11 @@ test("đổi người / dời giờ ca chưa diễn ra đi qua luật chung plan
   expect(users(/planScheduledChange\(/).filter((p) => !p.startsWith("lib/"))).toEqual(["App.tsx", "components/LiveCalendar.tsx", "components/MonthPlan.tsx", "components/SessionWindow.tsx"]);
 });
 
+
+test("host/trợ mới: chỉ Talent Pool tạo hồ sơ + tài khoản; Phân Quyền chỉ cấp tài khoản cho hồ sơ có sẵn", () => {
+  expect(users(/newTalentProfile:/).filter((p) => !p.startsWith("server/") && !p.startsWith("lib/"))).toEqual(["App.tsx"]);
+  const app = ALL.find((f) => f.path === "App.tsx")!.src;
+  // Đường duy nhất gửi newTalentProfile là handleCreateTalentAccount (nút "Thêm talent" của Talent Pool).
+  expect(app.indexOf("newTalentProfile:")).toBeGreaterThan(app.indexOf("const handleCreateTalentAccount"));
+  expect(app.indexOf("newTalentProfile:")).toBeLessThan(app.indexOf("const handleGrantTalentAccounts"));
+});

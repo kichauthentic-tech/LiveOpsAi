@@ -2796,6 +2796,7 @@ export default function App() {
                     onGrantTalentAccounts={handleGrantTalentAccounts}
                     onSetUserEmail={handleSetUserEmail}
                     onResetUserPassword={handleResetUserPassword}
+                    onOpenTalentPool={checkPermission("manage_talents") ? () => navigateTo("talents") : undefined}
                   />
                 )}
 

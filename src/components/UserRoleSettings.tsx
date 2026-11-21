@@ -21,13 +21,6 @@ export interface NewUserPayload {
   customRoleTitle: string;
   assignedBrandId?: string;
   assignedTalentId?: string;
-  newTalentProfile?: {
-    name: string;
-    phone: string;
-    role: Talent["role"];
-    gender: string;
-    niches: string[];
-  };
 }
 
 interface UserRoleSettingsProps {
@@ -49,6 +42,8 @@ interface UserRoleSettingsProps {
   onSetUserEmail: (userId: string, email: string) => Promise<void>;
   /** Đặt lại mật khẩu — trả mật khẩu tạm (một lần). */
   onResetUserPassword: (userId: string) => Promise<string>;
+  /** Host/trợ MỚI thêm ở Talent Pool (gom việc 21/11: một việc — một chỗ) — nút trong form tạo tài khoản dẫn sang. */
+  onOpenTalentPool?: () => void;
 }
 
 // Danh sách role app thật sự hiển thị trong Ma Trận. Cố ý KHÔNG suy từ Object.keys(rolePermissions)
@@ -87,7 +82,8 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
   sessions,
   onGrantTalentAccounts,
   onSetUserEmail,
-  onResetUserPassword
+  onResetUserPassword,
+  onOpenTalentPool
 }) => {
   const confirm = useConfirm();
   const [activeTab, setActiveTab] = useState<"roles" | "users" | "audit" | "usage">("roles");
@@ -118,14 +114,9 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
     assignedTalentId: ""
   });
 
-  // Tạo talent ở modal này = người MỚI: server tự tạo hồ sơ Talent Pool + link 2 chiều. Người đã có hồ sơ (34+ hồ sơ
-  // thật nạp 19/09 không kèm tài khoản) thì cấp ở khối TalentAccountGrants phía trên danh sách — giữ nguyên ca cũ.
-  const [newTalentForm, setNewTalentForm] = useState<{
-    phone: string;
-    role: Talent["role"];
-    gender: string;
-    niches: string;
-  }>({ phone: "", role: "Host", gender: "Nữ", niches: "" });
+  // Từ 21/11 (gom việc trên ca, Đợt 3) modal này KHÔNG tạo hồ sơ talent: host/trợ mới thêm ở Talent Pool ("Thêm talent" — tạo hồ sơ + tài
+  // khoản, đủ rate); người đã có hồ sơ thì cấp ở khối TalentAccountGrants phía trên danh sách — giữ nguyên ca cũ. Trước đó modal này là
+  // cửa thứ hai tạo hồ sơ mới (thiếu rate, dễ ra hồ sơ trùng người đã đứng ca).
 
   // Thêm email (tài khoản đăng nhập bằng tên) + đặt lại mật khẩu — chỉ ceo/admin, không áp cho chính mình, CEO không đụng Admin.
   const canManageAccounts = currentRole === "ceo" || currentRole === "admin";
@@ -350,22 +341,13 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
         };
         await onUpdateUser(updated);
       } else {
-        const isNewTalent = formData.role === "talent";
+        if (formData.role === "talent") return; // nút Gửi đã khoá — host/trợ mới thêm ở Talent Pool
         await onAddUser({
           name: formData.name,
           email: formData.email,
           role: formData.role,
           customRoleTitle: formData.customRoleTitle || roleLabel(formData.role),
-          assignedBrandId: formData.role === "brand" ? formData.assignedBrandId : undefined,
-          newTalentProfile: isNewTalent
-            ? {
-                name: formData.name,
-                phone: newTalentForm.phone,
-                role: newTalentForm.role,
-                gender: newTalentForm.gender,
-                niches: newTalentForm.niches.split(",").map((s) => s.trim()).filter(Boolean)
-              }
-            : undefined
+          assignedBrandId: formData.role === "brand" ? formData.assignedBrandId : undefined
         });
       }
 
@@ -389,7 +371,6 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
       assignedBrandId: "",
       assignedTalentId: ""
     });
-    setNewTalentForm({ phone: "", role: "Host", gender: "Nữ", niches: "" });
     setIsUserModalOpen(true);
   };
 
@@ -1046,44 +1027,14 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                       </select>
                     </div>
                   ) : (
-                    <div className="space-y-2">
-                      <p className="text-2xs text-amber-300/80">
-                        Chỉ dành cho người MỚI chưa có hồ sơ: hệ thống tạo hồ sơ Talent Pool tên "{formData.name || "chưa nhập"}" và gắn tài khoản này.
-                        Người đã đứng ca rồi thì đóng lại, cấp ở khối "Host / trợ chưa có tài khoản" — tạo ở đây sẽ ra hồ sơ trùng, không thấy ca cũ.
-                      </p>
-                      <div className="grid grid-cols-2 gap-2">
-                        <input
-                          type="text"
-                          placeholder="Số điện thoại"
-                          value={newTalentForm.phone}
-                          onChange={(e) => setNewTalentForm({ ...newTalentForm, phone: e.target.value })}
-                          className="px-3 py-2 bg-[var(--surface-base)] rounded-xl border border-[var(--border)] text-[var(--text)] focus:outline-none focus:border-amber-500"
-                        />
-                        <select
-                          value={newTalentForm.role}
-                          onChange={(e) => setNewTalentForm({ ...newTalentForm, role: e.target.value as Talent["role"] })}
-                          className="px-3 py-2 bg-[var(--surface-base)] rounded-xl border border-[var(--border)] text-[var(--text)] focus:outline-none focus:border-amber-500"
-                        >
-                          <option value="Host">Host</option>
-<option value="Assistant">Trợ live (Assistant)</option>
-                        </select>
-                        <select
-                          value={newTalentForm.gender}
-                          onChange={(e) => setNewTalentForm({ ...newTalentForm, gender: e.target.value })}
-                          className="px-3 py-2 bg-[var(--surface-base)] rounded-xl border border-[var(--border)] text-[var(--text)] focus:outline-none focus:border-amber-500"
-                        >
-                          <option value="Nữ">Nữ</option>
-                          <option value="Nam">Nam</option>
-                          <option value="Khác">Khác</option>
-                        </select>
-                        <input
-                          type="text"
-                          placeholder="Ngành hàng (phân cách bằng dấu phẩy)"
-                          value={newTalentForm.niches}
-                          onChange={(e) => setNewTalentForm({ ...newTalentForm, niches: e.target.value })}
-                          className="px-3 py-2 bg-[var(--surface-base)] rounded-xl border border-[var(--border)] text-[var(--text)] focus:outline-none focus:border-amber-500"
-                        />
-                      </div>
+                    <div className="space-y-2 text-xs text-amber-200">
+                      <p><b>Host / trợ mới</b> (chưa có hồ sơ): thêm ở Talent Pool — tạo hồ sơ kèm tài khoản và rate một lần.</p>
+                      <p><b>Người đã đứng ca</b> (đã có hồ sơ): đóng form này, cấp ở khối "Host / trợ chưa có tài khoản" ngay trên danh sách — giữ nguyên ca cũ.</p>
+                      {onOpenTalentPool && (
+                        <button type="button" onClick={() => { setIsUserModalOpen(false); onOpenTalentPool(); }} className="px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] font-bold text-white">
+                          Mở Talent Pool
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1100,7 +1051,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                 </button>
                 <button
                   type="submit"
-                  disabled={isSavingUser}
+                  disabled={isSavingUser || (!editingUser && formData.role === "talent")}
                   className="px-5 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-xl font-extrabold shadow-lg shadow-[var(--accent)]/30 disabled:opacity-60"
                 >
                   {isSavingUser ? "Đang xử lý..." : editingUser ? "Lưu Cập Nhật" : "Gửi Lời Mời"}
