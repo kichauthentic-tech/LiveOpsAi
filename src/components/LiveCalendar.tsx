@@ -33,6 +33,7 @@ import { SessionActionsContext } from "../lib/sessionActionsContext";
 import { planScheduledChange } from "../lib/scheduling/scheduledChange";
 import { talentRoleLabel } from "../lib/talentName";
 import { platformsWithValue, sumByPlatform } from "../lib/platforms/perf";
+import { changeReasonChoices } from "../lib/scheduling/changeReasons";
 interface LiveCalendarProps {
   sessions: LiveSession[];
   shiftSlots?: ShiftSlot[];
@@ -177,7 +178,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   const moveToDay = async (session: LiveSession, targetDateStr: string): Promise<boolean> => {
     const next = { date: targetDateStr, startTime: session.startTime, endTime: session.endTime, studioId: session.studioId, hostId: session.hostId, coHostId: session.coHostId };
     if (planScheduledChange(session, next, getTodayDateString()).viaRoster && sessionActions.reschedule) {
-      const reason = await prompt(`Lý do dời ca ${session.brandName} ${session.startTime}–${session.endTime} sang ${fmtDateVn(targetDateStr)} (host/trợ được báo)`, { placeholder: "vd: Brand đổi khung live" });
+      const reason = await prompt(`Lý do dời ca ${session.brandName} ${session.startTime}–${session.endTime} sang ${fmtDateVn(targetDateStr)} (host/trợ được báo)`, { choices: changeReasonChoices(false, true), placeholder: "Hoặc gõ lý do khác" });
       if (!reason?.trim()) return false;
       return sessionActions.reschedule(session, next, reason);
     }

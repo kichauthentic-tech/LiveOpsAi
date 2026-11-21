@@ -102,6 +102,7 @@ const SINGLE_PLATFORM_FILES: Record<string, string> = {
   "components/brand-workspace/BrandWeeklyReport.tsx": "nhận `platform`, lọc ca theo sàn",
   "components/brand-workspace/MonthlyReportTabs.tsx": "report TikTok, chỉ ca TikTok",
   "lib/dataraw/productListAgg.ts": "file product_list của một sàn",
+  "lib/calendar/monthProgress.ts": "GMV tiến độ tháng khoá theo `platformOf(s)` (gmv.TikTok / gmv.Shopee) — Lịch Vận Hành brand đọc từng sàn, không có tổng gộp",
   "lib/talent/channelSummary.ts": "mỗi dòng khoá theo `brandId|platform|role` — chỉ cộng ca của MỘT kênh brand × sàn (không có tổng gộp hai sàn)",
   "lib/metrics/avgGmv.ts": "perfOf/computeTalentBrandPerf nhận mảng đã lọc theo sàn",
   "lib/performance/brandCommitment.ts": "cam kết của một kênh: lọc brand + sàn + tháng",

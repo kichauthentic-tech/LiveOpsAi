@@ -59,6 +59,7 @@ import { channelTitle, platformOf, brandPlatformKey, type ReportPlatform } from 
 import { platformsOfBrand } from "../lib/channels";
 import { planRunRate } from "../lib/performance/planRunRate";
 import { InfoDot } from "./common/InfoDot";
+import { changeReasonChoices } from "../lib/scheduling/changeReasons";
 interface MonthPlanProps {
   /** Sàn của workspace agency (07/10): kế hoạch, target, cam kết của sàn này — không còn nút chuyển sàn trong màn. */
   platform: ReportPlatform;
@@ -587,7 +588,7 @@ export default function MonthPlan({
     const next = { date: session.date, startTime, endTime, studioId: session.studioId, hostId: session.hostId, coHostId: session.coHostId };
     let ok: boolean;
     if (planScheduledChange(session, next, todayVn()).viaRoster && sessionActions.reschedule) {
-      const reason = await prompt(`Lý do dời ca ${d.date.slice(8)}/${d.date.slice(5, 7)} ${session.startTime}–${session.endTime} sang ${startTime}–${endTime} (host/trợ được báo)`, { placeholder: "vd: Brand đổi khung live" });
+      const reason = await prompt(`Lý do dời ca ${d.date.slice(8)}/${d.date.slice(5, 7)} ${session.startTime}–${session.endTime} sang ${startTime}–${endTime} (host/trợ được báo)`, { choices: changeReasonChoices(false, true), placeholder: "Hoặc gõ lý do khác" });
       if (!reason?.trim()) return false;
       ok = await sessionActions.reschedule(session, next, reason);
     } else ok = await onUpdateSession({ ...session, startTime, endTime }, session);

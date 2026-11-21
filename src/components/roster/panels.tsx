@@ -625,7 +625,7 @@ export const ChangeLogPanel: React.FC<{ changes: RosterChange[] | null; sessions
   return (
     <section className="space-y-2 border-t border-[var(--border)] pt-4">
       <h4 className="text-sm font-black text-[var(--text)]">Nhật ký đổi lịch (30 ngày)</h4>
-      <p className="text-xs text-[var(--text-muted)]">Mỗi lần đổi người hoặc dời giờ một ca đã lên lịch, kèm lý do.<InfoDot label="Nhật ký ghi những gì">Chỉ ghi thao tác làm từ Điều Phối Lịch Live. Đổi ở Lịch &amp; Studio hay Cửa sổ Ca Live không vào đây.</InfoDot></p>
+      <p className="text-xs text-[var(--text-muted)]">Mỗi lần đổi người hoặc dời giờ một ca đã lên lịch, kèm lý do.<InfoDot label="Nhật ký ghi những gì">Ghi mọi lần đổi người / dời giờ ca chưa diễn ra, dù làm ở Điều Phối, Cửa sổ ca, Lịch hay Kế Hoạch Tháng. Ca đã qua sửa thẳng, không vào đây.</InfoDot></p>
       {changes === null && <p className="text-xs text-[var(--text-muted)]">Đang tải…</p>}
       {changes && changes.length === 0 && <p className="text-xs text-[var(--text-muted)]">Chưa có lần đổi nào.</p>}
       {changes && changes.length > 0 && (

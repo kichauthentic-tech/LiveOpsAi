@@ -33,6 +33,8 @@ import { SessionRoomCase } from "./SessionRoomCase";
 import { handoverOwnerLabel, hasHandover, isHandoverPerson } from "../lib/handover";
 import { useToast } from "../hooks/useToast";
 import { useConfirm } from "../hooks/useConfirm";
+import { ReasonChips } from "./common/ReasonChips";
+import { changeReasonChoices, effectiveChangeReason } from "../lib/scheduling/changeReasons";
 import { SessionActionsContext } from "../lib/sessionActionsContext";
 import { CLOSED_MONTH_NOTICE } from "../lib/closedMonth";
 import { describeStaff, effectiveSegments, hasStaffSegments } from "../lib/staffSegments";
@@ -267,9 +269,8 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
       coHostName: coObj?.name || ""
     };
     if (viaRoster) {
-      if (!changeReason.trim()) { showToast("Ghi lý do đổi lịch ca trước khi lưu."); return; }
       setSaving(true);
-      const done = await sessionActions.reschedule!(editBase, edit, changeReason);
+      const done = await sessionActions.reschedule!(editBase, edit, effectiveChangeReason(changeReason));
       setSaving(false);
       if (done) { setEditing(false); setChangeReason(""); }
       return;
@@ -529,9 +530,10 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                 </button>
               )}
               {viaRoster ? (
-                <label className="block"><span className="font-bold text-amber-300 block mb-1">Lý do {changePlan.peopleChanged && changePlan.timeChanged ? "đổi người và dời giờ" : changePlan.peopleChanged ? "đổi người" : "dời giờ"} <span className="font-normal text-[var(--text-faint)]">(bắt buộc) — ghi vào nhật ký đổi lịch chung với Điều Phối Lịch Live; host/trợ được báo</span></span>
-                  <input type="text" value={changeReason} onChange={(e) => setChangeReason(e.target.value)} placeholder="Vd: Host báo bận đột xuất" className={inputCls} />
-                </label>
+                <div className="space-y-1.5"><span className="font-bold text-amber-300 block">Lý do {changePlan.peopleChanged && changePlan.timeChanged ? "đổi người và dời giờ" : changePlan.peopleChanged ? "đổi người" : "dời giờ"} <span className="font-normal text-[var(--text-faint)]">— ghi vào nhật ký đổi lịch chung với Điều Phối Lịch Live; host/trợ được báo</span></span>
+                  <ReasonChips choices={changeReasonChoices(changePlan.peopleChanged, changePlan.timeChanged)} value={changeReason} onChange={setChangeReason} />
+                  <input type="text" aria-label="Lý do khác" value={changeReason} onChange={(e) => setChangeReason(e.target.value)} placeholder="Hoặc gõ lý do khác" className={inputCls} />
+                </div>
               ) : peopleChanged && (
                 <label className="block"><span className="font-bold text-amber-300 block mb-1">Lý do đổi người <span className="font-normal text-[var(--text-faint)]">({changePlan.directWhy || "báo bận, đổi ca…"}) — ghi vào nhật ký</span></span>
                   <input type="text" value={changeReason} onChange={(e) => setChangeReason(e.target.value)} placeholder="Vd: Host báo bận đột xuất" className={inputCls} />
@@ -540,7 +542,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
               <p className="text-2xs text-[var(--text-faint)]">{platformText("Target GMV", platformOf(s))} của ca lấy từ Kế Hoạch Tháng đã chốt — không sửa ở đây.</p>
               <div className="flex justify-end gap-2 pt-1">
                 <button onClick={() => setEditing(false)} className="px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] text-[var(--text-muted)] font-bold text-2xs">Huỷ</button>
-                <button onClick={saveEdit} disabled={saving || personBlocked || (viaRoster && !changeReason.trim())} title={personBlocked ? "Trùng người — đổi người hoặc giờ ca" : viaRoster && !changeReason.trim() ? "Ghi lý do trước khi lưu" : undefined} className="px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-60 text-white font-bold text-2xs">{saving ? "Đang lưu..." : "Lưu thay đổi"}</button>
+                <button onClick={saveEdit} disabled={saving || personBlocked} title={personBlocked ? "Trùng người — đổi người hoặc giờ ca" : undefined} className="px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-60 text-white font-bold text-2xs">{saving ? "Đang lưu..." : "Lưu thay đổi"}</button>
               </div>
             </section>
           )}

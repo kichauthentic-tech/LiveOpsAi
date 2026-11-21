@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import { MonthPicker } from "../components/common/MonthPicker";
+import { ReasonChips } from "../components/common/ReasonChips";
 
 // Thay window.confirm() (đợt dọn nợ kỹ thuật, tiếp theo useToast.tsx). window.confirm() là dialog
 // CHẶN — không test/automation được (Browser pane tự nuốt, trả về false ngay), không style được
@@ -32,6 +33,8 @@ interface PromptOptions {
   inputType?: "text" | "month" | "time";
   placeholder?: string;
   confirmLabel?: string;
+  /** Nút chọn nhanh phía trên ô gõ (vd lý do đổi lịch). Ô trống ⇒ trả lựa chọn đầu tiên, khỏi phải gõ. */
+  choices?: string[];
 }
 
 interface PromptState extends PromptOptions {
@@ -58,7 +61,7 @@ const PromptDialog: React.FC<{ state: PromptState; onSubmit: (value: string) => 
         onClick={(e) => e.stopPropagation()}
         onSubmit={(e) => {
           e.preventDefault();
-          onSubmit(value);
+          onSubmit(value.trim() ? value : state.choices?.[0] ?? value);
         }}
       >
         <label className="block space-y-2">
@@ -67,6 +70,8 @@ const PromptDialog: React.FC<{ state: PromptState; onSubmit: (value: string) => 
           {state.inputType === "month" ? (
             <MonthPicker value={value} onChange={setValue} align="left" />
           ) : (
+            <>
+            {state.choices && <ReasonChips choices={state.choices} value={value} onChange={setValue} />}
             <input
               autoFocus
               type={state.inputType ?? "text"}
@@ -75,6 +80,7 @@ const PromptDialog: React.FC<{ state: PromptState; onSubmit: (value: string) => 
               onChange={(e) => setValue(e.target.value)}
               className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)]"
             />
+            </>
           )}
         </label>
         <div className="flex items-center justify-end gap-2">
@@ -87,7 +93,7 @@ const PromptDialog: React.FC<{ state: PromptState; onSubmit: (value: string) => 
           </button>
           <button
             type="submit"
-            disabled={!value.trim()}
+            disabled={!value.trim() && !state.choices?.length}
             className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 transition-colors"
           >
             {state.confirmLabel ?? "OK"}

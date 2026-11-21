@@ -2,6 +2,7 @@
 // Chạy: npx vitest run tests/scheduledChange.test.ts
 import { describe, expect, test } from "vitest";
 import { planScheduledChange } from "../src/lib/scheduling/scheduledChange";
+import { DEFAULT_CHANGE_REASON, changeReasonChoices, effectiveChangeReason } from "../src/lib/scheduling/changeReasons";
 import { LiveSession } from "../src/types";
 
 const TODAY = "2026-11-21";
@@ -44,5 +45,23 @@ describe("planScheduledChange", () => {
   test("không đổi gì ⇒ không đi Điều Phối", () => {
     const s = ca();
     expect(planScheduledChange(s, edit(s), TODAY)).toMatchObject({ viaRoster: false, timeChanged: false, peopleChanged: false });
+  });
+});
+
+describe("lý do đổi lịch chọn nhanh (21/11: không bắt gõ)", () => {
+  test("đổi người ⇒ lựa chọn về người, mặc định đứng đầu", () => {
+    const c = changeReasonChoices(true, false);
+    expect(c[0]).toBe(DEFAULT_CHANGE_REASON);
+    expect(c).toContain("Talent báo bận");
+    expect(c).not.toContain("Brand đổi khung live");
+  });
+  test("đổi cả người lẫn giờ ⇒ gộp, không lặp", () => {
+    const c = changeReasonChoices(true, true);
+    expect(c).toContain("Brand đổi khung live");
+    expect(new Set(c).size).toBe(c.length);
+  });
+  test("không gõ gì ⇒ ghi lý do mặc định, không bao giờ trống", () => {
+    expect(effectiveChangeReason("  ")).toBe(DEFAULT_CHANGE_REASON);
+    expect(effectiveChangeReason(" Host ốm ")).toBe("Host ốm");
   });
 });

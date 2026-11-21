@@ -61,6 +61,7 @@ import type { EngineParams } from "../lib/scheduling/engineParams";
 import { platformOf, type ReportPlatform, type SchedulePlatform } from "../lib/reportPlatform";
 import { FeatureOffNote } from "./common/FeatureOffNote";
 import { InfoDot } from "./common/InfoDot";
+import { changeReasonChoices } from "../lib/scheduling/changeReasons";
 
 // Điều Phối Lịch Live (0175/0176, 13/10). Quy trình tuần user chốt: Kế Hoạch Tháng chốt ⇒ ca mở → trainer đặt HẠN ĐĂNG KÝ → host/trợ báo rảnh
 // (tab Đăng Ký Ca) → trainer xếp NHÁP ở đây (talent/brand không thấy) → "Công bố tuần": chốt cả tuần trong một transaction, mỗi người
@@ -539,7 +540,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
         showToast("Ca đã lên lịch phải có host — chọn người thay trước, hoặc huỷ ca.");
         return;
       }
-      const reason = presetReason ?? (await prompt(`Lý do đổi ${role === "host" ? "host" : "trợ live"} ca ${shift.brandName} ${dayLabel(shift.date)} ${shift.startTime} (ghi vào nhật ký, người bị rút nhận thông báo)`, { placeholder: "vd: Host báo ốm" }));
+      const reason = presetReason ?? (await prompt(`Lý do đổi ${role === "host" ? "host" : "trợ live"} ca ${shift.brandName} ${dayLabel(shift.date)} ${shift.startTime} (ghi vào nhật ký, người bị rút nhận thông báo)`, { choices: changeReasonChoices(true, false), placeholder: "Hoặc gõ lý do khác" }));
       if (!reason?.trim()) return;
       const saved = await rosterReassign(shift.sessionId!, hostId, coId ?? null, reason.trim());
       p.onSessionUpdated(saved);
@@ -590,7 +591,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
         showToast("Đã dời ca mở");
         return;
       }
-      const reason = await prompt(`Lý do dời ca ${shift.brandName} ${dayLabel(shift.date)} ${shift.startTime} sang ${dayLabel(v.date)} ${v.startTime}–${v.endTime}`, { placeholder: "vd: Brand đổi khung live" });
+      const reason = await prompt(`Lý do dời ca ${shift.brandName} ${dayLabel(shift.date)} ${shift.startTime} sang ${dayLabel(v.date)} ${v.startTime}–${v.endTime}`, { choices: changeReasonChoices(false, true), placeholder: "Hoặc gõ lý do khác" });
       if (!reason?.trim()) return;
       const saved = await rosterMoveSession(shift.sessionId!, v.date, v.startTime, v.endTime, reason.trim());
       p.onSessionUpdated(saved);
