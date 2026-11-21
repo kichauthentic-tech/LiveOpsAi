@@ -54,7 +54,10 @@ export const WeekGrid: React.FC<{
   /** Ca đã huỷ: vẫn hiện (gạch ngang, không bấm được) để trainer thấy đúng cái sẽ gửi brand. */
   cancelled?: RosterShift[];
 }> = ({ weekStart, month, channels, shifts, analysis, nameOf, roleOf, colorOf, selectedKey, canAdd, onSelect, onAdd, channelMeta, focus, cancelled }) => {
-  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)).filter((d) => !month || d.slice(0, 7) === month);
+  // Luôn đủ 7 cột cùng độ rộng (21/11): tuần vắt hai tháng thì ngày ngoài tháng để trống + mờ,
+  // thay vì cắt bỏ khiến 1–2 cột còn lại giãn hết chiều ngang.
+  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  const outside = (d: string) => !!month && d.slice(0, 7) !== month;
   const labelW = channelMeta ? 168 : 140;
   return (
     <div className="space-y-2">
@@ -62,7 +65,7 @@ export const WeekGrid: React.FC<{
         <div className="grid" style={{ minWidth: labelW + days.length * 168, gridTemplateColumns: `${labelW}px repeat(${days.length}, minmax(164px, 1fr))` }}>
           <div className="sticky left-0 z-10 bg-[var(--surface-elevated)] px-2 py-2 text-xs font-bold text-[var(--text-muted)] border-b border-r border-[var(--border)]">Kênh</div>
           {days.map((d) => (
-            <div key={d} className="bg-[var(--surface-elevated)] px-2 py-2 text-xs font-bold text-[var(--text)] border-b border-r border-[var(--border)]">
+            <div key={d} className={`bg-[var(--surface-elevated)] px-2 py-2 text-xs font-bold border-b border-r border-[var(--border)] ${outside(d) ? "text-[var(--text-faint)] opacity-50" : "text-[var(--text)]"}`}>
               {dayLabel(d)}
             </div>
           ))}
@@ -74,6 +77,7 @@ export const WeekGrid: React.FC<{
                 {channelMeta?.(ch)}
               </div>
               {days.map((d) => {
+                if (outside(d)) return <div key={d} aria-hidden className="border-b border-r border-[var(--border)] bg-[var(--surface-elevated)]/40" />;
                 const list = shifts.filter((s) => s.channelKey === ch.key && s.date === d);
                 return (
                   <div key={d} className="p-1.5 border-b border-r border-[var(--border)] space-y-2 min-w-0">
