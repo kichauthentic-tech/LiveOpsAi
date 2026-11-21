@@ -25,8 +25,6 @@ interface Props {
   monthlyReports: Map<string, BrandMonthlyReport>;
   talents: Talent[];
   canSeeMoney: boolean;
-  /** Ca nháp sa bàn đang chờ (useSessionDrafts của App). */
-  draftCount?: number;
   /** Màn nào người dùng mở được (theo quyền) — việc dẫn tới màn bị khoá thì không hiện. */
   canOpenTab: (tab: string) => boolean;
   onOpen: (todo: Todo) => void;
@@ -44,7 +42,7 @@ function prevMonthOf(month: string): string {
   return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
 }
 
-export const TodoPanel: React.FC<Props> = ({ brands, channels, sessions, shiftSlots, rates, termPeriods, monthlyReports, talents, canSeeMoney, draftCount, canOpenTab, onOpen }) => {
+export const TodoPanel: React.FC<Props> = ({ brands, channels, sessions, shiftSlots, rates, termPeriods, monthlyReports, talents, canSeeMoney, canOpenTab, onOpen }) => {
   const today = todayVn();
   const month = today.slice(0, 7);
   const [plansThisMonth, setPlansThisMonth] = useState<Map<string, BrandMonthPlan> | null>(null);
@@ -75,8 +73,8 @@ export const TodoPanel: React.FC<Props> = ({ brands, channels, sessions, shiftSl
 
   const todos = useMemo(() => {
     if (!plansThisMonth || !plansNextMonth || !commitments || affiliate === undefined || coverage === undefined || acks === undefined) return null;
-    return buildTodos({ today, draftCount, acks: acks ?? undefined, brands, channels, sessions, shiftSlots, plansThisMonth, plansNextMonth, coverage: coverage ?? undefined, commitments, rates, termPeriods, monthlyReports, talents, canSeeMoney, affiliate: affiliate ?? undefined }).filter((t) => canOpenTab(t.tab));
-  }, [today, acks, brands, channels, sessions, shiftSlots, plansThisMonth, plansNextMonth, coverage, commitments, rates, termPeriods, monthlyReports, talents, canSeeMoney, affiliate, canOpenTab, draftCount]);
+    return buildTodos({ today, acks: acks ?? undefined, brands, channels, sessions, shiftSlots, plansThisMonth, plansNextMonth, coverage: coverage ?? undefined, commitments, rates, termPeriods, monthlyReports, talents, canSeeMoney, affiliate: affiliate ?? undefined }).filter((t) => canOpenTab(t.tab));
+  }, [today, acks, brands, channels, sessions, shiftSlots, plansThisMonth, plansNextMonth, coverage, commitments, rates, termPeriods, monthlyReports, talents, canSeeMoney, affiliate, canOpenTab]);
 
   if (todos === null) return null; // đang tải — không vẽ khung rỗng rồi nhảy
   const { today: dayRows, month: monthGroups } = groupTodos(todos);

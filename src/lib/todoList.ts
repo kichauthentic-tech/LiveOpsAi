@@ -23,8 +23,8 @@ import { unackedSoon } from "./talent/acks";
 
 export type TodoLevel = "high" | "medium" | "low";
 
-/** Bảng Vận Hành mở sẵn chỗ này khi bấm việc: bộ lọc ca nháp / ca đã qua giờ chưa có số / chưa nhận lịch, hoặc một ngày cụ thể. */
-export type BoardView = "drafts" | "backlog" | "unack" | `day:${string}`;
+/** Bảng Vận Hành mở sẵn chỗ này khi bấm việc: bộ lọc ca đã qua giờ chưa có số / chưa nhận lịch, hoặc một ngày cụ thể. */
+export type BoardView = "backlog" | "unack" | `day:${string}`;
 
 export interface Todo {
   id: string;
@@ -38,15 +38,13 @@ export interface Todo {
   rememberBrandId?: string;
   /** Sàn đi kèm brand đã nhớ (kế hoạch theo sàn, 0140). */
   rememberPlatform?: "TikTok" | "Shopee";
-  /** Bảng Vận Hành mở sẵn bộ lọc này (24/10: ca nháp, ca chưa có số, chưa nhận lịch, một ngày). */
+  /** Bảng Vận Hành mở sẵn bộ lọc này (ca chưa có số, chưa nhận lịch, một ngày). */
   view?: BoardView;
   action: string;
 }
 
 export interface TodoInput {
   today: string; // YYYY-MM-DD
-  /** Số ca nháp sa bàn đang chờ xác nhận (0170). Vắng / 0 ⇒ không nhắc. */
-  draftCount?: number;
   /** Dòng "Đã nhận lịch" (0169) — vắng = DB chưa chạy 0169 / đọc lỗi ⇒ bỏ qua việc "chưa nhận lịch". */
   acks?: ShiftAck[];
   /** Giờ hiện tại (ms) cho việc tính theo giờ — vắng thì Date.now(). */
@@ -122,18 +120,6 @@ export function buildTodos(input: TodoInput): Todo[] {
   const idle = brands.filter((b) => !active.has(b.id));
   const out: Todo[] = [];
 
-  // Ca nháp của sa bàn (0170) — 24/10 gộp Phòng Điều Hành vào Bảng Vận Hành: nháp là MỘT việc ở đây, không còn khối riêng.
-  if (input.draftCount) {
-    out.push({
-      id: "session-drafts",
-      level: "high",
-      title: `${input.draftCount} ca nháp chờ xác nhận`,
-      detail: "Tạo từ sa bàn (Bảng Vận Hành · Cả tháng). Xác nhận = tạo ca thật và chốt người; trùng người/phòng bị chặn như ca thường.",
-      tab: "calendar",
-      view: "drafts",
-      action: "Xem ca nháp"
-    });
-  }
 
   for (const b of activeBrands) {
     const own = sessions.filter((s) => s.brandId === b.id);

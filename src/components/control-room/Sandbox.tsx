@@ -8,7 +8,7 @@ import type { RoomChannel } from "./types";
 import { InfoDot } from "../common/InfoDot";
 
 // Sa bàn: lưới ô ca 3 giờ còn trống (phòng của kênh rảnh + có host và trợ quen kênh rảnh) từ ngày mai tới cuối tháng. Bấm để thử,
-// "Tự xếp" chọn N ca tăng nhiều nhất, xác suất từng kênh đổi ngay. "Tạo ca nháp" ghi NHÁP (0170) — OP xác nhận mới thành ca thật.
+// "Tự xếp" chọn N ca tăng nhiều nhất, xác suất từng kênh đổi ngay. Thêm ca thật ở Điều Phối Lịch Live (21/11: sa bàn không tạo nháp nữa).
 
 const STARTS = ["10:00", "14:00", "20:00"];
 
@@ -140,10 +140,9 @@ export const Sandbox: React.FC<{
             )}
           </div>
           <p className="text-2xs text-[var(--text-faint)]">
-            Ca nháp chưa giữ phòng, chưa báo ai.
+            Chỉ là bản thử: chưa giữ phòng, chưa báo ai.
             <InfoDot label="Ca thêm hoạt động thế nào">
-              Ca thêm là giờ brand mua thêm (hoặc agency tặng) — bàn với brand trước. OP xác nhận ở khối &quot;Ca nháp chờ xác nhận&quot;
-              thì ca mới thành ca thật, và tự thành ca tăng cường (không cộng vào target tháng).
+              Ca thêm là giờ brand mua thêm (hoặc agency tặng) — bàn với brand trước, rồi thêm ca và xếp người ở Điều Phối Lịch Live.
             </InfoDot>
           </p>
         </div>

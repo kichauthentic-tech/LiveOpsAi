@@ -373,7 +373,7 @@ test("Bảng Vận Hành: khối Cần xử lý + nhãn \"chưa có số\" thay 
   expect(src).toMatch(/const backlog = useMemo\(\(\) => sessions\.filter\(isUnconfirmedPast\)/);
   expect(src).not.toMatch(/missingSteps\(|"chưa giao ca"|"chưa up file"|MISSING_LABEL/);
   // Không bày ô 0: tóm tắt chỉ hiện khi khoảng đang xem có ca; kỳ vọng / GMV tách theo sàn.
-  expect(src).toMatch(/\{summary\.total > 0 && range !== "drafts" && \(/);
+  expect(src).toMatch(/\{summary\.total > 0 && \(/);
   expect(src).toMatch(/label=\{`Kỳ vọng \$\{p\}`\}/);
   // Dòng ca là component ngoài hàm vẽ (không dựng lại cả danh sách mỗi lần cập nhật).
   expect(src).toMatch(/^const SessionRow: React\.FC</m);

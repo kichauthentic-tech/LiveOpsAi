@@ -26,8 +26,8 @@ test("duyệt đổi ca: hàng đợi duyệt chỉ ở Điều Phối Lịch Li
   expect(users(/<SwapApprovalQueue\b/)).toEqual(["components/RosterBoard.tsx"]);
 });
 
-test("không màn nào tạo ca + chốt người thẳng bằng ca nháp sa bàn", () => {
-  expect(users(/createSessionDrafts\(/).filter((p) => !p.startsWith("lib/db/"))).toEqual([]);
+test("không còn đường ca nháp sa bàn (tạo / nhận / bỏ) — thêm ca + xếp người chỉ ở Điều Phối Lịch Live", () => {
+  expect(users(/session_drafts|SessionDraft|useSessionDrafts|DraftsPanel/)).toEqual([]);
 });
 
 test("đổi người / dời giờ ca chưa diễn ra đi qua luật chung planScheduledChange", () => {

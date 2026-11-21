@@ -1,7 +1,7 @@
 import { platformText } from "../lib/metricGlossary";
 import React, { useContext, useEffect, useMemo, useState } from "react";
 import { SESSION_STATUS_CLS, SESSION_STATUS_LABEL_VI } from "../lib/sessionStatusUi";
-import { ArrowLeftRight, CalendarClock, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, FileClock, Radio, UserX, X } from "lucide-react";
+import { ArrowLeftRight, CalendarClock, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Radio, UserX, X } from "lucide-react";
 import { Brand, LiveSession, ShiftRegistration, ShiftSlot, Studio, Talent, UserRole, AuditLogEntry } from "../types";
 import { getTodayDate } from "../lib/dateUtils";
 import { fmtVndShort } from "../lib/format";
@@ -22,11 +22,8 @@ import { SessionActionsContext } from "../lib/sessionActionsContext";
 import { PageHeader } from "./common/PageHeader";
 import { StatTile } from "./common/StatTile";
 import { SlotDetailModal } from "./scheduling/SlotDetailModal";
-import { DraftsPanel } from "./control-room/DraftsPanel";
 import { ShiftBenchmarkBoard, defaultBenchPick, todayGroups } from "./control-room/ShiftBenchmarkBoard";
 import { DailyTargetBriefCard } from "./DailyTargetBriefCard";
-import type { SessionDraft } from "../lib/db/sessionDrafts";
-import type { DraftEdit } from "../hooks/useSessionDrafts";
 import type { ShiftWindow } from "./OpsSupport";
 
 // Bảng Vận Hành — màn của NHỊP HẰNG NGÀY (tái cấu trúc 2026-09-21): ca nào, ai trực, phòng nào, ca nào còn thiếu gì. Click ca → Cửa sổ
@@ -69,10 +66,6 @@ export interface OpsBoardProps {
   onViewChange?: (v: OpsView) => void;
   /** Nội dung chế độ "Cả tháng" (khối lập kế hoạch + OpsMonthView). */
   monthView?: React.ReactNode;
-  /** Ca nháp sa bàn đang chờ (0170). */
-  drafts?: SessionDraft[];
-  onAcceptDraft?: (d: SessionDraft, e: DraftEdit) => Promise<void>;
-  onDismissDrafts?: (ids: string[]) => Promise<void>;
   /** App yêu cầu mở sẵn một chỗ (bấm việc cần làm) — bảng mở rồi báo lại để App xoá yêu cầu. */
   requestRange?: BoardView | null;
   onRangeRequestHandled?: () => void;
@@ -84,7 +77,7 @@ export interface OpsBoardProps {
 
 export type OpsView = "day" | "month";
 
-type Range = "past" | "today" | "tomorrow" | "week" | "day" | "drafts" | "backlog";
+type Range = "past" | "today" | "tomorrow" | "week" | "day" | "backlog";
 type Filter = "nohost" | "noroom" | "unack";
 
 const WEEKDAY = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
@@ -108,11 +101,10 @@ function fmtDay(d: string): string {
 }
 const isUpcoming = (s: LiveSession, today: string) => s.status === "Upcoming" || s.status === "Live Now" || (s.status !== "Cancelled" && s.status !== "Completed" && s.date >= today);
 
-// Một dòng của bảng: ca thật (session), ca mở chưa chốt người (slot), hoặc ca nháp của sa bàn chờ xác nhận (draft).
+// Một dòng của bảng: ca thật (session) hoặc ca mở chưa chốt người (slot).
 type Row =
   | { kind: "session"; date: string; startTime: string; endTime: string; session: LiveSession }
-  | { kind: "slot"; date: string; startTime: string; endTime: string; slot: ShiftSlot; registered: number }
-  | { kind: "draft"; date: string; startTime: string; endTime: string; draft: SessionDraft };
+  | { kind: "slot"; date: string; startTime: string; endTime: string; slot: ShiftSlot; registered: number };
 
 // Bố cục 18/10: dòng ca là một hàng trong danh sách kẻ vạch, cột cố định giờ · brand · người · nhãn · kỳ vọng/GMV · trạng thái · mở chi tiết.
 // Màn hẹp: flex-wrap (trạng thái lên cùng hàng giờ + brand, người + nhãn xuống hàng dưới).
@@ -224,26 +216,6 @@ const SlotRow: React.FC<{ r: Extract<Row, { kind: "slot" }>; brand: Brand | unde
   </div>
 );
 
-// Ca nháp (sa bàn, 0170): viền nét đứt vàng — chưa phải ca thật; bấm để sửa giờ/người/phòng rồi xác nhận.
-const DraftRow: React.FC<{ d: SessionDraft; brand: Brand | undefined; hostName: string; coHostName: string; onOpen: (id: string) => void }> = ({ d, brand, hostName, coHostName, onOpen }) => (
-  <div role="button" tabIndex={0} onClick={() => onOpen(d.id)} onKeyDown={onKeyOpen(() => onOpen(d.id))} className={`${ROW_CLS} border border-dashed border-amber-500/40 bg-amber-500/[0.05] hover:bg-amber-500/10`} title="Ca nháp từ sa bàn — mở để xác nhận thành ca">
-    <span className="font-mono text-sm font-black text-[var(--text)] w-[104px] shrink-0">{d.startTime}–{d.endTime}</span>
-    <span className="flex items-center gap-1.5 min-w-0 sm:w-[168px] shrink-0">
-      <BrandLogo brand={brand} size="xs" />
-      <span className="text-sm font-bold text-[var(--text)] truncate">{brand?.name ?? "Brand"}</span>
-      <PlatformChip platform={d.platform} />
-    </span>
-    <span className="order-4 md:order-none flex-1 basis-40 min-w-0 md:basis-auto text-xs text-[var(--text-muted)] truncate">
-      {d.hostId ? <span className="text-[var(--text)]">{hostName}</span> : <span className="text-rose-300 font-bold">chưa chọn host</span>}
-      {d.coHostId ? <span className="text-[var(--text-faint)]"> · Trợ {coHostName}</span> : ""}
-    </span>
-    <span className="order-5 md:order-none ml-auto md:ml-0 text-2xs font-bold text-amber-300 truncate">{d.reason}</span>
-    <Expect value={d.expectedGmv} />
-    <span className="order-3 md:order-none ml-auto md:ml-0 text-2xs font-bold text-amber-300 flex items-center justify-center gap-1"><FileClock className="w-3.5 h-3.5" /> Nháp</span>
-    <span className="hidden md:block" />
-  </div>
-);
-
 // Khối "Cần xử lý": những thứ phải làm trước khi nhìn lịch. Mỗi dòng mở đúng danh sách / ngày / bộ lọc của nó.
 const NeedsQueue: React.FC<{
   backlogByDay: [string, number][];
@@ -332,9 +304,6 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
   view = "day",
   onViewChange,
   monthView,
-  drafts = [],
-  onAcceptDraft,
-  onDismissDrafts,
   requestRange = null,
   onRangeRequestHandled,
   expectedOf,
@@ -359,8 +328,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
   };
   const [rangeState, setRange] = useState<Range>("today");
   const [filter, setFilter] = useState<Filter | null>(null);
-  // Hết nháp khi đang ở bộ lọc Ca nháp ⇒ về hôm nay (nút lọc biến mất cùng lúc).
-  const range: Range = rangeState === "drafts" && drafts.length === 0 ? "today" : rangeState;
+  const range: Range = rangeState;
   const [anchor, setAnchor] = useState(today);
   const [openId, setOpenId] = useState<string | null>(null);
   // Bản tin target ↔ phễu benchmark: chip ca của bản tin chọn ca cho phễu (ShiftBenchmarkBoard) ngay bên dưới.
@@ -374,7 +342,6 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
     requestAnimationFrame(() => document.getElementById("shift-benchmark")?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
   const [openSlotId, setOpenSlotId] = useState<string | null>(null);
-  const [openDraftId, setOpenDraftId] = useState<string | null>(null);
   const [expandId, setExpandId] = useState<string | null>(null);
   // "Cả tháng" dựng một lần rồi giữ (ẩn khi về "Hôm nay & tuần") — trước 25/10 mỗi lần bấm tính lại ~0,8 giây.
   const [monthSeen, setMonthSeen] = useState(view === "month");
@@ -397,7 +364,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
   }, [requestOpenSessionId]);
   useEffect(() => {
     if (!requestRange) return;
-    if (requestRange === "drafts" || requestRange === "backlog") {
+    if (requestRange === "backlog") {
       setFilter(null);
       setRange(requestRange);
     } else if (requestRange === "unack") {
@@ -432,8 +399,6 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
   }, [sessions, acks, nowMs]);
 
   const brandById = useMemo(() => new Map(brands.map((b) => [b.id, b])), [brands]);
-  const draftName = (d: SessionDraft) => `${brandById.get(d.brandId)?.name ?? "Brand"} · ${d.platform}`;
-  const talentName = (id: string | null) => (id ? talents.find((t) => t.id === id)?.name ?? "?" : "");
   const regsBySlot = useMemo(() => {
     const m = new Map<string, number>();
     for (const r of shiftRegistrations) m.set(r.slotId, (m.get(r.slotId) ?? 0) + 1);
@@ -476,12 +441,11 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
     if (range === "tomorrow") return [addDays(today, 1), addDays(today, 1)];
     if (range === "past") return [addDays(today, -7), addDays(today, -1)];
     if (range === "week") { const mon = mondayOf(anchor); return [mon, addDays(mon, 6)]; }
-    if (range === "drafts") return [today, "9999-12-31"];
     if (range === "backlog") return ["0000-01-01", "9999-12-31"];
     return [anchor, anchor];
   }, [range, anchor, today]);
 
-  // Ops: mọi ca (session + slot mở chưa chốt + nháp) trong khoảng đang xem.
+  // Ops: mọi ca (session + slot mở chưa chốt) trong khoảng đang xem.
   const rows = useMemo<Row[]>(() => {
     const byTime = (a: Row, b: Row) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime);
     if (range === "backlog") {
@@ -489,11 +453,6 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
       return backlog.map<Row>((s) => ({ kind: "session", date: s.date, startTime: s.startTime, endTime: s.endTime, session: s })).sort((a, b) => b.date.localeCompare(a.date) || a.startTime.localeCompare(b.startTime));
     }
     const out: Row[] = [];
-    for (const d of drafts) {
-      if (d.date < from || d.date > to) continue;
-      out.push({ kind: "draft", date: d.date, startTime: d.startTime, endTime: d.endTime, draft: d });
-    }
-    if (range === "drafts") return out.sort(byTime);
     for (const s of sessions) {
       if (s.date < from || s.date > to || s.isBackfill) continue;
       if (filter && !matchFilter(s, filter)) continue;
@@ -507,7 +466,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
     }
     return out.sort(byTime);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessions, shiftSlots, drafts, range, from, to, regsBySlot, backlog, filter, unackBySession]);
+  }, [sessions, shiftSlots, range, from, to, regsBySlot, backlog, filter, unackBySession]);
 
   // Tóm tắt khoảng đang xem: số ca + (sắp tới) kỳ vọng / (đã qua) GMV đã ghi nhận — TÁCH theo sàn, không cộng TikTok với Shopee (07/10).
   const summary = useMemo(() => {
@@ -516,7 +475,6 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
     let expKnown = 0;
     if (expectedOf) {
       for (const r of rows) {
-        if (r.kind === "draft") continue;
         const id = r.kind === "session" ? r.session.id : r.slot.id;
         if (r.kind === "session" && !isUpcoming(r.session, today)) continue;
         const v = expectedOf(id);
@@ -527,7 +485,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
       }
     }
     return {
-      total: rows.filter((r) => r.kind !== "draft").length,
+      total: rows.length,
       noNumbers: ss.filter(isUnconfirmedPast).length,
       gmv: sumGmvByPlatform(ss),
       exp,
@@ -576,11 +534,6 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
                 {r === "past" ? "7 ngày qua" : r === "today" ? "Hôm nay" : r === "tomorrow" ? "Ngày mai" : r === "week" ? "Tuần" : "Ngày…"}
               </button>
             ))}
-            {view === "day" && drafts.length > 0 && (
-              <button onClick={() => { setRange("drafts"); setFilter(null); }} className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${range === "drafts" ? "seg-on" : "border-amber-500/50 text-amber-300 hover:text-[var(--text)]"}`}>
-                Ca nháp · {drafts.length}
-              </button>
-            )}
             {view === "day" && (range === "week" || range === "day") && (
               <div className="flex items-center gap-1">
                 <button onClick={() => setAnchor(addDays(anchor, range === "week" ? -7 : -1))} className="p-1.5 rounded-lg border border-[var(--border)] text-[var(--text-muted)]" aria-label="Lùi"><ChevronLeft className="w-4 h-4" /></button>
@@ -633,12 +586,6 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
             )}
             {aside && <aside className="min-w-0 xl:col-start-2 xl:row-start-1 xl:row-span-2 xl:sticky xl:top-0">{aside}</aside>}
             <div className="min-w-0 xl:col-start-1 xl:row-start-2 bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-2 sm:p-3 space-y-4">
-              {range === "drafts" && rows.length > 0 && (
-                <div className="flex flex-wrap items-center justify-between gap-2 px-2 sm:px-3 pt-1 text-xs text-[var(--text-muted)]">
-                  <span>{rows.length} ca nháp từ sa bàn (chế độ Cả tháng). Bấm từng ca để sửa giờ, người, phòng rồi xác nhận thành ca.</span>
-                  {onDismissDrafts && <button type="button" onClick={() => void onDismissDrafts(drafts.map((d) => d.id))} className="font-bold text-[var(--text-muted)] hover:text-rose-400 min-h-[28px]">Bỏ cả {drafts.length} ca nháp</button>}
-                </div>
-              )}
               {/* Tóm tắt một hàng ô không khung (thay 4 ô "Ca trong ngày / Chưa có người / Chưa giao ca / GMV" — 3 ô kia nay nằm ở khối Cần xử lý
                   và nhãn trên dòng ca). Không có ca thì không bày ô 0. */}
               {zeroMsg && (
@@ -647,7 +594,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
                   <button type="button" onClick={() => setZeroMsg(null)} aria-label="Đóng thông báo" className="p-1 text-[var(--text-faint)] hover:text-[var(--text)]"><X className="w-4 h-4" /></button>
                 </p>
               )}
-              {summary.total > 0 && range !== "drafts" && (
+              {summary.total > 0 && (
                 <div className="flex flex-wrap gap-x-8 gap-y-2 px-2 sm:px-3 pt-1">
                   <StatTile frame="plain" size="sm" label={range === "backlog" ? "Ca chưa có số liệu" : range === "today" ? "Ca hôm nay" : "Ca"} value={String(summary.total)} />
                   {pastRange
@@ -662,7 +609,6 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
                   {range !== "today" && range !== "tomorrow" && <p className={`px-2 sm:px-3 pb-1 text-xs font-black ${day === today ? "text-[var(--accent-text)]" : "text-[var(--text-faint)]"}`}>{fmtDay(day)}{day === today ? " · hôm nay" : ""}</p>}
                   <div className="divide-y divide-[var(--border-muted)]">
                     {list.map((r) => {
-                      if (r.kind === "draft") return <DraftRow key={r.draft.id} d={r.draft} brand={brandById.get(r.draft.brandId)} hostName={talentName(r.draft.hostId)} coHostName={talentName(r.draft.coHostId)} onOpen={setOpenDraftId} />;
                       const id = r.kind === "session" ? r.session.id : r.slot.id;
                       const open = expandId === id;
                       const row =
@@ -696,34 +642,6 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
             </div>
         </div>
       )}
-
-      {openDraftId && onAcceptDraft && onDismissDrafts && (() => {
-        const d = drafts.find((x) => x.id === openDraftId);
-        if (!d) return null;
-        const close = () => setOpenDraftId(null);
-        return (
-          <div className="fixed inset-0 z-50 bg-[var(--surface-base)]/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4" role="dialog" aria-label="Xác nhận ca nháp">
-            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl max-w-3xl w-full p-4 sm:p-6 space-y-3 shadow-2xl">
-              <div className="flex justify-between items-start gap-3">
-                <div className="min-w-0">
-                  <p className="font-black text-[var(--text)]">Ca nháp · {fmtDay(d.date)}</p>
-                  <p className="text-xs text-[var(--text-muted)]">Xác nhận = tạo ca thật và chốt người. Trùng người/phòng bị chặn như ca thường.</p>
-                </div>
-                <button type="button" onClick={close} aria-label="Đóng" className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text)]"><X className="w-4 h-4" /></button>
-              </div>
-              <DraftsPanel
-                drafts={[d]}
-                nameOf={draftName}
-                talents={talents}
-                studios={studios}
-                today={today}
-                onAccept={async (x, e) => { await onAcceptDraft(x, e); close(); }}
-                onDismiss={async (ids) => { await onDismissDrafts(ids); close(); }}
-              />
-            </div>
-          </div>
-        );
-      })()}
 
       {openSlotId && (() => {
         const slot = shiftSlots.find((x) => x.id === openSlotId);

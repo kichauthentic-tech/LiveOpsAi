@@ -50,7 +50,6 @@ import { myClashes, mySessions, openSlotsFrom } from "./lib/talent/myShifts";
 import { myBadgeCount } from "./lib/talent/agenda";
 import { myPendingAcks } from "./lib/talent/acks";
 import { useShiftAcks } from "./hooks/useShiftAcks";
-import { useSessionDrafts } from "./hooks/useSessionDrafts";
 import { useShiftExpectations } from "./hooks/useShiftExpectations";
 import type { BoardView } from "./lib/todoList";
 import type { OpsView } from "./components/OpsBoard";
@@ -275,7 +274,7 @@ export default function App() {
     setOpsView("month");
     setActiveTab("calendar");
   }, [activeTab]);
-  // Việc "N ca nháp chờ xác nhận" → Bảng Vận Hành mở sẵn bộ lọc Ca nháp (OpsBoard tiêu thụ rồi xoá).
+  // Bấm việc cần làm → Bảng Vận Hành mở sẵn bộ lọc (ca chưa có số / chưa nhận lịch / một ngày; OpsBoard tiêu thụ rồi xoá).
   const [opsRangeRequest, setOpsRangeRequest] = useState<BoardView | null>(null);
   // Q4: ca cần mở sau khi bấm thông báo (OpsBoard tiêu thụ rồi xoá).
   const [notifOpenSessionId, setNotifOpenSessionId] = useState<string | null>(null);
@@ -678,13 +677,6 @@ export default function App() {
   }, [shiftSlots, shiftRegistrations, myTalentIdForApp]);
   // T2 (0169): ca mới xếp / đổi giờ chưa bấm "Đã nhận".
   const { acks: talentAcks, loadedAt: talentAcksAt, ack: handleAckShifts } = useShiftAcks(!!myTalentIdForApp);
-  // Ca nháp sa bàn (0170) — một bản cho việc cần làm, dòng nháp của Bảng Vận Hành và chế độ "Cả tháng" (24/10).
-  const reloadSessionsAndSlots = React.useCallback(async () => {
-    const [s, sl] = await Promise.all([fetchSessions(), fetchShiftSlots()]);
-    setSessions(s);
-    setShiftSlots(sl);
-  }, [setSessions, setShiftSlots]);
-  const sessionDrafts = useSessionDrafts(activeTab === "calendar" && isOpsRole, reloadSessionsAndSlots);
   const talentAckCount = useMemo(
     () => (talentAcks ? myPendingAcks(visibleSessions, myTalentIdForApp, talentAcks, talentAcksAt).length : 0),
     [activeSessions, myTalentIdForApp, talentAcks, talentAcksAt]
@@ -2209,7 +2201,6 @@ export default function App() {
                         monthlyReports={monthlyReports}
                         talents={activeTalents}
                         canSeeMoney={currentRole === "ceo" || currentRole === "admin"}
-                        draftCount={sessionDrafts.drafts.length}
                         canOpenTab={canOpenTab}
                         onOpen={(t) => {
                           if (t.view) {
@@ -2267,18 +2258,10 @@ export default function App() {
                           planSlotTargets={planSlotTargets}
                           planMonthTotals={planMonthTotals}
                           engineParams={engineParams}
-                          draftCount={sessionDrafts.drafts.length}
                           onOpenRoster={rosterDoor}
-                          onShowDrafts={() => {
-                            setOpsView("day");
-                            setOpsRangeRequest("drafts");
-                          }}
                         />
                         </>
                       ) : undefined}
-                      drafts={isOpsRole ? sessionDrafts.drafts : []}
-                      onAcceptDraft={sessionDrafts.accept}
-                      onDismissDrafts={sessionDrafts.dismiss}
                       requestRange={opsRangeRequest}
                       onRangeRequestHandled={() => setOpsRangeRequest(null)}
                       expectedOf={isOpsRole ? (id) => (shiftExpect.byId ? shiftExpect.byId.get(id) : null) : undefined}

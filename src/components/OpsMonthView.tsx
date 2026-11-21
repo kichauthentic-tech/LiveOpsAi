@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { FileClock, MessageSquareText } from "lucide-react";
+import { MessageSquareText } from "lucide-react";
 import type { Brand, BrandChannel, BrandMonthPlan, BrandStudio, LiveSession, ShiftSlot } from "../types";
 import { DEFAULT_ENGINE_PARAMS, type EngineParams } from "../lib/scheduling/engineParams";
 import { effectiveCamp, resolveCampBucketType } from "../lib/campaignDays";
@@ -25,8 +25,8 @@ import { AskPanel } from "./control-room/AskPanel";
 import type { RoomChannel } from "./control-room/types";
 
 // BẢNG VẬN HÀNH · CẢ THÁNG (24/10: gộp Phòng Điều Hành 11/10 vào Bảng Vận Hành — cùng người dùng, cùng "ca sắp tới", chỉ khác tầm
-// nhìn). Còn: sa bàn + tự xếp (tạo ca NHÁP), ca xoay chuyển, MỘT bảng tải người, "Hỏi số liệu". Đã bỏ khi gộp: khối ca nháp riêng
-// (nháp nay là việc cần làm + dòng trong danh sách ca của "Hôm nay & tuần"), bảng tay nghề host riêng (host gợi ý xếp theo đúng thứ tự
+// nhìn). Còn: sa bàn + tự xếp (chỉ thử, 21/11 không tạo nháp — thêm ca ở Điều Phối Lịch Live), ca xoay chuyển, MỘT bảng tải người, "Hỏi số liệu". Đã bỏ khi gộp: khối ca nháp riêng
+// (21/11 bỏ hẳn đường ca nháp sa bàn), bảng tay nghề host riêng (host gợi ý xếp theo đúng thứ tự
 // của cửa sổ chốt ca — hostOrder). Khả năng đạt đi qua cùng engine (controlRoom.ts / pHitOf) và hiện bằng %.
 
 interface OpsMonthViewProps {
@@ -38,16 +38,12 @@ interface OpsMonthViewProps {
   planSlotTargets: Map<string, { date: string; target: number }[]>;
   planMonthTotals: Map<string, number>;
   engineParams?: EngineParams;
-  /** Số ca nháp cũ còn chờ (useSessionDrafts của App). Sa bàn không tạo nháp nữa từ 21/11 — thêm ca + xếp người ở Điều Phối Lịch Live. */
-  draftCount: number;
   /** Mở Điều Phối Lịch Live (đúng tuần của ca đầu tiên trong sa bàn). */
   onOpenRoster?: (date?: string, slotId?: string) => void;
-  /** Sang "Hôm nay & tuần", bộ lọc Ca nháp. */
-  onShowDrafts: () => void;
 }
 
 export default function OpsMonthView(props: OpsMonthViewProps) {
-  const { sessions, brands, brandChannels, shiftSlots, brandStudios, planSlotTargets, planMonthTotals, draftCount, onOpenRoster, onShowDrafts } = props;
+  const { sessions, brands, brandChannels, shiftSlots, brandStudios, planSlotTargets, planMonthTotals, onOpenRoster } = props;
   const params = props.engineParams ?? DEFAULT_ENGINE_PARAMS;
   const today = todayVn();
   const month = today.slice(0, 7);
@@ -170,11 +166,6 @@ export default function OpsMonthView(props: OpsMonthViewProps) {
       {/* Mô tả tháng nằm ở tiêu đề Bảng Vận Hành; hàng này chỉ còn nút. */}
       <div className="flex flex-wrap items-center justify-end gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          {draftCount > 0 && (
-            <button type="button" onClick={onShowDrafts} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold border border-amber-500/50 text-amber-300 min-h-[40px]">
-              <FileClock className="w-4 h-4" />{draftCount} ca nháp chờ xác nhận
-            </button>
-          )}
           <button type="button" onClick={() => setAskOpen(true)} className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-bold border border-[var(--accent)] text-[var(--accent-text)] min-h-[40px]">
             <MessageSquareText className="w-4 h-4" />Hỏi số liệu
           </button>
