@@ -1,13 +1,7 @@
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
 import { LiveSession, ShiftSlot, ShiftRegistration, Talent } from "../../types";
-import { X, Users, UserCheck, UserX, Check, AlertTriangle, Trash2 } from "lucide-react";
-import { dateTimeRangesOverlap, getTodayDate } from "../../lib/dateUtils";
-import { personClash } from "../../lib/scheduling/conflicts";
-import { useToast } from "../../hooks/useToast";
-import { useConfirm } from "../../hooks/useConfirm";
-import { FATIGUE_WEEK_HOURS, suggestHosts, suggestionLabel } from "../../lib/performance/hostSuggestion";
-import { talentShortName } from "../../lib/talentName";
-import { platformOf } from "../../lib/reportPlatform";
+import { X, Users, UserCheck, UserX, AlertTriangle, ClipboardList } from "lucide-react";
+import { dateTimeRangesOverlap } from "../../lib/dateUtils";
 import { fmtDateVn } from "../../lib/format";
 import { PlatformChip } from "../common/PlatformChip";
 
@@ -16,20 +10,19 @@ interface SlotDetailModalProps {
   onClose: () => void;
   talents: Talent[];
   registrations: ShiftRegistration[]; // toàn bộ, tự lọc theo slot.id
-  sessions: LiveSession[]; // agency-wide — check trùng lịch
+  sessions: LiveSession[]; // agency-wide
   shiftSlots: ShiftSlot[]; // agency-wide — check trùng studio với slot khác
-  canManage: boolean; // được xem người đăng ký + chọn Host/Trợ live + chốt lịch + xoá
+  canManage: boolean; // được xem người đăng ký
   myTalentId?: string; // nếu có — được tự đăng ký/huỷ đăng ký
   onRegister?: (slotId: string, talentId: string) => Promise<boolean>;
   onUnregister?: (slotId: string, talentId: string) => Promise<boolean>;
-  onFinalizeSlot?: (slot: ShiftSlot, hostId: string, coHostId: string | null) => Promise<boolean>;
-  onDeleteSlot?: (id: string) => Promise<void>;
-  fatigueWeekHours?: number; // ngưỡng mệt (AI Training Center), mặc định FATIGUE_WEEK_HOURS
+  /** Xếp người / chốt / bỏ ca chờ đăng ký chỉ ở Điều Phối Lịch Live (Đợt 2 gom việc trên ca, 21/11) — nút mở đúng tuần, chọn sẵn ca. */
+  onOpenRoster?: () => void;
 }
 
-// Panel đăng ký/chốt lịch cho 1 Ca — mở từ bất kỳ lịch nào (Agency/Brand) và từ dòng ca chưa có người ở Bảng Vận Hành.
-// Từ 08/10 đây là NƠI DUY NHẤT ops chốt Host + Trợ live (màn "Nhân sự ca" đã bỏ): người đã đăng ký được xếp theo
-// GMV/giờ 90 ngày gần nhất cùng sàn (suggestHosts), kèm cảnh báo mệt.
+// Cửa sổ một ca chờ đăng ký — mở từ Bảng Vận Hành, Lịch & Studio, Lịch Vận Hành brand. Từ 21/11 CHỈ XEM: ai đã báo rảnh, trùng phòng;
+// xếp Host + Trợ live, chốt ngay, bỏ ca làm ở MỘT chỗ là Điều Phối Lịch Live (trước đó có 6 cửa chốt người, cửa này bỏ qua nháp/công bố
+// tuần của Điều Phối). Talent vẫn tự đăng ký/huỷ ở đây.
 const WEEKDAY_VN = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
 
 export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
@@ -37,49 +30,18 @@ export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
   onClose,
   talents,
   registrations,
-  sessions,
   shiftSlots,
   canManage,
   myTalentId,
   onRegister,
   onUnregister,
-  onFinalizeSlot,
-  onDeleteSlot,
-  fatigueWeekHours = FATIGUE_WEEK_HOURS
+  onOpenRoster
 }) => {
-  const { showToast } = useToast();
-  const confirm = useConfirm();
-  const [hostId, setHostId] = useState("");
-  const [coHostId, setCoHostId] = useState("");
   const [busy, setBusy] = useState(false);
 
   const talentsById = new Map<string, Talent>(talents.map((t) => [t.id, t]));
   const regs = registrations.filter((r) => r.slotId === slot.id);
-  // Q1 (audit 2026-09-21): cho chốt cả người chưa đăng ký rảnh (ops xếp tay), có cảnh báo.
-  const regIds = new Set(regs.map((r) => r.talentId));
-  const others = talents.filter((t) => !regIds.has(t.id)).sort((a, b) => a.name.localeCompare(b.name, "vi"));
-  // Gợi ý xếp hạng chỉ cho người đã đăng ký; mốc 90 ngày — lấy cả đời thì host đã tiến bộ/đi xuống từ nửa năm trước vẫn kéo trung bình.
-  const suggestions = useMemo(() => {
-    if (!canManage) return [];
-    const d = new Date(`${getTodayDate()}T00:00:00`);
-    d.setDate(d.getDate() - 90);
-    const since = `${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, "0")}-${`${d.getDate()}`.padStart(2, "0")}`;
-    const nameById = new Map(talents.map((t) => [t.id, talentShortName(t)]));
-    return suggestHosts(
-      registrations.filter((r) => r.slotId === slot.id).map((r) => r.talentId),
-      nameById,
-      sessions,
-      slot.brandId,
-      new Date(`${slot.date}T00:00:00`).getDay(),
-      since,
-      { date: slot.date, startTime: slot.startTime, endTime: slot.endTime, platform: platformOf(slot) }
-    );
-  }, [canManage, registrations, talents, sessions, slot]);
   const iAmRegistered = myTalentId ? regs.some((r) => r.talentId === myTalentId) : false;
-
-  // Luật trùng lịch chung (lib/scheduling/conflicts.ts) — kiểm cả Trợ live (audit 2026-09-28 mục 8: bản cũ chỉ kiểm Host).
-  const hostConflict = personClash(sessions, slot, hostId || undefined);
-  const coHostConflict = personClash(sessions, slot, coHostId || undefined);
 
   const studioConflicts = slot.studioId
     ? shiftSlots.filter(
@@ -100,27 +62,6 @@ export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
     setBusy(false);
   };
 
-  const handleFinalize = async () => {
-    if (!hostId || !onFinalizeSlot) {
-      if (!hostId) showToast("Chọn Host trước khi chốt lịch.");
-      return;
-    }
-    setBusy(true);
-    const ok = await onFinalizeSlot(slot, hostId, coHostId || null);
-    setBusy(false);
-    if (ok) onClose();
-  };
-
-  const handleDelete = async () => {
-    if (!onDeleteSlot) return;
-    // Xoá ca chờ đăng ký mất luôn các lượt đăng ký rảnh của talent — một cú bấm nhầm icon thùng rác không được đi thẳng.
-    if (!(await confirm(`Xoá ca chờ đăng ký ${slot.brandName} ${slot.date} ${slot.startTime}–${slot.endTime}?${regs.length > 0 ? ` ${regs.length} lượt đăng ký rảnh của talent sẽ mất theo.` : ""} Không hoàn tác được.`, { danger: true }))) return;
-    setBusy(true);
-    await onDeleteSlot(slot.id);
-    setBusy(false);
-    onClose();
-  };
-
   return (
     <div className="fixed inset-0 z-50 bg-[var(--surface-base)]/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl max-w-lg w-full p-4 sm:p-6 space-y-4 shadow-2xl">
@@ -138,11 +79,6 @@ export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
             <p className="text-xs text-[var(--text-muted)] mt-0.5">Phòng {slot.studioName || "chưa đặt"}{slot.notes ? ` · ${slot.notes}` : ""}</p>
           </div>
           <div className="flex items-center gap-1 shrink-0">
-            {canManage && onDeleteSlot && (
-              <button onClick={handleDelete} disabled={busy} className="text-[var(--text-faint)] hover:text-rose-400 p-1.5 rounded-lg" title="Xoá ca" aria-label="Xoá ca">
-                <Trash2 className="w-4 h-4" />
-              </button>
-            )}
             <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text)] p-1.5 rounded-lg" aria-label="Đóng">
               <X className="w-5 h-5" />
             </button>
@@ -187,82 +123,13 @@ export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-2 pt-1">
-              <label className="block min-w-0">
-              <span className="block mb-1 text-2xs font-bold text-[var(--text-muted)]">Host</span>
-              <select
-                value={hostId}
-                onChange={(e) => setHostId(e.target.value)}
-                className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-2 text-xs text-[var(--text)] focus:outline-none focus:border-blue-500"
-              >
-                <option value="">Chọn host…</option>
-                {suggestions.length > 0 && (
-                  <optgroup label="Đã đăng ký rảnh (xếp theo hiệu suất)">
-                    {suggestions.map((s) => (
-                      <option key={s.talentId} value={s.talentId}>{suggestionLabel(s, fatigueWeekHours)}</option>
-                    ))}
-                  </optgroup>
-                )}
-                {others.length > 0 && (
-                  <optgroup label="Người khác (chưa đăng ký rảnh)">
-                    {others.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                  </optgroup>
-                )}
-              </select>
-              </label>
-              <label className="block min-w-0">
-              <span className="block mb-1 text-2xs font-bold text-[var(--text-muted)]">Trợ live <span className="font-normal text-[var(--text-faint)]">(tuỳ chọn)</span></span>
-              <select
-                value={coHostId}
-                onChange={(e) => setCoHostId(e.target.value)}
-                className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-2 text-xs text-[var(--text)] focus:outline-none focus:border-blue-500"
-              >
-                <option value="">Không có trợ live</option>
-                {regs.some((r) => r.talentId !== hostId) && (
-                  <optgroup label="Đã đăng ký rảnh">
-                    {regs.filter((r) => r.talentId !== hostId).map((r) => (
-                      <option key={r.talentId} value={r.talentId}>{talentsById.get(r.talentId)?.name ?? r.talentId}</option>
-                    ))}
-                  </optgroup>
-                )}
-                {others.some((t) => t.id !== hostId) && (
-                  <optgroup label="Người khác (chưa đăng ký rảnh)">
-                    {others.filter((t) => t.id !== hostId).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                  </optgroup>
-                )}
-              </select>
-              </label>
-            </div>
-            {((hostId && !regIds.has(hostId)) || (coHostId && !regIds.has(coHostId))) && (
-              <p className="text-2xs text-amber-400 flex items-center gap-1">
-                <AlertTriangle className="w-3 h-3 shrink-0" /> Người đã chọn CHƯA đăng ký rảnh ca này — xác nhận trước khi chốt.
-              </p>
-            )}
-
-            {hostConflict && (
-              <p className="text-2xs text-rose-400 flex items-center gap-1">
-                <AlertTriangle className="w-3 h-3 shrink-0" /> Host đã chọn đang {hostConflict.hostId === hostId ? "làm Host" : "làm Trợ live"} ca {hostConflict.brandName} {hostConflict.startTime}–{hostConflict.endTime} trùng giờ.
-              </p>
-            )}
-            {coHostConflict && (
-              <p className="text-2xs text-rose-400 flex items-center gap-1">
-                <AlertTriangle className="w-3 h-3 shrink-0" /> Trợ live đã chọn đang {coHostConflict.hostId === coHostId ? "làm Host" : "làm Trợ live"} ca {coHostConflict.brandName} {coHostConflict.startTime}–{coHostConflict.endTime} trùng giờ.
-              </p>
-            )}
-
-            {!!coHostId && coHostId === hostId && (
-              <p className="text-2xs text-rose-400 flex items-center gap-1">
-                <AlertTriangle className="w-3 h-3 shrink-0" /> Host và Trợ live đang là cùng một người — chọn lại Trợ live.
-              </p>
-            )}
-            {onFinalizeSlot && (
+            {onOpenRoster && (
               <button
-                onClick={handleFinalize}
-                disabled={!hostId || busy || !!hostConflict || !!coHostConflict || (!!coHostId && coHostId === hostId)}
-                title={hostConflict || coHostConflict ? "Một người chỉ đứng một ca tại một thời điểm — chọn người khác" : undefined}
-                className="w-full flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-bold px-3 py-2.5 rounded-xl transition-colors"
+                type="button"
+                onClick={() => { onOpenRoster(); onClose(); }}
+                className="w-full flex items-center justify-center gap-1.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs font-bold px-3 py-2.5 rounded-xl transition-colors"
               >
-                <Check className="w-3.5 h-3.5" /> {busy ? "Đang chốt..." : "Chốt Lịch"}
+                <ClipboardList className="w-3.5 h-3.5" /> Xếp người ở Điều Phối Lịch Live
               </button>
             )}
           </div>

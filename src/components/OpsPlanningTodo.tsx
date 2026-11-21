@@ -1,33 +1,29 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, Layers, Target } from "lucide-react";
-import type { Brand, BrandChannel, BrandMonthPlan, BrandMonthlyCommitment, LiveSession, ShiftRegistration, ShiftSlot, Talent } from "../types";
+import type { Brand, BrandChannel, BrandMonthPlan, BrandMonthlyCommitment, LiveSession, ShiftRegistration, ShiftSlot } from "../types";
 import { commitmentsRead } from "../lib/db/brandContracts";
 import { planStatusesRead } from "../lib/db/monthPlans";
 import { platformsOfBrand } from "../lib/channels";
 import { channelTitle, brandPlatformKey, type ReportPlatform } from "../lib/reportPlatform";
 import { SchedulingGap, computeSchedulingGaps, todayVn } from "../lib/performance/brandCommitment";
 import { eligibleSlots } from "../lib/performance/bulkFinalize";
-import { FATIGUE_WEEK_HOURS } from "../lib/performance/hostSuggestion";
-import { talentShortName } from "../lib/talentName";
 import { fmtMonth } from "../lib/format";
 import type { TabPrefetchCtx } from "../lib/db/prefetch";
-import { BulkFinalizePanel } from "./BulkFinalizePanel";
 import { MonthPicker } from "./common/MonthPicker";
 
 // Việc lập kế hoạch ca của ops — 08/10 chuyển từ màn "Nhân sự ca" (đã bỏ vì trùng Bảng Vận Hành / Cửa sổ Ca Live) sang cuối
-// Bảng Vận Hành. Chỉ giữ 4 thứ mà chỗ khác không có: (1) kênh chưa chốt Kế Hoạch Tháng sau, (2) brand còn thiếu giờ so với cam
-// kết hợp đồng, (3) ca mở chưa đủ người đăng ký, (4) chốt hàng loạt. Chốt từng ca: bấm dòng ca chưa có người ở Bảng Vận Hành
-// (SlotDetailModal, có gợi ý Host theo hiệu suất + cảnh báo mệt).
+// Bảng Vận Hành. Chỉ giữ 3 thứ mà chỗ khác không có: (1) kênh chưa chốt Kế Hoạch Tháng sau, (2) brand còn thiếu giờ so với cam
+// kết hợp đồng, (3) ca mở chưa đủ người đăng ký. Xếp người (từng ca hay hàng loạt) chỉ ở Điều Phối Lịch Live từ 21/11 — "Chốt lịch
+// hàng loạt" ở đây thành nút dẫn sang (Đợt 2 gom việc trên ca).
 
 interface Props {
   brands: Brand[];
   channels: BrandChannel[];
   sessions: LiveSession[];
-  talents: Talent[];
   shiftSlots: ShiftSlot[];
   shiftRegistrations: ShiftRegistration[];
-  fatigueWeekHours?: number;
-  onFinalizeSlot: (slot: ShiftSlot, hostId: string, coHostId: string | null) => Promise<boolean>;
+  /** Xếp người chỉ ở Điều Phối Lịch Live — mở đúng tuần của ca mở sớm nhất đã có người đăng ký. */
+  onOpenRoster?: (date?: string, slotId?: string) => void;
   /** Mở Kế Hoạch Tháng của đúng kênh (brand × sàn) chưa chốt. */
   onOpenMonthPlan: (brandId: string, platform: ReportPlatform) => void;
 }
@@ -48,10 +44,9 @@ export function prefetchOpsPlanning({ role }: TabPrefetchCtx): void {
 
 const num = (n: number) => n.toLocaleString("vi-VN", { maximumFractionDigits: 1 });
 
-export default function OpsPlanningTodo({ brands, channels, sessions, talents, shiftSlots, shiftRegistrations, fatigueWeekHours = FATIGUE_WEEK_HOURS, onFinalizeSlot, onOpenMonthPlan }: Props) {
+export default function OpsPlanningTodo({ brands, channels, sessions, shiftSlots, shiftRegistrations, onOpenRoster, onOpenMonthPlan }: Props) {
   const today = todayVn();
   const [month, setMonth] = useState(today.slice(0, 7));
-  const [bulkOpen, setBulkOpen] = useState(false);
 
   // Cam kết hợp đồng (0081): RLS chỉ cho ceo/admin/operations đọc. Lỗi/thiếu quyền chỉ ẩn khối cam kết, không chặn việc khác.
   const [commitments, setCommitments] = useState<BrandMonthlyCommitment[]>([]);
@@ -113,18 +108,11 @@ export default function OpsPlanningTodo({ brands, channels, sessions, talents, s
     [gaps]
   );
 
-  const bulkCandidateCount = useMemo(
-    () => eligibleSlots(shiftSlots, registrationsBySlot, month, today).length,
+  const bulkCandidates = useMemo(
+    () => [...eligibleSlots(shiftSlots, registrationsBySlot, month, today)].sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime)),
     [shiftSlots, registrationsBySlot, month, today]
   );
-
-  // Mốc lịch sử hiệu suất khi gợi ý host: 90 ngày gần nhất (lấy cả đời thì phong độ cũ kéo trung bình).
-  const perfSince = useMemo(() => {
-    const d = new Date(`${today}T00:00:00`);
-    d.setDate(d.getDate() - 90);
-    return `${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, "0")}-${`${d.getDate()}`.padStart(2, "0")}`;
-  }, [today]);
-  const talentNameById = useMemo(() => new Map(talents.map((t) => [t.id, talentShortName(t)])), [talents]);
+  const bulkCandidateCount = bulkCandidates.length;
 
   const workCount = planMissing.length + gapsToShow.length + (missingBoth > 0 ? 1 : 0) + (missingCoHost > 0 ? 1 : 0) + (bulkCandidateCount > 0 ? 1 : 0);
 
@@ -139,7 +127,7 @@ export default function OpsPlanningTodo({ brands, channels, sessions, talents, s
           <span className="text-2xs font-bold text-emerald-400 flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" /> không còn việc tồn đọng</span>
         )}
         <div className="ml-auto">
-          <MonthPicker value={month} onChange={(m) => { setMonth(m); setBulkOpen(false); }} />
+          <MonthPicker value={month} onChange={setMonth} />
         </div>
       </div>
 
@@ -168,7 +156,7 @@ export default function OpsPlanningTodo({ brands, channels, sessions, talents, s
           {missingBoth > 0 && <span><span className="font-bold">{missingBoth}</span> ca chưa có ai đăng ký</span>}
           {missingBoth > 0 && missingCoHost > 0 && <span className="text-rose-700">·</span>}
           {missingCoHost > 0 && <span className="text-amber-200"><span className="font-bold">{missingCoHost}</span> ca thiếu Trợ live</span>}
-          <span className="text-rose-300 text-xs">— {fmtMonth(month)}, từ hôm nay. Bấm dòng ca chưa có người ở trên để chốt.</span>
+          <span className="text-rose-300 text-xs">— {fmtMonth(month)}, từ hôm nay. Xếp người ở Điều Phối Lịch Live.</span>
         </div>
       )}
 
@@ -199,34 +187,20 @@ export default function OpsPlanningTodo({ brands, channels, sessions, talents, s
               );
             })}
           </div>
-          <p className="text-2xs text-[var(--text-faint)]">Giờ ca theo lịch, cùng loại giờ dùng để tính tiền brand. Mở thêm ca ở Lịch & Studio; đặt cam kết ở CRM hoặc Kế Hoạch Tháng.</p>
+          <p className="text-2xs text-[var(--text-faint)]">Giờ ca theo lịch, cùng loại giờ dùng để tính tiền brand. Mở thêm ca ở Điều Phối Lịch Live; đặt cam kết ở CRM hoặc Kế Hoạch Tháng.</p>
         </div>
       )}
 
-      {bulkCandidateCount > 0 && !bulkOpen && (
+      {bulkCandidateCount > 0 && onOpenRoster && (
         <button
-          onClick={() => setBulkOpen(true)}
-          className="w-full flex items-center justify-center gap-2 bg-[var(--surface-base)] border border-[var(--border)] hover:border-blue-700 rounded-xl px-4 py-3 text-sm font-bold text-[var(--text)] transition-colors"
+          type="button"
+          onClick={() => onOpenRoster(bulkCandidates[0].date, bulkCandidates[0].id)}
+          className="w-full flex items-center justify-center gap-2 bg-[var(--surface-base)] border border-[var(--border)] hover:border-[var(--accent)] rounded-xl px-4 py-3 text-sm font-bold text-[var(--text)] transition-colors"
         >
           <Layers className="w-4 h-4 text-blue-400" />
-          Chốt lịch hàng loạt
+          Xếp người ở Điều Phối Lịch Live
           <span className="text-xs font-normal text-[var(--text-muted)]">— {bulkCandidateCount} ca đang mở đã có người đăng ký</span>
         </button>
-      )}
-
-      {bulkOpen && (
-        <BulkFinalizePanel
-          slots={shiftSlots}
-          registrationsBySlot={registrationsBySlot}
-          sessions={sessions}
-          talentNameById={talentNameById}
-          month={month}
-          today={today}
-          perfSince={perfSince}
-          fatigueWeekHours={fatigueWeekHours}
-          onFinalizeSlot={onFinalizeSlot}
-          onClose={() => setBulkOpen(false)}
-        />
       )}
     </section>
   );

@@ -247,7 +247,7 @@ test("Điều Phối Lịch Live: thẻ ca chỉ còn vạch màu bên trái, n�
   expect(grid).not.toMatch(/border-dashed border-\[var\(--border\)\] py-1/);
 });
 
-test("cửa sổ chốt người: ngày + giờ là tiêu đề (dd/mm, không ISO), ô chọn có nhãn, một nút đóng", async () => {
+test("cửa sổ ca chờ đăng ký: ngày + giờ là tiêu đề (dd/mm, không ISO), chỉ xem + nút sang Điều Phối, một nút đóng", async () => {
   const React = await import("react");
   const { renderToStaticMarkup } = await import("react-dom/server");
   const { ToastProvider } = await import("../src/hooks/useToast");
@@ -259,14 +259,18 @@ test("cửa sổ chốt người: ngày + giờ là tiêu đề (dd/mm, không I
       React.createElement(ConfirmProvider, null,
         React.createElement(SlotDetailModal, {
           slot, onClose: () => {}, talents: [{ id: "t1", name: "Huỳnh Tấn Khanh" }], registrations: [{ id: "r1", slotId: "s1", talentId: "t1" }],
-          sessions: [], shiftSlots: [slot], canManage: true, onFinalizeSlot: async () => {}
+          sessions: [], shiftSlots: [slot], canManage: true, onOpenRoster: () => {}
         } as never)))
   );
   const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
   expect(text).toContain("T3 20/10 · 11:00–14:00");
   expect(text).not.toContain("2026-10-20");
   expect(text).not.toContain("Ca Chờ Đăng Ký");
-  expect(text).toMatch(/Host Chọn host…/);
-  expect(text).toMatch(/Trợ live \(tuỳ chọn\) Không có trợ live/);
+  // Gom việc trên ca (Đợt 2, 21/11): xếp người chỉ ở Điều Phối Lịch Live — cửa sổ này không còn ô chọn người / nút Chốt Lịch / xoá.
+  expect(text).toContain("Huỳnh Tấn Khanh");
+  expect(text).toContain("Xếp người ở Điều Phối Lịch Live");
+  expect(html).not.toContain("<select");
+  expect(text).not.toContain("Chốt Lịch");
+  expect(html).not.toContain('aria-label="Xoá ca"');
   expect(html.match(/aria-label="Đóng"/g)).toHaveLength(1);
 });

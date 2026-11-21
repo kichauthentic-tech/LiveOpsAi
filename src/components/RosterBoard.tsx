@@ -87,6 +87,10 @@ interface Props {
   onCreateSlot: (slot: ShiftSlot) => Promise<boolean>;
   onDeleteSlot: (id: string) => Promise<void>;
   onCancelSession: (id: string, reason: string, reopenSlot?: boolean) => Promise<boolean>;
+  /** Chốt một ca mở ngay (finalize_shift_slot) — cửa chốt lẻ duy nhất từ 21/11 (Đợt 2 gom việc trên ca). */
+  onFinalizeSlot: (slot: ShiftSlot, hostId: string, coHostId: string | null) => Promise<boolean>;
+  /** Màn khác bấm "Xếp người ở Điều Phối": mở đúng tuần, chọn sẵn ca mở (n đổi mỗi lần bấm). */
+  focus?: { date: string; slotId?: string; n: number } | null;
   /** Nạp lại ca + ca mở + đăng ký sau khi DB đổi lịch (công bố, đổi người, dời giờ). */
   onScheduleChanged: () => Promise<void>;
   onSessionUpdated: (s: LiveSession) => void;
@@ -891,6 +895,30 @@ export const RosterBoard: React.FC<Props> = (p) => {
     setSelectedKey(null);
     setCostPlan(null);
   };
+  // Đi từ màn khác sang (nút "Xếp người ở Điều Phối Lịch Live"): mở tuần của ca, chọn sẵn ca mở đó.
+  const focusN = p.focus?.n;
+  useEffect(() => {
+    if (!p.focus) return;
+    goWeekOf(p.focus.date);
+    if (p.focus.slotId) setSelectedKey(`o:${p.focus.slotId}`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chạy một lần cho mỗi lần bấm (n), không theo lịch
+  }, [focusN]);
+
+  // Chốt riêng một ca mở ngay (ca gấp) — cùng RPC finalize_shift_slot như trước ở Bảng Vận Hành; nháp của ca đó bỏ đi, ca khác giữ nháp.
+  const finalizeNow = (shift: RosterShift) =>
+    run(async () => {
+      const slot = p.shiftSlots.find((sl) => sl.id === shift.slotId);
+      if (!slot || !shift.hostId) return;
+      const who = `host ${nameOf(shift.hostId)}${shift.coHostId ? `, trợ ${nameOf(shift.coHostId)}` : shift.noAssistant ? ", No Asst" : ", chưa có trợ"}`;
+      if (!(await confirm(`Chốt ngay ca ${shift.brandName} ${dayLabel(shift.date)} ${shift.startTime}–${shift.endTime}: ${who}?\nCa thành ca thật ngay, host/trợ nhận tin. Ca nháp khác của tuần vẫn chờ công bố.`, { confirmLabel: "Chốt ngay" }))) return;
+      if (!(await p.onFinalizeSlot(slot, shift.hostId, shift.coHostId ?? null))) return;
+      if (shift.noAssistant && !shift.coHostId) await setSlotNoAssistant(slot.id, true);
+      await saveRosterDraft({ slotId: slot.id }, p.currentUserId);
+      setDrafts((prev) => prev.filter((d) => d.slotId !== slot.id));
+      setSelectedKey(null);
+      showToast(`Đã chốt ca ${shift.brandName} ${dayLabel(shift.date)} ${shift.startTime} — đã báo host/trợ`);
+    });
+
   const copyText = async (text: string, ok: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -1324,6 +1352,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
           onReopenSignup={(s, d) => void reopenSignup(s, d)}
           onMove={(s, v) => void move(s, v)}
           onRemove={(s) => void remove(s)}
+          onFinalizeNow={readOnly ? undefined : (s) => void finalizeNow(s)}
           onMode={changeMode}
         />
       )}

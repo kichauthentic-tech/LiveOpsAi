@@ -1,5 +1,5 @@
 import { platformText } from "../lib/metricGlossary";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { defaultPlanMonth } from "../lib/defaultMonth";
 import { BoostSlot, Brand, BrandChannel, BrandContract, BrandMonthPlan, BrandMonthPlanSlot, BrandMonthlyCommitment, BrandStudio, CalendarEventRow, LiveSession, PlanCampRanges, PlanGroupTargets, PromoScheme, ShiftSlot, Studio, Talent } from "../types";
 import { AlertTriangle, CalendarRange, Lock, Save, Sparkles, Trash2, Wand2, X } from "lucide-react";
@@ -48,7 +48,9 @@ import { RELIABILITY_LABEL, buildMonthForecaster, forecastReliability, planOutlo
 import { recordForecastSnapshots, type ForecastSnapshotInput } from "../lib/db/forecastSnapshots";
 import { EngineParams } from "../lib/scheduling/engineParams";
 import { findBrandStudioId } from "../lib/db/brandStudios";
-import { useConfirm } from "../hooks/useConfirm";
+import { useConfirm, usePrompt } from "../hooks/useConfirm";
+import { SessionActionsContext } from "../lib/sessionActionsContext";
+import { planScheduledChange } from "../lib/scheduling/scheduledChange";
 import { PageHeader } from "./common/PageHeader";
 
 import { fmtMonth, fmtFixed, fmtVndShort, fmtVndFull } from "../lib/format";
@@ -132,6 +134,8 @@ export default function MonthPlan({
   role
 }: MonthPlanProps) {
   const confirm = useConfirm();
+  const prompt = usePrompt();
+  const sessionActions = useContext(SessionActionsContext);
   const canRetarget = role === "ceo" || role === "admin";
   // Độ tin dự báo từng kênh: CHỈ admin (06/11, user: các role khác đỡ rối chữ).
   const isAdmin = role === "admin";
@@ -579,7 +583,14 @@ export default function MonthPlan({
       setMsg(errors[0]);
       return false;
     }
-    const ok = await onUpdateSession({ ...session, startTime, endTime }, session);
+    // Cùng luật đổi lịch với Cửa sổ ca / Điều Phối (21/11): ca chưa diễn ra ⇒ ghi lý do, vào sổ đổi lịch chung (roster_changes).
+    const next = { date: session.date, startTime, endTime, studioId: session.studioId, hostId: session.hostId, coHostId: session.coHostId };
+    let ok: boolean;
+    if (planScheduledChange(session, next, todayVn()).viaRoster && sessionActions.reschedule) {
+      const reason = await prompt(`Lý do dời ca ${d.date.slice(8)}/${d.date.slice(5, 7)} ${session.startTime}–${session.endTime} sang ${startTime}–${endTime} (host/trợ được báo)`, { placeholder: "vd: Brand đổi khung live" });
+      if (!reason?.trim()) return false;
+      ok = await sessionActions.reschedule(session, next, reason);
+    } else ok = await onUpdateSession({ ...session, startTime, endTime }, session);
     if (!ok) return false;
     setDrafts((prev) => withForecast(prev.map((x) => (x.key === key ? { ...x, startTime, endTime } : x))));
     setMsg(`Đã dời ca ${d.date.slice(8)}/${d.date.slice(5, 7)} sang ${startTime}–${endTime}; host/trợ giữ nguyên.`);

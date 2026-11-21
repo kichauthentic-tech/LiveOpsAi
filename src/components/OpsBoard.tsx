@@ -1,7 +1,7 @@
 import { platformText } from "../lib/metricGlossary";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useContext, useEffect, useMemo, useState } from "react";
 import { SESSION_STATUS_CLS, SESSION_STATUS_LABEL_VI } from "../lib/sessionStatusUi";
-import { CalendarClock, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, FileClock, Radio, UserX, X } from "lucide-react";
+import { ArrowLeftRight, CalendarClock, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, FileClock, Radio, UserX, X } from "lucide-react";
 import { Brand, LiveSession, ShiftRegistration, ShiftSlot, Studio, Talent, UserRole, AuditLogEntry } from "../types";
 import { getTodayDate } from "../lib/dateUtils";
 import { fmtVndShort } from "../lib/format";
@@ -18,7 +18,7 @@ import { unackedSoon } from "../lib/talent/acks";
 import type { BoardView } from "../lib/todoList";
 import { SessionWindow } from "./SessionWindow";
 import { ShiftTimeQueue } from "./ShiftTimeQueue";
-import { SwapApprovalQueue } from "./shiftSwap/SwapApprovalQueue";
+import { SessionActionsContext } from "../lib/sessionActionsContext";
 import { PageHeader } from "./common/PageHeader";
 import { StatTile } from "./common/StatTile";
 import { SlotDetailModal } from "./scheduling/SlotDetailModal";
@@ -57,9 +57,8 @@ export interface OpsBoardProps {
   onRequestDropout?: (sessionId: string, reason: string) => Promise<boolean>; // Đ7 (0116) — talent báo bận, chỉ gửi thông báo cho ops
   onLogAudit?: (entry: { action: string; details: string; category: AuditLogEntry["category"] }) => Promise<void>;
   // Ops chốt Host + Trợ live ngay trên dòng ca chưa có người (SlotDetailModal) — màn "Nhân sự ca" đã bỏ 08/10.
-  onFinalizeSlot?: (slot: ShiftSlot, hostId: string, coHostId: string | null) => Promise<boolean>;
-  onDeleteSlot?: (id: string) => Promise<void>;
-  fatigueWeekHours?: number;
+  /** Xếp người, chốt, bỏ ca mở, duyệt đổi ca: chỉ ở Điều Phối Lịch Live (Đợt 2 gom việc trên ca, 21/11). */
+  onOpenRoster?: (date?: string, slotId?: string) => void;
   // Q4: bấm thông báo → App đặt id ca cần mở; bảng mở Cửa sổ Ca Live rồi báo lại để App xoá yêu cầu.
   requestOpenSessionId?: string | null;
   onOpenRequestHandled?: () => void;
@@ -210,7 +209,7 @@ const SessionRow: React.FC<{
 };
 
 const SlotRow: React.FC<{ r: Extract<Row, { kind: "slot" }>; brand: Brand | undefined; expected?: number | null; showExpected: boolean; open: boolean; onOpen: (id: string) => void; onToggle?: () => void }> = ({ r, brand, expected, showExpected, open, onOpen, onToggle }) => (
-  <div role="button" tabIndex={0} onClick={() => onOpen(r.slot.id)} onKeyDown={onKeyOpen(() => onOpen(r.slot.id))} className={`${ROW_CLS} bg-rose-500/[0.06] hover:bg-rose-500/10`} title="Mở để chốt Host + Trợ live">
+  <div role="button" tabIndex={0} onClick={() => onOpen(r.slot.id)} onKeyDown={onKeyOpen(() => onOpen(r.slot.id))} className={`${ROW_CLS} bg-rose-500/[0.06] hover:bg-rose-500/10`} title="Xem ai đã báo rảnh — xếp người ở Điều Phối Lịch Live">
     <span className="font-mono text-sm font-black text-[var(--text)] w-[104px] shrink-0">{r.startTime.slice(0, 5)}–{r.endTime.slice(0, 5)}</span>
     <span className="flex items-center gap-1.5 min-w-0 sm:w-[168px] shrink-0">
       <BrandLogo brand={brand} size="xs" />
@@ -326,9 +325,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
   onSetSessionExcluded,
   onRequestDropout,
   onLogAudit,
-  onFinalizeSlot,
-  onDeleteSlot,
-  fatigueWeekHours,
+  onOpenRoster,
   requestOpenSessionId = null,
   onOpenRequestHandled,
   aside,
@@ -345,6 +342,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
 }) => {
   const today = getTodayDate();
   const isOps = OPS_ROLES.includes(currentRole);
+  const swapWaiting = (useContext(SessionActionsContext).swap?.requests ?? []).filter((r) => r.status === "pending_ops").length;
   const confirm = useConfirm();
   const [zeroMsg, setZeroMsg] = useState<string | null>(null);
   // "Bán 0" (07/11, đề xuất dự báo): ca qua giờ không có số mà ops biết là có live, không đơn nào. Trước đó ca nằm mãi ở "chưa có số" và
@@ -594,8 +592,16 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
         }
       />
 
-      {/* Yêu cầu đổi/nhường ca chờ duyệt (0212) — ngay dưới tiêu đề, cả hai chế độ xem (user 10/11: thông báo chuông dễ miss). */}
-      {isOps && <SwapApprovalQueue sessions={sessions} />}
+      {/* Yêu cầu đổi/nhường ca chờ duyệt (0212): duyệt ở MỘT chỗ là Điều Phối Lịch Live (Đợt 2 gom việc trên ca, 21/11) — ở đây chỉ báo
+          số đang chờ, ngay dưới tiêu đề (user 10/11: thông báo chuông dễ miss). */}
+      {isOps && swapWaiting > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-amber-500/40 bg-amber-500/10 px-4 py-3">
+          <p className="flex items-center gap-2 text-sm font-bold text-[var(--text)]"><ArrowLeftRight className="w-4 h-4 text-amber-400" /> {swapWaiting} yêu cầu đổi ca chờ duyệt</p>
+          {onOpenRoster && (
+            <button type="button" onClick={() => onOpenRoster()} className="px-3 py-1.5 rounded-xl border border-[var(--border)] text-xs font-bold text-[var(--text)] hover:border-[var(--accent)]">Duyệt ở Điều Phối Lịch Live</button>
+          )}
+        </div>
+      )}
 
       {isOps && (
         <div hidden={view !== "day"} className="space-y-4">
@@ -730,9 +736,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
             sessions={sessions}
             shiftSlots={shiftSlots}
             canManage
-            onFinalizeSlot={onFinalizeSlot}
-            onDeleteSlot={onDeleteSlot}
-            fatigueWeekHours={fatigueWeekHours}
+            onOpenRoster={onOpenRoster ? () => onOpenRoster(slot.date, slot.id) : undefined}
           />
         ) : null;
       })()}

@@ -1,6 +1,6 @@
 import React from "react";
 import { WAVE_NAME } from "../../lib/performance/channelHealth";
-import { Loader2, Sparkles, Trash2, Wand2 } from "lucide-react";
+import { Sparkles, Trash2, Wand2 } from "lucide-react";
 import { eachDay } from "../../lib/dateUtils";
 import { pWithAdds, type Candidate, type PlanObjective, type PlannedSession } from "../../lib/performance/controlRoom";
 import { ddmm, money, pct } from "../dashboard/shared";
@@ -25,9 +25,9 @@ export const Sandbox: React.FC<{
   onObjective: (o: PlanObjective) => void;
   onAuto: () => void;
   onClear: () => void;
-  onCreateDrafts: () => void;
-  creating: boolean;
-}> = ({ month, today, channels, candidates, plan, onToggle, budget, onBudget, objective, onObjective, onAuto, onClear, onCreateDrafts, creating }) => {
+  /** Sa bàn chỉ để xem tháng đổi thế nào; thêm ca + xếp người làm ở Điều Phối Lịch Live (gom việc trên ca, 21/11). */
+  onOpenRoster?: () => void;
+}> = ({ month, today, channels, candidates, plan, onToggle, budget, onBudget, objective, onObjective, onAuto, onClear, onOpenRoster }) => {
   const [y, m] = month.split("-").map(Number);
   const last = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
   const from = today >= last ? null : new Date(Date.UTC(Number(today.slice(0, 4)), Number(today.slice(5, 7)) - 1, Number(today.slice(8)) + 1)).toISOString().slice(0, 10);
@@ -117,9 +117,11 @@ export const Sandbox: React.FC<{
         <div className="space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-xs text-[var(--text-faint)]">Ca đề xuất<InfoDot label="Chọn người thế nào">Host hiệu suất cao nhất đang rảnh, trợ live ít giờ nhất tháng.</InfoDot></span>
-            <button type="button" onClick={onCreateDrafts} disabled={plan.length === 0 || creating} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-bold bg-[var(--accent)] text-[var(--accent-contrast)] disabled:opacity-40 min-h-[34px]">
-              {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}Tạo {plan.length} ca nháp cho OP
-            </button>
+            {onOpenRoster && (
+              <button type="button" onClick={onOpenRoster} disabled={plan.length === 0} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-bold border border-[var(--border)] text-[var(--text)] hover:border-[var(--accent)] disabled:opacity-40 min-h-[34px]">
+                <Sparkles className="w-4 h-4" />Thêm ca ở Điều Phối Lịch Live
+              </button>
+            )}
           </div>
           <div className="max-h-72 overflow-y-auto space-y-1.5">
             {plan.length === 0 ? (

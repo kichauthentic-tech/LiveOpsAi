@@ -40,6 +40,9 @@ interface Props {
   onReopenSignup?: (shift: RosterShift, deadline: Date) => void;
   onMove: (shift: RosterShift, v: { date: string; startTime: string; endTime: string }) => void;
   onRemove: (shift: RosterShift) => void;
+  /** Ca mở đã có host nháp: chốt riêng ca này ngay, không đợi công bố tuần (ca gấp). Từ 21/11 là cửa chốt lẻ duy nhất — Bảng Vận Hành /
+   *  Lịch & Studio / Lịch brand không còn nút "Chốt Lịch". */
+  onFinalizeNow?: (shift: RosterShift) => void;
   /** Đổi chế độ gợi ý (Cân bằng / Tiết kiệm chi phí / Tối ưu GMV) — cùng chế độ của thanh công cụ Điều Phối. */
   onMode?: (m: RankMode) => void;
 }
@@ -50,7 +53,7 @@ const MODES: { key: RankMode; label: string; hint: string }[] = [
   { key: "gmv", label: "Tối ưu GMV", hint: "Host có GMV/giờ cao hơn kỳ vọng cùng kênh × khung giờ lên trước (chỉ số co về ×1,00 theo số ca; lặp lại yếu giữa các tháng, r = 0,23)." }
 ];
 
-export const ShiftPanel: React.FC<Props> = ({ shift, analysis, ctx, talents, history, showCost, readOnly, busy, onClose, onAssign, onNoAssistant, onReopenSignup, onMove, onRemove, onMode }) => {
+export const ShiftPanel: React.FC<Props> = ({ shift, analysis, ctx, talents, history, showCost, readOnly, busy, onClose, onAssign, onNoAssistant, onReopenSignup, onMove, onRemove, onFinalizeNow, onMode }) => {
   const talentById = useMemo(() => new Map(talents.map((t) => [t.id, t])), [talents]);
   const nm = (id: string | undefined) => (id ? talentShortName(talentById.get(id)) || "?" : "");
   const issues = analysis.byShift.get(shift.key) ?? [];
@@ -205,6 +208,9 @@ export const ShiftPanel: React.FC<Props> = ({ shift, analysis, ctx, talents, his
         <div className="flex items-center gap-1.5 shrink-0">
           <MoreMenu
             items={[
+              ...(onFinalizeNow && !readOnly && !past && shift.kind === "open" && !!shift.hostId
+                ? [{ label: "Chốt ngay ca này (không đợi công bố tuần)", onClick: () => onFinalizeNow(shift), disabled: busy }]
+                : []),
               ...(canMove ? [{ label: moving ? "Ẩn dời ca" : "Dời ca", onClick: () => setMoving((v) => !v) }] : []),
               ...(!readOnly && !past && !shift.hasData && (shift.kind === "session" || !shift.planId)
                 ? [{ label: shift.kind === "open" ? "Bỏ ca này (ca thêm, chưa có người)" : "Huỷ ca — vẫn hiện gạch ngang trên lịch gửi brand", onClick: () => onRemove(shift), danger: true, disabled: busy }]

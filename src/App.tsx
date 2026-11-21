@@ -279,6 +279,8 @@ export default function App() {
   const [opsRangeRequest, setOpsRangeRequest] = useState<BoardView | null>(null);
   // Q4: ca cần mở sau khi bấm thông báo (OpsBoard tiêu thụ rồi xoá).
   const [notifOpenSessionId, setNotifOpenSessionId] = useState<string | null>(null);
+  // Gom việc trên ca (Đợt 2, 21/11): xếp người chỉ ở Điều Phối Lịch Live — màn khác bấm "Xếp người ở Điều Phối" thì mở đúng tuần, chọn sẵn ca.
+  const [rosterFocus, setRosterFocus] = useState<{ date: string; slotId?: string; n: number } | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   // Thu gọn sidebar thành thanh icon (w-16) để nhường không gian ngang cho nội dung.
   // Chỉ áp dụng từ breakpoint md trở lên — dưới md sidebar vẫn là drawer trượt như cũ.
@@ -1607,7 +1609,7 @@ export default function App() {
   const WEBSITE_NAV_GROUPS = BRAND_NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => i.id === "brand_calendar") })).filter((g) => g.items.length > 0);
   const baseNavGroups =
     isWebsiteWs ? WEBSITE_NAV_GROUPS : effectiveWorkspace.type === "brand" ? BRAND_NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => !hiddenBrandTabs.has(i.id)) })) : AGENCY_NAV_GROUPS;
-  const navGroups = swapWaiting > 0 ? baseNavGroups.map((g) => ({ ...g, items: g.items.map((i) => (i.id === "calendar" || i.id === "roster" ? { ...i, count: swapWaiting } : i)) })) : baseNavGroups;
+  const navGroups = swapWaiting > 0 ? baseNavGroups.map((g) => ({ ...g, items: g.items.map((i) => (i.id === "roster" ? { ...i, count: swapWaiting } : i)) })) : baseNavGroups;
   // Brand có kênh trên một sàn — danh sách brand của màn số liệu agency theo sàn đó.
   const brandsOn = (p: ReportPlatform) => visibleBrands.filter((b) => (brandPlatformsMap[b.id] ?? []).includes(p));
   // Màn "mọi kênh" của agency khi đang "Tất cả": mỗi sàn một khối (đầu khối có nhãn sàn), số hiệu suất không cộng giữa hai sàn.
@@ -1653,7 +1655,8 @@ export default function App() {
     void notifications.markRead([n.id]);
     if (n.kind === "shift_open" || n.kind === "signup_open") setActiveTab("shift_scheduling");
     else if (currentRole === "talent") setActiveTab("my_shifts");
-    else if (currentRole === "trainer") setActiveTab("roster");
+    // Duyệt đổi ca chỉ ở Điều Phối Lịch Live (Đợt 2 gom việc trên ca, 21/11).
+    else if (currentRole === "trainer" || n.kind === "swap_pending_ops") setActiveTab("roster");
     else setActiveTab("calendar");
     if (n.sessionId) setNotifOpenSessionId(n.sessionId);
     setMobileMenuOpen(false);
@@ -1685,6 +1688,12 @@ export default function App() {
     setBrandLinkIssue(null);
     setMobileMenuOpen(false);
   };
+
+  const openRosterAt = (date?: string, slotId?: string) => {
+    if (date) setRosterFocus({ date, slotId, n: Date.now() });
+    navigateTo("roster");
+  };
+  const rosterDoor = checkPermission("manage_roster") ? openRosterAt : undefined;
 
   // Mở Kế Hoạch Tháng của đúng một kênh (brand × sàn) từ bất kỳ màn nào.
   const openMonthPlanFor = (brandId: string, platform: ReportPlatform) => {
@@ -2166,6 +2175,8 @@ export default function App() {
                     currentUserId={activeUser.id}
                     onCreateSlot={handleCreateShiftSlot}
                     onDeleteSlot={handleDeleteShiftSlot}
+                    onFinalizeSlot={handleFinalizeShiftSlot}
+                    focus={rosterFocus}
                     onCancelSession={handleCancelSession}
                     onScheduleChanged={async () => {
                       const [s, sl, regs] = await Promise.all([fetchSessions(), fetchShiftSlots(), fetchShiftRegistrations()]);
@@ -2230,9 +2241,7 @@ export default function App() {
                   onSetSessionExcluded={handleSetSessionExcluded}
                   onRequestDropout={handleRequestDropout}
                   onLogAudit={pushAuditLog}
-                      onFinalizeSlot={handleFinalizeShiftSlot}
-                      onDeleteSlot={handleDeleteShiftSlot}
-                      fatigueWeekHours={engineParams.fatigueWeekHours}
+                      onOpenRoster={rosterDoor}
                       requestOpenSessionId={notifOpenSessionId}
                       onOpenRequestHandled={() => setNotifOpenSessionId(null)}
                       view={isOpsRole ? opsView : "day"}
@@ -2244,11 +2253,9 @@ export default function App() {
                           brands={visibleBrands}
                           channels={channels}
                           sessions={visibleSessions}
-                          talents={activeTalents}
                           shiftSlots={shiftSlots}
                           shiftRegistrations={shiftRegistrations}
-                          fatigueWeekHours={engineParams.fatigueWeekHours}
-                          onFinalizeSlot={handleFinalizeShiftSlot}
+                          onOpenRoster={rosterDoor}
                           onOpenMonthPlan={(brandId, platform) => openMonthPlanFor(brandId, platform)}
                         />
                         <OpsMonthView
@@ -2261,7 +2268,7 @@ export default function App() {
                           planMonthTotals={planMonthTotals}
                           engineParams={engineParams}
                           draftCount={sessionDrafts.drafts.length}
-                          onDraftsCreated={sessionDrafts.reload}
+                          onOpenRoster={rosterDoor}
                           onShowDrafts={() => {
                             setOpsView("day");
                             setOpsRangeRequest("drafts");
@@ -2300,11 +2307,9 @@ export default function App() {
                     brandStudios={brandStudios}
                     onUpdateSession={handleUpdateSession}
                     onSwitchSessionPlatform={handleSwitchSessionPlatform}
-                    onOpenRoster={checkPermission("manage_roster") ? () => navigateTo("roster") : undefined}
-                    onDeleteSlot={handleDeleteShiftSlot}
+                    onOpenRoster={rosterDoor}
                     onRegisterSlot={handleRegisterSlot}
                     onUnregisterSlot={handleUnregisterSlot}
-                    onFinalizeSlot={handleFinalizeShiftSlot}
                     myTalentId={activeUser.assignedTalentId}
                     currentRole={currentRole}
                     schemes={promoSchemes}
@@ -2491,11 +2496,9 @@ export default function App() {
                     onSetSessionExcluded={handleSetSessionExcluded}
                     onLogAudit={pushAuditLog}
                     onUpdateSession={handleUpdateSession}
-                    onOpenRoster={checkPermission("manage_roster") ? () => navigateTo("roster") : undefined}
-                    onDeleteSlot={handleDeleteShiftSlot}
+                    onOpenRoster={rosterDoor}
                     onRegisterSlot={handleRegisterSlot}
                     onUnregisterSlot={handleUnregisterSlot}
-                    onFinalizeSlot={handleFinalizeShiftSlot}
                   />
                 )}
 

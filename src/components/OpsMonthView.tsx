@@ -1,18 +1,15 @@
-import { platformText } from "../lib/metricGlossary";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { FileClock, MessageSquareText } from "lucide-react";
 import type { Brand, BrandChannel, BrandMonthPlan, BrandStudio, LiveSession, ShiftSlot } from "../types";
 import { DEFAULT_ENGINE_PARAMS, type EngineParams } from "../lib/scheduling/engineParams";
 import { effectiveCamp, resolveCampBucketType } from "../lib/campaignDays";
 import { platformsOfBrand } from "../lib/channels";
-import { errorMessage } from "../lib/errorMessage";
 import { planStatusesRead } from "../lib/db/monthPlans";
-import { createSessionDrafts } from "../lib/db/sessionDrafts";
 import { addDays } from "../lib/dateUtils";
 import { todayVn } from "../lib/performance/brandCommitment";
 import { monthEndOf, monthTargetOf, prevMonthOf } from "../lib/performance/ceoBrief";
 import { peopleLoad } from "../lib/performance/channelHealth";
-import { autoPlan, buildChannelRoom, monthBridge, pWithAdds, sandboxCandidates, type Candidate, type PlanObjective, type PlannedSession } from "../lib/performance/controlRoom";
+import { autoPlan, buildChannelRoom, monthBridge, sandboxCandidates, type Candidate, type PlanObjective, type PlannedSession } from "../lib/performance/controlRoom";
 import { hostOrder, suggestHosts } from "../lib/performance/hostSuggestion";
 import { buildAskContext } from "../lib/performance/askContext";
 import { isCountable } from "../lib/performance/hostPerformance";
@@ -41,15 +38,16 @@ interface OpsMonthViewProps {
   planSlotTargets: Map<string, { date: string; target: number }[]>;
   planMonthTotals: Map<string, number>;
   engineParams?: EngineParams;
-  /** Số ca nháp đang chờ (useSessionDrafts của App) — tạo nháp xong gọi `onDraftsCreated` để nạp lại. */
+  /** Số ca nháp cũ còn chờ (useSessionDrafts của App). Sa bàn không tạo nháp nữa từ 21/11 — thêm ca + xếp người ở Điều Phối Lịch Live. */
   draftCount: number;
-  onDraftsCreated: () => void;
+  /** Mở Điều Phối Lịch Live (đúng tuần của ca đầu tiên trong sa bàn). */
+  onOpenRoster?: (date?: string, slotId?: string) => void;
   /** Sang "Hôm nay & tuần", bộ lọc Ca nháp. */
   onShowDrafts: () => void;
 }
 
 export default function OpsMonthView(props: OpsMonthViewProps) {
-  const { sessions, brands, brandChannels, shiftSlots, brandStudios, planSlotTargets, planMonthTotals, draftCount, onDraftsCreated, onShowDrafts } = props;
+  const { sessions, brands, brandChannels, shiftSlots, brandStudios, planSlotTargets, planMonthTotals, draftCount, onOpenRoster, onShowDrafts } = props;
   const params = props.engineParams ?? DEFAULT_ENGINE_PARAMS;
   const today = todayVn();
   const month = today.slice(0, 7);
@@ -60,7 +58,6 @@ export default function OpsMonthView(props: OpsMonthViewProps) {
   const [plan, setPlan] = useState<PlannedSession[]>([]);
   const [budget, setBudget] = useState(8);
   const [objective, setObjective] = useState<PlanObjective>("probability");
-  const [creating, setCreating] = useState(false);
   const [askOpen, setAskOpen] = useState(false);
   const [swingPick, setSwingPick] = useState<string | null>(null);
 
@@ -142,38 +139,6 @@ export default function OpsMonthView(props: OpsMonthViewProps) {
     setPlan(p);
     if (p.length === 0) showToast(objective === "probability" ? "Không ca nào làm tăng xác suất đạt target — kênh còn lại thêm ca cũng không đổi được kết quả tháng." : "Không còn khung trống có đủ người.");
   };
-  const createDrafts = async () => {
-    setCreating(true);
-    try {
-      const items = plan.map((p) => {
-        const room = rooms.get(p.candidate.channelKey);
-        const before = room ? pWithAdds(room, plan.filter((x) => x.candidate.channelKey === p.candidate.channelKey && x !== p).map((x) => x.candidate)).pHit : null;
-        const after = room ? pWithAdds(room, plan.filter((x) => x.candidate.channelKey === p.candidate.channelKey).map((x) => x.candidate)).pHit : null;
-        const ch = channels.find((c) => c.key === p.candidate.channelKey)!;
-        return {
-          brandId: ch.brand.id,
-          platform: ch.platform,
-          date: p.candidate.date,
-          startTime: p.candidate.startTime,
-          endTime: p.candidate.endTime,
-          hostId: p.host.id,
-          coHostId: p.assistant.id,
-          studioId: ch.studioId || null,
-          expectedGmv: p.candidate.expected,
-          reason: before != null && after != null && after - before > 0.0005 ? `+${((after - before) * 100).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} điểm % xác suất đạt target` : `Thêm ${platformText("GMV", "all")}`
-        };
-      });
-      await createSessionDrafts(items);
-      setPlan([]);
-      onDraftsCreated();
-      showToast(`Đã tạo ${items.length} ca nháp — xác nhận ở "Hôm nay & tuần" (việc cần làm / bộ lọc Ca nháp).`);
-    } catch (e) {
-      showToast(errorMessage(e));
-    } finally {
-      setCreating(false);
-    }
-  };
-
   const askContext = useCallback(
     () =>
       buildAskContext({
@@ -218,7 +183,7 @@ export default function OpsMonthView(props: OpsMonthViewProps) {
 
       <Card className="space-y-3">
         <SectionTitle title="Sa bàn · thêm ca, xem tháng đổi ngay" note="Ô vàng nhạt: phòng còn trống và có host + trợ quen kênh còn rảnh. Host gợi ý theo cùng thứ tự của cửa sổ chốt ca." />
-        <Sandbox month={month} today={today} channels={withRoom} candidates={candidates} plan={plan} onToggle={toggle} budget={budget} onBudget={setBudget} objective={objective} onObjective={setObjective} onAuto={runAuto} onClear={() => setPlan([])} onCreateDrafts={createDrafts} creating={creating} />
+        <Sandbox month={month} today={today} channels={withRoom} candidates={candidates} plan={plan} onToggle={toggle} budget={budget} onBudget={setBudget} objective={objective} onObjective={setObjective} onAuto={runAuto} onClear={() => setPlan([])} onOpenRoster={onOpenRoster ? () => onOpenRoster([...plan].sort((x, y) => x.candidate.date.localeCompare(y.candidate.date))[0]?.candidate.date) : undefined} />
       </Card>
       <div className="grid gap-4 xl:grid-cols-2">
         <Card className="space-y-3">

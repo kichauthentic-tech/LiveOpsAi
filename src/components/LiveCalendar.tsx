@@ -44,12 +44,10 @@ interface LiveCalendarProps {
   onUpdateSession?: (updatedSession: LiveSession) => Promise<boolean>;
   /** 0199 — thả ca vào phòng của brand ở sàn kia ⇒ đổi sàn của ca (DB tách/gắn kế hoạch tháng theo sàn). */
   onSwitchSessionPlatform?: (session: LiveSession, platform: LiveSession["platform"], studioId: string) => Promise<boolean>;
-  /** Mở ca lẻ chỉ còn ở Điều Phối Lịch Live (Đợt 1 gom việc trên ca, 21/11) — nút ở đây dẫn sang đó. */
-  onOpenRoster?: () => void;
-  onDeleteSlot?: (id: string) => Promise<void>;
+  /** Xếp người / mở ca chỉ ở Điều Phối Lịch Live (gom việc trên ca, 21/11): mở Điều Phối, có ngày + ca thì mở đúng tuần và chọn sẵn ca. */
+  onOpenRoster?: (date?: string, slotId?: string) => void;
   onRegisterSlot?: (slotId: string, talentId: string) => Promise<boolean>;
   onUnregisterSlot?: (slotId: string, talentId: string) => Promise<boolean>;
-  onFinalizeSlot?: (slot: ShiftSlot, hostId: string, coHostId: string | null) => Promise<boolean>;
   myTalentId?: string;
   currentRole?: UserRole;
   schemes?: PromoScheme[];
@@ -93,10 +91,8 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   onUpdateSession,
   onSwitchSessionPlatform,
   onOpenRoster,
-  onDeleteSlot,
   onRegisterSlot,
   onUnregisterSlot,
-  onFinalizeSlot,
   myTalentId,
   currentRole,
   schemes = [],
@@ -769,7 +765,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
           ) : canManageSlots && onOpenRoster ? (
           <button
             type="button"
-            onClick={onOpenRoster}
+            onClick={() => onOpenRoster()}
             title="Mở thêm ca làm ở một chỗ: Điều Phối Lịch Live"
             className="w-full sm:w-auto border border-[var(--border)] text-[var(--text)] hover:border-[var(--accent)] font-bold px-4 py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 transition-all"
           >
@@ -1456,8 +1452,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
           myTalentId={myTalentId}
           onRegister={onRegisterSlot}
           onUnregister={onUnregisterSlot}
-          onFinalizeSlot={onFinalizeSlot}
-          onDeleteSlot={onDeleteSlot}
+          onOpenRoster={onOpenRoster ? () => onOpenRoster(selectedSlotDetail.date, selectedSlotDetail.id) : undefined}
         />
       )}
     </div>
