@@ -4,7 +4,12 @@ on:
   schedule:
     # 03:00 UTC daily (~10:00 sáng giờ Việt Nam)
     - cron: "0 3 * * *"
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      full:
+        description: "Sao lưu ĐẦY ĐỦ (gồm dòng thô brand_dataraw_rows ~90 MB egress)"
+        type: boolean
+        default: false
 
 jobs:
   backup:
@@ -30,8 +35,14 @@ jobs:
           fi
           mkdir -p backup
           STAMP=$(date -u +%Y%m%d-%H%M%S)
-          /usr/lib/postgresql/17/bin/pg_dump "$SUPABASE_DB_URL" --no-owner --no-acl --format=custom --file="backup/liveopsai-${STAMP}.dump"
-          echo "STAMP=${STAMP}" >> "$GITHUB_ENV"
+          # Egress (22/11): pg_dump kéo dữ liệu CHƯA NÉN qua pooler — trọn DB ≈ 90–100 MB/lần, trong đó ~89 MB là
+          # brand_dataraw_rows (dòng thô file tải lên; file gốc vẫn tải lại được từ sàn). Gói Free chỉ 5 GB/tháng ⇒ dump trọn
+          # mỗi ngày ăn ~50–60% egress. Ngày thường: bỏ DỮ LIỆU bảng đó (giữ cấu trúc); Chủ nhật hoặc chạy tay "full": trọn.
+          EXCLUDE="--exclude-table-data=public.brand_dataraw_rows"
+          KIND=lite
+          if [ "$(date -u +%u)" = "7" ] || [ "${{ inputs.full }}" = "true" ]; then EXCLUDE=""; KIND=full; fi
+          /usr/lib/postgresql/17/bin/pg_dump "$SUPABASE_DB_URL" --no-owner --no-acl --format=custom $EXCLUDE --file="backup/liveopsai-${STAMP}-${KIND}.dump"
+          echo "STAMP=${STAMP}-${KIND}" >> "$GITHUB_ENV"
 
       - name: Upload backup as artifact
         uses: actions/upload-artifact@v4
@@ -57,7 +68,10 @@ jobs:
 #    Giá trị: connection string ở bước 1 (đã điền mật khẩu thật)
 #
 # 3. Workflow tự chạy hằng ngày 03:00 UTC, hoặc vào tab Actions > "Backup Supabase
-#    Database" > "Run workflow" để chạy tay ngay.
+#    Database" > "Run workflow" để chạy tay ngay (tick "full" để gồm dòng thô).
+#    Ngày thường = bản "lite" (không có dữ liệu brand_dataraw_rows); Chủ nhật = "full".
+#    Phục hồi: pg_restore bản full gần nhất, rồi bản lite mới hơn (bản lite không đụng
+#    dữ liệu brand_dataraw_rows — đợt tải lên sau bản full thì tải lại file ở Dữ Liệu Gốc).
 #
 # 4. File .dump tải về qua tab Actions > chọn run > phần Artifacts. Phục hồi bằng:
 #    pg_restore --clean --no-owner --dbname="<connection-string-đích>" liveopsai-<timestamp>.dump

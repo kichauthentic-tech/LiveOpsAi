@@ -287,8 +287,9 @@ export async function fetchLockedPlanTargets(): Promise<LockedPlanTargets> {
   const data = await fetchAllPages<LockedPlanRow>((from, to) =>
     supabase
       .from("brand_month_plan_slots")
-      // plan(*) chứ không gọi tên cột: DB chưa chạy 0140 (thiếu platform) vẫn đọc được — lockedPlanTargetsFromRows coi là TikTok.
-      .select("slot_id,target_gmv,date,plan:brand_month_plans!inner(*)")
+      // Chỉ 3 cột của kế hoạch (22/11, egress): trước đây `plan(*)` chép NGUYÊN dòng kế hoạch (~750 byte) vào TỪNG ca kế hoạch ⇒
+      // 1.321 dòng = 1,29 MB mỗi lần mở app, mọi role. Gọi tên cột ⇒ ~0,2 MB. 0140 (cột platform) đã chạy từ lâu.
+      .select("slot_id,target_gmv,date,plan:brand_month_plans!inner(brand_id,platform,status)")
       .eq("plan.status", "locked")
       .order("slot_id", { ascending: true })
       .range(from, to)

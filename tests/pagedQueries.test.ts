@@ -14,6 +14,7 @@ vi.mock("../src/lib/supabaseClient", () => ({ supabase: {} }));
 
 const { PAGE_SIZE, fetchAllPages } = await import("../src/lib/db/fetchAllPages");
 const { SESSION_READ_COLUMNS } = await import("../src/lib/db/sessions");
+const { SHIFT_SLOT_READ_COLUMNS } = await import("../src/lib/db/shiftSlots");
 
 const SRC = join(__dirname, "..", "src");
 const DB = join(SRC, "lib/db");
@@ -119,6 +120,14 @@ describe("fetchAllSessionRows — đợt trang song song + cột tường minh",
     // ai_analysis cố ý không đọc ở danh sách (không màn nào dùng) — mọi cột khác sessionFromDb đọc phải có trong danh sách.
     for (const col of used) if (col !== "ai_analysis") expect(listed.has(col), `thiếu cột ${col} trong SESSION_READ_COLUMNS`).toBe(true);
     for (const col of listed) expect(used.has(col), `${col} có trong SESSION_READ_COLUMNS nhưng sessionFromDb không đọc`).toBe(true);
+  });
+
+  test("cột đọc shift_slots khớp những gì fromDb dùng (egress 22/11)", () => {
+    const mapper = bodyOf("shiftSlots.ts", "fromDb");
+    const used = new Set([...mapper.matchAll(/row\.([a-z_0-9]+)/g)].map((m) => m[1]));
+    const listed = new Set<string>(SHIFT_SLOT_READ_COLUMNS);
+    for (const col of used) expect(listed.has(col), `thiếu cột ${col} trong SHIFT_SLOT_READ_COLUMNS`).toBe(true);
+    for (const col of listed) expect(used.has(col), `${col} có trong SHIFT_SLOT_READ_COLUMNS nhưng fromDb không đọc`).toBe(true);
   });
 });
 

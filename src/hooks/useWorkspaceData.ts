@@ -74,6 +74,8 @@ const TABS_NEED_USERS = new Set(["user_settings", "crm", "finance"]);
 const TABS_NEED_AUDIT_LOGS = new Set(["user_settings"]);
 const TABS_NEED_TIKTOK = new Set(["tiktok_api"]);
 const TABS_NEED_AI_PROMPTS = new Set(["ai_training"]);
+// Danh mục SKU (egress 22/11): 1.747 dòng = 0,8 MB, trước đây mọi role (talent cũng vậy) tải lúc mở app mà chỉ 2 tab brand đọc.
+export const TABS_NEED_BRAND_SKUS = new Set(["brand_skus", "brand_live_basket"]);
 
 // Màn có thể sửa report tháng / kế hoạch tháng. Rời một trong các màn này mới cần nạp lại
 // `brand_monthly_reports`; trước đây nạp lại ở MỌI lần đổi tab (18 tab agency + 10 tab brand).
@@ -237,6 +239,8 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
   // docs/WORKSPACE_HISTORY.md). Fetch 1 lần ở agency-level, mỗi Brand Workspace
   // tự filter theo brandId.
   const [brandSkus, setBrandSkus] = useState<BrandSku[]>([]);
+  // Đã nạp danh mục SKU cho user nào — App giữ 2 tab SKU ở khung chờ tới khi về (không chớp "Chưa có sản phẩm").
+  const [brandSkusLoadedFor, setBrandSkusLoadedFor] = useState<string | null>(null);
   const [phaseB1Error, setPhaseB1Error] = useState<string | null>(null);
   // Giai đoạn C3 — Chương trình khuyến mãi tích hợp Calendar. Áp dụng theo khoảng ngày, agency-wide.
   const [promoSchemes, setPromoSchemes] = useState<PromoScheme[]>([]);
@@ -581,9 +585,14 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
     };
   }, [authUserId]);
 
+  // Nạp khi MỞ tab SKU/Giỏ live, một lần mỗi user (khuôn TABS_NEED_*). Handler thêm/sửa/xoá SKU tự cập nhật state như cũ.
+  const brandSkusRequestedRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!authUserId) return;
+    if (!authUserId || !TABS_NEED_BRAND_SKUS.has(activeTab)) return;
+    if (brandSkusRequestedRef.current === authUserId) return;
+    brandSkusRequestedRef.current = authUserId;
     let cancelled = false;
+    let settled = false;
     fetchBrandSkus()
       .then((skus) => {
         if (cancelled) return;
@@ -591,13 +600,20 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
         setPhaseB1Error(null);
       })
       .catch((err) => {
+        brandSkusRequestedRef.current = null; // hỏng thì lần mở tab sau thử lại
         if (cancelled) return;
         setPhaseB1Error(err.message ?? "Không tải được danh sách sản phẩm lên live.");
+      })
+      .finally(() => {
+        settled = true;
+        if (!cancelled) setBrandSkusLoadedFor(authUserId);
       });
     return () => {
       cancelled = true;
+      // Rời tab khi lượt nạp CÒN bay (kết quả sẽ bị bỏ) ⇒ mở khoá để lần mở sau nạp lại, không kẹt ở khung chờ.
+      if (!settled && brandSkusRequestedRef.current === authUserId) brandSkusRequestedRef.current = null;
     };
-  }, [authUserId]);
+  }, [authUserId, activeTab]);
 
   useEffect(() => {
     if (!authUserId) return;
@@ -774,6 +790,7 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
     setPhase19Error,
     brandSkus,
     setBrandSkus,
+    brandSkusReady: !!authUserId && brandSkusLoadedFor === authUserId,
     phaseB1Error,
     setPhaseB1Error,
     promoSchemes,

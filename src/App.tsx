@@ -71,7 +71,7 @@ import { profileOf } from "./lib/platforms/profiles";
 import { createBrandChannel, updateBrandChannel } from "./lib/db/brandChannels";
 import { lazyNamed } from "./lib/lazyNamed";
 import { dropPrefetched, type TabPrefetchCtx } from "./lib/db/prefetch";
-import { useWorkspaceData } from "./hooks/useWorkspaceData";
+import { useWorkspaceData, TABS_NEED_BRAND_SKUS } from "./hooks/useWorkspaceData";
 import { setDisplayLang } from "./lib/displayLang";
 import {
   CALENDAR_TABS,
@@ -430,6 +430,7 @@ export default function App() {
     setBrandPlatformRateHistory,
     phase19Error,
     brandSkus,
+    brandSkusReady,
     setBrandSkus,
     phaseB1Error,
     promoSchemes,
@@ -442,7 +443,9 @@ export default function App() {
     refreshTikTokStatus
   } = useWorkspaceData({ session, currentRole, isOpsRole, activeTab });
   // Cổng dữ liệu của tab đang mở: màn nhập số liệu chỉ cần brand + kênh (TABS_NEEDING_SHELL_ONLY), còn lại chờ đủ ca/talent/report.
-  const tabDataReady = TABS_NEEDING_SHELL_ONLY.has(activeTab) ? shellDataReady : coreDataReady;
+  const baseDataReady = TABS_NEEDING_SHELL_ONLY.has(activeTab) ? shellDataReady : coreDataReady;
+  // Tab SKU/Giỏ live chờ thêm danh mục SKU (nạp lúc mở tab — egress 22/11).
+  const tabDataReady = baseDataReady && (!TABS_NEED_BRAND_SKUS.has(activeTab) || brandSkusReady);
   // Tải chunk tab ngay, không đợi cổng `coreDataReady` ở khối render (cổng đó giữ chunk lại tới khi
   // đợt nạp dữ liệu về xong ⇒ thêm một vòng mạng nối tiếp mỗi lần mở app / đổi tab).
   useEffect(() => {

@@ -100,7 +100,9 @@ test("tab chờ đợt nạp dữ liệu đầu thay vì vẽ 0 ca / 'Chưa có�
   const app = readFileSync(join(SRC, "App.tsx"), "utf8");
   // Cổng của tab = cổng đủ ca/talent/report, trừ màn nhập số liệu (TABS_NEEDING_SHELL_ONLY, xem tests/shellOnlyTabs.test.ts).
   expect(app).toMatch(/!tabDataReady && !TABS_WITHOUT_CORE_DATA\.has\(activeTab\)/);
-  expect(app).toMatch(/const tabDataReady = TABS_NEEDING_SHELL_ONLY\.has\(activeTab\) \? shellDataReady : coreDataReady;/);
+  expect(app).toMatch(/const baseDataReady = TABS_NEEDING_SHELL_ONLY\.has\(activeTab\) \? shellDataReady : coreDataReady;/);
+  // Danh mục SKU nạp lúc mở tab SKU (egress 22/11) ⇒ 2 tab đó chờ thêm cờ của nó, không chớp "Chưa có sản phẩm".
+  expect(app).toMatch(/const tabDataReady = baseDataReady && \(!TABS_NEED_BRAND_SKUS\.has\(activeTab\) \|\| brandSkusReady\);/);
   // Ca phải nạp song song với RPC đóng ca đã qua giờ, không nối đuôi sau nó.
   expect(app).not.toMatch(/completePastSessions\(\)\s*\.catch\([^)]*\)\s*\.then\(\(\) => fetchSessions\(\)\)/);
 });

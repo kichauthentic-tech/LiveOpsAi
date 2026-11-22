@@ -714,6 +714,18 @@ Chữ brand thấy trong Report Tháng (component `report/*`, `*MonthlyReportTab
     ghi thử lên DB công ty), role brand/talent (nhánh "số dòng lệch ⇒ tải trọn" chỉ có unit test).
   - **Không làm (có chủ ý):** chỉ đọc cột `raw->…` theo lát cắt (Report/Dashboard brand không đọc dòng thô lúc mở — report đọc bản chụp; lợi ích
     nhỏ, rủi ro report ra 0 âm thầm); thu hẹp ca talent đọc (user chốt 05/11); cache xuống IndexedDB (dữ liệu brand nằm lại trên máy).
+- **Egress đợt 2 (22/11; 4,38/5 GB, chu kỳ hết 27/11).** Từ 09/11 talent dùng thật (15–28 người/ngày) ⇒ MỌI lần mở app (kể cả điện thoại
+  talent) tải trọn đợt nạp đầu. Đo bằng chính hàm db (service role, JSON giải nén; `scratchpad/meas/`): 4,2 MB/lần mở →
+  `brand_month_plan_slots` 1,29 MB (embed `plan(*)` chép nguyên dòng kế hoạch vào từng ca), `brand_skus` 0,8 MB, `shift_slots` 0,82,
+  `session_availability` 0,74, ca 0,52. **Nguồn lớn nhất lại KHÔNG ở app:** workflow `backup-supabase.yml` pg_dump TRỌN DB mỗi ngày qua
+  pooler (dữ liệu chưa nén ≈ 90–100 MB/lần, ~89 MB là `brand_dataraw_rows`) ≈ một nửa egress/ngày.
+  - Đã sửa: target kế hoạch chỉ đọc `plan(brand_id,platform,status)` (1,29 MB → 0,25; so trên DB thật: 3 map giống hệt cách cũ);
+    SKU nạp khi mở tab `brand_skus`/`brand_live_basket` (`TABS_NEED_BRAND_SKUS`, cổng `brandSkusReady` trong `tabDataReady`);
+    `shift_slots` đọc cột tường minh `SHIFT_SLOT_READ_COLUMNS` (test `pagedQueries` canh khớp `fromDb`). Lần mở app 4,2 → ~2,3 MB.
+    Sao lưu: ngày thường `--exclude-table-data=public.brand_dataraw_rows` (bản "lite"), Chủ nhật/chạy tay tick "full" = trọn.
+  - Byte trên dây (gzip Cloudflare) nhỏ hơn 3–15× byte JSON; chưa rõ Supabase tính egress theo loại nào — xếp hạng theo cả hai vẫn như trên.
+  - **Còn mở:** `onScheduleChanged` ở Điều Phối nạp lại trọn slot + đăng ký (~1,5 MB) sau mỗi lần đổi lịch; `session_availability`
+    tăng ~3.800 dòng/tháng và đọc trọn mọi lần mở app (chưa có cửa sổ thời gian); 23 feed .ics (`/api/calendar`) nhỏ, theo cửa sổ ngày.
 - **Nạp trước lượt đọc của màn** (`lib/db/prefetch.ts`, test `tests/prefetch.test.ts`): màn export `prefetchX(ctx)` khai
   `prefetchable(name, fn)` và effect MOUNT gọi `.take(...)`; App gọi qua `TAB_DATA_PREFETCH` CHỈ khi `!coreDataReady`.
   Giao đúng một lần, hết hạn 30 s, đổi tab là xoá — KHÔNG phải cache: đường đọc-sau-khi-ghi luôn gọi thẳng hàm db.

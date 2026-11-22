@@ -27,6 +27,15 @@ interface DbShiftSlot {
   open_need?: "host" | "co_host" | null;
 }
 
+// Cột đọc tường minh = đúng các khoá của DbShiftSlot (bỏ created_at/updated_at không màn nào dùng). Egress 22/11: bảng đọc TRỌN mỗi
+// lần mở app với mọi role (talent cũng đọc). Test `tests/pagedQueries.test.ts` canh khớp fromDb.
+export const SHIFT_SLOT_READ_COLUMNS = [
+  "id", "date", "start_time", "end_time", "brand_id", "brand_name", "platform", "studio_id", "studio_name", "notes", "status",
+  "session_id", "created_by", "template_id", "plan_id", "signup_deadline", "no_assistant", "open_need"
+] as const;
+
+const SHIFT_SLOT_SELECT = SHIFT_SLOT_READ_COLUMNS.join(",");
+
 const toHhMm = (t: string) => t.slice(0, 5);
 
 function fromDb(row: DbShiftSlot): ShiftSlot {
@@ -77,11 +86,12 @@ export async function fetchShiftSlots(): Promise<ShiftSlot[]> {
   const rows = await fetchAllPages<DbShiftSlot>((from, to) =>
     supabase
       .from("shift_slots")
-      .select("*")
+      .select(SHIFT_SLOT_SELECT)
       .order("date", { ascending: true })
       .order("start_time", { ascending: true })
       .order("id", { ascending: true })
       .range(from, to)
+      .returns<DbShiftSlot[]>()
   );
   return rows.map(fromDb);
 }
