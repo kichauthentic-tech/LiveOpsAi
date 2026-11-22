@@ -747,7 +747,17 @@ Chữ brand thấy trong Report Tháng (component `report/*`, `*MonthlyReportTab
     `sessionBySlot` (role đủ: suy từ `shiftSlots`; talent: bảng cặp). Đo DB thật: 688 → 228 KB/lượt mở; ca mở giống hệt `openSlotsFrom`
     bản đủ; target của cả 2.305 ca giống hệt. **Luật:** với talent `shiftSlots` CHỈ có ca mở từ hôm nay — màn talent mới cần slot đã
     chốt/đã qua thì phải nới `fetchTalentShiftSlots`; code gắn target phải đi qua `sessionBySlot`, không lặp `shiftSlots`.
-  - **Còn mở:** danh sách ca (~520 KB, talent đọc mọi ca — user chốt 05/11) vẫn tải trọn lúc mở app — khoản lớn nhất còn lại.
+  - **Danh sách ca theo phạm vi talent** (`sessions.ts` `setSessionScope` / `talentSessionWindowStart`, test `tests/sessionsScope.test.ts`):
+    talent = mọi ca từ hôm nay − 7 ngày + mọi ca CỦA MÌNH cả lịch sử (host/trợ qua `or()`, ca chỉ có tên trong đoạn giờ qua lô `in(id)`);
+    report tải theo lô id của đúng các ca đó; role khác = trọn như cũ. Hook chờ hồ sơ (`sessionScopeKey` từ `registrationScope`) rồi mới
+    nạp ⇒ talent thêm ~1 chặng mạng lúc mở app. Làm mới: dấu 0214 vẫn hỏi trước (giống ⇒ không tải); khác ⇒ `applyScopedDelta`: ca đổi
+    trong phạm vi (`updated_at` > mốc AND (date ≥ cửa sổ OR của mình)) + HEAD đếm ca trong cửa sổ so với kho (lệch ⇒ tải trọn); ca người
+    khác dời ra khỏi cửa sổ bị bỏ; ca mới vào phạm vi kéo theo report cũ của nó. Không bắt được (chấp nhận): xoá ca cũ của mình ngoài cửa
+    sổ, xoá report. Đo DB thật (2.305 ca): 3.459 KB → trung vị 785 KB, lớn nhất 1.062 KB; khớp từng trường với danh sách đủ. QUYỀN đọc
+    không đổi (user chốt 05/11) — lịch "Cả agency" lùi quá 7 ngày chỉ còn ca của mình. Kiểm app thật trên staging cục bộ (đăng nhập talent
+    test): 290/291 ca đúng phạm vi (ca cũ host/trợ/đoạn giờ có, ca cũ người khác không); sửa ca ⇒ 3 request phần đổi; xoá ca trong cửa
+    sổ ⇒ tải lại theo phạm vi; ops vẫn tải đủ. Số "~520 KB" ghi trước đó SAI: view
+    `live_sessions_secure` trả 0 dòng với service role — đo ca phải đọc bảng gốc.
 - **Nạp trước lượt đọc của màn** (`lib/db/prefetch.ts`, test `tests/prefetch.test.ts`): màn export `prefetchX(ctx)` khai
   `prefetchable(name, fn)` và effect MOUNT gọi `.take(...)`; App gọi qua `TAB_DATA_PREFETCH` CHỈ khi `!coreDataReady`.
   Giao đúng một lần, hết hạn 30 s, đổi tab là xoá — KHÔNG phải cache: đường đọc-sau-khi-ghi luôn gọi thẳng hàm db.

@@ -28,7 +28,7 @@ import {
 import { fetchTalents } from "../lib/db/talents";
 import { fetchStudios } from "../lib/db/studios";
 import { fetchEquipments } from "../lib/db/equipments";
-import { completePastSessions, loadSessionsFull, markSessionsUnapplied, refreshSessions, __resetSessionStore } from "../lib/db/sessions";
+import { completePastSessions, loadSessionsFull, markSessionsUnapplied, refreshSessions, setSessionScope, talentSessionWindowStart, __resetSessionStore } from "../lib/db/sessions";
 import { fetchBrands } from "../lib/db/brands";
 import { fetchUsers } from "../lib/db/users";
 import { fetchAuditLogs } from "../lib/db/auditLogs";
@@ -319,8 +319,11 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab, r
     };
   }, [authUserId]);
 
+  // Phạm vi danh sách ca (egress 22/11): chờ hồ sơ — talent = mọi ca từ hôm nay − 7 ngày + mọi ca của mình (sessions.ts
+  // setSessionScope); role khác = mọi ca. Khoá theo chuỗi để effect chỉ chạy lại khi phạm vi thật sự đổi.
+  const sessionScopeKey = registrationScope === null ? null : registrationScope === "all" ? "all" : `talent:${registrationScope}`;
   useEffect(() => {
-    if (!authUserId) return;
+    if (!authUserId || sessionScopeKey === null) return;
     let cancelled = false;
     fetchAllMonthlyReports()
       .then((m) => { if (!cancelled) setMonthlyReports(m); })
@@ -333,6 +336,7 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab, r
     let latestApplied = 0;
     // `full` = nạp trọn (mở app); còn lại = làm mới theo phần đã đổi (0214, xem refreshSessions) — null là không gì đổi.
     __resetSessionStore(); // người dùng khác đăng nhập ⇒ kho thô của người trước không dùng lại
+    setSessionScope(sessionScopeKey === "all" ? null : { talentId: sessionScopeKey.slice("talent:".length), from: talentSessionWindowStart(getTodayDate()) });
     const load = (seq: number, full = false) => {
       const startedAt = Date.now();
       return (full ? loadSessionsFull() : refreshSessions()).then((s) => {
@@ -380,7 +384,7 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab, r
       window.removeEventListener("focus", refresh);
       document.removeEventListener("visibilitychange", refresh);
     };
-  }, [authUserId]);
+  }, [authUserId, sessionScopeKey]);
 
   useEffect(() => {
     if (!authUserId) return;

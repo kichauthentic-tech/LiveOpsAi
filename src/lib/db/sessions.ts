@@ -458,7 +458,15 @@ const UNDEFINED_COLUMN = "42703";
 // Nhớ cho cả phiên: đã biết view thiếu cột thì các lượt nạp lại nền (mỗi 5 phút) không bắn lại request lỗi.
 let readColumns = SESSION_READ_COLUMNS;
 
-async function fetchAllSessionRows(): Promise<DbLiveSession[]> {
+// Lọc dòng cho danh sách ca theo phạm vi (app talent, egress 22/11) — dữ liệu thuần để không phải truyền builder có kiểu sâu.
+interface RowFilter {
+  fromDate?: string; // date >= fromDate
+  beforeDate?: string; // date < beforeDate
+  or?: string; // biểu thức or() của PostgREST
+  ids?: string[];
+}
+
+async function fetchAllSessionRows(f?: RowFilter): Promise<DbLiveSession[]> {
   const out: DbLiveSession[] = [];
   // Rơi về bảng gốc một lần rồi giữ nguyên cho các đợt sau — không thử lại view mỗi đợt.
   let source: string = READ_VIEW;
@@ -467,9 +475,12 @@ async function fetchAllSessionRows(): Promise<DbLiveSession[]> {
       Promise.all(
         Array.from({ length: PAGES_PER_WAVE }, (_, i) => {
           const start = from + i * PAGE;
-          return supabase
-            .from(source)
-            .select(source === READ_VIEW ? readColumns : "*")
+          let q = supabase.from(source).select(source === READ_VIEW ? readColumns : "*");
+          if (f?.fromDate) q = q.gte("date", f.fromDate);
+          if (f?.beforeDate) q = q.lt("date", f.beforeDate);
+          if (f?.or) q = q.or(f.or);
+          if (f?.ids) q = q.in("id", f.ids);
+          return q
             .order("date", { ascending: false })
             .order("start_time", { ascending: false })
             .order("id", { ascending: true })
@@ -539,12 +550,66 @@ export function parseStamp(raw: string | null): ParsedStamp | null {
   return { raw, sCount, sMax, rCount, rMax, seg: p[2], cp: p[3], pub: p[4], snap: p[5] };
 }
 
-interface SessionStore { stamp: ParsedStamp; rows: DbLiveSession[]; reports: DbSessionReport[]; segments: DbStaffSegment[]; checkpoints: DbCheckpoint[]; deltaOk: boolean; unapplied: boolean }
+interface SessionStore { stamp: ParsedStamp; rows: DbLiveSession[]; reports: DbSessionReport[]; segments: DbStaffSegment[]; checkpoints: DbCheckpoint[]; deltaOk: boolean; unapplied: boolean; scope: SessionScope | null }
 let store: SessionStore | null = null;
 /** Test + đăng xuất/đổi người dùng: bỏ kho để lượt sau tải trọn. */
 export function __resetSessionStore(): void {
   store = null;
   stampRpcMissing = false;
+  sessionScope = null;
+}
+
+// ── Phạm vi danh sách ca của app talent (egress 22/11) ─────────────────────────────────────────────────────────────
+// Đo 22/11 (2.305 ca): danh sách trọn ≈ 2,87 MB ca + 0,49 MB report MỖI lần mở app, mọi role. Talent chỉ dùng ca người khác
+// ở lịch "Cả agency" (tuần đang xem), chuẩn bị ca (ca trước cùng kênh / phòng trước mình), đổi-nhường ca (ca sắp tới), ca nối —
+// đều quanh hiện tại; tab Tôi chỉ dùng ca CỦA MÌNH nhưng cả lịch sử. ⇒ phạm vi talent = mọi ca từ hôm nay − 7 ngày + mọi ca của
+// mình (host / trợ / có tên trong đoạn giờ). Trung vị 744 KB thay vì 3,4 MB. QUYỀN đọc không đổi (user chốt 05/11 talent đọc
+// được mọi ca) — chỉ là app không tải sẵn ca cũ của người khác; lùi lịch "Cả agency" quá 7 ngày chỉ còn thấy ca của mình.
+export interface SessionScope {
+  talentId: string; // "" = tài khoản talent chưa gắn hồ sơ ⇒ chỉ cửa sổ
+  from: string; // YYYY-MM-DD — mọi ca từ ngày này
+}
+let sessionScope: SessionScope | null = null;
+export const TALENT_SESSION_WINDOW_DAYS = 7;
+export function talentSessionWindowStart(today: string): string {
+  const t = Date.parse(`${today}T00:00:00Z`) - TALENT_SESSION_WINDOW_DAYS * 86_400_000;
+  return new Date(t).toISOString().slice(0, 10);
+}
+/** null = mọi ca (ops/trainer/brand). Đổi phạm vi ⇒ bỏ kho để lượt sau tải trọn theo phạm vi mới. */
+export function setSessionScope(next: SessionScope | null): void {
+  if ((sessionScope?.talentId ?? null) === (next?.talentId ?? null) && (sessionScope?.from ?? null) === (next?.from ?? null)) return;
+  sessionScope = next;
+  store = null;
+}
+const ownOr = (sc: SessionScope) => `host_id.eq.${sc.talentId},co_host_id.eq.${sc.talentId}`;
+const isOwnRow = (sc: SessionScope, r: DbLiveSession, segOwned: Set<string>) =>
+  !!sc.talentId && (r.host_id === sc.talentId || r.co_host_id === sc.talentId || segOwned.has(r.id));
+const segOwnedIds = (sc: SessionScope, segments: DbStaffSegment[]) =>
+  new Set(sc.talentId ? segments.filter((g) => g.talent_id === sc.talentId).map((g) => g.session_id) : []);
+const ID_CHUNK = 150; // id uuid 36 ký tự ⇒ ~5,5 KB URL mỗi lô
+
+/** Ca trong phạm vi talent: cửa sổ + ca cũ của mình (host/trợ) + ca cũ mình chỉ có tên trong đoạn giờ. */
+async function fetchScopedSessionRows(sc: SessionScope, segments: DbStaffSegment[]): Promise<DbLiveSession[]> {
+  const [recent, ownOld] = await Promise.all([
+    fetchAllSessionRows({ fromDate: sc.from }),
+    sc.talentId ? fetchAllSessionRows({ beforeDate: sc.from, or: ownOr(sc) }) : Promise.resolve([] as DbLiveSession[])
+  ]);
+  const byId = new Map([...recent, ...ownOld].map((r) => [r.id, r]));
+  const missing = [...segOwnedIds(sc, segments)].filter((id) => !byId.has(id));
+  for (let i = 0; i < missing.length; i += ID_CHUNK) {
+    for (const r of await fetchAllSessionRows({ ids: missing.slice(i, i + ID_CHUNK) })) byId.set(r.id, r);
+  }
+  return [...byId.values()].sort(bySessionOrder);
+}
+
+/** Report của đúng các ca đã nạp (theo lô id) — bảng report 1-1 với ca. */
+async function fetchReportsFor(ids: string[]): Promise<DbSessionReport[]> {
+  const chunks: string[][] = [];
+  for (let i = 0; i < ids.length; i += ID_CHUNK) chunks.push(ids.slice(i, i + ID_CHUNK));
+  const parts = await Promise.all(
+    chunks.map((c) => fetchAllPages<DbSessionReport>((from, to) => supabase.from("live_session_reports").select("*").in("session_id", c).order("session_id", { ascending: true }).range(from, to)))
+  );
+  return parts.flat();
 }
 /** Hook đã BỎ kết quả của lượt nạp vừa rồi (có ghi cục bộ chen giữa) ⇒ lượt làm mới sau phải trả danh sách dù dấu không đổi. */
 export function markSessionsUnapplied(): void {
@@ -562,12 +627,80 @@ const bySessionOrder = (a: DbLiveSession, b: DbLiveSession) =>
 /** Nạp trọn (lúc mở app / khi không làm mới theo phần được). Dấu lấy TRƯỚC dữ liệu: có ghi chen giữa thì lượt sau tải thừa, không sót. */
 export async function loadSessionsFull(stampRaw?: string | null): Promise<LiveSession[]> {
   const stampP = stampRaw !== undefined ? Promise.resolve(stampRaw) : fetchSessionsChangeStamp().catch(() => null);
+  const sc = sessionScope;
+  if (sc) {
+    // Phạm vi talent: đoạn giờ về trước (cần để biết ca cũ nào "của mình"), rồi ca, rồi report của đúng các ca đó.
+    const [st, segments, checkpoints] = await Promise.all([stampP, fetchAllSegments(), fetchAllCheckpoints()]);
+    const rows = await fetchScopedSessionRows(sc, segments);
+    const reports = await fetchReportsFor(rows.map((r) => r.id));
+    const stamp = parseStamp(st);
+    store = stamp && sessionScope === sc ? { stamp, rows, reports, segments, checkpoints, deltaOk: true, unapplied: false, scope: sc } : null;
+    return assembleSessions(rows, reports, segments, checkpoints);
+  }
   const [st, rows, reports, segments, checkpoints] = await Promise.all([stampP, fetchAllSessionRows(), fetchAllReports(), fetchAllSegments(), fetchAllCheckpoints()]);
   const stamp = parseStamp(st);
   store = stamp
-    ? { stamp, rows, reports, segments, checkpoints, deltaOk: rows.length === stamp.sCount && reports.length === stamp.rCount, unapplied: false }
+    ? { stamp, rows, reports, segments, checkpoints, deltaOk: rows.length === stamp.sCount && reports.length === stamp.rCount, unapplied: false, scope: null }
     : null;
   return assembleSessions(rows, reports, segments, checkpoints);
+}
+
+/**
+ * Làm mới theo phần đổi cho danh sách THEO PHẠM VI (talent). Dấu 0214 đếm cả bảng nên không so được số dòng của danh sách thiếu —
+ * thay bằng: ca đổi trong phạm vi (cửa sổ OR của mình) + đếm số ca trong CỬA SỔ (HEAD, cùng mốc ngày) so với kho. Lệch ⇒ tải trọn.
+ * Không bắt được (chấp nhận, lượt mở app sau tự đúng): xoá ca cũ của mình ngoài cửa sổ; xoá report.
+ */
+async function applyScopedDelta(cur: SessionStore, next: ParsedStamp, sc: SessionScope): Promise<boolean> {
+  if (next.pub !== cur.stamp.pub) return false;
+  const sessionsChanged = next.sCount !== cur.stamp.sCount || next.sMax !== cur.stamp.sMax;
+  if (next.snap !== cur.stamp.snap && !sessionsChanged) return false;
+  let rows = cur.rows, reports = cur.reports, segments = cur.segments, checkpoints = cur.checkpoints;
+  if (next.seg !== cur.stamp.seg) segments = await fetchAllSegments();
+  if (next.cp !== cur.stamp.cp) checkpoints = await fetchAllCheckpoints();
+  const known = new Set(cur.rows.map((r) => r.id));
+  if (sessionsChanged) {
+    const since = sinceOf(cur.stamp.sMax);
+    if (!since) return false;
+    const inScope = sc.talentId ? `date.gte.${sc.from},${ownOr(sc)}` : null;
+    const changedQ = supabase.from(READ_VIEW).select(readColumns).gt("updated_at", since);
+    const [{ data, error }, head] = await Promise.all([
+      (inScope ? changedQ.or(inScope) : changedQ.gte("date", sc.from)).limit(PAGE),
+      supabase.from(READ_VIEW).select("id", { count: "exact", head: true }).gte("date", sc.from)
+    ]);
+    if (error || head.error || head.count === null) return false;
+    const changed = (data as unknown as DbLiveSession[]) ?? [];
+    if (changed.length >= PAGE) return false;
+    const byId = new Map(cur.rows.map((r) => [r.id, r]));
+    for (const r of changed) byId.set(r.id, r);
+    // Ca người khác dời ra ngoài cửa sổ ⇒ bỏ khỏi kho (ca của mình giữ cả lịch sử).
+    const segOwned = segOwnedIds(sc, segments);
+    for (const [id, r] of byId) if (r.date < sc.from && !isOwnRow(sc, r, segOwned)) byId.delete(id);
+    const inWindow = [...byId.values()].filter((r) => r.date >= sc.from).length;
+    if (inWindow !== head.count) return false;
+    rows = [...byId.values()].sort(bySessionOrder);
+  }
+  const ids = new Set(rows.map((r) => r.id));
+  if (next.rCount !== cur.stamp.rCount || next.rMax !== cur.stamp.rMax) {
+    const since = sinceOf(cur.stamp.rMax);
+    if (!since) reports = await fetchReportsFor([...ids]);
+    else {
+      const { data, error } = await supabase.from("live_session_reports").select("*").gt("updated_at", since).limit(PAGE);
+      if (error) return false;
+      const changed = (data as DbSessionReport[]) ?? [];
+      if (changed.length >= PAGE) return false;
+      const byId = new Map(reports.map((r) => [r.session_id, r]));
+      for (const r of changed) if (ids.has(r.session_id)) byId.set(r.session_id, r);
+      reports = [...byId.values()];
+    }
+  }
+  // Ca mới vào phạm vi (dời ngày vào cửa sổ, ca mới của mình) có thể đã có report từ trước mốc ⇒ lấy report của riêng chúng.
+  const added = [...ids].filter((id) => !known.has(id));
+  if (added.length > 0) {
+    const have = new Set(reports.map((r) => r.session_id));
+    reports = [...reports.filter((r) => ids.has(r.session_id)), ...(await fetchReportsFor(added)).filter((r) => !have.has(r.session_id))];
+  } else reports = reports.filter((r) => ids.has(r.session_id));
+  store = { stamp: next, rows, reports, segments, checkpoints, deltaOk: true, unapplied: cur.unapplied, scope: sc };
+  return true;
 }
 
 async function applyDelta(cur: SessionStore, next: ParsedStamp): Promise<boolean> {
@@ -607,7 +740,7 @@ async function applyDelta(cur: SessionStore, next: ParsedStamp): Promise<boolean
   }
   if (next.seg !== cur.stamp.seg) segments = await fetchAllSegments();
   if (next.cp !== cur.stamp.cp) checkpoints = await fetchAllCheckpoints();
-  store = { stamp: next, rows, reports, segments, checkpoints, deltaOk: true, unapplied: cur.unapplied };
+  store = { stamp: next, rows, reports, segments, checkpoints, deltaOk: true, unapplied: cur.unapplied, scope: null };
   return true;
 }
 
@@ -624,9 +757,9 @@ export async function refreshSessions(): Promise<LiveSession[] | null> {
   const raw = await fetchSessionsChangeStamp().catch(() => null);
   const next = parseStamp(raw);
   const cur = store;
-  if (!next || !cur) return loadSessionsFull(raw);
+  if (!next || !cur || cur.scope !== sessionScope) return loadSessionsFull(raw);
   if (next.raw !== cur.stamp.raw) {
-    const ok = cur.deltaOk && (await applyDelta(cur, next).catch(() => false));
+    const ok = cur.deltaOk && (await (cur.scope ? applyScopedDelta(cur, next, cur.scope) : applyDelta(cur, next)).catch(() => false));
     if (!ok) return loadSessionsFull(raw);
   } else if (!cur.unapplied) return null;
   const s = store!;
