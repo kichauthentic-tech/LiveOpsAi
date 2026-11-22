@@ -9,25 +9,29 @@ export const esc = (s: unknown) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&
 export const num = (s: unknown) => parseFloat(String(s).replace("−", "-").replace(/\./g, "").replace(",", ".").replace("%", "").replace("+", ""));
 
 // ---------- bảng ----------
-export function tbl(head: string[], rows: any[], wideCols: number[] = []): string {
+/** Ô bảng: chuỗi, hoặc {t: nội dung, c: class (up/dn/nt/w…), s: style}. */
+export type Cell = string | { t: string; c?: string; s?: string };
+/** Dòng bảng: mảng ô, dòng nhóm {grp}, hoặc dòng tô đậm {hl, c: ô}. */
+export type TableRow = Cell[] | { grp: string } | { hl?: boolean; c: Cell[] };
+export function tbl(head: string[], rows: TableRow[], wideCols: number[] = []): string {
   const cls = (i: number) => (wideCols.includes(i) ? ' class="w"' : "");
-  return `<thead><tr>${head.map((h: string, i: number) => `<th${cls(i)}>${h}</th>`).join("")}</tr></thead><tbody>${rows.map((r: any) => r.grp ? `<tr class="grp"><td colspan="${head.length}">${r.grp}</td></tr>` : `<tr${r.hl ? ' class="hl"' : ""}>${(r.c || r).map((c: any, i: number) => typeof c === "object" ? `<td class="${c.c || ""}${wideCols.includes(i) && !/\bw\b/.test(c.c || "") ? " w" : ""}"${c.s ? ` style="${c.s}"` : ""}>${c.t}</td>` : `<td${cls(i)}>${c}</td>`).join("")}</tr>`).join("")}</tbody>`;
+  return `<thead><tr>${head.map((h: string, i: number) => `<th${cls(i)}>${h}</th>`).join("")}</tr></thead><tbody>${rows.map((r) => "grp" in r ? `<tr class="grp"><td colspan="${head.length}">${r.grp}</td></tr>` : `<tr${"hl" in r && r.hl ? ' class="hl"' : ""}>${(Array.isArray(r) ? r : r.c).map((c: Cell, i: number) => typeof c === "object" ? `<td class="${c.c || ""}${wideCols.includes(i) && !/\bw\b/.test(c.c || "") ? " w" : ""}"${c.s ? ` style="${c.s}"` : ""}>${c.t}</td>` : `<td${cls(i)}>${c}</td>`).join("")}</tr>`).join("")}</tbody>`;
 }
-export const ch = (txt: string, thr: number, neutral?: boolean): any => { const v = num(txt); if (isNaN(v)) return txt; const c = neutral || Math.abs(v) <= thr ? "nt" : v > 0 ? "up" : "dn"; return { t: txt, c }; };
+export const ch = (txt: string, thr: number, neutral?: boolean): Cell => { const v = num(txt); if (isNaN(v)) return txt; const c = neutral || Math.abs(v) <= thr ? "nt" : v > 0 ? "up" : "dn"; return { t: txt, c }; };
 export const pill = (t: string, k: string) => `<span class="pill ${k}">${t}</span>`;
 export const W = (t: string) => ({ t, c: "w" });
 
 // ---------- biểu đồ SVG ----------
-export const TX = (x: number, y: number, t: string, o: any = {}) => `<text x="${x}" y="${y}" text-anchor="${o.a || "middle"}" style="fill:${o.c || "var(--muted)"};font-size:${o.s || 11}px;font-weight:${o.w || 500}">${t}</text>`;
+export const TX = (x: number, y: number, t: string, o: { a?: string; c?: string; s?: number; w?: number } = {}) => `<text x="${x}" y="${y}" text-anchor="${o.a || "middle"}" style="fill:${o.c || "var(--muted)"};font-size:${o.s || 11}px;font-weight:${o.w || 500}">${t}</text>`;
 export const svg = (w: number, h: number, inner: string) => `<svg viewBox="0 0 ${w} ${h}" width="100%" role="img" style="display:block;height:auto">${inner}</svg>`;
 
 // biểu đồ cầu: steps = [{l, v, t: "total"|"delta", txt}]
-export function waterfall(steps: any[], o: any): string {
+export function waterfall(steps: { l: string; v: number; t?: string; txt: string }[], o: { h?: number; max: number; min: number }): string {
   const Wd = 640, H = o.h || 270, m = { l: 8, r: 8, t: 28, b: 46 };
   const pw = Wd - m.l - m.r, ph = H - m.t - m.b, n = steps.length, bw = (pw / n) * 0.6;
   const Y = (v: number) => m.t + ((o.max - v) / (o.max - o.min)) * ph;
   let cur = 0, out = `<line x1="${m.l}" x2="${Wd - m.r}" y1="${H - m.b}" y2="${H - m.b}" style="stroke:var(--line)"/>`;
-  steps.forEach((s: any, i: number) => {
+  steps.forEach((s, i: number) => {
     const cx = m.l + (pw / n) * (i + 0.5);
     let a, b;
     if (s.t === "total") { a = o.min; b = s.v; cur = s.v; } else { a = cur; b = cur + s.v; cur = b; }
@@ -42,7 +46,11 @@ export function waterfall(steps: any[], o: any): string {
   return svg(Wd, H, out);
 }
 // cột nhóm có trục 0: groups = [{l, v: [..]}], series = [{color}]
-export function columns(groups: any[], series: any[], o: any): string {
+export function columns(
+  groups: { l: string; v: (number | null)[]; colors?: (string | undefined)[] }[],
+  series: { color: string }[],
+  o: { h?: number; max: number; min: number; ref?: number | null; refLabel?: string; base?: number; fmt: (v: number) => string }
+): string {
   const Wd = 640, H = o.h || 250, m = { l: 8, r: 8, t: 22, b: 30 };
   const pw = Wd - m.l - m.r, ph = H - m.t - m.b, gw = pw / groups.length;
   const Y = (v: number) => m.t + ((o.max - v) / (o.max - o.min)) * ph;
@@ -50,7 +58,7 @@ export function columns(groups: any[], series: any[], o: any): string {
   let out = "";
   if (o.ref != null) out += `<line x1="${m.l}" x2="${Wd - m.r}" y1="${Y(o.ref)}" y2="${Y(o.ref)}" style="stroke:var(--cream);stroke-dasharray:4 4;opacity:.7"/>` + TX(Wd - m.r, Y(o.ref) - 5, o.refLabel || "", { a: "end", s: 11, c: "var(--cream)" });
   out += `<line x1="${m.l}" x2="${Wd - m.r}" y1="${Y(o.base || 0)}" y2="${Y(o.base || 0)}" style="stroke:var(--muted)"/>`;
-  groups.forEach((g: any, i: number) => {
+  groups.forEach((g, i: number) => {
     const gx = m.l + gw * i + gw / 2 - (bw * series.length) / 2;
     g.v.forEach((v: number | null, j: number) => {
       if (v == null) return;
@@ -65,11 +73,11 @@ export function columns(groups: any[], series: any[], o: any): string {
   return svg(Wd, H, out);
 }
 // cột chồng 100%: cols = [{l, v: [..]}], segs = [{name, color}]
-export function stack100(cols: any[], segs: any[], o: any): string {
+export function stack100(cols: { l: string; v: number[] }[], segs: { color: string }[], o: { h?: number }): string {
   const Wd = 640, H = o.h || 260, m = { l: 8, r: 8, t: 10, b: 28 };
   const pw = Wd - m.l - m.r, ph = H - m.t - m.b, gw = pw / cols.length, bw = Math.min(90, gw * 0.62);
   let out = "";
-  cols.forEach((c: any, i: number) => {
+  cols.forEach((c, i: number) => {
     const tot = c.v.reduce((a: number, b: number) => a + b, 0); let y = H - m.b; const x = m.l + gw * i + (gw - bw) / 2;
     c.v.forEach((v: number, j: number) => {
       const hh = (v / tot) * ph; y -= hh;
@@ -81,7 +89,14 @@ export function stack100(cols: any[], segs: any[], o: any): string {
   return svg(Wd, H, out);
 }
 // phân tán: pts = [{x, y, r, l, color, dx, dy, a}]
-export function scatter(pts: any[], o: any): string {
+export function scatter(
+  pts: { x: number; y: number; r: number; l: string; color: string; dx?: number; dy?: number | null; a?: string }[],
+  o: {
+    h?: number; x0: number; x1: number; y0: number; y1: number; kx?: number; ky?: number;
+    xf: (v: number) => string; yf: (v: number) => string; xl: string; yl: string;
+    vx?: number | null; vy?: number | null; quad?: { x: number; y: number; t: string; a?: string }[];
+  }
+): string {
   const Wd = 640, H = o.h || 320, m = { l: 48, r: 14, t: 14, b: 42 };
   const pw = Wd - m.l - m.r, ph = H - m.t - m.b;
   const X = (v: number) => m.l + ((v - o.x0) / (o.x1 - o.x0)) * pw, Y = (v: number) => m.t + ((o.y1 - v) / (o.y1 - o.y0)) * ph;
@@ -92,17 +107,18 @@ export function scatter(pts: any[], o: any): string {
   out += TX(m.l + pw / 2, H - 4, o.xl, { s: 11 }) + `<text transform="translate(11 ${m.t + ph / 2}) rotate(-90)" text-anchor="middle" style="fill:var(--muted);font-size:11px">${o.yl}</text>`;
   if (o.vx != null) out += `<line x1="${X(o.vx)}" x2="${X(o.vx)}" y1="${m.t}" y2="${H - m.b}" style="stroke:var(--cream);stroke-dasharray:4 4;opacity:.6"/>`;
   if (o.vy != null) out += `<line x1="${m.l}" x2="${Wd - m.r}" y1="${Y(o.vy)}" y2="${Y(o.vy)}" style="stroke:var(--cream);stroke-dasharray:4 4;opacity:.6"/>`;
-  (o.quad || []).forEach((q: any) => { out += TX(q.x, q.y, q.t, { a: q.a || "start", s: 11, c: "var(--gold-dim)", w: 600 }); });
-  pts.forEach((p: any) => {
+  (o.quad || []).forEach((q) => { out += TX(q.x, q.y, q.t, { a: q.a || "start", s: 11, c: "var(--gold-dim)", w: 600 }); });
+  pts.forEach((p) => {
     out += `<circle cx="${X(p.x)}" cy="${Y(p.y)}" r="${p.r}" style="fill:${p.color};fill-opacity:.75;stroke:${p.color}"/>`;
     out += TX(X(p.x) + (p.dx || 0), Y(p.y) + (p.dy != null ? p.dy : -p.r - 5), p.l, { a: p.a || "middle", s: 11, c: "var(--cream)", w: 600 });
   });
   return svg(Wd, H, out);
 }
 // thanh ngang / bullet: rows = [{name, sub, value, text, dim, mark, cls}]
-export function hbars(rows: any[], max?: number): string {
-  const m = max || Math.max(...rows.map((r: any) => Math.max(r.value, r.mark || 0)));
-  return rows.map((r: any) => `<div class="nm">${esc(r.name)}${r.sub ? `<small>${esc(r.sub)}</small>` : ""}</div>
+export interface HBarRow { name: string; sub?: string; value: number; text: string; dim?: boolean; mark?: number | null; cls?: string }
+export function hbars(rows: HBarRow[], max?: number): string {
+  const m = max || Math.max(...rows.map((r) => Math.max(r.value, r.mark || 0)));
+  return rows.map((r) => `<div class="nm">${esc(r.name)}${r.sub ? `<small>${esc(r.sub)}</small>` : ""}</div>
       <div class="trk"><div class="fill ${r.dim ? "dim" : ""} ${r.cls || ""}" style="width:${Math.min(100, (r.value / m) * 100)}%"></div>${r.mark != null ? `<div class="mk" style="left:${(r.mark / m) * 100}%"></div>` : ""}</div>
       <div class="v">${r.text}</div>`).join("");
 }

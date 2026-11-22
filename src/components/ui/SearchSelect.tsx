@@ -90,11 +90,12 @@ export default function SearchSelect({
     };
   }, [open]);
 
+  const hasPos = pos !== null;
   useEffect(() => {
     if (!open) return;
     const t = setTimeout(() => inputRef.current?.focus(), 0);
     return () => clearTimeout(t);
-  }, [open, pos !== null]);
+  }, [open, hasPos]);
 
   useEffect(() => {
     setActive(0);

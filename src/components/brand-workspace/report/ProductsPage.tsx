@@ -168,7 +168,7 @@ export const ProductsPageBody: React.FC<{
   curDaysLabel: string;
   prevMonthLabel: string;
   empty?: React.ReactNode;
-}> = ({ data, images, canManage, onSaveImage, curDaysLabel, prevMonthLabel, empty }) => {
+}> = ({ data, images, canManage, onSaveImage, curDaysLabel, empty }) => {
   const [status, setStatus] = useState("");
   const sku = data.sku;
   const shopee = data.variant === "shopee";

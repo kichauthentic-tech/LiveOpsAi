@@ -70,7 +70,6 @@ export const TalentToday: React.FC<Props> = ({
   sessions,
   shiftSlots,
   brands,
-  talents,
   currentRole,
   myTalentId,
   currentUserId,

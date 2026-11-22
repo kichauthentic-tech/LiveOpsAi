@@ -131,7 +131,7 @@ export function fitAllocationModel(history: LiveSession[], month: string, params
     for (const b of ["dday", "midmonth", "payday"] as CampDayBucket[]) { pen[c] = params.allocRidge; v[c++] = r.bucket === b ? 1 : 0; }
     if (useBand) for (let k = 0; k < BANDS; k++) { pen[c] = params.allocRidge; v[c++] = r.band === k ? 1 : 0; }
     if (useCampPos) for (let p = 0; p < POS; p++) { pen[c] = params.allocRidge; v[c++] = isPosBucket(r.bucket) && r.pos === p ? 1 : 0; }
-    if (useWeekend) { pen[c] = weekendRidge; v[c++] = r.wkd ? 1 : 0; }
+    if (useWeekend) { pen[c] = weekendRidge; v[c] = r.wkd ? 1 : 0; }
     return v;
   });
   const off = rows.map((r) => Math.log(r.hours));

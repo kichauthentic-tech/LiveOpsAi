@@ -53,7 +53,7 @@ const MODES: { key: RankMode; label: string; hint: string }[] = [
   { key: "gmv", label: "Tối ưu GMV", hint: "Host có GMV/giờ cao hơn kỳ vọng cùng kênh × khung giờ lên trước (chỉ số co về ×1,00 theo số ca; lặp lại yếu giữa các tháng, r = 0,23)." }
 ];
 
-export const ShiftPanel: React.FC<Props> = ({ shift, analysis, ctx, talents, history, showCost, readOnly, busy, onClose, onAssign, onNoAssistant, onReopenSignup, onMove, onRemove, onFinalizeNow, onMode }) => {
+export const ShiftPanel: React.FC<Props> = ({ shift, analysis, ctx, talents, history, showCost, readOnly, busy, onClose, onAssign, onNoAssistant, onMove, onRemove, onFinalizeNow, onMode }) => {
   const talentById = useMemo(() => new Map(talents.map((t) => [t.id, t])), [talents]);
   const nm = (id: string | undefined) => (id ? talentShortName(talentById.get(id)) || "?" : "");
   const issues = analysis.byShift.get(shift.key) ?? [];

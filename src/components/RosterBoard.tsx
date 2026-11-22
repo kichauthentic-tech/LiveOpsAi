@@ -793,15 +793,15 @@ export const RosterBoard: React.FC<Props> = (p) => {
         .filter(Boolean)
         .join("\n");
       if (!(await confirm(msg, { confirmLabel: `Công bố ${total} ca` }))) return;
-      let published = 0;
-      let notified = 0;
+      let result: Awaited<ReturnType<typeof publishRosterRange>>;
       try {
-        ({ published, notified } = await publishRosterRange(planRange.from, planRange.to, rangeWeeks.map(([w]) => w)));
+        result = await publishRosterRange(planRange.from, planRange.to, rangeWeeks.map(([w]) => w));
       } catch (e) {
         await Promise.all([p.onScheduleChanged(), reloadRoster()]);
         showToast(`Chưa công bố được: ${errorMessage(e)}`);
         return;
       }
+      const { published, notified } = result;
       await Promise.all([p.onScheduleChanged(), reloadRoster()]);
       persistAuto(
         Object.fromEntries(

@@ -17,7 +17,7 @@ import { shopeeShopSplitThrough, shopeeShopTrend } from "../../lib/report/shopee
 import { ProductsPageBody, productsKpis, type ProductsPageData } from "./report/ProductsPage";
 import { HostPageBody, hostKpis, type HostPageData } from "./report/HostPage";
 import { NextLivePlanPanel, LIVE_TARGET_MANUAL_KEY, decodeLiveTarget, encodeLiveTarget } from "./report/NextMonthPanels";
-import { fmtM, fmtP, hbars, heat, pill, tbl, W, waterfall } from "./report/demoCharts";
+import { fmtM, fmtP, hbars, heat, pill, tbl, W, waterfall, type TableRow } from "./report/demoCharts";
 import { saveMonthlyReportSectionNote } from "../../lib/db/monthlyReports";
 import { fetchMonthPlan } from "../../lib/db/monthPlans";
 import { downloadSheetsAsXlsx, xlsxFailText } from "../../lib/exportXlsx";
@@ -449,7 +449,7 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
 
   // ======================= 2 · Key Metrics (cùng khung KeyMetricsDemoPage) =======================
   const kmTable = pm.km[kmTab];
-  const kmRows: unknown[] = [];
+  const kmRows: TableRow[] = [];
   for (const g of SHOPEE_KM_GROUPS) {
     const rs = kmTable.rows.filter((r) => r.def.group === g.group);
     if (!rs.length) continue;

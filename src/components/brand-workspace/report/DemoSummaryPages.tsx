@@ -7,7 +7,7 @@ import type { BridgePoint, PlanHourRow } from "../../../lib/report/reportVisuals
 import type { CampDayBucket } from "../../../lib/campaignDays";
 import { parseRatePct, type RefundTrackRow } from "../../../lib/report/nextMonthPlan";
 import { DAY_TYPE_SHORT } from "./theme";
-import { columns, fmtP, hbars, pill, tbl, waterfall } from "./demoCharts";
+import { columns, fmtP, hbars, pill, tbl, waterfall, type TableRow } from "./demoCharts";
 import { DemoHead, DemoKpis, DemoLegend, DemoPage, DemoPanel, DemoStack, DemoTable, Html, pcTone, type DemoKpi } from "./DemoBlocks";
 import { byLang, t, monthLong } from "../../../lib/displayLang";
 
@@ -83,15 +83,18 @@ const CH_COLOR = { sellerLive: "#e0b43c", affiliate: "#d95926", video: "#199e70"
 const ChannelDonut: React.FC<{ parts: { color: string; v: number }[]; total: number; center: string; label: string }> = ({ parts, total, center, label }) => {
   const R = 62;
   const C = 2 * Math.PI * R;
-  let acc = 0;
+  // Độ dài + điểm bắt đầu từng cung tính trước (không cộng dồn biến trong lúc vẽ — lint React Compiler).
+  const arcs = parts.reduce<{ len: number; start: number }[]>((out, sp) => {
+    const prev = out[out.length - 1];
+    out.push({ len: total > 0 ? (sp.v / total) * C : 0, start: prev ? prev.start + prev.len : 0 });
+    return out;
+  }, []);
   return (
     <svg viewBox="0 0 160 160" width="160" height="160" role="img" aria-label={`${label} ${t("theo kênh", "by channel")}`} style={{ flex: "none" }}>
       <circle cx="80" cy="80" r={R} fill="none" stroke="var(--line)" strokeWidth="22" />
       {parts.map((s, i) => {
-        const len = total > 0 ? (s.v / total) * C : 0;
-        const el = <circle key={i} cx="80" cy="80" r={R} fill="none" stroke={s.color} strokeWidth="22" strokeDasharray={`${len} ${C - len}`} strokeDashoffset={-acc} transform="rotate(-90 80 80)" />;
-        acc += len;
-        return el;
+        const { len, start } = arcs[i];
+        return <circle key={i} cx="80" cy="80" r={R} fill="none" stroke={s.color} strokeWidth="22" strokeDasharray={`${len} ${C - len}`} strokeDashoffset={-start} transform="rotate(-90 80 80)" />;
       })}
       <text x="80" y="76" textAnchor="middle" fontSize="11" fill="var(--muted)">{label}</text>
       <text x="80" y="96" textAnchor="middle" fontSize="18" fontWeight="900" fill="var(--cream)">{center}</text>
@@ -211,7 +214,7 @@ export const SummaryDemoPage: React.FC<SummaryDemoProps> = (p) => {
     })),
     hbMax / 1e6
   );
-  const planRows: any[] = ph.map((r) => [DAY_TYPE_SHORT[r.key], fmtP(r.share * 100, 0, false), amt(r.planTarget), String(Math.round(r.planHours)), amt(r.planGmvPerHour!)]);
+  const planRows: TableRow[] = ph.map((r) => [DAY_TYPE_SHORT[r.key], fmtP(r.share * 100, 0, false), amt(r.planTarget), String(Math.round(r.planHours)), amt(r.planGmvPerHour!)]);
   if (tHours > 0) planRows.push({ hl: true, c: [t("Cả tháng", "Whole month"), "100%", amt(tTarget), String(Math.round(tHours)), amt(tTarget / tHours)] });
   const end = p.partial ? upTo(p.curEndDay) : monthN;
 
@@ -420,7 +423,7 @@ export const KeyMetricsDemoPage: React.FC<{
   const last = months.length - 1;
   const table = keyMetricsTable(months, tab, cv);
   const byKey = new Map(table.rows.map((r) => [r.def.key, r]));
-  const rows: any[] = [];
+  const rows: TableRow[] = [];
   for (const o of KM_ORDER) {
     const r = byKey.get(o.key);
     if (!r) continue;

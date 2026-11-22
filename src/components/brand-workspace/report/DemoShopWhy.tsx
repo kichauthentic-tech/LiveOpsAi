@@ -17,7 +17,7 @@ import { type AttributionByType, type AttributionMonth } from "../../../lib/repo
 import { numLocale, byLang, t } from "../../../lib/displayLang";
 
 const BLUE = "#7fb0e0";
-import { W, ch, columns, fmtM, fmtP, heat, hbars, pill, stack100, tbl, waterfall } from "./demoCharts";
+import { W, ch, columns, fmtM, fmtP, heat, hbars, pill, stack100, tbl, waterfall, type Cell } from "./demoCharts";
 import { featureOffText } from "../../../lib/featureOff";
 
 // Hai trang "Toàn shop & đóng góp của livestream YFB" và "Phân tích nguyên nhân" dựng theo demo Report Tháng đã chốt
@@ -253,7 +253,7 @@ export const DemoShopPage: React.FC<DemoShopProps> = ({ no, title, control, mixe
 
   // Direct vs Indirect: brand đọc tỷ trọng Indirect cao thành "live không chốt được đơn". Chỉ liệt kê số, không kết luận.
   // Chênh so tháng liền trước tô màu từ 5 điểm trở lên (ngưỡng chọn tay, chưa backtest; loại ngày chỉ ~3 ngày nên dưới mức này gần như là nhiễu).
-  const shift = (cur: AttributionMonth | null | undefined, before: AttributionMonth | null | undefined): any => {
+  const shift = (cur: AttributionMonth | null | undefined, before: AttributionMonth | null | undefined): Cell => {
     if (!cur || !before) return "—";
     const d = cur.indirectPct - before.indirectPct;
     return { t: `${d < 0 ? "−" : "+"}${fmtFixed(Math.abs(d), 1)} ${t("điểm", "pts")}`, c: Math.abs(d) < 5 ? "nt" : d > 0 ? "dn" : "up" };

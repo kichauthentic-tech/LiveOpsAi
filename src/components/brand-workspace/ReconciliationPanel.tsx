@@ -231,7 +231,7 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
 
   const mergeGroups = useMemo(() => suggestMergeGroups(rows), [rows]);
   const mergePicked = mergeGroups.filter((g) => !mergeOff.has(g.ids[0]));
-  const applicable = rows.filter((r) => APPLIED_BUCKETS.includes(r.bucket));
+  const applicable = useMemo(() => rows.filter((r) => APPLIED_BUCKETS.includes(r.bucket)), [rows]);
   const selectedCount = applicable.filter((r) => !r.excluded).length;
   const check = useMemo(() => checkReconGroups({
     rows,
@@ -246,11 +246,12 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
   const blockingIssues = check.issues.filter((i) => BLOCKING.includes(i.kind));
   const issueSessionIds = useMemo(() => new Set(check.issues.map((i) => i.sessionId).filter((x): x is string => !!x)), [check]);
 
-  const listed = applicable.slice().sort((a, b) => (a.startedAt ?? "").localeCompare(b.startedAt ?? ""));
-  const listedPicked = listed.filter((r) => !r.excluded);
+  // Memo theo nguồn (lint React Compiler): trước đây mảng dựng lại mỗi lần vẽ ⇒ các useMemo phía dưới không bao giờ trúng.
+  const listed = useMemo(() => applicable.slice().sort((a, b) => (a.startedAt ?? "").localeCompare(b.startedAt ?? "")), [applicable]);
+  const listedPicked = useMemo(() => listed.filter((r) => !r.excluded), [listed]);
   const listedGmv = listedPicked.reduce((s, r) => s + r.gmv, 0);
-  const otherRows = rows.filter((r) => !APPLIED_BUCKETS.includes(r.bucket));
-  const unassignedRows = otherRows.filter((r) => r.bucket === "unassigned");
+  const otherRows = useMemo(() => rows.filter((r) => !APPLIED_BUCKETS.includes(r.bucket)), [rows]);
+  const unassignedRows = useMemo(() => otherRows.filter((r) => r.bucket === "unassigned"), [otherRows]);
   const inhouseRows = otherRows.filter((r) => r.bucket === "inhouse");
   const outsideGroups = useMemo(() => groupOutsideRows(unassignedRows, sessions), [unassignedRows, sessions]);
 

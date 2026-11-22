@@ -3,7 +3,7 @@ import { fmtFixed } from "../../../lib/format";
 import { SHOPEE_SHOP as SS } from "../../../lib/metricGlossary";
 import { shopeeShopMonthThrough, shopeeShopSourcesThrough, shopeeShopSpikeDays, type ShopeeShopMonth, type ShopeeShopDay, type ShopeeShopSnapshot } from "../../../lib/report/shopeeShopReport";
 import { DemoHead, DemoKpis, DemoPage, DemoPanel, DemoStack, DemoTable, Html, type DemoKpi } from "./DemoBlocks";
-import { esc, fmtM, fmtP, hbars, svg, tbl, TX } from "./demoCharts";
+import { esc, fmtM, fmtP, hbars, svg, tbl, TX, type TableRow } from "./demoCharts";
 import { monthLong, monthShort, numLocale, t as tr } from "../../../lib/displayLang";
 
 // 3 trang CẢ SHOP của Report Tháng Shopee (bản 7, 31/10/2026) + các khối cả shop gắn vào trang Sản phẩm / Quảng cáo / Đơn huỷ.
@@ -311,15 +311,14 @@ export const ShopeeChannelsPage: React.FC<PageProps> = (p) => {
   );
   const blocks = ["card", "live", "affiliate", "video"] as const;
   const srcHtml = blocks
-    .map((b) => {
+    .map((b): TableRow[] => {
       const rs = shop.sources.filter((s) => s.block === b);
-      if (!rs.length) return "";
+      if (!rs.length) return [];
       const head = rs[0];
       const sub = rs.slice(1).filter((s) => s.sales > 0);
       return [{ grp: esc(srcBlockLabel(b)) }, ...[head, ...sub].map((s, i) => [i === 0 ? `<b>${esc(s.source)}</b>` : `<span class="nt" style="padding-left:14px">${esc(s.source)}</span>`, fmtM(s.sales), pc(ratio(s.sales, head.sales > 0 ? head.sales : total)), s.orders > 0 ? nf(s.orders) : "—", s.clicks > 0 ? nf(s.clicks) : "—"])];
     })
-    .flat()
-    .filter(Boolean);
+    .flat();
   const adsRows = shop.sources.filter((s) => s.block === "ads" && (s.sales > 0 || s.cost > 0));
   const spikes = shopeeShopSpikeDays(shop);
   return (

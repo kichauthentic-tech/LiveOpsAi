@@ -73,16 +73,15 @@ export default function TalentShiftSignup({ mode, onOpenTab, brands, shiftSlots,
   }, [today]);
   // Hạn theo ĐỢT của ngày ca (0200: ca 1–15 / 16–cuối có hạn riêng) hoặc hạn riêng của ca bổ sung.
   const deadlineOf = (slot: ShiftSlot) => signupDeadlineOf(slot, rosterMonths, weeks, isoWeekStart);
+  const mineBySlot = useMemo(
+    () => new Set(shiftRegistrations.filter((r) => !!myTalentId && r.talentId === myTalentId).map((r) => r.slotId)),
+    [shiftRegistrations, myTalentId]
+  );
   // 0226: qua hạn chỉ khoá SỬA/HUỶ ca mình đã đăng ký; ca còn mở thiếu người vẫn đăng ký thêm được.
   const closed = (slot: ShiftSlot) => {
     const d = deadlineOf(slot);
     return !!d && new Date(d) <= new Date() && mineBySlot.has(slot.id);
   };
-
-  const mineBySlot = useMemo(
-    () => new Set(shiftRegistrations.filter((r) => !!myTalentId && r.talentId === myTalentId).map((r) => r.slotId)),
-    [shiftRegistrations, myTalentId]
-  );
   const allOpen = useMemo(() => openSlotsFrom(shiftSlots, today), [shiftSlots, today]);
   const openSlots = useMemo(() => allOpen.filter((s) => mineBySlot.has(s.id) === (mode === "registered")), [allOpen, mineBySlot, mode]);
   const booked = useMemo(() => myShifts.filter((s) => s.status !== "Cancelled"), [myShifts]);

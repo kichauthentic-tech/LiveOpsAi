@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   ACTION_AUTO_KEYS,
   ACTION_AUTO_LABEL,
@@ -57,7 +57,10 @@ const ActionEditor: React.FC<{
 }> = ({ id, items, canManage, resultTitle, result, onSave, extra, onReset }) => {
   const [rows, setRows] = useState<ActionItem[]>(items);
   const rowsRef = useRef(rows);
-  rowsRef.current = rows;
+  // Đồng bộ ref sau khi vẽ (không ghi ref trong lúc vẽ — lint React Compiler); handler sửa dòng cũng tự gán trong `queue`.
+  useLayoutEffect(() => {
+    rowsRef.current = rows;
+  }, [rows]);
   const [status, setStatus] = useState("");
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const dirty = useRef(false);

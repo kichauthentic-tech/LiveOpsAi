@@ -209,14 +209,14 @@ export const PersonRulesGrid: React.FC<{
     if (editing || pop) return;
     const k = e.key;
     const mod = e.ctrlKey || e.metaKey;
-    if (k === "ArrowDown") (e.preventDefault(), move(1, 0, e.shiftKey));
-    else if (k === "ArrowUp") (e.preventDefault(), move(-1, 0, e.shiftKey));
-    else if (k === "ArrowRight") (e.preventDefault(), move(0, 1, e.shiftKey));
-    else if (k === "ArrowLeft") (e.preventDefault(), move(0, -1, e.shiftKey));
-    else if (k === "Tab") (e.preventDefault(), move(0, e.shiftKey ? -1 : 1));
-    else if (k === "Enter" || k === "F2") (e.preventDefault(), activate(sel.r, sel.c));
-    else if (k === "Delete" || k === "Backspace") (e.preventDefault(), applyMany((_r, col, cur) => clearCellRule(cur, col)));
-    else if (mod && k.toLowerCase() === "z") (e.preventDefault(), doUndo());
+    if (k === "ArrowDown") { e.preventDefault(); move(1, 0, e.shiftKey); }
+    else if (k === "ArrowUp") { e.preventDefault(); move(-1, 0, e.shiftKey); }
+    else if (k === "ArrowRight") { e.preventDefault(); move(0, 1, e.shiftKey); }
+    else if (k === "ArrowLeft") { e.preventDefault(); move(0, -1, e.shiftKey); }
+    else if (k === "Tab") { e.preventDefault(); move(0, e.shiftKey ? -1 : 1); }
+    else if (k === "Enter" || k === "F2") { e.preventDefault(); activate(sel.r, sel.c); }
+    else if (k === "Delete" || k === "Backspace") { e.preventDefault(); applyMany((_r, col, cur) => clearCellRule(cur, col)); }
+    else if (mod && k.toLowerCase() === "z") { e.preventDefault(); doUndo(); }
     else if (mod && k.toLowerCase() === "d") {
       e.preventDefault();
       const first = rows[range.r0];
@@ -228,7 +228,10 @@ export const PersonRulesGrid: React.FC<{
       const col = vCols[sel.c];
       if (row && col) {
         const v = cellView(row, col, ctx);
-        if (v.editable && !v.popover) (e.preventDefault(), setEditing({ r: sel.r, c: sel.c, init: k }));
+        if (v.editable && !v.popover) {
+          e.preventDefault();
+          setEditing({ r: sel.r, c: sel.c, init: k });
+        }
       }
     }
   };

@@ -671,8 +671,8 @@ export default function App() {
   // được trên điện thoại — có lịch mới cần xem (1) + chỗ bị xếp trùng giờ; KHÔNG đếm ca "cần giao" (admin giao trên máy phòng
   // live, user chốt 16/10). Chấm của "Đăng ký" = ca đang mở mình chưa đăng ký.
   const myTalentIdForApp = currentRole === "talent" ? activeUser.assignedTalentId : undefined;
-  const talentMyShifts = useMemo(() => mySessions(visibleSessions, myTalentIdForApp), [activeSessions, myTalentIdForApp]);
-  const talentClashCount = useMemo(() => myClashes(visibleSessions, myTalentIdForApp, getTodayDate()).length, [activeSessions, myTalentIdForApp]);
+  const talentMyShifts = useMemo(() => mySessions(visibleSessions, myTalentIdForApp), [visibleSessions, myTalentIdForApp]);
+  const talentClashCount = useMemo(() => myClashes(visibleSessions, myTalentIdForApp, getTodayDate()).length, [visibleSessions, myTalentIdForApp]);
   const talentOpenCount = useMemo(() => {
     if (!myTalentIdForApp) return 0;
     const mine = new Set(shiftRegistrations.filter((r) => r.talentId === myTalentIdForApp).map((r) => r.slotId));
@@ -682,7 +682,7 @@ export default function App() {
   const { acks: talentAcks, loadedAt: talentAcksAt, ack: handleAckShifts } = useShiftAcks(!!myTalentIdForApp);
   const talentAckCount = useMemo(
     () => (talentAcks ? myPendingAcks(visibleSessions, myTalentIdForApp, talentAcks, talentAcksAt).length : 0),
-    [activeSessions, myTalentIdForApp, talentAcks, talentAcksAt]
+    [visibleSessions, myTalentIdForApp, talentAcks, talentAcksAt]
   );
 
   // Workspace thật đang áp dụng — role "brand" bị ép cứng vào brand của chính họ (không cho
@@ -793,7 +793,7 @@ export default function App() {
   // Kênh brand × sàn cho bộ chọn workspace ở Header (07/10): brand hai sàn hiện thành mục riêng từng sàn + Tổng.
   const brandPlatformsMap = useMemo(
     () => Object.fromEntries(visibleBrands.map((b) => [b.id, platformsOfBrand(channels, b.id)])) as Record<string, ReportPlatform[]>,
-    [brands, channels]
+    [visibleBrands, channels]
   );
 
   // Brand có kênh Website (hoặc đã có ca/ca mở Website) ⇒ bộ chọn workspace hiện thêm "<brand> Website".
@@ -1244,7 +1244,7 @@ export default function App() {
       return false;
     }
     try {
-      let saved = await setSessionStaffSegments(session.id, segments);
+      const saved = await setSessionStaffSegments(session.id, segments);
       setSessions((prev) => prev.map((x) => (x.id === saved.id ? saved : x)));
       // Đổi HOST giữa ca: 14/11 user chốt HOÀN VỀ CÁCH CŨ — ca giữ MỘT dòng, chỉ lưu đoạn giờ của từng người.
       // Không còn tự gọi split_session_at_host_change (0216) nữa; RPC vẫn còn trên DB nhưng app không dùng. Không đề xuất lại.
