@@ -24,8 +24,8 @@ import { upsertSessionFinance, setSessionFinanceApproval } from "./lib/db/financ
 import { updateAiAgentPrompt } from "./lib/db/aiAgentPrompts";
 import { upsertBrandPlatformCommissionRate, upsertBrandPlatformRate, upsertBrandPlatformReturnRate, upsertBrandServiceScope, type ServiceScopePatch } from "./lib/db/brandPlatformRates";
 import { setBrandStudio } from "./lib/db/brandStudios";
-import { fetchShiftSlots, createShiftSlot, deleteShiftSlot } from "./lib/db/shiftSlots";
-import { fetchShiftRegistrations, registerForSlot, unregisterFromSlot } from "./lib/db/shiftRegistrations";
+import { refreshShiftSlots, createShiftSlot, deleteShiftSlot } from "./lib/db/shiftSlots";
+import { refreshShiftRegistrations, registerForSlot, unregisterFromSlot } from "./lib/db/shiftRegistrations";
 import { fetchTalentRateHistory } from "./lib/db/talentRateHistory";
 import { fetchBrandPlatformRateHistory } from "./lib/db/brandPlatformRateHistory";
 import { createBrandSku, importBrandSkus, updateBrandSku, deleteBrandSku } from "./lib/db/brandSkus";
@@ -1439,7 +1439,7 @@ export default function App() {
   // ca để Đăng Ký & Chốt Lịch / lịch thấy ngay, không cần F5.
   const reloadShiftSlots = async () => {
     try {
-      const [slots, planTargets, boostTargets] = await Promise.all([fetchShiftSlots(), fetchLockedPlanTargets(), fetchBoostTargets().catch(() => new Map<string, number>())]);
+      const [slots, planTargets, boostTargets] = await Promise.all([refreshShiftSlots(), fetchLockedPlanTargets(), fetchBoostTargets().catch(() => new Map<string, number>())]);
       setShiftSlots(slots);
       setPlanTargetsBySlotId(planTargets.bySlotId);
       setPlanMonthTotals(planTargets.monthTotals);
@@ -1583,7 +1583,7 @@ export default function App() {
     } catch (e) {
       showToast(`Không thể chốt lịch: ${errorMessage(e)}`);
       // Thường do máy khác vừa chốt/huỷ ca này (RPC từ chối slot không còn mở) — nạp lại để màn khớp DB thay vì bảo người dùng tự tải lại trang.
-      Promise.all([fetchShiftSlots(), fetchSessions()])
+      Promise.all([refreshShiftSlots(), fetchSessions()])
         .then(([sl, ss]) => { setShiftSlots(sl); setSessions(ss); })
         .catch(() => {});
       return false;
@@ -2174,7 +2174,7 @@ export default function App() {
                     focus={rosterFocus}
                     onCancelSession={handleCancelSession}
                     onScheduleChanged={async () => {
-                      const [s, sl, regs] = await Promise.all([fetchSessions(), fetchShiftSlots(), fetchShiftRegistrations()]);
+                      const [s, sl, regs] = await Promise.all([fetchSessions(), refreshShiftSlots(), refreshShiftRegistrations()]);
                       setSessions(s);
                       setShiftSlots(sl);
                       setShiftRegistrations(regs);

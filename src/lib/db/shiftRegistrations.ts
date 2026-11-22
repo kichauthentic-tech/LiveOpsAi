@@ -1,5 +1,6 @@
 import { supabase } from "../supabaseClient";
 import { fetchAllPages } from "./fetchAllPages";
+import { deltaSince, maxStamp, mergeDelta, type DeltaStore } from "./deltaTable";
 import { ShiftRegistration } from "../../types";
 
 interface DbShiftRegistration {
@@ -20,12 +21,47 @@ function fromDb(row: DbShiftRegistration): ShiftRegistration {
 
 // Presence/absence of a row is the whole model — no update, only insert
 // ("đăng ký") and delete ("hủy đăng ký"), same shape as auditLogs.ts.
+// Kho thô cho lượt nạp lại theo phần đã đổi (deltaTable.ts). Bảng chỉ thêm/xoá, không sửa ⇒ dấu = registered_at (default now()):
+// dòng thêm có dấu mới, dòng xoá lộ ra ở số dòng lệch ⇒ tải trọn.
+let regStore: DeltaStore<DbShiftRegistration> | null = null;
+export function __resetShiftRegistrationStore(): void {
+  regStore = null;
+}
+
+const REG_SELECT = "id,slot_id,talent_id,registered_at";
+const sortedRegs = (rows: Iterable<DbShiftRegistration>) => [...rows].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)).map(fromDb);
+
+/** Nạp TRỌN (mở app). Nạp lại sau khi ghi thì dùng `refreshShiftRegistrations`. */
 export async function fetchShiftRegistrations(): Promise<ShiftRegistration[]> {
   // Một dòng cho mỗi lượt talent đăng ký ca — tăng theo số ca. Xem src/lib/db/fetchAllPages.ts.
   const rows = await fetchAllPages<DbShiftRegistration>((from, to) =>
-    supabase.from("session_availability").select("*").order("id", { ascending: true }).range(from, to)
+    supabase.from("session_availability").select(REG_SELECT).order("id", { ascending: true }).range(from, to).returns<DbShiftRegistration[]>()
   );
+  regStore = { byId: new Map(rows.map((r) => [r.id, r])), mark: maxStamp(rows, (r) => r.registered_at) };
   return rows.map(fromDb);
+}
+
+/** Nạp lại theo phần đã đổi (egress 22/11): ~740 KB → vài KB. Chưa có kho / số dòng lệch (có lượt huỷ đăng ký) ⇒ tải trọn. */
+export async function refreshShiftRegistrations(): Promise<ShiftRegistration[]> {
+  const base = regStore;
+  if (!base) return fetchShiftRegistrations();
+  const [changed, head] = await Promise.all([
+    fetchAllPages<DbShiftRegistration>((from, to) =>
+      supabase
+        .from("session_availability")
+        .select(REG_SELECT)
+        .gt("registered_at", deltaSince(base.mark))
+        .order("id", { ascending: true })
+        .range(from, to)
+        .returns<DbShiftRegistration[]>()
+    ),
+    supabase.from("session_availability").select("id", { count: "exact", head: true })
+  ]);
+  if (head.error) throw head.error;
+  const next = mergeDelta(base, changed, head.count, (r) => r.registered_at, (r) => r);
+  if (!next || regStore !== base) return fetchShiftRegistrations();
+  regStore = next;
+  return sortedRegs(next.byId.values());
 }
 
 export async function registerForSlot(slotId: string, talentId: string): Promise<ShiftRegistration> {

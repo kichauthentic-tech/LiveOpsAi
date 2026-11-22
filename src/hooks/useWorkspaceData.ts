@@ -43,8 +43,8 @@ import { fetchTalentBrandRoles } from "../lib/db/talentBrandRoles";
 import type { TalentBrandRole } from "../lib/roster/talentBrandRoles";
 import { fetchMonthFeeInputs, fetchTalentRules, fetchTermsPeriods } from "../lib/db/brandTerms";
 import type { BrandTalentRule, MonthFeeInputs, TermsPeriod } from "../lib/commercial/terms";
-import { fetchShiftSlots } from "../lib/db/shiftSlots";
-import { fetchShiftRegistrations } from "../lib/db/shiftRegistrations";
+import { fetchShiftSlots, __resetShiftSlotStore } from "../lib/db/shiftSlots";
+import { fetchShiftRegistrations, __resetShiftRegistrationStore } from "../lib/db/shiftRegistrations";
 import { fetchTalentRateHistory } from "../lib/db/talentRateHistory";
 import { fetchBrandPlatformRateHistory } from "../lib/db/brandPlatformRateHistory";
 import { fetchBrandSkus } from "../lib/db/brandSkus";
@@ -485,6 +485,9 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
   useEffect(() => {
     if (!authUserId) return;
     let cancelled = false;
+    // Người khác đăng nhập ⇒ kho thô (nạp lại theo phần đổi) của người trước không dùng lại; nạp trọn bên dưới đặt lại kho.
+    __resetShiftSlotStore();
+    __resetShiftRegistrationStore();
     Promise.all([fetchBrandPlatformRates(), fetchShiftSlots(), fetchShiftRegistrations(), fetchLockedPlanTargets().catch(() => ({ bySlotId: new Map<string, number>(), monthTotals: new Map<string, number>(), slotTargets: new Map<string, { date: string; target: number }[]>() })), fetchBrandStudios().catch(() => [] as BrandStudio[])])
       .then(([rates, slots, regs, planTargets, bStudios]) => {
         if (cancelled) return;

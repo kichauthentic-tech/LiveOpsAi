@@ -1,5 +1,6 @@
 import { supabase } from "../supabaseClient";
 import { fetchAllPages } from "./fetchAllPages";
+import { deltaSince, mergeDelta, type DeltaStore } from "./deltaTable";
 import { assertAffected } from "./assertAffected";
 import { ShiftSlot } from "../../types";
 import { LEGACY_PLATFORM } from "../reportPlatform";
@@ -80,20 +81,73 @@ function toDb(s: ShiftSlot) {
   };
 }
 
+// Kho thô cho lượt nạp lại theo phần đã đổi (deltaTable.ts). Nạp trọn = đặt lại kho; người khác đăng nhập ⇒ __resetShiftSlotStore.
+let slotStore: DeltaStore<DbShiftSlot> | null = null;
+export function __resetShiftSlotStore(): void {
+  slotStore = null;
+}
+
+/** Thứ tự như truy vấn trọn: ngày, giờ bắt đầu, id (uuid chữ thường so chuỗi = thứ tự byte của Postgres). */
+function sortedSlots(rows: Iterable<DbShiftSlot>): ShiftSlot[] {
+  const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+  return [...rows].sort((a, b) => cmp(a.date, b.date) || cmp(a.start_time, b.start_time) || cmp(a.id, b.id)).map(fromDb);
+}
+
+/** Dấu thời gian lớn nhất của bảng — lượt nhỏ chạy CÙNG lúc nạp trọn; dòng đổi xen giữa nằm trong biên 2 phút của lượt sau. */
+async function latestSlotStamp(): Promise<string | null> {
+  const { data, error } = await supabase.from("shift_slots").select("updated_at").order("updated_at", { ascending: false }).limit(1);
+  if (error) throw error;
+  return ((data as { updated_at: string }[] | null) ?? [])[0]?.updated_at ?? null;
+}
+
+/** Nạp TRỌN (mở app). Nạp lại sau khi ghi thì dùng `refreshShiftSlots`. */
 export async function fetchShiftSlots(): Promise<ShiftSlot[]> {
   // Một dòng cho mỗi ca đã xếp — chỉ tăng. Cuộn trang để không âm thầm mất ca khi qua 1.000
   // (xem src/lib/db/fetchAllPages.ts). Xếp ASC nên trần cắt mất đúng các ca MỚI nhất.
-  const rows = await fetchAllPages<DbShiftSlot>((from, to) =>
-    supabase
-      .from("shift_slots")
-      .select(SHIFT_SLOT_SELECT)
-      .order("date", { ascending: true })
-      .order("start_time", { ascending: true })
-      .order("id", { ascending: true })
-      .range(from, to)
-      .returns<DbShiftSlot[]>()
-  );
+  const [mark, rows] = await Promise.all([
+    latestSlotStamp().catch(() => undefined),
+    fetchAllPages<DbShiftSlot>((from, to) =>
+      supabase
+        .from("shift_slots")
+        .select(SHIFT_SLOT_SELECT)
+        .order("date", { ascending: true })
+        .order("start_time", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, to)
+        .returns<DbShiftSlot[]>()
+    )
+  ]);
+  // Không đọc được mốc ⇒ không giữ kho (lượt làm mới sau sẽ tải trọn như cũ).
+  slotStore = mark === undefined ? null : { byId: new Map(rows.map((r) => [r.id, r])), mark };
   return rows.map(fromDb);
+}
+
+/**
+ * Nạp lại theo phần đã đổi (egress 22/11): ~1 KB thay vì ~690 KB khi chỉ vài ca đổi. Chưa có kho / số dòng lệch server
+ * (ca bị xoá) ⇒ tải trọn. Dùng ở mọi chỗ nạp lại sau khi ghi (Điều Phối công bố/mở đăng ký, chốt kế hoạch, chốt ca lỗi).
+ */
+export async function refreshShiftSlots(): Promise<ShiftSlot[]> {
+  const base = slotStore;
+  if (!base) return fetchShiftSlots();
+  type Stamped = DbShiftSlot & { updated_at: string };
+  const [changed, head] = await Promise.all([
+    fetchAllPages<Stamped>((from, to) =>
+      supabase
+        .from("shift_slots")
+        .select(`${SHIFT_SLOT_SELECT},updated_at`)
+        .gt("updated_at", deltaSince(base.mark))
+        .order("updated_at", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, to)
+        .returns<Stamped[]>()
+    ),
+    supabase.from("shift_slots").select("id", { count: "exact", head: true })
+  ]);
+  if (head.error) throw head.error;
+  const next = mergeDelta<DbShiftSlot, Stamped>(base, changed, head.count, (r) => r.updated_at, ({ updated_at: _u, ...r }) => r);
+  if (!next || slotStore !== base) return fetchShiftSlots();
+  slotStore = next;
+  return sortedSlots(next.byId.values());
 }
 
 // Index idx_shift_slots_natural_key (0088): cùng brand + ngày + giờ + nền tảng đã có ca chưa huỷ.

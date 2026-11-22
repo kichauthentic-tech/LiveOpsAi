@@ -724,8 +724,14 @@ Chữ brand thấy trong Report Tháng (component `report/*`, `*MonthlyReportTab
     `shift_slots` đọc cột tường minh `SHIFT_SLOT_READ_COLUMNS` (test `pagedQueries` canh khớp `fromDb`). Lần mở app 4,2 → ~2,3 MB.
     Sao lưu: ngày thường `--exclude-table-data=public.brand_dataraw_rows` (bản "lite"), Chủ nhật/chạy tay tick "full" = trọn.
   - Byte trên dây (gzip Cloudflare) nhỏ hơn 3–15× byte JSON; chưa rõ Supabase tính egress theo loại nào — xếp hạng theo cả hai vẫn như trên.
-  - **Còn mở:** `onScheduleChanged` ở Điều Phối nạp lại trọn slot + đăng ký (~1,5 MB) sau mỗi lần đổi lịch; `session_availability`
-    tăng ~3.800 dòng/tháng và đọc trọn mọi lần mở app (chưa có cửa sổ thời gian); 23 feed .ics (`/api/calendar`) nhỏ, theo cửa sổ ngày.
+  - **Slot + đăng ký nạp lại theo phần đổi** (`lib/db/deltaTable.ts` hàm thuần, test `tests/deltaTable.test.ts`): `refreshShiftSlots` /
+    `refreshShiftRegistrations` hỏi dòng có `updated_at` (slot, trigger 0014) / `registered_at` (đăng ký chỉ thêm/xoá) > mốc − 2 phút + HEAD
+    `count=exact`; số dòng lệch (có xoá) ⇒ tải trọn. App CHỈ nạp lại qua hai hàm này (Điều Phối `onScheduleChanged`, chốt kế hoạch, chốt ca
+    lỗi — test cấm `fetchShiftSlots(` trong App.tsx); nạp trọn chỉ ở đợt mở app (hook đặt lại kho khi đổi user). Đo DB thật: không đổi gì
+    688 + 740 KB → 1,1 KB; giả lập kho cũ 5 ngày ⇒ khớp từng trường với tải trọn. **Luật:** cột/bảng ghi vào shift_slots mà KHÔNG qua UPDATE
+    (vd. tắt trigger) sẽ không được thấy; session_availability mà thêm UPDATE thì phải thêm cột dấu riêng.
+  - **Còn mở:** `session_availability` tăng ~3.800 dòng/tháng và vẫn đọc trọn mỗi lần mở app (chưa có cửa sổ thời gian); 23 feed .ics
+    (`/api/calendar`) nhỏ, theo cửa sổ ngày.
 - **Nạp trước lượt đọc của màn** (`lib/db/prefetch.ts`, test `tests/prefetch.test.ts`): màn export `prefetchX(ctx)` khai
   `prefetchable(name, fn)` và effect MOUNT gọi `.take(...)`; App gọi qua `TAB_DATA_PREFETCH` CHỈ khi `!coreDataReady`.
   Giao đúng một lần, hết hạn 30 s, đổi tab là xoá — KHÔNG phải cache: đường đọc-sau-khi-ghi luôn gọi thẳng hàm db.
