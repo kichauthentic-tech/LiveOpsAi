@@ -219,6 +219,8 @@ export default function App() {
   const { showToast } = useToast();
 
   const currentRole: UserRole = profile?.role ?? "talent";
+  // Đăng ký ca cần tải (egress 22/11): chờ hồ sơ; talent chỉ đăng ký của mình ("" = chưa gắn hồ sơ talent), role khác tải đủ.
+  const registrationScope: string | null = !profile ? null : profile.role === "talent" ? (profile.assigned_talent_id ?? "") : "all";
   // Report Tháng bật tiếng Anh thì đặt displayLang = "en" lúc nó render; mọi lần App render (đổi tab…) trả về tiếng Việt
   // trước khi dựng màn khác — rời report là các màn còn lại không bị dính chữ/số kiểu Anh (lib/displayLang.ts).
   setDisplayLang("vi");
@@ -441,7 +443,7 @@ export default function App() {
     shellDataReady,
     reloadRolePermissions,
     refreshTikTokStatus
-  } = useWorkspaceData({ session, currentRole, isOpsRole, activeTab });
+  } = useWorkspaceData({ session, currentRole, isOpsRole, activeTab, registrationScope });
   // Cổng dữ liệu của tab đang mở: màn nhập số liệu chỉ cần brand + kênh (TABS_NEEDING_SHELL_ONLY), còn lại chờ đủ ca/talent/report.
   const baseDataReady = TABS_NEEDING_SHELL_ONLY.has(activeTab) ? shellDataReady : coreDataReady;
   // Tab SKU/Giỏ live chờ thêm danh mục SKU (nạp lúc mở tab — egress 22/11).

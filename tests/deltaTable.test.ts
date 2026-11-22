@@ -67,3 +67,14 @@ test("Điều Phối / chốt kế hoạch nạp lại slot + đăng ký theo ph
   expect(app).not.toMatch(/fetchShiftRegistrations\(/);
   expect(app).toMatch(/refreshShiftSlots\(\), refreshShiftRegistrations\(\)/);
 });
+
+test("talent chỉ tải đăng ký ca của chính mình, chờ hồ sơ rồi mới tải (egress 22/11)", () => {
+  const app = readFileSync(join(__dirname, "..", "src", "App.tsx"), "utf8");
+  const hook = readFileSync(join(__dirname, "..", "src", "hooks", "useWorkspaceData.ts"), "utf8");
+  // Phạm vi: chưa có hồ sơ ⇒ null (chờ — currentRole mặc định "talent" trước khi hồ sơ về, tải theo nó là tải sai phạm vi).
+  expect(app).toMatch(/const registrationScope: string \| null = !profile \? null : profile\.role === "talent" \? \(profile\.assigned_talent_id \?\? ""\) : "all";/);
+  expect(app).toMatch(/useWorkspaceData\(\{[^}]*registrationScope[^}]*\}\)/);
+  expect(hook).toMatch(/if \(!authUserId \|\| registrationScope === null\) return;/);
+  // Không còn tải đủ đăng ký trong đợt nạp chung lúc mở app.
+  expect(hook).not.toMatch(/Promise\.all\(\[[^\]]*fetchShiftRegistrations\(\)/);
+});

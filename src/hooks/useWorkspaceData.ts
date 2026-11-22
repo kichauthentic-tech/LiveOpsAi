@@ -91,9 +91,11 @@ export interface WorkspaceDataInput {
   currentRole: UserRole;
   isOpsRole: boolean;
   activeTab: string;
+  /** Phạm vi đăng ký ca cần tải — xem effect đăng ký ca. */
+  registrationScope: string | null;
 }
 
-export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }: WorkspaceDataInput) {
+export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab, registrationScope }: WorkspaceDataInput) {
   // Role Permissions Matrix — real data from Supabase `role_permissions` (Phase 6), no mock/localStorage fallback
   const [rolePermissions, setRolePermissions] = useState<RolePermissionsMap>({} as RolePermissionsMap);
   const [phase6Loading, setPhase6Loading] = useState(true);
@@ -487,14 +489,12 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
     let cancelled = false;
     // Người khác đăng nhập ⇒ kho thô (nạp lại theo phần đổi) của người trước không dùng lại; nạp trọn bên dưới đặt lại kho.
     __resetShiftSlotStore();
-    __resetShiftRegistrationStore();
-    Promise.all([fetchBrandPlatformRates(), fetchShiftSlots(), fetchShiftRegistrations(), fetchLockedPlanTargets().catch(() => ({ bySlotId: new Map<string, number>(), monthTotals: new Map<string, number>(), slotTargets: new Map<string, { date: string; target: number }[]>() })), fetchBrandStudios().catch(() => [] as BrandStudio[])])
-      .then(([rates, slots, regs, planTargets, bStudios]) => {
+    Promise.all([fetchBrandPlatformRates(), fetchShiftSlots(), fetchLockedPlanTargets().catch(() => ({ bySlotId: new Map<string, number>(), monthTotals: new Map<string, number>(), slotTargets: new Map<string, { date: string; target: number }[]>() })), fetchBrandStudios().catch(() => [] as BrandStudio[])])
+      .then(([rates, slots, planTargets, bStudios]) => {
         if (cancelled) return;
         setBrandPlatformRates(rates);
         setBrandStudios(bStudios);
         setShiftSlots(slots);
-        setShiftRegistrations(regs);
         setPlanTargetsBySlotId(planTargets.bySlotId);
         setPlanMonthTotals(planTargets.monthTotals);
         setPlanSlotTargets(planTargets.slotTargets);
@@ -513,6 +513,22 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
     // brand_month_plan_slots/brand_studios đều được gọi 2 lần, cách nhau ~156 ms. Tham số engine (chỉ
     // ops dùng) đã tách xuống effect riêng bên dưới đúng vì lý do đó.
   }, [authUserId]);
+
+  // Đăng ký ca (egress 22/11): tải SAU khi biết hồ sơ — talent chỉ tải đăng ký của chính mình (app talent không dùng đăng ký người
+  // khác; danh sách người đăng ký chỉ ops xem), các role khác tải đủ. `registrationScope`: null = chưa có hồ sơ (chờ), "" = talent
+  // chưa gắn hồ sơ talent (không cần dòng nào), "all" = mọi đăng ký, còn lại = id talent. App chỉ vẽ màn sau khi hồ sơ về nên chờ
+  // ở đây không làm chậm màn.
+  useEffect(() => {
+    if (!authUserId || registrationScope === null) return;
+    let cancelled = false;
+    __resetShiftRegistrationStore(); // người khác đăng nhập / đổi phạm vi ⇒ kho cũ không dùng lại
+    (registrationScope === "" ? Promise.resolve([] as ShiftRegistration[]) : fetchShiftRegistrations(registrationScope === "all" ? undefined : registrationScope))
+      .then((regs) => { if (!cancelled) setShiftRegistrations(regs); })
+      .catch((err) => { if (!cancelled) setPhase14Error(err.message ?? "Không tải được dữ liệu đăng ký ca — thử tải lại trang."); });
+    return () => {
+      cancelled = true;
+    };
+  }, [authUserId, registrationScope]);
 
   // Tham số engine gợi ý lịch — màn Kế Hoạch Tháng / Hỗ Trợ Vận Hành / Điều Phối Lịch Live dùng. Đọc được: ceo/operations/admin
   // (0105) + trainer (0176); role khác gọi cũng chỉ nhận về rỗng.

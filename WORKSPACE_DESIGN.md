@@ -730,8 +730,13 @@ Chữ brand thấy trong Report Tháng (component `report/*`, `*MonthlyReportTab
     lỗi — test cấm `fetchShiftSlots(` trong App.tsx); nạp trọn chỉ ở đợt mở app (hook đặt lại kho khi đổi user). Đo DB thật: không đổi gì
     688 + 740 KB → 1,1 KB; giả lập kho cũ 5 ngày ⇒ khớp từng trường với tải trọn. **Luật:** cột/bảng ghi vào shift_slots mà KHÔNG qua UPDATE
     (vd. tắt trigger) sẽ không được thấy; session_availability mà thêm UPDATE thì phải thêm cột dấu riêng.
-  - **Còn mở:** `session_availability` tăng ~3.800 dòng/tháng và vẫn đọc trọn mỗi lần mở app (chưa có cửa sổ thời gian); 23 feed .ics
-    (`/api/calendar`) nhỏ, theo cửa sổ ngày.
+  - **Talent chỉ tải đăng ký ca của mình:** `registrationScope` (App: null khi chưa có hồ sơ ⇒ chờ; talent = `assigned_talent_id`,
+    "" nếu chưa gắn; role khác "all") → effect riêng trong `useWorkspaceData` gọi `fetchShiftRegistrations(talentId?)`; kho làm mới
+    giữ phạm vi. App talent chỉ dùng đăng ký của chính mình (Đăng ký ca, chấm đỏ, SlotDetailModal không `canManage`). Đo DB thật:
+    740 KB → trung vị 12 KB/lượt mở (60 dòng), lớn nhất 72 KB. **Luật:** màn talent mới cần đăng ký người khác (vd. "còn N chỗ") ⇒
+    đổi phạm vi hoặc thêm RPC đếm, đừng lặng lẽ dùng `shiftRegistrations` (với talent chỉ có dòng của họ).
+  - **Còn mở:** ops vẫn đọc trọn `session_availability` lúc mở app (~3.800 dòng/tháng đăng ký, chưa có cửa sổ thời gian — hiện mọi dòng
+    đều cho slot T12 nên cửa sổ chưa cắt được gì); 23 feed .ics (`/api/calendar`) nhỏ, theo cửa sổ ngày.
 - **Nạp trước lượt đọc của màn** (`lib/db/prefetch.ts`, test `tests/prefetch.test.ts`): màn export `prefetchX(ctx)` khai
   `prefetchable(name, fn)` và effect MOUNT gọi `.take(...)`; App gọi qua `TAB_DATA_PREFETCH` CHỈ khi `!coreDataReady`.
   Giao đúng một lần, hết hạn 30 s, đổi tab là xoá — KHÔNG phải cache: đường đọc-sau-khi-ghi luôn gọi thẳng hàm db.
