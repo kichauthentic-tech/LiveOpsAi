@@ -89,3 +89,17 @@ test("cửa sổ đăng ký ca = đầu tháng trước, kể cả qua năm", ()
   expect(registrationWindowStart("2027-01-15")).toBe("2026-12-01");
   expect(registrationWindowStart("2027-03-31")).toBe("2027-02-01");
 });
+
+test("talent chỉ tải ca mở từ hôm nay + cặp slot → ca; target gắn qua cặp đó (egress 22/11)", () => {
+  const hook = readFileSync(join(__dirname, "..", "src", "hooks", "useWorkspaceData.ts"), "utf8");
+  const db = readFileSync(join(__dirname, "..", "src", "lib", "db", "shiftSlots.ts"), "utf8");
+  expect(hook).toMatch(/const slotMode = registrationScope === null \? null : registrationScope === "all" \? "all" : "talent";/);
+  expect(hook).toMatch(/: fetchTalentShiftSlots\(getTodayDate\(\)\)/);
+  // Target kế hoạch / tăng cường gắn qua sessionBySlot (talent không có slot đã chốt trong shiftSlots).
+  expect(hook).toMatch(/for \(const \[slotId, sessionId\] of sessionBySlot\)/);
+  expect(hook).not.toMatch(/for \(const sl of shiftSlots\) \{\s*if \(sl\.sessionId && (plan|boost)TargetsBySlotId/);
+  const fn = db.slice(db.indexOf("export async function fetchTalentShiftSlots("), db.indexOf("export async function refreshShiftSlots("));
+  expect(fn).toContain('.eq("status", "open")');
+  expect(fn).toContain('.gte("date", today)');
+  expect(fn).toContain('.not("session_id", "is", null)');
+});

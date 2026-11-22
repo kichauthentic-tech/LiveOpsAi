@@ -742,7 +742,12 @@ Chữ brand thấy trong Report Tháng (component `report/*`, `*MonthlyReportTab
   - **Feed .ics — không đổi (có chủ ý):** mỗi lần lịch điện thoại hỏi ≈ 10–25 KB đọc DB/talent (23 feed; hỏi mỗi giờ ≈ 8 MB/ngày, chưa
     đo được tần suất thật — `.vercel/project.json` trong repo trỏ project "pickdi-operator", không phải LiveOps). KHÔNG bật cache CDN
     (`s-maxage`): `vercel.json` rewrite mọi `/api/*` về một hàm, chưa kiểm khoá cache có tách theo link ⇒ rủi ro talent nhận lịch người khác.
-  - **Còn mở:** `shift_slots` (~690 KB, mọi role kể cả talent) và danh sách ca (~520 KB) vẫn tải trọn lúc mở app — hai khoản lớn nhất còn lại.
+  - **Talent tải slot thu gọn:** `slotMode` (từ `registrationScope`) — talent gọi `fetchTalentShiftSlots(today)`: ca MỞ từ hôm nay (đủ cột)
+    + cặp slot → ca (`id,session_id`, từ đầu tháng trước); role khác tải trọn như cũ. Target kế hoạch/tăng cường gắn vào ca qua
+    `sessionBySlot` (role đủ: suy từ `shiftSlots`; talent: bảng cặp). Đo DB thật: 688 → 228 KB/lượt mở; ca mở giống hệt `openSlotsFrom`
+    bản đủ; target của cả 2.305 ca giống hệt. **Luật:** với talent `shiftSlots` CHỈ có ca mở từ hôm nay — màn talent mới cần slot đã
+    chốt/đã qua thì phải nới `fetchTalentShiftSlots`; code gắn target phải đi qua `sessionBySlot`, không lặp `shiftSlots`.
+  - **Còn mở:** danh sách ca (~520 KB, talent đọc mọi ca — user chốt 05/11) vẫn tải trọn lúc mở app — khoản lớn nhất còn lại.
 - **Nạp trước lượt đọc của màn** (`lib/db/prefetch.ts`, test `tests/prefetch.test.ts`): màn export `prefetchX(ctx)` khai
   `prefetchable(name, fn)` và effect MOUNT gọi `.take(...)`; App gọi qua `TAB_DATA_PREFETCH` CHỈ khi `!coreDataReady`.
   Giao đúng một lần, hết hạn 30 s, đổi tab là xoá — KHÔNG phải cache: đường đọc-sau-khi-ghi luôn gọi thẳng hàm db.

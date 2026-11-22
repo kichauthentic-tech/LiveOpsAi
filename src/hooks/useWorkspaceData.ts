@@ -43,7 +43,8 @@ import { fetchTalentBrandRoles } from "../lib/db/talentBrandRoles";
 import type { TalentBrandRole } from "../lib/roster/talentBrandRoles";
 import { fetchMonthFeeInputs, fetchTalentRules, fetchTermsPeriods } from "../lib/db/brandTerms";
 import type { BrandTalentRule, MonthFeeInputs, TermsPeriod } from "../lib/commercial/terms";
-import { fetchShiftSlots, __resetShiftSlotStore } from "../lib/db/shiftSlots";
+import { fetchShiftSlots, fetchTalentShiftSlots, __resetShiftSlotStore } from "../lib/db/shiftSlots";
+import { getTodayDate } from "../lib/dateUtils";
 import { fetchShiftRegistrations, __resetShiftRegistrationStore } from "../lib/db/shiftRegistrations";
 import { fetchTalentRateHistory } from "../lib/db/talentRateHistory";
 import { fetchBrandPlatformRateHistory } from "../lib/db/brandPlatformRateHistory";
@@ -162,25 +163,34 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab, r
   const [engineParamsUpdatedAt, setEngineParamsUpdatedAt] = useState<string | null>(null);
   const [engineParamsError, setEngineParamsError] = useState<string | null>(null);
   const [engineParamsLoading, setEngineParamsLoading] = useState(false);
+  // Slot → ca thật (để gắn target kế hoạch / tăng cường). Role đủ dữ liệu: suy từ danh sách slot. Talent (egress 22/11) chỉ có ca
+  // mở trong `shiftSlots` nên nạp riêng bảng cặp này (fetchTalentShiftSlots).
+  const [talentSessionBySlot, setTalentSessionBySlot] = useState<Map<string, string> | null>(null);
+  const sessionBySlot = useMemo(() => {
+    if (talentSessionBySlot) return talentSessionBySlot;
+    const out = new Map<string, string>();
+    for (const sl of shiftSlots) if (sl.sessionId) out.set(sl.id, sl.sessionId);
+    return out;
+  }, [talentSessionBySlot, shiftSlots]);
   const planTargetsBySessionId = useMemo(() => {
     const out = new Map<string, number>();
     if (planTargetsBySlotId.size === 0) return out;
-    for (const sl of shiftSlots) {
-      if (sl.sessionId && planTargetsBySlotId.has(sl.id)) out.set(sl.sessionId, planTargetsBySlotId.get(sl.id)!);
+    for (const [slotId, sessionId] of sessionBySlot) {
+      if (planTargetsBySlotId.has(slotId)) out.set(sessionId, planTargetsBySlotId.get(slotId)!);
     }
     return out;
-  }, [planTargetsBySlotId, shiftSlots]);
+  }, [planTargetsBySlotId, sessionBySlot]);
   // Ca tăng cường sinh ở DB (trigger 0165, target tạm 0186) mỗi khi có ca mới / dời giờ — đường tạo ca thì nhiều (Lịch & Studio,
   // Điều Phối, Bảng Vận Hành, RPC mở khung) nên nạp lại theo chữ ký danh sách ca thay vì vá từng chỗ. Bảng nhỏ (vài dòng/tháng).
   const boostSlotSig = useMemo(() => shiftSlots.map((sl) => `${sl.id}${sl.date}${sl.startTime}${sl.endTime}${sl.status}`).join("|"), [shiftSlots]);
   const boostTargetsBySessionId = useMemo(() => {
     const out = new Map<string, number>();
     if (boostTargetsBySlotId.size === 0) return out;
-    for (const sl of shiftSlots) {
-      if (sl.sessionId && boostTargetsBySlotId.has(sl.id)) out.set(sl.sessionId, boostTargetsBySlotId.get(sl.id)!);
+    for (const [slotId, sessionId] of sessionBySlot) {
+      if (boostTargetsBySlotId.has(slotId)) out.set(sessionId, boostTargetsBySlotId.get(slotId)!);
     }
     return out;
-  }, [boostTargetsBySlotId, shiftSlots]);
+  }, [boostTargetsBySlotId, sessionBySlot]);
   // Trạng thái hiển thị theo giờ thật (0096): tick mỗi phút để "Đang live"/"Đã xong" tự đổi khi mở lâu.
   const [nowMs, setNowMs] = useState(() => Date.now());
   useEffect(() => {
@@ -487,14 +497,11 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab, r
   useEffect(() => {
     if (!authUserId) return;
     let cancelled = false;
-    // Người khác đăng nhập ⇒ kho thô (nạp lại theo phần đổi) của người trước không dùng lại; nạp trọn bên dưới đặt lại kho.
-    __resetShiftSlotStore();
-    Promise.all([fetchBrandPlatformRates(), fetchShiftSlots(), fetchLockedPlanTargets().catch(() => ({ bySlotId: new Map<string, number>(), monthTotals: new Map<string, number>(), slotTargets: new Map<string, { date: string; target: number }[]>() })), fetchBrandStudios().catch(() => [] as BrandStudio[])])
-      .then(([rates, slots, planTargets, bStudios]) => {
+    Promise.all([fetchBrandPlatformRates(), fetchLockedPlanTargets().catch(() => ({ bySlotId: new Map<string, number>(), monthTotals: new Map<string, number>(), slotTargets: new Map<string, { date: string; target: number }[]>() })), fetchBrandStudios().catch(() => [] as BrandStudio[])])
+      .then(([rates, planTargets, bStudios]) => {
         if (cancelled) return;
         setBrandPlatformRates(rates);
         setBrandStudios(bStudios);
-        setShiftSlots(slots);
         setPlanTargetsBySlotId(planTargets.bySlotId);
         setPlanMonthTotals(planTargets.monthTotals);
         setPlanSlotTargets(planTargets.slotTargets);
@@ -513,6 +520,29 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab, r
     // brand_month_plan_slots/brand_studios đều được gọi 2 lần, cách nhau ~156 ms. Tham số engine (chỉ
     // ops dùng) đã tách xuống effect riêng bên dưới đúng vì lý do đó.
   }, [authUserId]);
+
+  // Slot ca (egress 22/11): tải SAU khi biết hồ sơ (cùng `registrationScope`). Talent: chỉ ca mở từ hôm nay + cặp slot → ca
+  // (fetchTalentShiftSlots, ~250 KB thay vì ~690 KB); role khác: trọn danh sách (Điều Phối, Kế Hoạch Tháng, lịch… cần đủ).
+  const slotMode = registrationScope === null ? null : registrationScope === "all" ? "all" : "talent";
+  useEffect(() => {
+    if (!authUserId || slotMode === null) return;
+    let cancelled = false;
+    __resetShiftSlotStore(); // người khác đăng nhập ⇒ kho thô của người trước không dùng lại; nạp trọn đặt lại kho
+    const load =
+      slotMode === "all"
+        ? fetchShiftSlots().then((slots) => ({ slots, sessionBySlot: null }))
+        : fetchTalentShiftSlots(getTodayDate());
+    load
+      .then(({ slots, sessionBySlot: links }) => {
+        if (cancelled) return;
+        setShiftSlots(slots);
+        setTalentSessionBySlot(links);
+      })
+      .catch((err) => { if (!cancelled) setPhase14Error(err.message ?? "Không tải được danh sách ca chờ đăng ký — thử tải lại trang."); });
+    return () => {
+      cancelled = true;
+    };
+  }, [authUserId, slotMode]);
 
   // Đăng ký ca (egress 22/11): tải SAU khi biết hồ sơ — talent chỉ tải đăng ký của chính mình (app talent không dùng đăng ký người
   // khác; danh sách người đăng ký chỉ ops xem), các role khác tải đủ. `registrationScope`: null = chưa có hồ sơ (chờ), "" = talent

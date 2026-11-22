@@ -1,6 +1,7 @@
 import { supabase } from "../supabaseClient";
 import { fetchAllPages } from "./fetchAllPages";
 import { deltaSince, mergeDelta, type DeltaStore } from "./deltaTable";
+import { registrationWindowStart } from "./shiftRegistrations";
 import { assertAffected } from "./assertAffected";
 import { ShiftSlot } from "../../types";
 import { LEGACY_PLATFORM } from "../reportPlatform";
@@ -120,6 +121,42 @@ export async function fetchShiftSlots(): Promise<ShiftSlot[]> {
   // Không đọc được mốc ⇒ không giữ kho (lượt làm mới sau sẽ tải trọn như cũ).
   slotStore = mark === undefined ? null : { byId: new Map(rows.map((r) => [r.id, r])), mark };
   return rows.map(fromDb);
+}
+
+/**
+ * App talent (egress 22/11): 4 tab talent chỉ cần (1) ca MỞ từ hôm nay — Đăng ký ca, chấm đỏ, ca mở trên lịch — và (2) cặp slot → ca
+ * để gắn target kế hoạch / tăng cường vào ca thật ("Target ca" ở Ca của tôi, thẻ ca). Đọc trọn bảng (~690 KB) ⇒ ~250 KB.
+ * Cặp slot → ca chỉ từ đầu tháng trước (cùng cửa sổ đăng ký ca): ca cũ hơn trên lịch talent không hiện target nữa — có chủ ý.
+ * Không giữ kho làm mới theo phần đổi (bản thiếu) — nơi gọi `refreshShiftSlots` (chỉ màn ops) sẽ tải trọn.
+ */
+export async function fetchTalentShiftSlots(today: string): Promise<{ slots: ShiftSlot[]; sessionBySlot: Map<string, string> }> {
+  const linksFrom = registrationWindowStart(today);
+  const [open, links] = await Promise.all([
+    fetchAllPages<DbShiftSlot>((from, to) =>
+      supabase
+        .from("shift_slots")
+        .select(SHIFT_SLOT_SELECT)
+        .eq("status", "open")
+        .gte("date", today)
+        .order("date", { ascending: true })
+        .order("start_time", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, to)
+        .returns<DbShiftSlot[]>()
+    ),
+    fetchAllPages<{ id: string; session_id: string }>((from, to) =>
+      supabase
+        .from("shift_slots")
+        .select("id,session_id")
+        .not("session_id", "is", null)
+        .gte("date", linksFrom)
+        .order("id", { ascending: true })
+        .range(from, to)
+        .returns<{ id: string; session_id: string }[]>()
+    )
+  ]);
+  slotStore = null;
+  return { slots: open.map(fromDb), sessionBySlot: new Map(links.map((r) => [r.id, r.session_id])) };
 }
 
 /**
