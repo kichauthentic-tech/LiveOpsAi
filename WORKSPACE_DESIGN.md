@@ -735,8 +735,14 @@ Chữ brand thấy trong Report Tháng (component `report/*`, `*MonthlyReportTab
     giữ phạm vi. App talent chỉ dùng đăng ký của chính mình (Đăng ký ca, chấm đỏ, SlotDetailModal không `canManage`). Đo DB thật:
     740 KB → trung vị 12 KB/lượt mở (60 dòng), lớn nhất 72 KB. **Luật:** màn talent mới cần đăng ký người khác (vd. "còn N chỗ") ⇒
     đổi phạm vi hoặc thêm RPC đếm, đừng lặng lẽ dùng `shiftRegistrations` (với talent chỉ có dòng của họ).
-  - **Còn mở:** ops vẫn đọc trọn `session_availability` lúc mở app (~3.800 dòng/tháng đăng ký, chưa có cửa sổ thời gian — hiện mọi dòng
-    đều cho slot T12 nên cửa sổ chưa cắt được gì); 23 feed .ics (`/api/calendar`) nhỏ, theo cửa sổ ngày.
+  - **Cửa sổ đăng ký ca:** mọi role chỉ đọc đăng ký của slot từ đầu tháng trước (`registrationWindowStart`), lọc bằng embed RỖNG
+    `shift_slots!inner()` + `shift_slots.date=gte.` (không thêm byte; đếm HEAD cùng bộ lọc ⇒ slot dời qua mép cửa sổ lộ ở số dòng lệch;
+    sang tháng ⇒ tải trọn lại). 22/11 chưa cắt dòng nào (mọi đăng ký là slot T12); từ T1 không còn phình. Lùi Điều Phối về ≥ 2 tháng
+    trước sẽ không thấy "báo rảnh" — có chủ ý.
+  - **Feed .ics — không đổi (có chủ ý):** mỗi lần lịch điện thoại hỏi ≈ 10–25 KB đọc DB/talent (23 feed; hỏi mỗi giờ ≈ 8 MB/ngày, chưa
+    đo được tần suất thật — `.vercel/project.json` trong repo trỏ project "pickdi-operator", không phải LiveOps). KHÔNG bật cache CDN
+    (`s-maxage`): `vercel.json` rewrite mọi `/api/*` về một hàm, chưa kiểm khoá cache có tách theo link ⇒ rủi ro talent nhận lịch người khác.
+  - **Còn mở:** `shift_slots` (~690 KB, mọi role kể cả talent) và danh sách ca (~520 KB) vẫn tải trọn lúc mở app — hai khoản lớn nhất còn lại.
 - **Nạp trước lượt đọc của màn** (`lib/db/prefetch.ts`, test `tests/prefetch.test.ts`): màn export `prefetchX(ctx)` khai
   `prefetchable(name, fn)` và effect MOUNT gọi `.take(...)`; App gọi qua `TAB_DATA_PREFETCH` CHỈ khi `!coreDataReady`.
   Giao đúng một lần, hết hạn 30 s, đổi tab là xoá — KHÔNG phải cache: đường đọc-sau-khi-ghi luôn gọi thẳng hàm db.

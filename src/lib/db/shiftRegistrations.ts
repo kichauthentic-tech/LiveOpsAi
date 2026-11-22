@@ -1,6 +1,7 @@
 import { supabase } from "../supabaseClient";
 import { fetchAllPages } from "./fetchAllPages";
 import { deltaSince, maxStamp, mergeDelta, type DeltaStore } from "./deltaTable";
+import { getTodayDate } from "../dateUtils";
 import { ShiftRegistration } from "../../types";
 
 interface DbShiftRegistration {
@@ -26,12 +27,28 @@ function fromDb(row: DbShiftRegistration): ShiftRegistration {
 let regStore: DeltaStore<DbShiftRegistration> | null = null;
 // Phạm vi của kho: null = mọi đăng ký (ops/trainer/brand); id talent = chỉ đăng ký của talent đó (egress 22/11).
 let regScope: string | null = null;
+// Cửa sổ của kho (ngày slot nhỏ nhất). Sang tháng mới ⇒ cửa sổ đổi ⇒ tải trọn lại.
+let regFrom: string | null = null;
 export function __resetShiftRegistrationStore(): void {
   regStore = null;
   regScope = null;
+  regFrom = null;
 }
 
-const REG_SELECT = "id,slot_id,talent_id,registered_at";
+/**
+ * Cửa sổ đăng ký ca (egress 22/11): chỉ đăng ký của slot từ ĐẦU THÁNG TRƯỚC trở đi. Đăng ký chỉ có nghĩa với slot đang xếp / đã xếp
+ * gần đây (Điều Phối, Đăng ký ca, lịch, Bảng Vận Hành đều đọc theo tuần/tháng hiện tại trở đi); bảng tăng ~3.800 dòng mỗi tháng và
+ * trước đây đọc trọn mỗi lần mở app. Lùi Điều Phối về 2 tháng trước sẽ không còn thấy "báo rảnh" — có chủ ý.
+ */
+export function registrationWindowStart(today: string): string {
+  const [y, m] = today.split("-").map(Number);
+  const py = m === 1 ? y - 1 : y;
+  const pm = m === 1 ? 12 : m - 1;
+  return `${py}-${String(pm).padStart(2, "0")}-01`;
+}
+
+// `shift_slots!inner()` = embed RỖNG: lọc theo ngày slot mà không trả thêm cột nào (PostgREST ≥ 12; đã thử trên DB thật).
+const REG_SELECT = "id,slot_id,talent_id,registered_at,shift_slots!inner()";
 const sortedRegs = (rows: Iterable<DbShiftRegistration>) => [...rows].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)).map(fromDb);
 
 /**
@@ -42,13 +59,15 @@ const sortedRegs = (rows: Iterable<DbShiftRegistration>) => [...rows].sort((a, b
  */
 export async function fetchShiftRegistrations(talentId?: string): Promise<ShiftRegistration[]> {
   const scope = talentId ?? null;
+  const windowFrom = registrationWindowStart(getTodayDate());
   // Một dòng cho mỗi lượt talent đăng ký ca — tăng theo số ca. Xem src/lib/db/fetchAllPages.ts.
   const rows = await fetchAllPages<DbShiftRegistration>((from, to) => {
-    const q = supabase.from("session_availability").select(REG_SELECT);
+    const q = supabase.from("session_availability").select(REG_SELECT).gte("shift_slots.date", windowFrom);
     return (scope ? q.eq("talent_id", scope) : q).order("id", { ascending: true }).range(from, to).returns<DbShiftRegistration[]>();
   });
   regStore = { byId: new Map(rows.map((r) => [r.id, r])), mark: maxStamp(rows, (r) => r.registered_at) };
   regScope = scope;
+  regFrom = windowFrom;
   return rows.map(fromDb);
 }
 
@@ -56,16 +75,17 @@ export async function fetchShiftRegistrations(talentId?: string): Promise<ShiftR
 export async function refreshShiftRegistrations(): Promise<ShiftRegistration[]> {
   const base = regStore;
   const scope = regScope;
-  if (!base) return fetchShiftRegistrations(scope ?? undefined);
+  const windowFrom = registrationWindowStart(getTodayDate());
+  if (!base || regFrom !== windowFrom) return fetchShiftRegistrations(scope ?? undefined);
   const since = deltaSince(base.mark);
+  // Đếm cùng cửa sổ: slot dời ngày qua mép cửa sổ (đăng ký không đổi dấu) cũng lộ ra ở số dòng lệch ⇒ tải trọn.
+  const counted = supabase.from("session_availability").select("id,shift_slots!inner()", { count: "exact", head: true }).gte("shift_slots.date", windowFrom);
   const [changed, head] = await Promise.all([
     fetchAllPages<DbShiftRegistration>((from, to) => {
-      const q = supabase.from("session_availability").select(REG_SELECT).gt("registered_at", since);
+      const q = supabase.from("session_availability").select(REG_SELECT).gte("shift_slots.date", windowFrom).gt("registered_at", since);
       return (scope ? q.eq("talent_id", scope) : q).order("id", { ascending: true }).range(from, to).returns<DbShiftRegistration[]>();
     }),
-    scope
-      ? supabase.from("session_availability").select("id", { count: "exact", head: true }).eq("talent_id", scope)
-      : supabase.from("session_availability").select("id", { count: "exact", head: true })
+    scope ? counted.eq("talent_id", scope) : counted
   ]);
   if (head.error) throw head.error;
   const next = mergeDelta(base, changed, head.count, (r) => r.registered_at, (r) => r);

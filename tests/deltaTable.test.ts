@@ -1,7 +1,11 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { deltaSince, maxStamp, mergeDelta, type DeltaStore } from "../src/lib/db/deltaTable";
+
+// shiftRegistrations.ts import supabaseClient (ném lỗi khi CI không có .env) — chỉ cần hàm thuần nên mock client.
+vi.mock("../src/lib/supabaseClient", () => ({ supabase: {} }));
+const { registrationWindowStart } = await import("../src/lib/db/shiftRegistrations");
 
 // Nạp lại shift_slots / session_availability theo phần đã đổi (egress 22/11).
 type Row = { id: string; v: string };
@@ -77,4 +81,11 @@ test("talent chỉ tải đăng ký ca của chính mình, chờ hồ sơ rồi 
   expect(hook).toMatch(/if \(!authUserId \|\| registrationScope === null\) return;/);
   // Không còn tải đủ đăng ký trong đợt nạp chung lúc mở app.
   expect(hook).not.toMatch(/Promise\.all\(\[[^\]]*fetchShiftRegistrations\(\)/);
+});
+
+test("cửa sổ đăng ký ca = đầu tháng trước, kể cả qua năm", () => {
+  expect(registrationWindowStart("2026-11-22")).toBe("2026-10-01");
+  expect(registrationWindowStart("2026-12-01")).toBe("2026-11-01");
+  expect(registrationWindowStart("2027-01-15")).toBe("2026-12-01");
+  expect(registrationWindowStart("2027-03-31")).toBe("2027-02-01");
 });
