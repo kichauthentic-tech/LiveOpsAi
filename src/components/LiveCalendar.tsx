@@ -47,6 +47,7 @@ interface LiveCalendarProps {
   onSwitchSessionPlatform?: (session: LiveSession, platform: LiveSession["platform"], studioId: string) => Promise<boolean>;
   /** Xếp người / mở ca chỉ ở Điều Phối Lịch Live (gom việc trên ca, 21/11): mở Điều Phối, có ngày + ca thì mở đúng tuần và chọn sẵn ca. */
   onOpenRoster?: (date?: string, slotId?: string) => void;
+  onDeleteSlot?: (id: string) => Promise<void>;
   onRegisterSlot?: (slotId: string, talentId: string) => Promise<boolean>;
   onUnregisterSlot?: (slotId: string, talentId: string) => Promise<boolean>;
   myTalentId?: string;
@@ -92,6 +93,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   onUpdateSession,
   onSwitchSessionPlatform,
   onOpenRoster,
+  onDeleteSlot,
   onRegisterSlot,
   onUnregisterSlot,
   myTalentId,
@@ -1454,6 +1456,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
           onRegister={onRegisterSlot}
           onUnregister={onUnregisterSlot}
           onOpenRoster={onOpenRoster ? () => onOpenRoster(selectedSlotDetail.date, selectedSlotDetail.id) : undefined}
+          onDeleteSlot={onDeleteSlot}
         />
       )}
     </div>

@@ -57,6 +57,7 @@ interface BrandCalendarProps {
   onUpdateSession?: (s: LiveSession) => Promise<boolean>;
   /** Xếp người / mở ca chỉ ở Điều Phối Lịch Live (gom việc trên ca, 21/11): mở Điều Phối, có ngày + ca thì mở đúng tuần và chọn sẵn ca. */
   onOpenRoster?: (date?: string, slotId?: string) => void;
+  onDeleteSlot?: (id: string) => Promise<void>;
   onRegisterSlot?: (slotId: string, talentId: string) => Promise<boolean>;
   onUnregisterSlot?: (slotId: string, talentId: string) => Promise<boolean>;
   // Cửa sổ Ca Live (2026-09-21): click ca đã có → cùng cửa sổ với agency; brand chỉ đọc.
@@ -112,6 +113,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
   canEdit = true,
   onUpdateSession,
   onOpenRoster,
+  onDeleteSlot,
   onRegisterSlot,
   onUnregisterSlot,
   currentRole,
@@ -700,6 +702,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
           onRegister={onRegisterSlot}
           onUnregister={onUnregisterSlot}
           onOpenRoster={onOpenRoster ? () => onOpenRoster(selectedSlotDetail.date, selectedSlotDetail.id) : undefined}
+          onDeleteSlot={canManage ? onDeleteSlot : undefined}
         />
       )}
     </div>

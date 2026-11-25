@@ -2296,6 +2296,7 @@ export default function App() {
                     onUpdateSession={handleUpdateSession}
                     onSwitchSessionPlatform={handleSwitchSessionPlatform}
                     onOpenRoster={rosterDoor}
+                    onDeleteSlot={handleDeleteShiftSlot}
                     onRegisterSlot={handleRegisterSlot}
                     onUnregisterSlot={handleUnregisterSlot}
                     myTalentId={activeUser.assignedTalentId}
@@ -2485,6 +2486,7 @@ export default function App() {
                     onLogAudit={pushAuditLog}
                     onUpdateSession={handleUpdateSession}
                     onOpenRoster={rosterDoor}
+                    onDeleteSlot={handleDeleteShiftSlot}
                     onRegisterSlot={handleRegisterSlot}
                     onUnregisterSlot={handleUnregisterSlot}
                   />

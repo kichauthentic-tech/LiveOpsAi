@@ -4,6 +4,7 @@ import { X, Users, UserCheck, UserX, AlertTriangle, ClipboardList } from "lucide
 import { dateTimeRangesOverlap } from "../../lib/dateUtils";
 import { fmtDateVn } from "../../lib/format";
 import { PlatformChip } from "../common/PlatformChip";
+import { useConfirm } from "../../hooks/useConfirm";
 
 interface SlotDetailModalProps {
   slot: ShiftSlot;
@@ -18,6 +19,8 @@ interface SlotDetailModalProps {
   onUnregister?: (slotId: string, talentId: string) => Promise<boolean>;
   /** Xếp người / chốt / bỏ ca chờ đăng ký chỉ ở Điều Phối Lịch Live (Đợt 2 gom việc trên ca, 21/11) — nút mở đúng tuần, chọn sẵn ca. */
   onOpenRoster?: () => void;
+  /** Huỷ (xoá) ca đang mở chưa chốt người ngay tại lịch — chỉ người xếp lịch (canManage). */
+  onDeleteSlot?: (id: string) => Promise<void>;
 }
 
 // Cửa sổ một ca chờ đăng ký — mở từ Bảng Vận Hành, Lịch & Studio, Lịch Vận Hành brand. Từ 21/11 CHỈ XEM: ai đã báo rảnh, trùng phòng;
@@ -35,9 +38,23 @@ export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
   myTalentId,
   onRegister,
   onUnregister,
-  onOpenRoster
+  onOpenRoster,
+  onDeleteSlot
 }) => {
   const [busy, setBusy] = useState(false);
+  const confirm = useConfirm();
+  const canDropSlot = canManage && !!onDeleteSlot && slot.status === "open" && !slot.sessionId;
+  const handleDropSlot = async () => {
+    if (!onDeleteSlot) return;
+    if (!(await confirm(`Huỷ ca chờ đăng ký ${fmtDateVn(slot.date, false)} ${slot.startTime.slice(0, 5)}–${slot.endTime.slice(0, 5)} (${slot.brandName})? Các đăng ký rảnh của ca này cũng mất.`, { danger: true }))) return;
+    setBusy(true);
+    try {
+      await onDeleteSlot(slot.id);
+      onClose();
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const talentsById = new Map<string, Talent>(talents.map((t) => [t.id, t]));
   const regs = registrations.filter((r) => r.slotId === slot.id);
@@ -130,6 +147,16 @@ export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
                 className="w-full flex items-center justify-center gap-1.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs font-bold px-3 py-2.5 rounded-xl transition-colors"
               >
                 <ClipboardList className="w-3.5 h-3.5" /> Xếp người ở Điều Phối Lịch Live
+              </button>
+            )}
+            {canDropSlot && (
+              <button
+                type="button"
+                onClick={handleDropSlot}
+                disabled={busy}
+                className="w-full text-xs font-bold px-3 py-2 rounded-xl border border-rose-800 text-rose-300 hover:bg-rose-950 disabled:opacity-50"
+              >
+                Huỷ ca đang mở này
               </button>
             )}
           </div>
