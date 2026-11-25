@@ -78,18 +78,40 @@ export default function TalentShiftSignup({ mode, onOpenTab, brands, shiftSlots,
     [shiftRegistrations, myTalentId]
   );
   // 0226: qua hạn chỉ khoá SỬA/HUỶ ca mình đã đăng ký; ca còn mở thiếu người vẫn đăng ký thêm được.
+  // 25/11: ca đã chốt / đã huỷ / đã qua ngày cũng khoá (chỉ để xem lại).
   const closed = (slot: ShiftSlot) => {
+    if (!mineBySlot.has(slot.id)) return false;
+    if (slot.status !== "open" || slot.date < today) return true;
     const d = deadlineOf(slot);
-    return !!d && new Date(d) <= new Date() && mineBySlot.has(slot.id);
+    return !!d && new Date(d) <= new Date();
   };
   const allOpen = useMemo(() => openSlotsFrom(shiftSlots, today), [shiftSlots, today]);
-  const openSlots = useMemo(() => allOpen.filter((s) => mineBySlot.has(s.id) === (mode === "registered")), [allOpen, mineBySlot, mode]);
+  // "Đã đăng ký" = MỌI ca mình đăng ký từ đầu tháng này (kể cả đã chốt/huỷ) để xem lại; "Đang mở" = ca còn mở chưa đăng ký.
+  const openSlots = useMemo(() => {
+    if (mode === "open") return allOpen.filter((s) => !mineBySlot.has(s.id));
+    const from = `${today.slice(0, 7)}-01`;
+    return shiftSlots
+      .filter((s) => mineBySlot.has(s.id) && s.date >= from)
+      .sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
+  }, [allOpen, shiftSlots, mineBySlot, mode, today]);
+  const sessionById = useMemo(() => new Map(myShifts.map((s) => [s.id, s])), [myShifts]);
+  // Kết quả của ca đã khoá: chờ chốt (qua hạn) / đã xếp cho mình / chốt không có tên mình / huỷ.
+  const outcomeOf = (slot: ShiftSlot): string => {
+    if (slot.status === "cancelled") return "Ca đã huỷ";
+    if (slot.status === "finalized") {
+      const sess = slot.sessionId ? sessionById.get(slot.sessionId) : undefined;
+      return sess && sess.status !== "Cancelled" ? "✓ Đã xếp cho bạn" : "Đã chốt, không có tên bạn";
+    }
+    return slot.date < today ? "Đã qua ngày" : "✓ Bạn đã đăng ký · hết hạn sửa, chờ chốt";
+  };
   const booked = useMemo(() => myShifts.filter((s) => s.status !== "Cancelled"), [myShifts]);
 
   // ---- Bộ lọc: Tháng → Tuần trong tháng → Buổi → Brand. Mỗi nút đếm số ca còn lại sau các lọc khác. ----
   const months = useMemo(() => [...new Set(openSlots.map((s) => s.date.slice(0, 7)))].sort(), [openSlots]);
   const [monthPick, setMonthPick] = useState<string | null>(null);
-  const month = monthPick && months.includes(monthPick) ? monthPick : months[0] ?? today.slice(0, 7);
+  // Mặc định: tháng đầu tiên còn ca từ hôm nay (tab "Đã đăng ký" có thể còn cả ca tháng này đã qua).
+  const defaultMonth = months.find((m) => openSlots.some((s) => s.date.startsWith(m) && s.date >= today)) ?? months[months.length - 1] ?? today.slice(0, 7);
+  const month = monthPick && months.includes(monthPick) ? monthPick : defaultMonth;
   const [weekPick, setWeekPick] = useState<string>("all"); // "all" | weekStart (T2)
   const [part, setPart] = useState<DayPart | "all">("all");
   const [brandFilter, setBrandFilter] = useState("all");
@@ -117,7 +139,8 @@ export default function TalentShiftSignup({ mode, onOpenTab, brands, shiftSlots,
   const dates = [...new Set(shown.map((s) => s.date))].sort();
 
   const monthAll = allOpen.filter((s) => s.date.startsWith(month));
-  const registeredInMonth = monthAll.filter((s) => mineBySlot.has(s.id));
+  const registeredInMonth =
+    mode === "registered" ? inMonth.filter((s) => s.status !== "cancelled") : monthAll.filter((s) => mineBySlot.has(s.id));
   const bulkTargets = mode === "open" ? shown.filter((s) => !closed(s)) : [];
   // Theo NGÀY của ca (không theo thứ Hai đầu tuần): tuần 27/10–02/11 có thứ Hai thuộc tháng trước, hạn tháng phải lấy theo tháng của ca.
   const deadlines = [...new Set(inMonth.filter(byWeek).map((s) => deadlineOf(s)).filter((d): d is string => !!d))].sort();
@@ -169,9 +192,9 @@ export default function TalentShiftSignup({ mode, onOpenTab, brands, shiftSlots,
     );
     if (!myTalentId || locked)
       return (
-        <div key={slot.id} className={`rounded-2xl border p-3 ${mine ? "border-emerald-700 bg-emerald-500/5" : "border-[var(--border)] bg-[var(--surface)] opacity-60"}`}>
+        <div key={slot.id} className={`rounded-2xl border p-3 ${mine ? (slot.status === "cancelled" ? "border-[var(--border)] bg-[var(--surface)] opacity-60" : "border-emerald-700 bg-emerald-500/5") : "border-[var(--border)] bg-[var(--surface)] opacity-60"}`}>
           {head}
-          <p className="mt-3 text-xs text-[var(--text-muted)]">{!myTalentId ? "Tài khoản chưa gắn hồ sơ" : mine ? "✓ Bạn đã đăng ký · đã hết hạn sửa" : "Đã hết hạn đăng ký"}</p>
+          <p className="mt-3 text-xs text-[var(--text-muted)]">{!myTalentId ? "Tài khoản chưa gắn hồ sơ" : mine ? outcomeOf(slot) : "Đã hết hạn đăng ký"}</p>
         </div>
       );
     return (
@@ -200,7 +223,7 @@ export default function TalentShiftSignup({ mode, onOpenTab, brands, shiftSlots,
         <p className="text-sm text-[var(--text-muted)]">
           {mode === "open"
             ? "Chạm vào mọi ca bạn làm được — đăng ký càng nhiều càng dễ được xếp."
-            : "Đang chờ trainer chốt, chưa phải lịch chắc chắn. Chạm vào ca để huỷ."}
+            : "Trước hạn chạm vào ca để huỷ; qua hạn chỉ xem."}
         </p>
       </div>
 
@@ -216,7 +239,7 @@ export default function TalentShiftSignup({ mode, onOpenTab, brands, shiftSlots,
             ? allOpen.length > 0
               ? "Bạn đã đăng ký hết các ca đang mở."
               : "Hiện chưa có ca nào cần người. OP mở ca tháng sau khi chốt kế hoạch tháng — bạn sẽ nhận thông báo."
-            : "Bạn chưa đăng ký ca nào đang chờ chốt."}
+            : "Bạn chưa đăng ký ca nào trong tháng này."}
           {onOpenTab && allOpen.length > 0 && (
             <button
               type="button"
@@ -241,7 +264,7 @@ export default function TalentShiftSignup({ mode, onOpenTab, brands, shiftSlots,
                   className={`px-4 py-2 min-h-12 rounded-2xl border text-left ${m === month ? "border-[var(--accent)] bg-[var(--accent)]/10" : "border-[var(--border)] bg-[var(--surface)]"}`}
                 >
                   <span className={`block text-base font-black ${m === month ? "text-[var(--accent-text)]" : "text-[var(--text)]"}`}>{monthLabel(m)}</span>
-                  <span className="block text-xs text-[var(--text-faint)]">{openSlots.filter((s) => s.date.startsWith(m)).length} {mode === "open" ? "ca cần người" : "ca chờ chốt"}</span>
+                  <span className="block text-xs text-[var(--text-faint)]">{openSlots.filter((s) => s.date.startsWith(m)).length} {mode === "open" ? "ca cần người" : "ca đã đăng ký"}</span>
                 </button>
               ))}
             </div>
@@ -249,9 +272,16 @@ export default function TalentShiftSignup({ mode, onOpenTab, brands, shiftSlots,
             <div className="flex-1 min-w-[14rem] rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 flex flex-wrap items-center gap-x-6 gap-y-2">
               <p className="text-sm text-[var(--text-muted)]">
                 {monthLabel(month)} bạn đã đăng ký{" "}
-                <b className="text-xl font-black text-[var(--text)]">{registeredInMonth.length}</b> / {monthAll.length} ca
+                <b className="text-xl font-black text-[var(--text)]">{registeredInMonth.length}</b>
+                {mode === "open" ? ` / ${monthAll.length}` : ""} ca
                 <span className="text-[var(--text-faint)]"> · {hoursText(registeredInMonth.reduce((a, s) => a + slotHours(s), 0))}</span>
               </p>
+              {!nextDeadline && deadlines.length > 0 && (
+                <p className="flex items-center gap-1.5 text-sm text-[var(--text)]">
+                  <Clock3 className="w-4 h-4 shrink-0 text-amber-300" />
+                  Đã hết hạn sửa
+                </p>
+              )}
               {nextDeadline && (
                 <p className="flex items-center gap-1.5 text-sm text-[var(--text)]">
                   <Clock3 className="w-4 h-4 shrink-0 text-amber-300" />

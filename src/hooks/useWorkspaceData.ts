@@ -535,7 +535,7 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab, r
     const load =
       slotMode === "all"
         ? fetchShiftSlots().then((slots) => ({ slots, sessionBySlot: null }))
-        : fetchTalentShiftSlots(getTodayDate());
+        : fetchTalentShiftSlots(getTodayDate(), registrationScope || undefined);
     load
       .then(({ slots, sessionBySlot: links }) => {
         if (cancelled) return;
@@ -546,7 +546,7 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab, r
     return () => {
       cancelled = true;
     };
-  }, [authUserId, slotMode]);
+  }, [authUserId, slotMode, registrationScope]);
 
   // Đăng ký ca (egress 22/11): tải SAU khi biết hồ sơ — talent chỉ tải đăng ký của chính mình (app talent không dùng đăng ký người
   // khác; danh sách người đăng ký chỉ ops xem), các role khác tải đủ. `registrationScope`: null = chưa có hồ sơ (chờ), "" = talent

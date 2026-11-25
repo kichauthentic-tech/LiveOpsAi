@@ -94,7 +94,7 @@ test("talent chỉ tải ca mở từ hôm nay + cặp slot → ca; target gắn
   const hook = readFileSync(join(__dirname, "..", "src", "hooks", "useWorkspaceData.ts"), "utf8");
   const db = readFileSync(join(__dirname, "..", "src", "lib", "db", "shiftSlots.ts"), "utf8");
   expect(hook).toMatch(/const slotMode = registrationScope === null \? null : registrationScope === "all" \? "all" : "talent";/);
-  expect(hook).toMatch(/: fetchTalentShiftSlots\(getTodayDate\(\)\)/);
+  expect(hook).toMatch(/: fetchTalentShiftSlots\(getTodayDate\(\), registrationScope \|\| undefined\)/);
   // Target kế hoạch / tăng cường gắn qua sessionBySlot (talent không có slot đã chốt trong shiftSlots).
   expect(hook).toMatch(/for \(const \[slotId, sessionId\] of sessionBySlot\)/);
   expect(hook).not.toMatch(/for \(const sl of shiftSlots\) \{\s*if \(sl\.sessionId && (plan|boost)TargetsBySlotId/);
@@ -102,4 +102,8 @@ test("talent chỉ tải ca mở từ hôm nay + cặp slot → ca; target gắn
   expect(fn).toContain('.eq("status", "open")');
   expect(fn).toContain('.gte("date", today)');
   expect(fn).toContain('.not("session_id", "is", null)');
+  // 25/11: ca MÌNH đã đăng ký mà không còn mở (chốt/huỷ) vẫn tải để "Ca đã đăng ký" xem lại được — lọc qua embed theo talent.
+  expect(fn).toContain('session_availability!inner(talent_id)');
+  expect(fn).toContain('.eq("session_availability.talent_id", talentId)');
+  expect(fn).toContain('.neq("status", "open")');
 });

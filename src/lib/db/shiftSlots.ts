@@ -129,9 +129,9 @@ export async function fetchShiftSlots(): Promise<ShiftSlot[]> {
  * Cặp slot → ca chỉ từ đầu tháng trước (cùng cửa sổ đăng ký ca): ca cũ hơn trên lịch talent không hiện target nữa — có chủ ý.
  * Không giữ kho làm mới theo phần đổi (bản thiếu) — nơi gọi `refreshShiftSlots` (chỉ màn ops) sẽ tải trọn.
  */
-export async function fetchTalentShiftSlots(today: string): Promise<{ slots: ShiftSlot[]; sessionBySlot: Map<string, string> }> {
+export async function fetchTalentShiftSlots(today: string, talentId?: string): Promise<{ slots: ShiftSlot[]; sessionBySlot: Map<string, string> }> {
   const linksFrom = registrationWindowStart(today);
-  const [open, links] = await Promise.all([
+  const [open, links, mine] = await Promise.all([
     fetchAllPages<DbShiftSlot>((from, to) =>
       supabase
         .from("shift_slots")
@@ -153,10 +153,28 @@ export async function fetchTalentShiftSlots(today: string): Promise<{ slots: Shi
         .order("id", { ascending: true })
         .range(from, to)
         .returns<{ id: string; session_id: string }[]>()
-    )
+    ),
+    // Ca talent ĐÃ đăng ký nhưng không còn "mở" (trainer chốt / huỷ) — giữ lại để "Ca đã đăng ký" vẫn cho xem lại sau hạn.
+    // Chỉ từ đầu tháng này; đầy đủ cột (khác `links`), lọc qua embed session_availability!inner.
+    talentId
+      ? fetchAllPages<DbShiftSlot>((from, to) =>
+          supabase
+            .from("shift_slots")
+            .select(`${SHIFT_SLOT_SELECT},session_availability!inner(talent_id)`)
+            .eq("session_availability.talent_id", talentId)
+            .neq("status", "open")
+            .gte("date", `${today.slice(0, 7)}-01`)
+            .order("date", { ascending: true })
+            .order("id", { ascending: true })
+            .range(from, to)
+            .returns<DbShiftSlot[]>()
+        )
+      : Promise.resolve([] as DbShiftSlot[])
   ]);
   slotStore = null;
-  return { slots: open.map(fromDb), sessionBySlot: new Map(links.map((r) => [r.id, r.session_id])) };
+  const seen = new Set(open.map((r) => r.id));
+  const slots = [...open, ...mine.filter((r) => !seen.has(r.id))];
+  return { slots: slots.map(fromDb), sessionBySlot: new Map(links.map((r) => [r.id, r.session_id])) };
 }
 
 /**
