@@ -96,6 +96,25 @@ export function personWindows(s: LiveSession, talentId: string): DateTimeRange[]
     .map((g) => segmentRange(s, g));
 }
 
+/** Phút kể từ đầu ca mà ca dừng vì KẾT THÚC SỚM (ops khai ở giao ca, `report.earlyLeaveMinutes`, live_session_reports
+ *  .early_leave_minutes). null = ca không kết thúc sớm. Cùng luật DB `private.person_windows` (0232). */
+export function earlyOffAtMin(s: Pick<LiveSession, "startTime" | "endTime" | "report">): number | null {
+  const early = s.report?.earlyLeaveMinutes ?? 0;
+  const dur = sessionMinutes(s);
+  if (!(early > 0) || dur <= 0) return null;
+  return Math.max(0, dur - early);
+}
+
+/** Khoảng một người BẬN ở ca — dùng cho kiểm trùng người. = `personWindows` nhưng cắt tại giờ ca kết thúc sớm (user 25/11:
+ *  ca 13–15 off lúc 14h thì host rảnh từ 14h, xếp được vào ca 14h). Giờ lương / giờ tuần / giờ theo lịch vẫn dùng personWindows. */
+export function busyWindows(s: LiveSession, talentId: string): DateTimeRange[] {
+  const cut = earlyOffAtMin(s);
+  if (cut == null) return personWindows(s, talentId);
+  return effectiveSegments(s)
+    .filter((g) => g.talentId === talentId && Math.min(g.toMin, cut) > g.fromMin)
+    .map((g) => segmentRange(s, { fromMin: g.fromMin, toMin: Math.min(g.toMin, cut) }));
+}
+
 export interface StaffShare {
   talentId: string;
   name: string;

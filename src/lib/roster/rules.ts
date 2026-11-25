@@ -1,7 +1,7 @@
 import type { LiveSession, ShiftRegistration, ShiftSlot } from "../../types";
 import type { SchedulePlatform } from "../reportPlatform";
 import { addDays, type DateTimeRange, dateTimeRangesOverlap } from "../dateUtils";
-import { hasStaffSegments, personRoleMinutes, personWindows } from "../staffSegments";
+import { busyWindows, earlyOffAtMin, hasStaffSegments, personRoleMinutes, personWindows } from "../staffSegments";
 import { hasSessionData } from "../sessionStatus";
 import { sessionDurationHours } from "../pnl";
 
@@ -222,8 +222,9 @@ export function personEntries(shifts: readonly RosterShift[]): Map<string, Perso
         const k = `${g.talentId}|${g.role}`;
         if (seen.has(k)) continue;
         seen.add(k);
-        const ranges = personWindows(sh.session, g.talentId);
-        const abs = ranges.map(absRange);
+        const ranges = busyWindows(sh.session, g.talentId);
+        // Cả đoạn của người này nằm sau giờ kết thúc sớm ⇒ không bận lúc nào; mốc đầu/cuối vẫn lấy theo lịch để không ra Infinity.
+        const abs = (ranges.length ? ranges : personWindows(sh.session, g.talentId)).map(absRange);
         push(g.talentId, {
           shift: sh,
           role: g.role,
@@ -242,7 +243,10 @@ export function personEntries(shifts: readonly RosterShift[]): Map<string, Perso
     ] as const) {
       if (!tid || seen.has(`${tid}|${role}`)) continue;
       if (sh.segmented && (sh.session?.staffSegments ?? []).some((g) => g.role === role)) continue;
-      push(tid, { shift: sh, role, ranges: [whole], minutes: b - a, start: a, end: b });
+      // Ca đã khai Kết thúc sớm: người rảnh từ giờ off (busyWindows) — kiểm trùng + khoảng nghỉ theo giờ off; giờ vẫn theo lịch.
+      const cut = sh.session ? earlyOffAtMin(sh.session) : null;
+      const ranges = cut == null ? [whole] : busyWindows(sh.session!, tid);
+      push(tid, { shift: sh, role, ranges, minutes: b - a, start: a, end: cut == null ? b : a + cut });
     }
   }
   for (const list of out.values()) list.sort((x, y) => x.start - y.start);

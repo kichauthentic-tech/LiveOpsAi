@@ -1,6 +1,6 @@
 import { LiveSession, ShiftSlot } from "../../types";
 import { DateTimeRange, dateTimeRangesOverlap } from "../dateUtils";
-import { personWindows } from "../staffSegments";
+import { busyWindows } from "../staffSegments";
 
 // Kiểm trùng lịch — MỘT bộ luật cho mọi cửa xếp/sửa ca (audit 2026-09-28 mục 8). DB không chặn trùng, nên
 // cảnh báo ở UI là hàng rào duy nhất; trước bản này 5 cửa kiểm theo 4 luật khác nhau:
@@ -16,12 +16,13 @@ export interface ScheduleWindow extends DateTimeRange {
 }
 
 /** Ca (chưa huỷ, chồng giờ) mà người này đang làm Host hoặc Trợ live. Ca đổi người giữa ca (0138) chỉ tính đúng khoảng
- *  người này đứng ca — ra giữa ca thì phần sau của ca không còn chiếm họ. */
+ *  người này đứng ca — ra giữa ca thì phần sau của ca không còn chiếm họ; ca đã khai Kết thúc sớm thì người rảnh từ giờ off
+ *  (`busyWindows`, DB 0232). */
 export function personClash(sessions: LiveSession[], want: DateTimeRange, talentId: string | undefined, excludeSessionId?: string): LiveSession | null {
   if (!talentId) return null;
   return (
     sessions.find(
-      (s) => s.id !== excludeSessionId && s.status !== "Cancelled" && personWindows(s, talentId).some((w) => dateTimeRangesOverlap(w, want))
+      (s) => s.id !== excludeSessionId && s.status !== "Cancelled" && busyWindows(s, talentId).some((w) => dateTimeRangesOverlap(w, want))
     ) ?? null
   );
 }
@@ -96,7 +97,7 @@ export function findPersonClashes(sessions: LiveSession[], opts: { from?: string
       for (const b of [...today.slice(i + 1), ...before]) {
         for (const id of people(a)) {
           if (!people(b).includes(id)) continue;
-          if (personWindows(a, id).some((wa) => personWindows(b, id).some((wb) => dateTimeRangesOverlap(wa, wb)))) {
+          if (busyWindows(a, id).some((wa) => busyWindows(b, id).some((wb) => dateTimeRangesOverlap(wa, wb)))) {
             const [x, y] = b.date < a.date || (b.date === a.date && b.startTime < a.startTime) ? [b, a] : [a, b];
             out.push({ talentId: id, talentName: nameIn(a, id) || nameIn(b, id), session: x, other: y });
           }
