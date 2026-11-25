@@ -40,6 +40,30 @@ export async function downloadSheetsAsXlsx(sheets: { name: string; rows: Record<
   XLSX.writeFile(wb, filename);
 }
 
+// Xuất lưới ô có định dạng số (bảng xoay: chỉ số theo dòng) — dùng cho bảng gửi brand, cần dán sang mail/slide đúng dạng
+// như trên màn. `sheets[].grid` là mảng dòng; ô {v, z} = giá trị + định dạng Excel; merges = vùng gộp ô.
+export async function downloadGridXlsx(
+  sheets: { name: string; grid: { v: string | number; z?: string }[][]; merges?: { s: { r: number; c: number }; e: { r: number; c: number } }[] }[],
+  filename: string
+): Promise<void> {
+  const XLSX = await import("xlsx");
+  const wb = XLSX.utils.book_new();
+  const usedNames = new Set<string>();
+  for (const { name, grid, merges } of sheets) {
+    const ws = XLSX.utils.aoa_to_sheet(grid.map((row) => row.map((c) => c.v)));
+    grid.forEach((row, r) =>
+      row.forEach((c, ci) => {
+        if (c.z && typeof c.v === "number") ws[XLSX.utils.encode_cell({ r, c: ci })].z = c.z;
+      })
+    );
+    if (merges?.length) ws["!merges"] = merges;
+    const width = Math.max(...grid.map((r) => r.length));
+    ws["!cols"] = Array.from({ length: width }, (_, i) => ({ wch: i === 0 ? 18 : 16 }));
+    XLSX.utils.book_append_sheet(wb, ws, safeSheetName(name, usedNames));
+  }
+  XLSX.writeFile(wb, filename);
+}
+
 /**
  * Câu báo lỗi khi xuất Excel — nói MỘT lần ở đây. Audit chữ 14/11: 11 màn tự viết lại cùng một câu
  * (`Không tải được file Excel: …`), sửa chữ phải sửa 11 chỗ.

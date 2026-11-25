@@ -27,13 +27,14 @@ import {
 } from "../../lib/affiliate/plan";
 import { matchPlanToSessions, sameCreator, sessionAlreadyHasColumn } from "../../lib/affiliate/planMatch";
 import { errorMessage } from "../../lib/errorMessage";
-import { downloadRowsAsXlsx, xlsxFailText } from "../../lib/exportXlsx";
+import { downloadGridXlsx, downloadRowsAsXlsx, xlsxFailText } from "../../lib/exportXlsx";
 import { useToast } from "../../hooks/useToast";
 import { BarChart3, CalendarDays, ClipboardPaste, Database, Download, Link2, Loader2, Lock, Plus, Save, Send, Trash2, Undo2, Users } from "lucide-react";
 import { metricHint } from "../../lib/metricGlossary";
 
 import { fmtFixed, fmtMonth, fmtVndFull } from "../../lib/format";
 import { MonthPicker } from "../common/MonthPicker";
+import { buildTrackGrid, mergedPartsOf, mergeSameCreatorSameDay } from "../../lib/affiliate/trackExport";
 import { PageHeader } from "../common/PageHeader";
 import { AffiliatePlanTable, CAMPAIGN_STYLE, CAMPAIGN_TYPES } from "./AffiliatePlanTable";
 import { featureOffText } from "../../lib/featureOff";
@@ -265,6 +266,8 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
   };
 
   // Cột hiển thị ở chế độ THEO DÕI: chỉ phiên đã live, gom theo tháng (chỉ tháng nằm trong dải đang xem), trong tháng sắp theo ngày live.
+  // Gộp restart: phiên cùng creator + cùng ngày liền nhau hiện một cột (chỉ đọc; tắt để sửa từng đoạn). Dữ liệu lưu không đổi.
+  const [mergeView, setMergeView] = useState(true);
   const columns = useMemo(() => {
     const byMonth = new Map<string, Row[]>();
     for (const e of entries) {
@@ -277,8 +280,11 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
     }
     return rangeMonths
       .filter((m) => byMonth.has(m))
-      .map((m) => ({ month: m, items: (byMonth.get(m) ?? []).slice().sort(byLiveDate) }));
-  }, [entries, rangeMonths]);
+      .map((m) => {
+        const sorted = (byMonth.get(m) ?? []).slice().sort(byLiveDate);
+        return { month: m, items: mergeView ? mergeSameCreatorSameDay(sorted) : sorted };
+      });
+  }, [entries, rangeMonths, mergeView]);
 
   const flatColumns = useMemo(() => columns.flatMap((g) => g.items), [columns]);
 
@@ -288,37 +294,15 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
     [entries, planMonth, canManage]
   );
 
-  // Xuất Excel (chế độ THEO DÕI) — mỗi cột (1 phiên/creator) đang hiện trên bảng thành 1 dòng, đúng dải tháng đang
-  // lọc. Bảng UI xoay ngang (chỉ số theo dòng, phiên theo cột) chỉ để đọc trên màn; ra Excel thì
-  // trả về chiều thường (mỗi dòng 1 phiên) cho dễ lọc/pivot tiếp.
+  // Xuất Excel (chế độ THEO DÕI), đúng dải tháng đang lọc.
   const { showToast } = useToast();
+  // Bảng gửi brand = đúng bảng trên màn (chỉ số theo dòng, phiên theo cột) nhưng GỘP phiên cùng creator + cùng ngày liền nhau
+  // (restart sang tài khoản khác, vd "Mạnh Ka" + "Mạnh Ka - Giày") thành một cột — để copy thẳng gửi brand. Chỉ đổi cách trình
+  // bày khi xuất, dữ liệu đã lưu giữ nguyên từng phiên.
   const handleExport = () => {
-    downloadRowsAsXlsx(
-      "Affiliate",
-      flatColumns.map((e) => ({
-        "Tháng": e.periodMonth.slice(0, 7),
-        "Creator": e.creatorName,
-        "Camp": e.campName ?? "",
-        "Campaign Type": e.campaignType ?? "",
-        "Ngày Live": e.liveDateLabel ?? "",
-        "Timeline": e.timelineLabel ?? "",
-        "Target GMV": e.targetGmv ?? "",
-        "Direct GMV": e.directGmv ?? "",
-        "Giờ live": e.durationHours ?? "",
-        "GMV/giờ": e.directGmv && e.durationHours ? Math.round(e.directGmv / e.durationHours) : "",
-        "% Target": e.directGmv && e.targetGmv ? Math.round((e.directGmv / e.targetGmv) * 10000) / 100 : "",
-        "LIVE impressions": e.liveImpressions ?? "",
-        "LIVE CTR": e.ctr ?? "",
-        "CTOR": e.ctor ?? "",
-        "Ads cost": e.adsCost ?? "",
-        "Budget Ads": planBudget(e) ?? "",
-        "Ads / Budget %": e.adsCost != null && planBudget(e) ? Math.round((e.adsCost / planBudget(e)!) * 100) : "",
-        "ROAS": e.directGmv && e.adsCost ? Math.round((e.directGmv / e.adsCost) * 10) / 10 : "",
-        "Orders": e.orders ?? "",
-        "Items sold": e.itemsSold ?? "",
-        "Avg. price": e.avgPrice ?? "",
-        "Viewers": e.viewer ?? ""
-      })),
+    const { grid, merges } = buildTrackGrid(columns.map((g) => ({ label: fmtMonth(g.month.slice(0, 7)), items: g.items })));
+    downloadGridXlsx(
+      [{ name: "Affiliate", grid, merges }],
       `Affiliate_${brandName}_${fromMonth}_${toMonth}.xlsx`.replace(/\s+/g, "_")
     ).catch((e) => showToast(xlsxFailText(e)));
   };
@@ -568,6 +552,7 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
   };
 
   const readOnly = !canManage;
+  const roCell = (e: Row) => readOnly || mergedPartsOf(e) > 0;
   const cellCls = "px-2 py-1.5 border-r border-[var(--border)] text-center whitespace-nowrap";
   const labelCls = "px-3 py-1.5 border-r border-[var(--border)] text-left font-semibold text-[var(--text-faint)] sticky left-0 bg-[var(--surface-base)] z-10 whitespace-nowrap";
   // `min-h-6` = 24px, sàn vùng bấm WCAG 2.5.8: 56 ô nhập của bảng này trước đây cao 20px
@@ -582,7 +567,7 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
   const numInput = (e: Row, label: string, key: keyof AffiliateActualEntry, fmt: (n?: number | null) => string) => {
     const cellId = `${e._key}:${String(key)}`;
     const value = e[key] as number | undefined;
-    if (readOnly) return <span>{fmt(value)}</span>;
+    if (roCell(e)) return <span>{fmt(value)}</span>;
     return (
       <input
         className={inputCls}
@@ -602,7 +587,7 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
   };
 
   const textInput = (e: Row, label: string, key: "creatorName" | "liveDateLabel" | "timelineLabel") =>
-    readOnly ? (
+    roCell(e) ? (
       <span>{e[key] || "—"}</span>
     ) : (
       <input className={inputCls} aria-label={cellLabel(e, label)} value={e[key] ?? ""} onChange={(ev) => update(e, { [key]: ev.target.value })} />
@@ -613,7 +598,7 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
   const planInput = (e: Row, label: string, key: "planDurationHours" | "planBudgetAds", derived: number | undefined, fmt: (n?: number | null) => string) => {
     const cellId = `${e._key}:${key}`;
     const override = e[key];
-    if (readOnly) return <span>{derived != null ? fmt(derived) : "—"}</span>;
+    if (roCell(e)) return <span>{derived != null ? fmt(derived) : "—"}</span>;
     return (
       <input
         className={`${inputCls} ${override != null ? "font-bold" : ""}`}
@@ -975,6 +960,13 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
         </div>
       )}
 
+      {mode === "track" && !loading && flatColumns.length > 0 && (
+        <label className="flex items-center gap-2 text-xs text-[var(--text-faint)] w-fit cursor-pointer">
+          <input type="checkbox" checked={mergeView} onChange={(ev) => setMergeView(ev.target.checked)} />
+          Gộp restart: cùng creator, cùng ngày, liền nhau (nghỉ ≤60 phút) thành một cột — cột gộp chỉ đọc; bỏ chọn để sửa từng đoạn
+        </label>
+      )}
+
       {mode !== "track" ? null : loading ? (
         <div className="p-8 text-center text-[var(--text-faint)] flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Đang tải…</div>
       ) : flatColumns.length === 0 ? (
@@ -1011,7 +1003,7 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
             </thead>
             <tbody>
               {metricRow("Campaign Type", (e, label) =>
-                readOnly ? (
+                roCell(e) ? (
                   <span className={`px-2 py-0.5 rounded text-xs font-semibold ${CAMPAIGN_STYLE[e.campaignType ?? ""] ?? ""}`}>{e.campaignType || "—"}</span>
                 ) : (
                   <ChipPicker
@@ -1025,7 +1017,7 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
                 )
               )}
               {metricRow("Camp", (e, label) =>
-                readOnly ? (
+                roCell(e) ? (
                   <span className="text-xs font-semibold">{e.campName || "—"}</span>
                 ) : (
                   <ChipPicker
@@ -1077,6 +1069,9 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
                   <td className={labelCls} />
                   {flatColumns.map((e) => (
                     <td key={e._key} className={cellCls}>
+                      {mergedPartsOf(e) > 0 ? (
+                        <span className="text-2xs text-[var(--text-faint)]" title="Cột gộp từ nhiều đoạn — tắt “Gộp restart” để sửa/xoá từng đoạn">gộp {mergedPartsOf(e)} đoạn</span>
+                      ) : (
                       <button
                         onClick={() => removeEntry(e)}
                         title="Xoá cột"
@@ -1084,6 +1079,7 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
+                      )}
                     </td>
                   ))}
                 </tr>
