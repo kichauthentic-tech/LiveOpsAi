@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Lock } from "lucide-react";
-import type { Talent } from "../../types";
+import type { LiveSession, Talent } from "../../types";
 import { contrastRatio, getBrandTheme } from "../../lib/brandTheme";
 import { InfoDot } from "../common/InfoDot";
 import { loadMonthRules, type MonthRules } from "../../hooks/useMonthRules";
 import type { AutoCap } from "../../lib/roster/autoCaps";
 import { parseCommitmentSheet } from "../../lib/roster/commitmentSheet";
-import { copyRulesToMonth, emptyBrandRule, emptyMonthRule, isMonthLocked, type MonthRule, type NightRule, type RuleRole } from "../../lib/roster/monthRules";
+import { copyRulesToMonth, emptyBrandRule, emptyMonthRule, hasContent, isMonthLocked, type MonthRule, type NightRule, type RuleRole } from "../../lib/roster/monthRules";
 import { DAY_KINDS, DAY_KIND_LABEL, type DayKind } from "../../lib/roster/placementRules";
 import { addDays } from "../../lib/dateUtils";
 import {
@@ -17,9 +17,12 @@ import {
   cellText,
   cellView,
   clearCellRule,
+  dualTalents,
   otherRole,
+  prevMonthRoleHours,
   visibleCols,
   type GridBrand,
+  type RoleKindFn,
   type GridCol,
   type GridCtx,
   type GridRow,
@@ -27,7 +30,8 @@ import {
 } from "../../lib/roster/rulesGrid";
 
 // LƯỚI "LUẬT ĐẶT GIỜ TỪNG NGƯỜI" kiểu Excel (Điều Phối → Thêm). Mỗi người một dòng, mỗi cột là một luật; mỗi brand một nhóm cột
-// (Cả brand = nhận / trần giờ / loại ngày riêng, rồi trần giờ từng sàn). Người làm 2 vai: bấm ▸ ở tên để mở dòng vai còn lại.
+// (Cả brand = nhận / trần giờ / loại ngày riêng, rồi trần giờ từng sàn). Người làm 2 vai (hồ sơ vai theo brand hoặc lịch 2 tháng
+// trước) tự có 2 dòng Host + Trợ liền nhau: mỗi dòng một bộ trần brand × sàn của riêng vai đó. Kênh mà hồ sơ chỉ cho vai kia thì ô gạch.
 // Dữ liệu theo THÁNG (bảng talent_month_rules, 0229); tháng đã qua tự khoá. Bộ xếp tự fill đọc đúng bảng này.
 
 const monthLabel = (m: string) => `T${Number(m.slice(5))}/${m.slice(0, 4)}`;
@@ -66,8 +70,12 @@ export const PersonRulesGrid: React.FC<{
   nameOf: (id: string) => string;
   rules: MonthRules;
   autoCaps: Readonly<Record<string, AutoCap>>;
+  /** Lịch (để biết ai làm 2 vai + giờ tháng trước). */
+  sessions?: readonly LiveSession[];
+  /** Hồ sơ "Vai được xếp theo brand" (cài tay + tự suy) — cùng nguồn với bộ xếp. */
+  roleKind?: RoleKindFn;
   readOnly?: boolean;
-}> = ({ month, onMonth, today, talents, brands, nameOf, rules, autoCaps, readOnly }) => {
+}> = ({ month, onMonth, today, talents, brands, nameOf, rules, autoCaps, sessions = [], roleKind, readOnly }) => {
   const locked = isMonthLocked(month, today);
   const canEdit = !locked && !readOnly;
   const [role, setRole] = useState<"all" | RuleRole>("all");
@@ -76,7 +84,8 @@ export const PersonRulesGrid: React.FC<{
   const [q, setQ] = useState("");
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [colMenu, setColMenu] = useState(false);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [showPrev, setShowPrev] = useState(false);
+  const [sheetRole, setSheetRole] = useState<RuleRole>("host");
   const [sel, setSel] = useState({ r: 0, c: 2 });
   const [anchor, setAnchor] = useState({ r: 0, c: 2 });
   const [editing, setEditing] = useState<{ r: number; c: number; init: string } | null>(null);
@@ -90,17 +99,22 @@ export const PersonRulesGrid: React.FC<{
   const brandName = useCallback((id: string) => brands.find((b) => b.id === id)?.name ?? "brand", [brands]);
   const cols = useMemo(() => buildGridCols(brands), [brands]);
   const autoInfo = useMemo(() => Object.fromEntries(Object.entries(autoCaps).map(([id, c]) => [id, { monthMax: c.monthMax, avg: c.avg }])), [autoCaps]);
-  const allRows = useMemo(() => buildGridRows(talents, rules.rules, month, nameOf, autoInfo), [talents, rules.rules, month, nameOf, autoInfo]);
-  const ctx: GridCtx = useMemo(() => ({ brandName, brandIds: brands.map((b) => b.id), siblings: (id) => rules.forTalent(id), locked: !canEdit }), [brandName, brands, rules, canEdit]);
+  const dual = useMemo(() => dualTalents(talents.map((t) => t.id), brands, roleKind, sessions, month), [talents, brands, roleKind, sessions, month]);
+  const allRows = useMemo(() => buildGridRows(talents, rules.rules, month, nameOf, autoInfo, dual), [talents, rules.rules, month, nameOf, autoInfo, dual]);
+  const prev = useMemo(() => (showPrev ? prevMonthRoleHours(sessions, month) : undefined), [showPrev, sessions, month]);
+  const ctx: GridCtx = useMemo(
+    () => ({ brandName, brandIds: brands.map((b) => b.id), siblings: (id) => rules.forTalent(id), locked: !canEdit, roleKind, brandPlatforms: (id) => brands.find((b) => b.id === id)?.platforms ?? [], prev }),
+    [brandName, brands, rules, canEdit, roleKind, prev]
+  );
+  const siblingRow = useCallback((row: GridRow) => allRows.find((r) => r.talentId === row.talentId && r.role !== row.role), [allRows]);
 
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return allRows.filter((r) => {
       if (needle && !r.name.toLowerCase().includes(needle)) return false;
-      if (role !== "all") return r.role === role;
-      return r.primary || expanded.has(r.talentId);
+      return role === "all" || r.role === role;
     });
-  }, [allRows, q, role, expanded]);
+  }, [allRows, q, role]);
   const vCols = useMemo(() => visibleCols(cols, { brand: brandF, platform: platF, role, hidden }), [cols, brandF, platF, role, hidden]);
   const groups = useMemo(() => {
     const out: { name: string; span: number }[] = [];
@@ -138,7 +152,9 @@ export const PersonRulesGrid: React.FC<{
 
   // ---- ghi ---------------------------------------------------------------------------------------------------------------
   const commit = useCallback(
-    (changes: { row: GridRow; next: MonthRule }[], record = true) => {
+    (all: { row: GridRow; next: MonthRule }[], record = true) => {
+      // Bấm lại đúng lựa chọn đang có (vd "✓ Nhận" ở ô đã nhận) không ghi gì: tránh đẻ dòng luật trống / ghi đè y nguyên.
+      const changes = all.filter((c) => JSON.stringify(c.next) !== JSON.stringify(c.row.rule));
       if (!canEdit || changes.length === 0) return;
       if (record) setUndo((u) => [...u.slice(-40), { before: changes.map((c) => ({ key: c.row.key, rule: c.row.stored ? c.row.rule : null })) }]);
       void rules.save(changes.map((c) => c.next));
@@ -278,9 +294,14 @@ export const PersonRulesGrid: React.FC<{
         miss.push(p.nameRaw);
         continue;
       }
-      const row = allRows.find((r) => r.talentId === p.talentId && r.primary);
-      if (!row) continue;
-      const next: MonthRule = { ...row.rule, brands: { ...row.rule.brands }, maxHours: p.hours, note: p.note || row.rule.note };
+      // Bảng Host / bảng Trợ của sheet: điền đúng dòng vai đó. Người 1 vai ⇒ giờ ở sheet = trần tháng; người 2 vai ⇒ = trần giờ vai này.
+      const own = allRows.filter((r) => r.talentId === p.talentId);
+      const found = own.find((r) => r.role === sheetRole);
+      const base = own[0];
+      if (!base) continue;
+      const row: GridRow = found ?? { ...base, key: `${p.talentId}|${sheetRole}`, role: sheetRole, primary: false, dual: true, stored: false, rule: { ...emptyMonthRule(month, p.talentId!, sheetRole), maxHours: base.rule.maxHours, firstHalfMax: base.rule.firstHalfMax } };
+      const twoRoles = row.dual || !found;
+      const next: MonthRule = { ...row.rule, brands: { ...row.rule.brands }, ...(twoRoles ? { roleHours: p.hours } : { maxHours: p.hours }), note: p.note || row.rule.note };
       if (p.rule) {
         const general = p.rule.clauses.filter((c) => !c.brandId).flatMap((c) => c.days);
         if (general.length) next.dayKinds = [...new Set(general)] as DayKind[];
@@ -318,20 +339,20 @@ export const PersonRulesGrid: React.FC<{
     const toggleDay = (cur: readonly DayKind[], d: DayKind) => (cur.includes(d) ? cur.filter((x) => x !== d) : [...cur, d]);
     if (popCol.kind === "role") {
       const other = otherRole(popRow.role);
-      const hasOther = rules.forTalent(popRow.talentId).some((x) => x.role === other);
+      const hasOther = !!siblingRow(popRow);
       return (
         <div className="space-y-2">
           <b>{nameOf(popRow.talentId)}</b>
           {!hasOther ? (
-            <button type="button" className={chip(false)} onClick={() => (commit([{ row: { ...popRow, key: `${popRow.talentId}|${other}`, role: other, rule: emptyMonthRule(month, popRow.talentId, other), stored: false }, next: { ...emptyMonthRule(month, popRow.talentId, other), maxHours: r.maxHours, firstHalfMax: r.firstHalfMax } }]), setPop(null), setExpanded((s) => new Set(s).add(popRow.talentId)))}>
+            <button type="button" className={chip(false)} onClick={() => (commit([{ row: { ...popRow, key: `${popRow.talentId}|${other}`, role: other, rule: emptyMonthRule(month, popRow.talentId, other), stored: false }, next: { ...emptyMonthRule(month, popRow.talentId, other), maxHours: r.maxHours, firstHalfMax: r.firstHalfMax } }]), setPop(null))}>
               Thêm vai {other === "assistant" ? "Trợ" : "Host"}
             </button>
-          ) : !popRow.primary ? (
+          ) : !popRow.primary && popRow.stored ? (
             <button type="button" className={chip(false)} onClick={() => (void rules.remove(popRow.talentId, popRow.role), setPop(null))}>
               Bỏ luật vai này
             </button>
           ) : (
-            <span className="text-xs text-[var(--text-muted)]">Có 2 vai: bấm ▸ ở tên để mở dòng vai còn lại.</span>
+            <span className="block text-xs text-[var(--text-muted)]">{dual.has(popRow.talentId) ? "Làm cả 2 vai (theo hồ sơ vai hoặc lịch 2 tháng trước) nên có sẵn 2 dòng." : "Có 2 dòng: Host và Trợ."}</span>
           )}
         </div>
       );
@@ -374,7 +395,7 @@ export const PersonRulesGrid: React.FC<{
       };
       return (
         <div className="space-y-2">
-          <b>{brandName(id)}</b>
+          <b>{brandName(id)}{popRow.dual ? ` · ${popRow.role === "host" ? "Host" : "Trợ"}` : ""}</b>
           <div className="flex gap-1.5">
             <button type="button" className={chip(b.hours !== "x")} onClick={() => set({ ...b, hours: b.hours === "x" ? null : b.hours })}>
               ✓ Nhận
@@ -429,8 +450,7 @@ export const PersonRulesGrid: React.FC<{
     const v = cellView(row, col, ctx);
     const inRange = ri >= range.r0 && ri <= range.r1 && ci >= range.c0 && ci <= range.c1;
     const isSel = ri === sel.r && ci === sel.c;
-    const isDualToggle = col.kind === "name" && row.dual && row.primary && role === "all";
-    const text = isDualToggle ? `${expanded.has(row.talentId) ? "▾" : "▸"} ${v.text}` : v.text;
+    const text = v.text;
     const sticky = ci === 0 ? "sticky left-0 z-[2] bg-[var(--surface)]" : ci === 1 ? "sticky z-[2] bg-[var(--surface)] shadow-[2px_0_0_var(--border)]" : "";
     const hatch = v.tone === "na" ? "bg-[repeating-linear-gradient(135deg,transparent_0_5px,var(--surface-hover)_5px_10px)] cursor-not-allowed" : "";
     return (
@@ -441,24 +461,16 @@ export const PersonRulesGrid: React.FC<{
           ...(ci === 1 ? { left: vCols[0]?.w } : {}),
           ...(!isSel && !inRange && !sticky && !hatch ? { backgroundColor: tintOf(col.group, 7, "var(--surface)") } : {})
         }}
-        className={`relative max-w-[240px] cursor-cell truncate border-b border-r border-[var(--border)] px-2.5 ${col.kind === "max" || col.kind === "half" || col.kind === "roleHours" || col.kind === "avg" || col.kind === "auto" ? "text-right" : ""} ${TONE[v.tone]} ${sticky} ${hatch} ${isSel ? "outline outline-2 -outline-offset-2 outline-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_10%,var(--surface))]" : inRange ? "bg-[color-mix(in_srgb,var(--accent)_12%,var(--surface))]" : ""} ${isDualToggle ? "cursor-pointer font-semibold" : ""}`}
+        className={`relative max-w-[240px] cursor-cell truncate border-b border-r border-[var(--border)] px-2.5 ${col.kind === "max" || col.kind === "half" || col.kind === "roleHours" || col.kind === "avg" || col.kind === "auto" ? "text-right" : ""} ${TONE[v.tone]} ${sticky} ${hatch} ${isSel ? "outline outline-2 -outline-offset-2 outline-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_10%,var(--surface))]" : inRange ? "bg-[color-mix(in_srgb,var(--accent)_12%,var(--surface))]" : ""} ${row.dual && !row.primary && ci === 0 ? "pl-5" : ""}`}
         onMouseDown={(e) => {
           if (e.button !== 0) return;
           setPop(null);
-          if (isDualToggle && !e.shiftKey) {
-            setExpanded((s) => {
-              const n = new Set(s);
-              if (n.has(row.talentId)) n.delete(row.talentId);
-              else n.add(row.talentId);
-              return n;
-            });
-          }
           setSel({ r: ri, c: ci });
           if (!e.shiftKey) setAnchor({ r: ri, c: ci });
           boxRef.current?.focus({ preventScroll: true });
         }}
         onClick={(e) => {
-          if (!e.shiftKey && v.popover && v.editable && !isDualToggle) openPop(ri, ci);
+          if (!e.shiftKey && v.popover && v.editable) openPop(ri, ci);
         }}
         onDoubleClick={() => activate(ri, ci)}
       >
@@ -497,7 +509,7 @@ export const PersonRulesGrid: React.FC<{
 
   const dimmed = (row: GridRow) => platF !== "all" && !canDoPlatform(row.rule, brands, platF, brandF);
   const total = new Set(allRows.map((r) => r.talentId)).size;
-  const storedCount = rules.rules.length;
+  const storedCount = rules.rules.filter(hasContent).length;
 
   return (
     <div className="space-y-2 text-xs" data-testid="person-rules-grid">
@@ -531,6 +543,9 @@ export const PersonRulesGrid: React.FC<{
         </select>
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm tên…" aria-label="Tìm tên" className="min-h-7 w-32 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2 text-[var(--text)]" />
         <span className="flex-1" />
+        <button type="button" aria-pressed={showPrev} className={chip(showPrev)} onClick={() => setShowPrev((v) => !v)}>
+          So tháng trước
+        </button>
         <button type="button" className={chip(false)} disabled={undo.length === 0 || !canEdit} onClick={doUndo}>
           Hoàn tác{undo.length ? ` (${undo.length})` : ""}
         </button>
@@ -557,9 +572,9 @@ export const PersonRulesGrid: React.FC<{
       </div>
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs text-[var(--text-muted)]">
-        <span>{total} người · {storedCount} dòng có luật riêng</span>
+        <span>{total} người · {dual.size} người 2 vai · {storedCount} dòng có luật riêng</span>
         <InfoDot label="Bảng luật">
-          Mỗi người một dòng, mỗi cột là một luật. Mọi số là trần TỐI ĐA. Brand / sàn gõ x = không nhận. Chữ nghiêng xám là hệ thống tự suy, chấm là bạn đã đặt tay. Tự fill lịch của tháng này đọc đúng bảng này.
+          Mỗi người một dòng, mỗi cột là một luật. Mọi số là trần TỐI ĐA. Brand / sàn gõ x = không nhận. Chữ nghiêng xám là hệ thống tự suy, chấm là bạn đã đặt tay. Người làm 2 vai có dòng Host và dòng Trợ: trần brand / sàn ở dòng nào chỉ tính giờ của vai đó; trần tháng dùng chung. Ô gạch "chỉ Host / chỉ Trợ" theo hồ sơ vai ở Talent Pool. Tự fill lịch của tháng này đọc đúng bảng này.
         </InfoDot>
         {locked && (
           <span className="inline-flex items-center gap-1 font-bold">
@@ -580,8 +595,17 @@ export const PersonRulesGrid: React.FC<{
 
       {pasteOpen && canEdit && (
         <div className="space-y-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3">
-          <b>Dán từ sheet TỶ LỆ LỊCH LÀM</b>
-          <span className="block text-[var(--text-muted)]">Mỗi dòng: tên, ô mức cast. Hệ thống đọc giờ và phần trong ngoặc, rồi điền vào lưới (vai chính của người đó). Dòng không khớp tên sẽ báo lại.</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <b>Dán từ sheet TỶ LỆ LỊCH LÀM</b>
+            <div className="inline-flex gap-1 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-0.5" role="group" aria-label="Bảng của sheet">
+              {(["host", "assistant"] as const).map((v) => (
+                <button key={v} type="button" aria-pressed={sheetRole === v} className={segBtn(sheetRole === v)} onClick={() => setSheetRole(v)}>
+                  Bảng {v === "host" ? "Host" : "Trợ"}
+                </button>
+              ))}
+            </div>
+          </div>
+          <span className="block text-[var(--text-muted)]">Mỗi dòng: tên, ô mức cast. Điền vào dòng {sheetRole === "host" ? "Host" : "Trợ"}; người 2 vai thì giờ thành trần giờ vai. Dòng không khớp tên sẽ báo lại.</span>
           <textarea value={pasteText} onChange={(e) => setPasteText(e.target.value)} rows={4} aria-label="Dán từ sheet" placeholder="B.Thy	60h /tháng (6-7-CN, camp)" className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-base)] p-2 text-[var(--text)]" />
           <button type="button" className={chip(true)} disabled={!pasteText.trim()} onClick={applySheet}>
             Điền vào lưới

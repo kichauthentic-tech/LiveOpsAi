@@ -81,15 +81,32 @@ describe("đọc luật cho một ca", () => {
 
 describe("kiểm tra luật", () => {
   const name = (id: string) => id.toUpperCase();
-  test("nửa đầu lớn hơn trần tháng, làn lớn hơn brand, 2 vai chưa chia giờ", () => {
+  test("nửa đầu lớn hơn trần tháng, làn lớn hơn brand; 2 vai không bắt chia giờ, chỉ báo khi vượt trần tháng", () => {
     expect(M.checkRule(rule({ maxHours: 40, firstHalfMax: 50 }), [], ["b1"], name, 30).level).toBe("bad");
     expect(M.checkRule(rule({ maxHours: 40, brands: { b1: { hours: 20, days: null, night: null } }, lanes: { "b1|TikTok": 30 } }), [], ["b1"], name, 30).level).toBe("bad");
     const host = rule({ maxHours: 50, roleHours: 35 });
     const asst = rule({ maxHours: 50, roleHours: null }, "w", "assistant");
-    expect(M.checkRule(host, [host, asst], ["b1"], name, 30).messages.join()).toMatch(/Chưa chia giờ/);
+    expect(M.checkRule(host, [host, asst], ["b1"], name, 30).level).toBe("ok");
     const asst2 = { ...asst, roleHours: 20 };
     expect(M.checkRule(host, [host, asst2], ["b1"], name, 30).level).toBe("bad"); // 35 + 20 > 50
     expect(M.checkRule({ ...host, roleHours: 30 }, [{ ...host, roleHours: 30 }, asst2], ["b1"], name, 30).level).toBe("ok");
+  });
+  test("2 vai: làn/brand lớn hơn trần vai = lỗi; Host + Trợ cùng làn vượt trần tháng = lỗi; trần chưa biết thì không so", () => {
+    expect(M.checkRule(rule({ roleHours: 10, lanes: { "b1|TikTok": 12 } }), [], ["b1"], name, 40).messages.join()).toMatch(/trần làn lớn hơn trần vai/);
+    expect(M.checkRule(rule({ roleHours: 10, brands: { b1: { hours: 15, days: null, night: null } } }), [], ["b1"], name, 40).messages.join()).toMatch(/trần brand lớn hơn trần vai/);
+    const h = rule({ maxHours: 40, lanes: { "b1|Shopee": 25 } });
+    const a = rule({ maxHours: 40, lanes: { "b1|Shopee": 20 } }, "w", "assistant");
+    expect(M.checkRule(h, [h, a], ["b1"], name, 30).messages.join()).toMatch(/Host \+ Trợ \(45h\) vượt trần tháng 40h/);
+    expect(M.checkRule(h, [h, { ...a, lanes: { "b1|Shopee": 15 } }], ["b1"], name, 30).level).toBe("ok");
+    const noCap = rule({ roleHours: 35 });
+    expect(M.checkRule(noCap, [noCap, rule({ roleHours: 15 }, "w", "assistant")], ["b1"], name, 0).level).toBe("ok");
+  });
+  test("cộng trần brand của cả 2 vai mới so với trần tháng", () => {
+    const h = rule({ maxHours: 50, brands: { b1: { hours: 30, days: null, night: null } } });
+    const a = rule({ maxHours: 50, brands: { b1: { hours: 25, days: null, night: null } } }, "w", "assistant");
+    expect(M.checkRule(h, [h, a], ["b1"], name, 30).level).toBe("ok"); // 30 + 25 ≥ 50
+    expect(M.checkRule(h, [h, { ...a, brands: { b1: { hours: 10, days: null, night: null } } }], ["b1"], name, 30).messages.join()).toMatch(/cả 2 vai 40h/);
+    expect(M.checkRule(h, [h, rule({ maxHours: 50 }, "w", "assistant")], ["b1"], name, 30).level).toBe("ok"); // vai Trợ tự do ⇒ không hụt
   });
   test("không nhận brand nào = lỗi; cộng trần brand thấp hơn trần tháng = cảnh báo hụt giờ", () => {
     const x = { hours: "x" as const, days: null, night: null };
@@ -167,6 +184,18 @@ describe("bộ xếp đọc luật tháng", () => {
     const plan = run({ slots: s2, talents, regs: regs2, tuning: withRule(rule({ night: "no" })) });
     expect(hostOf(plan, "s1")).toBe("w");
     expect(hostOf(plan, "late")).toBe("o");
+  });
+
+  test("người 2 vai cùng một làn: trần Host 6h và trần Trợ 3h tính riêng từng vai", () => {
+    const four = [slot("d1", day(3)), slot("d2", day(4)), slot("d3", day(5)), slot("d4", day(6))];
+    const ppl = [tal("d", "Host", 100000), tal("h", "Host", 300000)];
+    const regs4 = four.flatMap((s) => [reg(s.id, "d"), reg(s.id, "h")]);
+    const monthRules = { d: { host: rule({ lanes: { "b1|TikTok": 6 } }, "d", "host"), co_host: rule({ lanes: { "b1|TikTok": 3 } }, "d", "assistant") } };
+    const plan = run({ slots: four, talents: ppl, regs: regs4, tuning: { ...tuning(), monthRules } });
+    const n = (role: "host" | "co_host") => plan.assignments.filter((a) => a.talentId === "d" && a.role === role).length;
+    expect(n("host")).toBeLessThanOrEqual(2);
+    expect(n("co_host")).toBeLessThanOrEqual(1);
+    expect(n("host") + n("co_host")).toBeGreaterThanOrEqual(2);
   });
 
   test("không có luật tháng thì chạy như cũ", () => {

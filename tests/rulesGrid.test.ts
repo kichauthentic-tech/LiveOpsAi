@@ -1,6 +1,7 @@
 // Lưới "Luật đặt giờ từng người": dựng dòng/cột, hiển thị ô, đọc chữ gõ/dán. Chạy: npx vitest run tests/rulesGrid.test.ts
 import { describe, expect, it } from "vitest";
-import { applyCellText, buildGridCols, buildGridRows, canDoPlatform, cellText, cellView, clearCellRule, parseDays, parseNight, visibleCols, type GridBrand, type GridCtx } from "../src/lib/roster/rulesGrid";
+import { applyCellText, buildGridCols, buildGridRows, canDoPlatform, cellText, cellView, checkOf, clearCellRule, dualTalents, parseDays, parseNight, prevMonthRoleHours, roleBlock, visibleCols, type GridBrand, type GridCtx, type RoleKindFn } from "../src/lib/roster/rulesGrid";
+import type { LiveSession } from "../src/types";
 import { emptyMonthRule, type MonthRule } from "../src/lib/roster/monthRules";
 
 const M = "2026-12";
@@ -73,12 +74,12 @@ describe("hiển thị ô", () => {
     const ctx = ctxFor([], true);
     expect(cols.filter((c) => cellView(row, c, ctx).editable)).toEqual([]);
   });
-  it("người 2 vai chưa chia giờ: ô trần giờ vai báo 'chưa chia'; ô brand hiện tóm tắt", () => {
+  it("người 2 vai chưa chia giờ: ô trần giờ vai ghi 'không chia' (không báo lỗi); ô brand hiện tóm tắt", () => {
     const rules = [rule("t1", "host", { brands: { v: { hours: 45, days: ["camp"], night: null } } }), rule("t1", "assistant")];
     const rows = buildGridRows(talents, rules, M, nameOf, {});
     const host = rows.find((r) => r.key === "t1|host")!;
     const ctx = ctxFor(rules);
-    expect(cellView(host, col("roleHours"), ctx)).toMatchObject({ text: "chưa chia", tone: "bad" });
+    expect(cellView(host, col("roleHours"), ctx)).toMatchObject({ text: "không chia", tone: "auto" });
     expect(cellView(host, col("brand:v"), ctx).text).toBe("45h · Camp");
     expect(cellView(rows.find((r) => r.key === "t1|assistant")!, col("name"), ctx).text).toBe("↳ Thịnh");
   });
@@ -140,5 +141,72 @@ describe("lọc sàn", () => {
     expect(canDoPlatform(r, brands, "Shopee")).toBe(false);
     expect(canDoPlatform(r, brands, "TikTok")).toBe(true);
     expect(canDoPlatform(rule("t1", "host", { brands: { c: { hours: "x", days: null, night: null } } }), brands, "Website")).toBe(false);
+  });
+});
+
+describe("người làm 2 vai (trần theo brand × sàn × vai)", () => {
+  // t1 (Host) cả hai ở VERA TikTok; t2 (Trợ) chỉ trợ ở CROCS TikTok; t3 host ở CROCS TikTok nhưng chỉ trợ ở CROCS Shopee.
+  const kinds: Record<string, "host" | "assistant" | "both"> = { "v|TikTok|t1": "both", "c|TikTok|t2": "assistant", "c|TikTok|t3": "host", "c|Shopee|t3": "assistant" };
+  const roleKind: RoleKindFn = (b, p, t) => kinds[`${b}|${p}|${t}`];
+  const ses = (date: string, hostId: string, coHostId: string, o: Partial<LiveSession> = {}) => ({ date, status: "Completed", hostId, coHostId, brandId: "c", platform: "TikTok", startTime: "19:00", endTime: "22:00", ...o }) as LiveSession;
+
+  it("tự nhận ra người 2 vai: từ hồ sơ vai ('Cả hai' hoặc host kênh này / trợ kênh kia) hoặc ≥3 ca mỗi vai trong 2 tháng trước", () => {
+    const fromProfile = dualTalents(["t1", "t2", "t3"], brands, roleKind, [], M);
+    expect([...fromProfile].sort()).toEqual(["t1", "t3"]);
+    const hist = [1, 2, 3].flatMap((d) => [ses(`2026-11-0${d}`, "t2", "x"), ses(`2026-10-1${d}`, "x", "t2")]);
+    expect(dualTalents(["t2"], brands, undefined, hist, M).has("t2")).toBe(true);
+    expect(dualTalents(["t2"], brands, undefined, hist.slice(0, 5), M).has("t2")).toBe(false); // chỉ 2 ca trợ
+    expect(dualTalents(["t2"], brands, undefined, hist.map((h) => ({ ...h, date: "2026-08-01" })), M).has("t2")).toBe(false); // quá 2 tháng
+  });
+
+  it("người 2 vai luôn có 2 dòng; dòng chưa lưu mượn trần tháng + nửa đầu của dòng đã lưu", () => {
+    const rules = [rule("t2", "assistant", { maxHours: 60, firstHalfMax: 30 })];
+    const rows = buildGridRows(talents, rules, M, nameOf, {}, new Set(["t2"]));
+    const t = rows.filter((r) => r.talentId === "t2");
+    expect(t.map((r) => [r.role, r.stored])).toEqual([["assistant", true], ["host", false]]);
+    expect(t[1].rule.maxHours).toBe(60);
+    expect(t[1].rule.firstHalfMax).toBe(30);
+    expect(t.every((r) => r.dual)).toBe(true);
+  });
+
+  it("ô làn bị hồ sơ chặn vai này ⇒ gạch 'chỉ Host / chỉ Trợ', không sửa được; kênh 'Cả hai' / chưa cài vẫn nhập được", () => {
+    const rows = buildGridRows(talents, [], M, nameOf, {}, new Set(["t3"]));
+    const host = rows.find((r) => r.key === "t3|host")!;
+    const asst = rows.find((r) => r.key === "t3|assistant")!;
+    const ctx = { ...ctxFor([]), roleKind, brandPlatforms: (id: string) => brands.find((b) => b.id === id)!.platforms };
+    expect(cellView(host, col("lane:c|Shopee"), ctx)).toMatchObject({ text: "chỉ Trợ", tone: "na", editable: false });
+    expect(cellView(asst, col("lane:c|TikTok"), ctx)).toMatchObject({ text: "chỉ Host", editable: false });
+    expect(cellView(host, col("lane:c|TikTok"), ctx).editable).toBe(true);
+    expect(cellView(host, col("lane:c|Website"), ctx).editable).toBe(true); // chưa cài
+    expect(roleBlock(host, col("brand:c"), ctx)).toBeNull(); // còn TikTok
+    const t2 = buildGridRows(talents, [], M, nameOf, {}).find((r) => r.key === "t2|assistant")!;
+    expect(roleBlock({ ...t2, role: "host" }, col("lane:c|TikTok"), ctx)).toBe("chỉ Trợ");
+    const onlyAsst: RoleKindFn = (b, _p, t) => (b === "v" && t === "t1" ? "assistant" : undefined);
+    const t1 = buildGridRows(talents, [], M, nameOf, {}).find((r) => r.key === "t1|host")!;
+    expect(cellView(t1, col("brand:v"), { ...ctx, roleKind: onlyAsst }).text).toBe("chỉ Trợ"); // mọi sàn của VERA chặn Host
+  });
+
+  it("Kiểm báo ô đã có số mà hồ sơ nay chặn vai đó", () => {
+    const r = rule("t3", "host", { lanes: { "c|Shopee": 10 } });
+    const row = buildGridRows(talents, [r], M, nameOf, {}).find((x) => x.key === "t3|host")!;
+    const c = checkOf(row, { ...ctxFor([r]), roleKind });
+    expect(c.level).toBe("warn");
+    expect(c.messages.join()).toMatch(/CROCS Shopee: hồ sơ chỉ cho Trợ/);
+  });
+
+  it("'So tháng trước': ô trống hiện giờ thực tháng trước của đúng vai; chép ô vẫn ra rỗng", () => {
+    const hist = [ses("2026-11-03", "t1", "t2"), ses("2026-11-04", "t2", "t1", { platform: "Shopee" }), ses("2026-10-04", "t1", "t2")];
+    const prev = prevMonthRoleHours(hist, M);
+    expect(prev.month).toBe("2026-11");
+    const rows = buildGridRows(talents, [], M, nameOf, {}, new Set(["t1"]));
+    const ctx = { ...ctxFor([]), prev };
+    const h = rows.find((r) => r.key === "t1|host")!;
+    const a = rows.find((r) => r.key === "t1|assistant")!;
+    expect(cellView(h, col("lane:c|TikTok"), ctx).text).toBe("tự do · T11 3h");
+    expect(cellView(h, col("lane:c|Shopee"), ctx).text).toBe("tự do");
+    expect(cellView(a, col("lane:c|Shopee"), ctx).text).toBe("tự do · T11 3h");
+    expect(cellView(h, col("brand:c"), ctx).text).toBe("✓ nhận · T11 3h");
+    expect(cellText(h, col("lane:c|TikTok"), ctx)).toBe("");
+    expect(cellText(h, col("brand:c"), ctx)).toBe("");
   });
 });

@@ -131,10 +131,12 @@ export function checkRule(rule: MonthRule, siblings: readonly MonthRule[], brand
   const bad: string[] = [];
   const warn: string[] = [];
   const cap = rule.maxHours ?? autoMax;
-  if (rule.firstHalfMax !== null && rule.firstHalfMax > cap) bad.push("Nửa đầu lớn hơn trần tháng");
+  // cap 0 = chưa biết trần (không đặt tay, chưa đủ lịch sử để tự suy) ⇒ bỏ mọi phép so với trần tháng.
+  const known = cap > 0;
+  if (known && rule.firstHalfMax !== null && rule.firstHalfMax > cap) bad.push("Nửa đầu lớn hơn trần tháng");
   if (brandIds.length > 0 && brandIds.every((id) => rule.brands[id]?.hours === "x")) bad.push("Không nhận brand nào");
   for (const [id, b] of Object.entries(rule.brands)) {
-    if (typeof b.hours === "number" && b.hours > cap) bad.push(`${brandName(id)}: trần brand lớn hơn trần tháng`);
+    if (known && typeof b.hours === "number" && b.hours > cap) bad.push(`${brandName(id)}: trần brand lớn hơn trần tháng`);
   }
   for (const [k, v] of Object.entries(rule.lanes)) {
     if (typeof v !== "number") continue;
@@ -142,20 +144,39 @@ export function checkRule(rule: MonthRule, siblings: readonly MonthRule[], brand
     const bh = rule.brands[brandId]?.hours;
     if (typeof bh === "number" && v > bh) bad.push(`${brandName(brandId)} ${platform}: trần làn lớn hơn trần brand`);
   }
-  const all = siblings.length > 0 ? siblings : [rule];
-  if (all.length > 1) {
-    if (all.some((r) => r.roleHours === null)) warn.push("Chưa chia giờ giữa 2 vai");
-    else {
-      const sum = all.reduce((s, r) => s + (r.roleHours ?? 0), 0);
-      if (sum > cap) bad.push(`Giờ 2 vai (${sum}h) vượt trần tháng ${cap}h`);
+  const all = siblings.some((r) => r.role === rule.role) ? siblings.map((r) => (r.role === rule.role ? rule : r)) : [rule, ...siblings];
+  const other = all.find((r) => r.role !== rule.role);
+  const word = (r: RuleRole) => (r === "host" ? "Host" : "Trợ");
+  // Trần vai là trần riêng của vai: brand / làn của chính vai đó không vượt được (bộ xếp dừng ở trần vai trước).
+  if (rule.roleHours !== null) {
+    for (const [id, b] of Object.entries(rule.brands)) if (typeof b.hours === "number" && b.hours > rule.roleHours) bad.push(`${brandName(id)}: trần brand lớn hơn trần vai ${rule.roleHours}h`);
+    for (const [k, v] of Object.entries(rule.lanes)) {
+      if (typeof v !== "number" || v <= rule.roleHours) continue;
+      const [brandId, platform] = k.split("|");
+      bad.push(`${brandName(brandId)} ${platform}: trần làn lớn hơn trần vai ${rule.roleHours}h`);
     }
   }
-  const nums = Object.values(rule.brands).filter((b) => typeof b.hours === "number" && b.hours !== null);
-  const brandsOpen = brandIds.filter((id) => rule.brands[id]?.hours !== "x");
-  const allCapped = nums.length > 0 && brandsOpen.every((id) => typeof rule.brands[id]?.hours === "number");
-  if (bad.length === 0 && allCapped) {
-    const sum = brandsOpen.reduce((s, id) => s + (rule.brands[id].hours as number), 0);
-    if (sum < cap) warn.push(`Cộng trần brand ${sum}h thấp hơn trần tháng ${cap}h, hụt ${cap - sum}h`);
+  if (other) {
+    // Không bắt buộc chia giờ giữa 2 vai (mỗi vai đã có trần brand / làn riêng); chỉ báo khi số đặt vượt trần tháng.
+    if (known && rule.roleHours !== null && other.roleHours !== null && rule.roleHours + other.roleHours > cap) bad.push(`Giờ 2 vai (${rule.roleHours + other.roleHours}h) vượt trần tháng ${cap}h`);
+    for (const [k, v] of Object.entries(rule.lanes)) {
+      const o = other.lanes[k];
+      if (!known || typeof v !== "number" || typeof o !== "number" || v + o <= cap) continue;
+      const [brandId, platform] = k.split("|");
+      bad.push(`${brandName(brandId)} ${platform}: ${word(rule.role)} + ${word(other.role)} (${v + o}h) vượt trần tháng ${cap}h`);
+    }
+  }
+  // Cộng trần brand (gộp mọi vai của người) thấp hơn trần tháng ⇒ người đó không bao giờ đạt trần tháng. Chỉ khi MỌI vai đều đã đặt trần mọi brand còn nhận.
+  const openSum = (r: MonthRule): number | null => {
+    const open = brandIds.filter((id) => r.brands[id]?.hours !== "x");
+    if (open.length === 0) return 0;
+    if (!open.every((id) => typeof r.brands[id]?.hours === "number")) return null;
+    return open.reduce((t, id) => t + (r.brands[id].hours as number), 0);
+  };
+  const sums = all.map(openSum);
+  if (known && bad.length === 0 && sums.every((x) => x !== null) && sums.some((x) => (x as number) > 0)) {
+    const sum = sums.reduce((t: number, x) => t + (x as number), 0);
+    if (sum < cap) warn.push(`Cộng trần brand${all.length > 1 ? " cả 2 vai" : ""} ${sum}h thấp hơn trần tháng ${cap}h, hụt ${cap - sum}h`);
   }
   if (bad.length === 0 && rule.maxHours !== null && avgHours && avgHours > 0 && rule.maxHours < avgHours * 0.7) warn.push(`Thấp hơn TB ${Math.round((1 - rule.maxHours / avgHours) * 100)}%`);
   return { level: bad.length ? "bad" : warn.length ? "warn" : "ok", messages: [...bad, ...warn] };
@@ -168,7 +189,7 @@ const DAY_SHORT: Record<DayKind, string> = { weekend: "6-7-CN", camp: "Camp", re
 const NIGHT_TEXT: Record<NightRule, string> = { any: "", only: "chỉ ca đêm", no: "không ca đêm" };
 
 export function describeMonthRule(rule: MonthRule, brandName: (id: string) => string, autoMax: number): string {
-  const parts: string[] = [rule.maxHours !== null ? `≤${rule.maxHours}h/tháng` : `trần tự suy ${autoMax}h`];
+  const parts: string[] = [rule.maxHours !== null ? `≤${rule.maxHours}h/tháng` : autoMax > 0 ? `trần tự suy ${autoMax}h` : "chưa đủ lịch sử để tự suy trần"];
   if (rule.roleHours !== null) parts.push(`vai này ≤${rule.roleHours}h`);
   const g: string[] = [];
   if (rule.dayKinds.length) g.push(rule.dayKinds.map((d) => DAY_SHORT[d]).join("+"));

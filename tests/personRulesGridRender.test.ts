@@ -51,11 +51,19 @@ describe("PersonRulesGrid", () => {
     expect(html).toContain("✕ không nhận");
     expect(html).toContain("≤60h/tháng"); // câu luật đọc được
   });
-  it("người 2 vai vẫn một dòng: có dấu ▸, dòng trợ chưa mở", () => {
+  it("người 2 vai luôn hiện 2 dòng liền nhau (Host rồi ↳ Trợ), không còn nút ▸", () => {
     const rules = [{ ...emptyMonthRule("2026-12", "t1", "host"), roleHours: 35 }, { ...emptyMonthRule("2026-12", "t1", "assistant"), roleHours: 15 }];
     const html = render(rules);
-    expect(html).toContain("▸ B.Thy");
-    expect(html).not.toContain("↳ B.Thy");
+    expect(html).not.toContain("▸ B.Thy");
+    expect(html).toContain("↳ B.Thy");
+    expect(html.indexOf(">B.Thy<")).toBeLessThan(html.indexOf("↳ B.Thy"));
+  });
+  it("hồ sơ vai cho Nhi (Trợ) đứng Host ở CROCS TikTok ⇒ Nhi tự có dòng Host, ô làn chặn hiện 'chỉ Host / chỉ Trợ'", () => {
+    const roleKind = (b: string, p: string, t: string) => (t === "t3" && b === "c" ? (p === "TikTok" ? "both" : "assistant") : undefined) as never;
+    const html = render([], { roleKind });
+    expect(html).toContain("↳ Nhi");
+    expect(html).toContain("chỉ Trợ");
+    expect(html).toContain("1 người 2 vai");
   });
   it("tháng đã qua tự khoá: banner khoá, không có nút dán/hoàn tác sửa", () => {
     const html = render([], { month: "2026-10" }, { month: "2026-10", locked: true });

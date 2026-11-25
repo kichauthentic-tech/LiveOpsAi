@@ -1241,7 +1241,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
                 showCost={showCost}
               />
             )}
-            {section === "people" && <PersonRulesGrid month={viewMonth} onMonth={setViewMonth} today={getTodayDate()} talents={p.talents} brands={ruleBrands} nameOf={nameOf} rules={monthRules} autoCaps={autoCaps} readOnly={readOnly} />}
+            {section === "people" && <PersonRulesGrid month={viewMonth} onMonth={setViewMonth} today={getTodayDate()} talents={p.talents} brands={ruleBrands} nameOf={nameOf} rules={monthRules} autoCaps={autoCaps} sessions={p.sessions} roleKind={brandRules?.roleKind} readOnly={readOnly} />}
             {section === "next" && <NextDesk {...deskProps} registrations={p.shiftRegistrations} drafts={drafts} weeks={weeks} />}
             {section === "checks" && <ChecksPanel analysis={analysis} shifts={wk} onSelect={setSelectedKey} />}
             {section === "absence" && <AbsencePanel key={weekStart} weekStart={weekStart} shifts={shifts} analysis={analysis} ctx={ctx} talents={p.talents} showCost={showCost} readOnly={readOnly} busy={busy} onAssign={assign} />}
