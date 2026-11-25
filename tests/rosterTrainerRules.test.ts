@@ -44,18 +44,27 @@ const hostOf = (plan: ReturnType<typeof run>, slotId: string) => plan.assignment
 const coOf = (plan: ReturnType<typeof run>, slotId: string) => plan.assignments.find((a) => a.slotId === slotId && a.role === "co_host")?.talentId;
 const hours = (plan: ReturnType<typeof run>, id: string) => plan.load.filter((l) => l.talentId === id).reduce((n, l) => n + l.hours, 0);
 
-describe("trần giờ riêng theo đợt", () => {
+describe("trần giờ riêng theo đợt (luật MỀM)", () => {
   // 10 ca × 3h ở nửa đầu (ngày 2–11), 10 ca × 3h ở nửa sau (ngày 17–26) ⇒ nửa đầu = 50% giờ tháng.
   const slots = [...Array.from({ length: 10 }, (_, i) => slot(`a${i}`, day(2 + i))), ...Array.from({ length: 10 }, (_, i) => slot(`b${i}`, day(17 + i)))];
   const talents = [tal("x", "Host", 200000)];
   const regs = slots.map((s) => reg(s.id, "x"));
   const range = { from: day(1), to: day(15) };
+  const withY = [tal("x", "Host", 200000), tal("y", "Host", 400000)];
+  const regsXY = slots.flatMap((s) => [reg(s.id, "x"), reg(s.id, "y")]);
+  const hostH = (plan: ReturnType<typeof run>, id: string) => plan.load.filter((l) => l.talentId === id && l.role === "host").reduce((n, l) => n + l.hours, 0);
 
-  test("trần 20h/tháng, xếp ngày 1–15: nhận ≈ nửa trần (+10%), phần còn lại chừa cho nửa sau", () => {
+  test("trần 20h/tháng, xếp ngày 1–15, còn người khác: x nhận ≈ nửa trần (+10%), phần còn lại về y", () => {
+    const plan = run({ slots, talents: withY, regs: regsXY, range, minScale: 0.5, tuning: tuning({}, { x: { monthMax: 20 } }) });
+    expect(hostH(plan, "x")).toBeLessThanOrEqual(11 + 1e-9); // 20 × 0,5 × 1,1 = 11 ⇒ 3 ca × 3h
+    expect(hostH(plan, "x")).toBeGreaterThanOrEqual(9);
+    expect(plan.unfilled.filter((u) => u.role === "host")).toHaveLength(0);
+  });
+
+  test("trần mềm: x là người duy nhất đăng ký thì vẫn nhận hết nửa đầu, ca không bị bỏ trống", () => {
     const plan = run({ slots, talents, regs, range, minScale: 0.5, tuning: tuning({}, { x: { monthMax: 20 } }) });
-    expect(hours(plan, "x")).toBeLessThanOrEqual(11 + 1e-9); // 20 × 0,5 × 1,1 = 11 ⇒ 3 ca × 3h
-    expect(hours(plan, "x")).toBeGreaterThanOrEqual(9);
-    expect(plan.unfilled.some((u) => u.detail.includes("đủ trần giờ nửa đầu"))).toBe(true);
+    expect(hours(plan, "x")).toBe(30);
+    expect(plan.unfilled.filter((u) => u.role === "host")).toHaveLength(0);
   });
 
   test("không đặt trần thì người duy nhất đăng ký nhận hết nửa đầu (đúng lỗi chị Trainer lo)", () => {
@@ -63,14 +72,14 @@ describe("trần giờ riêng theo đợt", () => {
     expect(hours(plan, "x")).toBe(30);
   });
 
-  test("ô 'nửa đầu' ghi đè số tự tính", () => {
-    const plan = run({ slots, talents, regs, range, minScale: 0.5, tuning: tuning({}, { x: { monthMax: 40, firstHalfMax: 6 } }) });
-    expect(hours(plan, "x")).toBe(6);
+  test("ô 'nửa đầu' ghi đè số tự tính (còn người khác ⇒ x dừng ở 6h)", () => {
+    const plan = run({ slots, talents: withY, regs: regsXY, range, minScale: 0.5, tuning: tuning({}, { x: { monthMax: 40, firstHalfMax: 6 } }) });
+    expect(hostH(plan, "x")).toBe(6);
   });
 
-  test("xếp cả tháng: trần tháng vẫn chặn (không có dung sai)", () => {
-    const plan = run({ slots, talents, regs, tuning: tuning({}, { x: { monthMax: 20 } }) });
-    expect(hours(plan, "x")).toBeLessThanOrEqual(20);
+  test("xếp cả tháng, còn người khác: trần tháng x vẫn là mức ưu tiên (x ≈ 20h)", () => {
+    const plan = run({ slots, talents: withY, regs: regsXY, tuning: tuning({}, { x: { monthMax: 20 } }) });
+    expect(hostH(plan, "x")).toBeLessThanOrEqual(21 + 1e-9);
   });
 });
 

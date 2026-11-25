@@ -135,6 +135,8 @@ export interface Candidate {
   famCo: number;
   weekHours: number;
   issues: string[];
+  /** Số cảnh báo trong `issues` chỉ là vượt TRẦN GIỜ của lưới Luật giờ (luật mềm): Tự fill ưu tiên người sạch, hết người sạch mới nhận người chỉ vướng trần. */
+  capIssues: number;
   cost: PlannedCost;
   /** Chỉ số Performance (chỉ vai host). */
   perf?: HostPerf;
@@ -151,15 +153,15 @@ const SOFT_WEEK_CAP = 36;
 const fmtH = (h: number) => (Math.round(h * 10) / 10).toString().replace(".", ",");
 
 /** Những gì sẽ xảy ra nếu xếp `talentId` vào ca: trùng (chặn), quá giờ tuần (chặn), nghỉ ngắn / chạy phòng / quá giờ ngày (cảnh báo). */
-function whatIf(shift: RosterShift, talentId: string, role: RosterRole, ctx: RankContext, an: Pick<RosterAnalysis, "entries">): { blocked?: string; issues: string[]; weekHours: number } {
+function whatIf(shift: RosterShift, talentId: string, role: RosterRole, ctx: RankContext, an: Pick<RosterAnalysis, "entries">): { blocked?: string; issues: string[]; capIssues: number; weekHours: number } {
   const violation = brandRuleViolation(ctx.brandRules, shift.brandId, talentId, role, shift.platform);
-  if (violation) return { blocked: violation.text[0].toUpperCase() + violation.text.slice(1), issues: [], weekHours: 0 };
+  if (violation) return { blocked: violation.text[0].toUpperCase() + violation.text.slice(1), issues: [], capIssues: 0, weekHours: 0 };
   const want = { date: shift.date, startTime: shift.startTime, endTime: shift.endTime };
   const [a, b] = absRange(want);
   const list = (an.entries.get(talentId) ?? []).filter((e) => e.shift.key !== shift.key);
   for (const e of list) {
     if (e.ranges.some((r) => dateTimeRangesOverlap(r, want))) {
-      return { blocked: `Đang ở ca ${e.shift.brandName} ${e.shift.startTime}–${e.shift.endTime}`, issues: [], weekHours: 0 };
+      return { blocked: `Đang ở ca ${e.shift.brandName} ${e.shift.startTime}–${e.shift.endTime}`, issues: [], capIssues: 0, weekHours: 0 };
     }
   }
   const weekEnd = addDays(ctx.weekStart, 6);
@@ -167,6 +169,7 @@ function whatIf(shift: RosterShift, talentId: string, role: RosterRole, ctx: Ran
   const inWeek = shift.date >= ctx.weekStart && shift.date <= weekEnd;
   const after = curWeek + (inWeek ? shiftHours(shift) : 0);
   const issues: string[] = [];
+  let capIssues = 0;
   // 09/11 (0206): quá giờ tuần chỉ CẢNH BÁO — vẫn chọn được; có cảnh báo thì Tự fill bỏ qua người này (c.issues.length === 0).
   if (after > ctx.rules.maxWeekHours) issues.push(`sẽ thành ${fmtH(after)} giờ/tuần (tối đa ${ctx.rules.maxWeekHours})`);
   const lateMin = (() => {
@@ -181,13 +184,16 @@ function whatIf(shift: RosterShift, talentId: string, role: RosterRole, ctx: Ran
   if (mr && mr.month === month) {
     const rs = { date: shift.date, brandId: shift.brandId, platform: shift.platform, night: b - dayStart(shift.date) >= lateMin };
     const hb = hardBlock(mr, rs);
-    if (hb) return { blocked: `Luật tháng ${role === "host" ? "host" : "trợ"}: ${hb}`, issues: [], weekHours: curWeek };
+    if (hb) return { blocked: `Luật tháng ${role === "host" ? "host" : "trợ"}: ${hb}`, issues: [], capIssues: 0, weekHours: curWeek };
     const caps = hourCapsFor(mr, shift);
     const mine = list.filter((e) => e.role === role && e.shift.date.slice(0, 7) === month);
     const sum = (rows: typeof mine) => rows.reduce((t, e) => t + e.minutes / 60, 0);
     const h = shiftHours(shift);
     const over = (cur: number, cap: number | null, label: string) => {
-      if (cap !== null && cur + h > cap + 1e-6) issues.push(`vượt trần ${label} (${fmtH(cur + h)}/${fmtH(cap)}h)`);
+      if (cap !== null && cur + h > cap + 1e-6) {
+        issues.push(`vượt trần ${label} (${fmtH(cur + h)}/${fmtH(cap)}h)`);
+        capIssues += 1;
+      }
     };
     over(sum(mine), caps.role, "giờ vai trong tháng");
     over(sum(mine.filter((e) => e.shift.brandId === shift.brandId)), caps.brand, `giờ ${shift.brandName}`);
@@ -217,11 +223,11 @@ function whatIf(shift: RosterShift, talentId: string, role: RosterRole, ctx: Ran
     if (run > ctx.rules.maxStreakDays) issues.push(`${run} ngày làm liền`);
   }
   if (after > ctx.rules.warnWeekHours) issues.push(`${fmtH(after)}h tuần`);
-  return { issues, weekHours: curWeek };
+  return { issues, capIssues, weekHours: curWeek };
 }
 
 /** Luật khi xếp MỘT người cụ thể vào MỘT vai của một ca (màn "Theo người"): `ctx.weekStart` phải là tuần chứa ca. */
-export function checkPlacement(shift: RosterShift, talentId: string, role: RosterRole, ctx: RankContext, entries: RosterAnalysis["entries"]): { blocked?: string; issues: string[]; weekHours: number } {
+export function checkPlacement(shift: RosterShift, talentId: string, role: RosterRole, ctx: RankContext, entries: RosterAnalysis["entries"]): { blocked?: string; issues: string[]; capIssues: number; weekHours: number } {
   return whatIf(shift, talentId, role, ctx, { entries });
 }
 
@@ -239,11 +245,11 @@ export function rankCandidates(shift: RosterShift, role: RosterRole, ctx: RankCo
     const cost = plannedCost(t, ctx.history, role, shift.date, h);
     const registered = shift.registrants.includes(t.id);
     if (w.blocked) {
-      out.push({ talentId: t.id, blocked: w.blocked, score: -Infinity, famHost: f.host, famCo: f.co, weekHours: w.weekHours, issues: [], cost, registered, qualified: false });
+      out.push({ talentId: t.id, blocked: w.blocked, score: -Infinity, famHost: f.host, famCo: f.co, weekHours: w.weekHours, issues: [], capIssues: 0, cost, registered, qualified: false });
       continue;
     }
     const famN = role === "host" ? f.host + 0.5 * f.co : f.co + 0.5 * f.host;
-    let score = (45 * Math.log1p(famN)) / Math.log1p(30) + 30 * Math.max(-0.5, 1 - w.weekHours / SOFT_WEEK_CAP) - 12 * w.issues.length;
+    let score = (45 * Math.log1p(famN)) / Math.log1p(30) + 30 * Math.max(-0.5, 1 - w.weekHours / SOFT_WEEK_CAP) - 12 * (w.issues.length - w.capIssues) - 6 * w.capIssues;
     if (f.host + f.co === 0) score -= 25;
     if (registered) score += 30;
     if (ctx.brandRules?.preferred.has(`${shift.brandId}|${t.id}`)) score += 20;
@@ -252,7 +258,7 @@ export function rankCandidates(shift: RosterShift, role: RosterRole, ctx: RankCo
     const perf = role === "host" ? ctx.perf?.get(t.id) : undefined;
     const chGmv = role === "host" ? ctx.chGmv?.get(hostChannelKey(t.id, shift.channelKey)) : undefined;
     const castPct = chGmv && chGmv.n >= CHANNEL_GMV_MIN_N && cost.hourly && !cost.missing && h > 0 ? cost.amount / h / chGmv.gmvPerHour : undefined;
-    out.push({ talentId: t.id, score, famHost: f.host, famCo: f.co, weekHours: w.weekHours, issues: w.issues, cost, registered, qualified, perf, chGmv, castPct });
+    out.push({ talentId: t.id, score, famHost: f.host, famCo: f.co, weekHours: w.weekHours, issues: w.issues, capIssues: w.capIssues, cost, registered, qualified, perf, chGmv, castPct });
   }
   // Cân bằng (09/11, demo user duyệt): thêm nhẹ hiệu suất (host) và chi phí tương đối trong danh sách — cùng tinh thần trọng số "Cân bằng"
   // của Xếp cả tháng. Không đủ rate thì phần chi phí = 0 (không phạt người thiếu rate ở chế độ này).
@@ -309,9 +315,12 @@ export function autofillWeek(ctx: RankContext): { assignments: Assignment[]; mis
       if (role === "host" ? cur.hostId : cur.coHostId) continue;
       if (role === "co_host" && cur.noAssistant) continue; // thẻ No Asst: ca chủ ý không trợ
       const an = analyzeRoster(shifts, ctx.rules, ctx.weekStart, ctx.nameOf, undefined, ctx.brandRules);
-      const pick = rankCandidates(cur, role, { ...ctx, shifts }, an).find(
-        (c) => !c.blocked && c.issues.length === 0 && c.famHost + c.famCo > 0 && (ctx.mode !== "cost" || c.qualified)
-      );
+      const ranked = rankCandidates(cur, role, { ...ctx, shifts }, an);
+      // Trần giờ ở lưới Luật giờ là luật MỀM (tháng đăng ký nhiều/ít, giờ live nhiều/ít khác nhau): ưu tiên người còn dưới trần,
+      // hết người sạch thì nhận người chỉ vướng trần (không để ca trống chỉ vì trần), người vướng luật khác vẫn bị bỏ qua.
+      const pick =
+        ranked.find((c) => !c.blocked && c.issues.length === 0 && c.famHost + c.famCo > 0 && (ctx.mode !== "cost" || c.qualified)) ??
+        ranked.find((c) => !c.blocked && c.capIssues > 0 && c.issues.length === c.capIssues && c.famHost + c.famCo > 0 && (ctx.mode !== "cost" || !c.cost.missing));
       if (!pick) {
         missed += 1;
         continue;

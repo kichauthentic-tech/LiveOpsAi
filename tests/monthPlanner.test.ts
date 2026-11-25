@@ -45,14 +45,14 @@ describe("planMonth", () => {
     expect(plan.unfilled.find((u) => u.shiftKey === "o:s2" && u.role === "host")?.reason).toBe("no_registrant");
   });
 
-  test("giờ tối đa tháng là luật cứng", () => {
+  test("giờ tối đa tháng là luật MỀM: hết người dưới trần thì vượt ít nhất, không để ca trống", () => {
     const talents = [tal("a", "Host", 200000), tal("b", "Host", 300000)];
     const slots = Array.from({ length: 6 }, (_, i) => slot(`s${i}`, day(2 + i)));
     const regs = slots.flatMap((s) => [reg(s.id, "a"), reg(s.id, "b")]);
     const plan = run({ slots, talents, regs, bounds: { host: { min: 3, max: 6 }, co_host: { min: 3, max: 6 } } });
-    for (const l of plan.load) expect(l.hours).toBeLessThanOrEqual(6 + 1e-9);
-    // Hai người, mỗi người ≤ 6h (cả hai vai) ⇒ chỉ lấp được 4 chỗ của 2 ca; 4 ca còn lại trống host.
-    expect(plan.unfilled.filter((u) => u.role === "host").length).toBe(4);
+    // Mỗi người trần 6h nhưng có 6 ca cần host ⇒ vẫn lấp đủ (cũ: 4 ca trống), phần vượt hiện ở báo cáo tải ("over").
+    expect(plan.unfilled.filter((u) => u.role === "host").length).toBe(0);
+    expect(plan.load.some((l) => l.status === "over")).toBe(true);
   });
 
   test("chi phí: chọn người rẻ hơn; performance: chọn người chỉ số cao hơn", () => {

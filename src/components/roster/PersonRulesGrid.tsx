@@ -574,7 +574,7 @@ export const PersonRulesGrid: React.FC<{
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs text-[var(--text-muted)]">
         <span>{total} người · {dual.size} người 2 vai · {storedCount} dòng có luật riêng</span>
         <InfoDot label="Bảng luật">
-          Mỗi người một dòng, mỗi cột là một luật. Mọi số là trần TỐI ĐA. Brand / sàn gõ x = không nhận. Chữ nghiêng xám là hệ thống tự suy, chấm là bạn đã đặt tay. Người làm 2 vai có dòng Host và dòng Trợ: trần brand / sàn ở dòng nào chỉ tính giờ của vai đó; trần tháng dùng chung. Ô gạch "chỉ Host / chỉ Trợ" theo hồ sơ vai ở Talent Pool. Tự fill lịch của tháng này đọc đúng bảng này.
+          Mỗi người một dòng, mỗi cột là một luật. Mọi số là trần MỀM: Tự fill ưu tiên người còn dưới trần, hết người mới vượt (ca không bị bỏ trống). Brand / sàn gõ x = không nhận (luật cứng). Chữ nghiêng xám là hệ thống tự suy, chấm là bạn đã đặt tay. Người làm 2 vai có dòng Host và dòng Trợ: trần brand / sàn ở dòng nào chỉ tính giờ của vai đó; trần tháng dùng chung. Ô gạch "chỉ Host / chỉ Trợ" theo hồ sơ vai ở Talent Pool. Tự fill lịch của tháng này đọc đúng bảng này.
         </InfoDot>
         {locked && (
           <span className="inline-flex items-center gap-1 font-bold">

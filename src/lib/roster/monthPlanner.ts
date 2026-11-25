@@ -390,8 +390,11 @@ class Roster {
   hoursThrough(id: string, month: string, to: string) {
     return this.list(id).reduce((s, e) => s + (inMonth(e.date, month) && e.date <= to ? e.hours : 0), 0);
   }
-  /** Lý do KHÔNG xếp được (null = xếp được). Mọi luật ở đây là luật cứng của bộ xếp, chặt hơn DB (DB chỉ chặn trùng + quá giờ tuần). */
-  blocked(id: string, shift: RosterShift, max: number, month: string, role?: RosterRole): string | null {
+  /**
+   * Lý do KHÔNG xếp được (null = xếp được): trùng ca, "✕" brand/làn ở luật tháng, giờ tuần/ngày, nghỉ sau ca khuya. Chặt hơn DB (DB chỉ chặn
+   * trùng + quá giờ tuần). TRẦN GIỜ THÁNG không còn ở đây — xem `capOver` (luật mềm).
+   */
+  blocked(id: string, shift: RosterShift, month: string, role?: RosterRole): string | null {
     const [a, b] = absRange(shift);
     const h = shiftHours(shift);
     const list = this.list(id);
@@ -400,20 +403,9 @@ class Roster {
     if (mr) {
       const hb = hardBlock(mr, { date: shift.date, brandId: shift.brandId, platform: shift.platform, night: false });
       if (hb) return `luật tháng: ${hb}`;
-      if (inMonth(shift.date, month)) {
-        const caps = hourCapsFor(mr, shift);
-        const mine = list.filter((e) => e.role === role && inMonth(e.date, month));
-        const sum = (rows: typeof mine) => rows.reduce((t, e) => t + e.hours, 0);
-        if (caps.role !== null && sum(mine) + h > caps.role + 1e-6) return "vượt trần giờ của vai trong tháng";
-        if (caps.brand !== null && sum(mine.filter((e) => e.channel.split("|")[0] === shift.brandId)) + h > caps.brand + 1e-6) return "vượt trần giờ brand";
-        if (caps.lane !== null && sum(mine.filter((e) => e.channel === shift.channelKey)) + h > caps.lane + 1e-6) return "vượt trần giờ làn brand × sàn";
-      }
     }
     // Chị Trainer 18/11: không xếp một host hai ca cùng brand × sàn trong một ngày (host khác brand/sàn cùng ngày vẫn được).
     if (role === "host") for (const e of list) if (e.role === "host" && e.date === shift.date && e.channel === shift.channelKey && e.key !== shift.key) return "đã có ca host cùng brand + sàn trong ngày";
-    if (this.hoursInMonth(id, month) + (inMonth(shift.date, month) ? h : 0) > max) return "vượt giờ tối đa tháng";
-    const rc = this.rangeCaps.get(id);
-    if (rc && inMonth(shift.date, month) && shift.date <= rc.to && this.hoursThrough(id, month, rc.to) + h > rc.max + 1e-6) return "đủ trần giờ nửa đầu, chừa cho nửa sau";
     const ws = isoWeekStart(shift.date);
     const we = addDays(ws, 6);
     const week = list.filter((e) => e.date >= ws && e.date <= we).reduce((s, e) => s + e.hours, 0);
@@ -427,6 +419,34 @@ class Roster {
       if (e.start >= b && thisLate && e.start - b < rest) return "ca sau quá sát ca khuya";
     }
     return null;
+  }
+  /**
+   * Vượt TRẦN GIỜ (luật MỀM — Trainer 25/11: tháng đăng ký nhiều/ít, giờ live nhiều/ít khác nhau nên trần chỉ là mức ưu tiên, không chặn):
+   * trần tháng của người (mặc định vai hoặc trần riêng), trần đợt 1–15, trần giờ vai / brand / làn ở lưới Luật giờ. Trả về lý do + số giờ
+   * vượt (để chọn người vượt ít nhất khi hết người dưới trần); null = còn dưới mọi trần.
+   */
+  capOver(id: string, shift: RosterShift, max: number, month: string, role?: RosterRole): { reason: string; over: number } | null {
+    const h = shiftHours(shift);
+    const inM = inMonth(shift.date, month);
+    const list = this.list(id);
+    let worst: { reason: string; over: number } | null = null;
+    const note = (reason: string, cur: number, cap: number) => {
+      const over = cur + h - cap;
+      if (over > 1e-6 && (!worst || over > worst.over)) worst = { reason, over };
+    };
+    if (inM) note("vượt giờ tối đa tháng", this.hoursInMonth(id, month), max);
+    const rc = this.rangeCaps.get(id);
+    if (rc && inM && shift.date <= rc.to) note("đủ trần giờ nửa đầu, chừa cho nửa sau", this.hoursThrough(id, month, rc.to), rc.max);
+    const mr = role ? this.monthRules?.[id]?.[role] : undefined;
+    if (mr && inM) {
+      const caps = hourCapsFor(mr, shift);
+      const mine = list.filter((e) => e.role === role && inMonth(e.date, month));
+      const sum = (rows: typeof mine) => rows.reduce((t, e) => t + e.hours, 0);
+      if (caps.role !== null) note("vượt trần giờ của vai trong tháng", sum(mine), caps.role);
+      if (caps.brand !== null) note("vượt trần giờ brand", sum(mine.filter((e) => e.channel.split("|")[0] === shift.brandId)), caps.brand);
+      if (caps.lane !== null) note("vượt trần giờ làn brand × sàn", sum(mine.filter((e) => e.channel === shift.channelKey)), caps.lane);
+    }
+    return worst;
   }
   add(id: string, shift: RosterShift, role: RosterRole, planned: boolean) {
     const [a, b] = absRange(shift);
@@ -565,16 +585,21 @@ export function planMonth(input: PlanInput): MonthPlan {
         unfilled.push({ shiftKey: shift.key, role, reason: "no_registrant", detail: shift.registrants.length === 0 ? "chưa ai đăng ký ca này" : role === "host" ? "người đăng ký chưa đủ điều kiện làm host" : "không có người đăng ký phù hợp" });
         continue;
       }
-      const cands: { id: string; why: string | null; cost: number; load: number; b: HourBounds }[] = pool.map((id) => {
+      const cands: { id: string; why: string | null; over: number; cost: number; load: number; b: HourBounds }[] = pool.map((id) => {
         const b = bounds.get(id)!;
         const violation = brandRuleViolation(input.brandRules, shift.brandId, id, role, shift.platform);
-        return { id, why: violation ? violation.text : roster.blocked(id, shift, b.max, month, role), cost: costNum(id, role, shift), load: roster.hoursInMonth(id, month), b };
+        const why = violation ? violation.text : roster.blocked(id, shift, month, role);
+        return { id, why, over: why ? 0 : roster.capOver(id, shift, b.max, month, role)?.over ?? 0, cost: costNum(id, role, shift), load: roster.hoursInMonth(id, month), b };
       });
-      const ok = cands.filter((c) => !c.why);
-      if (ok.length === 0) {
+      const allOk = cands.filter((c) => !c.why);
+      if (allOk.length === 0) {
         unfilled.push({ shiftKey: shift.key, role, reason: "all_blocked", detail: `${pool.length} người đăng ký nhưng đều vướng: ${[...new Set(cands.map((c) => c.why))].slice(0, 2).join("; ")}` });
         continue;
       }
+      // Trần giờ là luật mềm: còn người dưới trần thì chỉ xét họ; hết người dưới trần thì xét người vượt ÍT NHẤT (không để ca trống chỉ vì trần).
+      const underCap = allOk.filter((c) => c.over === 0);
+      const minOver = underCap.length > 0 ? 0 : Math.min(...allOk.map((c) => c.over));
+      const ok = underCap.length > 0 ? underCap : allOk.filter((c) => c.over <= minOver + 1e-6);
       // Trợ: người hồ sơ Assistant được ưu tiên tuyệt đối; host chỉ vào chỗ trợ khi không còn Assistant nào xếp được (đỡ ăn giờ của trợ, rẻ hơn).
       const assistants = role === "co_host" ? ok.filter((c) => talentById.get(c.id)!.role !== "Host") : [];
       if (assistants.length > 0) ok.splice(0, ok.length, ...assistants);
@@ -789,7 +814,7 @@ function rebalance(
         const nMonth = input.tuning?.monthRules?.[n.t.id]?.[a.role];
         if (nMonth && (input.tuning?.params.rosterRuleMissPenalty ?? 0) > 0 && !softFit(nMonth, { date: s.date, brandId: s.brandId, platform: s.platform, night: roster.isLate(absRange(s)[1], s.date) }).ok) continue;
         roster.remove(a.talentId, a.shiftKey, a.role);
-        if (roster.blocked(n.t.id, s, n.b.max, month, a.role)) {
+        if (roster.blocked(n.t.id, s, month, a.role) || roster.capOver(n.t.id, s, n.b.max, month, a.role)) {
           roster.add(a.talentId, s, a.role, true);
           continue;
         }

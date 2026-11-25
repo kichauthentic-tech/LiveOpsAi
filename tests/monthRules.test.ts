@@ -40,7 +40,7 @@ const tuning = (over: Partial<typeof DEFAULT_ENGINE_PARAMS> = {}, personCaps?: R
   personCaps
 });
 const hostOf = (plan: ReturnType<typeof run>, slotId: string) => plan.assignments.find((a) => a.slotId === slotId && a.role === "host")?.talentId;
-const hours = (plan: ReturnType<typeof run>, id: string) => plan.load.filter((l) => l.talentId === id).reduce((n, l) => n + l.hours, 0);
+const hostHours = (plan: ReturnType<typeof run>, id: string) => plan.load.filter((l) => l.talentId === id && l.role === "host").reduce((n, l) => n + l.hours, 0);
 
 const M = await import("../src/lib/roster/monthRules");
 const rule = (over: Partial<import("../src/lib/roster/monthRules").MonthRule> = {}, id = "w", role: "host" | "assistant" = "host") => ({ ...M.emptyMonthRule(MONTH, id, role), ...over });
@@ -155,19 +155,26 @@ describe("bộ xếp đọc luật tháng", () => {
     expect(plan.unfilled.length).toBeGreaterThan(0);
   });
 
-  test("trần giờ làn brand × sàn: 3 ca × 3h, trần làn 6h ⇒ tối đa 2 ca", () => {
+  test("trần giờ làn brand × sàn là luật MỀM: 3 ca × 3h, trần làn 6h", () => {
+    // Còn người khác dưới trần ⇒ w dừng ở 6h (2 ca host), ca còn lại về o.
+    const plan = run({ slots, talents, regs, tuning: withRule(rule({ lanes: { "b1|TikTok": 6 } })) });
+    expect(hostHours(plan, "w")).toBeCloseTo(6, 6);
+    expect(hostHours(plan, "o")).toBeCloseTo(3, 6);
+    // Không còn ai khác ⇒ vẫn nhận hết (vượt trần), ca không bị bỏ trống chỉ vì trần.
     const only = slots.map((s) => reg(s.id, "w"));
-    const plan = run({ slots, talents: [talents[0]], regs: only, tuning: withRule(rule({ lanes: { "b1|TikTok": 6 } })) });
-    expect(hours(plan, "w")).toBeLessThanOrEqual(6 + 1e-9);
-    expect(hours(plan, "w")).toBeGreaterThanOrEqual(6 - 1e-9);
+    const solo = run({ slots, talents: [talents[0]], regs: only, tuning: withRule(rule({ lanes: { "b1|TikTok": 6 } })) });
+    expect(hostHours(solo, "w")).toBeCloseTo(9, 6);
   });
 
-  test("trần giờ brand và trần giờ vai", () => {
+  test("trần giờ brand và trần giờ vai (mềm): nhường người khác khi còn người dưới trần", () => {
+    const byBrand = run({ slots, talents, regs, tuning: withRule(rule({ brands: { b1: { hours: 3, days: null, night: null } } })) });
+    expect(hostHours(byBrand, "w")).toBeCloseTo(3, 6);
+    expect(hostHours(byBrand, "o")).toBeCloseTo(6, 6);
+    const byRole = run({ slots, talents, regs, tuning: withRule(rule({ roleHours: 3 })) });
+    expect(hostHours(byRole, "w")).toBeCloseTo(3, 6);
     const only = slots.map((s) => reg(s.id, "w"));
-    const byBrand = run({ slots, talents: [talents[0]], regs: only, tuning: withRule(rule({ brands: { b1: { hours: 3, days: null, night: null } } })) });
-    expect(hours(byBrand, "w")).toBeLessThanOrEqual(3 + 1e-9);
-    const byRole = run({ slots, talents: [talents[0]], regs: only, tuning: withRule(rule({ roleHours: 3 })) });
-    expect(hours(byRole, "w")).toBeLessThanOrEqual(3 + 1e-9);
+    const solo = run({ slots, talents: [talents[0]], regs: only, tuning: withRule(rule({ roleHours: 3 })) });
+    expect(hostHours(solo, "w")).toBeCloseTo(9, 6);
   });
 
   test("trần của vai Trợ không chặn vai Host của cùng người", () => {
@@ -186,16 +193,16 @@ describe("bộ xếp đọc luật tháng", () => {
     expect(hostOf(plan, "late")).toBe("o");
   });
 
-  test("người 2 vai cùng một làn: trần Host 6h và trần Trợ 3h tính riêng từng vai", () => {
+  test("người 2 vai cùng một làn: trần Host 6h và trần Trợ 3h tính riêng từng vai (mềm: hết người khác thì vẫn nhận)", () => {
     const four = [slot("d1", day(3)), slot("d2", day(4)), slot("d3", day(5)), slot("d4", day(6))];
     const ppl = [tal("d", "Host", 100000), tal("h", "Host", 300000)];
     const regs4 = four.flatMap((s) => [reg(s.id, "d"), reg(s.id, "h")]);
     const monthRules = { d: { host: rule({ lanes: { "b1|TikTok": 6 } }, "d", "host"), co_host: rule({ lanes: { "b1|TikTok": 3 } }, "d", "assistant") } };
     const plan = run({ slots: four, talents: ppl, regs: regs4, tuning: { ...tuning(), monthRules } });
     const n = (role: "host" | "co_host") => plan.assignments.filter((a) => a.talentId === "d" && a.role === role).length;
-    expect(n("host")).toBeLessThanOrEqual(2);
-    expect(n("co_host")).toBeLessThanOrEqual(1);
-    expect(n("host") + n("co_host")).toBeGreaterThanOrEqual(2);
+    // d rẻ hơn nhưng trần làn Host 6h ⇒ nhận 2 ca host, các ca còn lại nhường h (còn dưới trần).
+    expect(n("host")).toBe(2);
+    expect(plan.unfilled.filter((u) => u.role === "host")).toHaveLength(0);
   });
 
   test("không có luật tháng thì chạy như cũ", () => {

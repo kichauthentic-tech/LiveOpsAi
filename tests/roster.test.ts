@@ -267,6 +267,7 @@ describe("familiarity + candidates", () => {
     const k = C.rankCandidates(target, "host", ctx, an).find((c) => c.talentId === "khanh")!;
     expect(k.blocked).toBeUndefined();
     expect(k.issues.some((i) => /vượt trần giờ CROCS TikTok \(6\/4h\)/.test(i))).toBe(true);
+    expect(k.capIssues).toBe(1); // trần giờ được đếm riêng: luật MỀM, Tự fill chỉ lùi về người vướng trần khi hết người sạch
     expect(k.issues.some((i) => /ngoài luật tháng: ngoài loại ngày/.test(i))).toBe(true);
     // Luật của tháng khác không áp cho ca tháng 10.
     const nov = M.plannerInputsFromRules([{ ...henryCo, month: "2026-11" }]).monthRules;
@@ -274,6 +275,18 @@ describe("familiarity + candidates", () => {
     // Tự lấp tuần cũng không đưa Henry vào trợ.
     const res = C.autofillWeek(ctx);
     expect(res.assignments.some((a) => a.role === "co_host" && a.talentId === "henry")).toBe(false);
+  });
+
+  test("trần giờ là luật MỀM với Tự fill tuần: ưu tiên người còn dưới trần, hết người thì vẫn nhận người vướng trần", async () => {
+    const M = await import("../src/lib/roster/monthRules");
+    const shifts = R.buildRosterShifts([ca("k1", { hostId: "khanh", coHostId: "loan", date: "2026-10-12", startTime: "10:00", endTime: "13:00" })], [slot("o1")], [], [], WEEK, "2026-10-18");
+    const capRule = (id: string) => ({ ...M.emptyMonthRule("2026-10", id, "host"), lanes: { "crocs|TikTok": 1 } });
+    const capKhanh = M.plannerInputsFromRules([capRule("khanh")]).monthRules;
+    const one = C.autofillWeek({ ...ctxOf(shifts, "balance"), monthRules: capKhanh });
+    expect(one.assignments.find((a) => a.slotId === "o1" && a.role === "host")?.talentId).not.toBe("khanh"); // còn người dưới trần
+    const capAll = M.plannerInputsFromRules([capRule("khanh"), capRule("henry")]).monthRules;
+    const all = C.autofillWeek({ ...ctxOf(shifts, "balance"), monthRules: capAll });
+    expect(all.assignments.some((a) => a.slotId === "o1" && a.role === "host")).toBe(true); // hết người sạch ⇒ vẫn xếp, không trống chỉ vì trần
   });
 
   test("No Asst (0207): tự lấp bỏ qua vai trợ của ca đã gắn thẻ, ca không gắn vẫn được xếp trợ", () => {
