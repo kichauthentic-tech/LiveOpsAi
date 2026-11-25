@@ -430,8 +430,8 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
           frame="card"
           label="Sắp tới"
           value={`${h1(progress.upcoming)}h`}
-          hint={`đã chốt${progress.openCount > 0 ? ` · +${h1(progress.open)}h ca mở` : ""}`}
-          title="Giờ các ca đã chốt chưa live, ca mở chờ đăng ký tính riêng"
+          hint={`đã chốt${progress.openCount > 0 ? ` · +${h1(progress.open)}h đang mở` : ""}`}
+          title="Giờ đã chốt chưa live; giờ đang mở (chờ đăng ký) tính riêng"
         />
         <StatTile
           frame="card"
