@@ -233,6 +233,26 @@ export async function deleteShiftSlot(id: string): Promise<void> {
   assertAffected(data, "xoá ca chờ đăng ký");
 }
 
+/**
+ * Huỷ (không xoá) một ca MỞ chưa chốt của kế hoạch tháng — Điều Phối Lịch Live 26/11. Ca về `cancelled` (cột/CHECK có từ 0014, 0185/0220
+ * đã dùng): dòng kế hoạch + target giữ nguyên, lượt báo rảnh giữ lại (mở lại thì còn), vẽ gạch ngang như ca đã chốt bị huỷ, và "Chốt lại"
+ * ở Kế Hoạch Tháng KHÔNG tự mở lại (0185 "giữ huỷ"). Không cần migration.
+ */
+export async function cancelOpenSlot(id: string): Promise<void> {
+  const { data, error } = await supabase.from("shift_slots").update({ status: "cancelled" }).eq("id", id).eq("status", "open").is("session_id", null).select("id");
+  if (error) throw error;
+  assertAffected(data, "huỷ ca mở");
+}
+
+/** Mở lại ca mở đã huỷ ở Điều Phối (về `open`, giữ lượt báo rảnh). Đã có ca sống/ca mở cùng khung ⇒ chỉ mục tự nhiên (0088) báo trùng. */
+export async function reopenCancelledSlot(id: string): Promise<ShiftSlot> {
+  const { data, error } = await supabase.from("shift_slots").update({ status: "open" }).eq("id", id).eq("status", "cancelled").is("session_id", null).select();
+  if (isDuplicateSlotError(error)) throw new Error("Khung giờ này đã có ca khác (đang sống hoặc đang mở) — không mở lại ca huỷ được.");
+  if (error) throw error;
+  assertAffected(data, "mở lại ca mở đã huỷ");
+  return fromDb((data as DbShiftSlot[])[0]);
+}
+
 /** Dời ngày/giờ một ca CÒN MỞ (chưa chốt người) — Điều Phối Lịch Live. Ca đã chốt thì dời qua RPC roster_move_session (có lý do). */
 export async function updateOpenSlotTime(id: string, v: { date: string; startTime: string; endTime: string }): Promise<ShiftSlot> {
   const { data, error } = await supabase

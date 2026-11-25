@@ -21,19 +21,21 @@ export const BrandScheduleExportDialog: React.FC<{
   month: string;
   sessions: LiveSession[];
   shiftSlots: ShiftSlot[];
+  /** Id ca mở thuộc kế hoạch đã chốt — để vẽ gạch ngang cho ca mở bị huỷ ở Điều Phối. */
+  planSlotIds?: { has(slotId: string): boolean };
   onClose: () => void;
-}> = ({ month: initialMonth, sessions, shiftSlots, onClose }) => {
+}> = ({ month: initialMonth, sessions, shiftSlots, planSlotIds, onClose }) => {
   const { showToast } = useToast();
   const [month, setMonth] = useState(initialMonth);
   const [off, setOff] = useState<Set<string>>(new Set());
   const [mode, setMode] = useState<ExportMode>("per-brand");
   const [busy, setBusy] = useState(false);
 
-  const channels = useMemo(() => collectScheduleChannels(sessions, shiftSlots, month), [sessions, shiftSlots, month]);
+  const channels = useMemo(() => collectScheduleChannels(sessions, shiftSlots, month, planSlotIds), [sessions, shiftSlots, month, planSlotIds]);
   const keyOf = (c: { brandId: string; platform: string }) => `${c.brandId}|${c.platform}`;
   const picked = channels.filter((c) => !off.has(keyOf(c)));
   const brandCount = new Set(picked.map((c) => c.brandId)).size;
-  const openCount = picked.reduce((n, c) => n + c.shifts.filter((s) => s.kind === "open").length, 0);
+  const openCount = picked.reduce((n, c) => n + c.shifts.filter((s) => s.kind === "open" && !s.cancelled).length, 0);
 
   const toggle = (k: string) =>
     setOff((prev) => {
@@ -87,7 +89,7 @@ export const BrandScheduleExportDialog: React.FC<{
             <div className="rounded-xl border border-[var(--border)] divide-y divide-[var(--border)]">
               {channels.map((c) => {
                 const k = keyOf(c);
-                const open = c.shifts.filter((s) => s.kind === "open").length;
+                const open = c.shifts.filter((s) => s.kind === "open" && !s.cancelled).length;
                 return (
                   <label key={k} className="flex items-center gap-3 px-3 py-2 text-sm cursor-pointer hover:bg-[var(--surface-hover)]">
                     <input type="checkbox" checked={!off.has(k)} onChange={() => toggle(k)} />

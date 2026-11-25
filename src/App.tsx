@@ -391,6 +391,7 @@ export default function App() {
     setMonthlyReports,
     shiftSlots,
     setShiftSlots,
+    planTargetsBySlotId,
     setPlanTargetsBySlotId,
     planMonthTotals,
     setPlanMonthTotals,
@@ -2172,6 +2173,7 @@ export default function App() {
                     currentUserId={activeUser.id}
                     onCreateSlot={handleCreateShiftSlot}
                     onDeleteSlot={handleDeleteShiftSlot}
+                    planSlotIds={planTargetsBySlotId}
                     onFinalizeSlot={handleFinalizeShiftSlot}
                     focus={rosterFocus}
                     onCancelSession={handleCancelSession}

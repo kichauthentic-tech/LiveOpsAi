@@ -10,7 +10,7 @@ import { fmtVndShort } from "../lib/format";
 import { talentShortName } from "../lib/talentName";
 import { addDays, getTodayDate, isoWeekStart } from "../lib/dateUtils";
 import { sumGmvByPlatform } from "../lib/platforms/perf";
-import { updateOpenSlotTime } from "../lib/db/shiftSlots";
+import { cancelOpenSlot, reopenCancelledSlot, updateOpenSlotTime } from "../lib/db/shiftSlots";
 import {
   fetchRosterChanges,
   fetchRosterDrafts,
@@ -90,6 +90,8 @@ interface Props {
   currentUserId?: string;
   onCreateSlot: (slot: ShiftSlot) => Promise<boolean>;
   onDeleteSlot: (id: string) => Promise<void>;
+  /** Slot id của mọi dòng kế hoạch ĐÃ CHỐT (App: planTargetsBySlotId) — ca mở huỷ ở Điều Phối chỉ vẽ gạch ngang khi còn dòng kế hoạch. */
+  planSlotIds?: { has(slotId: string): boolean };
   onCancelSession: (id: string, reason: string, reopenSlot?: boolean) => Promise<boolean>;
   /** Chốt một ca mở ngay (finalize_shift_slot) — cửa chốt lẻ duy nhất từ 21/11 (Đợt 2 gom việc trên ca). */
   onFinalizeSlot: (slot: ShiftSlot, hostId: string, coHostId: string | null) => Promise<LiveSession | null>;
@@ -309,7 +311,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
     () => buildRosterShifts(p.sessions, p.shiftSlots, drafts, p.shiftRegistrations, addDays(weekStart, -7), addDays(weekEnd, 1)),
     [p.sessions, p.shiftSlots, drafts, p.shiftRegistrations, weekStart, weekEnd]
   );
-  const cancelledWk = useMemo(() => buildCancelledShifts(p.sessions, weekStart, weekEnd, p.shiftSlots), [p.sessions, p.shiftSlots, weekStart, weekEnd]);
+  const cancelledWk = useMemo(() => buildCancelledShifts(p.sessions, weekStart, weekEnd, p.shiftSlots, p.planSlotIds), [p.sessions, p.shiftSlots, p.planSlotIds, weekStart, weekEnd]);
   const personColors = useMemo(() => buildPersonColors(p.talents), [p.talents]);
   const inferredRoles = useMemo(() => inferRoleRows(p.sessions), [p.sessions]);
   const brandRules = useMemo(
@@ -606,8 +608,16 @@ export const RosterBoard: React.FC<Props> = (p) => {
   const remove = (shift: RosterShift) =>
     run(async () => {
       if (shift.kind === "open") {
-        const planNote = shift.planId ? " Ca này thuộc Kế Hoạch Tháng: dòng kế hoạch và target vẫn giữ, chỉ ca bị gỡ — muốn bỏ hẳn thì xoá dòng ở Kế Hoạch Tháng; bấm Chốt lại ở đó sẽ mở lại ca." : "";
-        if (!(await confirm(`Bỏ ca mở ${shift.brandName} ${dayLabel(shift.date)} ${shift.startTime}–${shift.endTime}? Lượt báo rảnh của ca này cũng mất.${planNote}`, { danger: true, confirmLabel: "Bỏ ca" }))) return;
+        if (shift.planId) {
+          // Ca của Kế Hoạch Tháng: huỷ KHÔNG xoá — ca ở lại lưới dạng gạch ngang (như ca đã chốt bị huỷ), mở lại được ngay tại đó.
+          if (!(await confirm(`Huỷ ca mở ${shift.brandName} ${dayLabel(shift.date)} ${shift.startTime}–${shift.endTime}? Ca hiện gạch ngang trên lịch (cả file gửi brand), mở lại được bằng cách bấm vào thẻ gạch ngang. Dòng kế hoạch + target ở Kế Hoạch Tháng vẫn giữ; Chốt lại ở đó không tự mở lại ca này.`, { danger: true, confirmLabel: "Huỷ ca" }))) return;
+          await cancelOpenSlot(shift.slotId!);
+          await p.onScheduleChanged();
+          setSelectedKey(null);
+          showToast("Đã huỷ ca mở — hiện gạch ngang trên lịch, bấm vào để mở lại");
+          return;
+        }
+        if (!(await confirm(`Bỏ ca mở ${shift.brandName} ${dayLabel(shift.date)} ${shift.startTime}–${shift.endTime}? Lượt báo rảnh của ca này cũng mất.`, { danger: true, confirmLabel: "Bỏ ca" }))) return;
         await p.onDeleteSlot(shift.slotId!);
         setSelectedKey(null);
         return;
@@ -621,6 +631,14 @@ export const RosterBoard: React.FC<Props> = (p) => {
   const reopenCancelled = (shift: RosterShift, hostId?: string, coHostId?: string) =>
     run(async () => {
       const label = `${shift.brandName} ${dayLabel(shift.date)} ${shift.startTime}–${shift.endTime}`;
+      if (shift.kind === "open") {
+        // Ca MỞ đã huỷ (không có phiên): chỉ đổi slot về `open`, lượt báo rảnh cũ còn nguyên — không có host/trợ để báo.
+        await reopenCancelledSlot(shift.slotId!);
+        await p.onScheduleChanged();
+        setSelectedKey(`o:${shift.slotId}`);
+        showToast(`Đã mở lại ca mở ${label} — chọn host/trợ bên phải`);
+        return;
+      }
       const what = hostId ? `Mở lại ca ${label} với host ${nameOf(hostId)}${coHostId ? `, trợ ${nameOf(coHostId)}` : ", chưa có trợ"}` : `Mở lại ca ${label} thành ca mở để xếp người`;
       const reason = await prompt(`${what} — lý do (ghi vào nhật ký)`, { choices: ["Brand chạy lại ca này", "Huỷ nhầm", "Lịch sheet đổi lại"], placeholder: "Hoặc gõ lý do khác" });
       if (!reason?.trim()) return;
@@ -1345,7 +1363,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
         </div>
       )}
 
-      {exportOpen && <BrandScheduleExportDialog month={viewMonth} sessions={p.sessions} shiftSlots={p.shiftSlots} onClose={() => setExportOpen(false)} />}
+      {exportOpen && <BrandScheduleExportDialog month={viewMonth} sessions={p.sessions} shiftSlots={p.shiftSlots} planSlotIds={p.planSlotIds} onClose={() => setExportOpen(false)} />}
       {addFor && (
         <OpenSlotModal
           fixedBrand={{ id: addFor.ch.brandId, name: addFor.ch.brandName }}

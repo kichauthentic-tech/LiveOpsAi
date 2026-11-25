@@ -82,7 +82,13 @@ export interface DraftAssignment {
 /** Ca đã huỷ trong [from, to] — chỉ để HIỂN THỊ (gạch ngang trên lịch, file gửi brand). Không đưa vào phân tích/xếp người.
  *  Có `slots`: ca huỷ đã được mở lại / tạo lại đúng khung (cùng brand × sàn × ngày × giờ, còn một ca sống hoặc ca mở) thì không vẽ gạch nữa
  *  — "Mở lại thành ca mở" (0233) giữ ca huỷ làm lịch sử, brand không được thấy cả gạch lẫn ca mới cùng giờ. */
-export function buildCancelledShifts(sessions: readonly LiveSession[], from: string, to: string, slots?: readonly ShiftSlot[]): RosterShift[] {
+export function buildCancelledShifts(
+  sessions: readonly LiveSession[],
+  from: string,
+  to: string,
+  slots?: readonly ShiftSlot[],
+  planSlotIds?: { has(slotId: string): boolean }
+): RosterShift[] {
   const frame = (brandId: string | undefined, platform: string, date: string, start: string, end: string) => `${brandId ?? ""}|${platform}|${date}|${start.slice(0, 5)}|${end.slice(0, 5)}`;
   const alive = new Set<string>();
   if (slots) {
@@ -116,6 +122,34 @@ export function buildCancelledShifts(sessions: readonly LiveSession[], from: str
       hasData: false,
       registrants: []
     });
+  }
+  // Ca MỞ chưa chốt bị huỷ ở Điều Phối (26/11): slot `cancelled`, chưa có phiên. Chỉ vẽ khi dòng kế hoạch của ca vẫn còn trong kế hoạch ĐÃ CHỐT
+  // (`planSlotIds`) — ca bị gỡ khỏi kế hoạch (0220 / xoá kế hoạch) cũng ra `cancelled` nhưng không được hiện gạch ngang cho brand.
+  if (slots && planSlotIds) {
+    for (const sl of slots) {
+      if (sl.status !== "cancelled" || sl.sessionId || !sl.brandId || sl.date < from || sl.date > to || !planSlotIds.has(sl.id)) continue;
+      if (alive.has(frame(sl.brandId, sl.platform, sl.date, sl.startTime, sl.endTime))) continue;
+      out.push({
+        key: `x:o:${sl.id}`,
+        kind: "open",
+        slotId: sl.id,
+        brandId: sl.brandId,
+        brandName: sl.brandName,
+        platform: sl.platform,
+        channelKey: channelKeyOf(sl.brandId, sl.platform),
+        date: sl.date,
+        startTime: sl.startTime,
+        endTime: sl.endTime,
+        studioId: sl.studioId || undefined,
+        studioName: sl.studioName ?? "",
+        cancelled: true,
+        planId: sl.planId,
+        drafted: false,
+        segmented: false,
+        hasData: false,
+        registrants: []
+      });
+    }
   }
   return out;
 }

@@ -55,6 +55,30 @@ describe("buildCancelledShifts", () => {
     expect(R.buildCancelledShifts([cancelled], "2026-11-23", "2026-11-29", [slot("o1", { status: "finalized", sessionId: "zz" })])).toHaveLength(1);
   });
 
+  test("ca MỞ huỷ ở Điều Phối (slot cancelled, chưa phiên) ⇒ gạch ngang chỉ khi còn dòng kế hoạch đã chốt", () => {
+    const sl = slot("p1", { status: "cancelled", planId: "plan1" });
+    const inPlan = { has: (id: string) => id === "p1" };
+    const [x] = R.buildCancelledShifts([], "2026-11-23", "2026-11-29", [sl], inPlan);
+    expect(x.key).toBe("x:o:p1");
+    expect(x.kind).toBe("open");
+    expect(x.slotId).toBe("p1");
+    expect(x.cancelled).toBe(true);
+    // ca bị gỡ khỏi kế hoạch (0220/xoá kế hoạch) cũng ra `cancelled` nhưng không còn dòng kế hoạch ⇒ brand không thấy gạch
+    expect(R.buildCancelledShifts([], "2026-11-23", "2026-11-29", [sl], { has: () => false })).toHaveLength(0);
+    // không truyền planSlotIds ⇒ hành vi cũ (không vẽ slot huỷ)
+    expect(R.buildCancelledShifts([], "2026-11-23", "2026-11-29", [sl])).toHaveLength(0);
+    // ngoài khoảng ngày / đã có ca sống hoặc ca mở cùng khung ⇒ ẩn
+    expect(R.buildCancelledShifts([], "2026-12-01", "2026-12-07", [sl], inPlan)).toHaveLength(0);
+    expect(R.buildCancelledShifts([], "2026-11-23", "2026-11-29", [sl, slot("p2")], inPlan)).toHaveLength(0);
+    expect(R.buildCancelledShifts([ca("s2")], "2026-11-23", "2026-11-29", [sl], inPlan)).toHaveLength(0);
+    // slot huỷ có phiên (ca đã chốt) không đi đường này — đã có gạch từ phiên Cancelled
+    expect(R.buildCancelledShifts([], "2026-11-23", "2026-11-29", [{ ...sl, sessionId: "zz" }], inPlan)).toHaveLength(0);
+  });
+
+  test("ca mở huỷ không vào bộ xếp / kiểm lịch", () => {
+    expect(R.buildRosterShifts([], [slot("p1", { status: "cancelled", planId: "plan1" })], [], [], "2026-11-23", "2026-11-29")).toHaveLength(0);
+  });
+
   test("ca huỷ không bao giờ vào bộ xếp / kiểm lịch", () => {
     expect(R.buildRosterShifts([ca("c", { status: "Cancelled" })], [], [], [], "2026-11-23", "2026-11-29")).toHaveLength(0);
   });

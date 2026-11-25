@@ -31,6 +31,7 @@ export const CancelledShiftPanel: React.FC<Props> = ({ shift, analysis, ctx, tal
   // Người cũ còn rảnh không: cùng luật chặn của bộ gợi ý người (trùng ca, "x" ở luật tháng, brand không nhận).
   const hostBlock = useMemo(() => (shift.hostId ? checkPlacement(shift, shift.hostId, "host", ctx, analysis.entries).blocked : undefined), [shift, ctx, analysis]);
   const coBlock = useMemo(() => (shift.coHostId ? checkPlacement(shift, shift.coHostId, "co_host", ctx, analysis.entries).blocked : undefined), [shift, ctx, analysis]);
+  const openOnly = shift.kind === "open"; // ca MỞ huỷ ở Điều Phối: chưa có phiên/host/trợ, chỉ mở lại thành ca mở
   const canKeep = !!shift.hostId && !hostBlock;
   const keepCo = shift.coHostId && !coBlock ? shift.coHostId : undefined;
 
@@ -67,10 +68,14 @@ export const CancelledShiftPanel: React.FC<Props> = ({ shift, analysis, ctx, tal
         </button>
       </div>
       <div className="flex-1 overflow-y-auto p-4 space-y-4 text-xs">
-        <ul className="space-y-2">
-          {personLine("Host lúc huỷ", shift.hostId, hostBlock)}
-          {personLine("Trợ lúc huỷ", shift.coHostId, coBlock)}
-        </ul>
+        {openOnly ? (
+          <p className="text-[var(--text-muted)]">Ca mở chưa chốt người, đã huỷ ở Điều Phối. Dòng kế hoạch + target ở Kế Hoạch Tháng vẫn giữ; lượt báo rảnh cũ (nếu có) còn nguyên khi mở lại.</p>
+        ) : (
+          <ul className="space-y-2">
+            {personLine("Host lúc huỷ", shift.hostId, hostBlock)}
+            {personLine("Trợ lúc huỷ", shift.coHostId, coBlock)}
+          </ul>
+        )}
         {!readOnly && (
           <div className="space-y-2">
             {shift.hostId && (
@@ -91,13 +96,13 @@ export const CancelledShiftPanel: React.FC<Props> = ({ shift, analysis, ctx, tal
               onClick={() => onReopenOpen(shift)}
               className="w-full text-left px-3 py-2 rounded-xl border border-[var(--border)] text-[var(--text)] font-bold hover:bg-[var(--surface-hover)] disabled:opacity-40"
             >
-              Mở lại thành ca mở để xếp người khác
+              {openOnly ? "Mở lại ca mở" : "Mở lại thành ca mở để xếp người khác"}
               <span className="block text-2xs font-medium text-[var(--text-muted)]">Ca về dạng ca mở trên lưới: chọn host/trợ (nháp), rồi công bố hoặc ⋯ → Chốt ngay.</span>
             </button>
             {shift.hostId && !canKeep && <p className="text-2xs text-[var(--text-muted)]">Host cũ không còn rảnh khung này — mở thành ca mở rồi chọn người khác.</p>}
           </div>
         )}
-        <p className="text-2xs text-[var(--text-faint)]">Mở lại xong, gạch ngang của ca này không còn trên lịch gửi brand. Lý do mở lại ghi vào nhật ký đổi lịch.</p>
+        <p className="text-2xs text-[var(--text-faint)]">{openOnly ? "Mở lại xong, gạch ngang của ca này không còn trên lịch gửi brand." : "Mở lại xong, gạch ngang của ca này không còn trên lịch gửi brand. Lý do mở lại ghi vào nhật ký đổi lịch."}</p>
       </div>
     </aside>
   );
