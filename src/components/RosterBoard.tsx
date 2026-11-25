@@ -22,6 +22,8 @@ import {
   publishRosterRange,
   rosterMoveSession,
   rosterReassign,
+  rosterReopenCancelled,
+  rosterSetSegments,
   saveRosterDraft,
   setSlotNoAssistant,
   openSlotsForSignup,
@@ -37,6 +39,7 @@ import { inferRoleRows, type TalentBrandRole } from "../lib/roster/talentBrandRo
 import { analyzeRoster, buildBrandRuleIndex, buildCancelledShifts, buildRosterShifts, channelKeyOf, DEFAULT_ROSTER_RULES, shiftHours, type RosterRole, type RosterRules, type RosterShift } from "../lib/roster/rules";
 import { buildFamiliarity, famOf, planCostCut, shiftCost, type CostMove, type RankContext, type RankMode } from "../lib/roster/candidates";
 import { ShiftPanel, dayLabel } from "./roster/ShiftPanel";
+import { CancelledShiftPanel } from "./roster/CancelledShiftPanel";
 import { AbsencePanel, ChangeLogPanel, ChecksPanel, HoursCostPanel, MatrixPanel, RulesPanel, WeekGrid, type ChannelRow } from "./roster/panels";
 import { NextDesk, nextMonthOf, useRosterDesk } from "./roster/MonthDesk";
 import { MonthStrip, fmtWhen, type MonthAction, type MonthCard } from "./roster/MonthStrip";
@@ -61,7 +64,7 @@ import type { EngineParams } from "../lib/scheduling/engineParams";
 import { platformOf, type ReportPlatform, type SchedulePlatform } from "../lib/reportPlatform";
 import { FeatureOffNote } from "./common/FeatureOffNote";
 import { InfoDot } from "./common/InfoDot";
-import { changeReasonChoices } from "../lib/scheduling/changeReasons";
+import { changeReasonChoices, effectiveChangeReason } from "../lib/scheduling/changeReasons";
 
 // Điều Phối Lịch Live (0175/0176, 13/10). Quy trình tuần user chốt: Kế Hoạch Tháng chốt ⇒ ca mở → trainer đặt HẠN ĐĂNG KÝ → host/trợ báo rảnh
 // (tab Đăng Ký Ca) → trainer xếp NHÁP ở đây (talent/brand không thấy) → "Công bố tuần": chốt cả tuần trong một transaction, mỗi người
@@ -306,7 +309,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
     () => buildRosterShifts(p.sessions, p.shiftSlots, drafts, p.shiftRegistrations, addDays(weekStart, -7), addDays(weekEnd, 1)),
     [p.sessions, p.shiftSlots, drafts, p.shiftRegistrations, weekStart, weekEnd]
   );
-  const cancelledWk = useMemo(() => buildCancelledShifts(p.sessions, weekStart, weekEnd), [p.sessions, weekStart, weekEnd]);
+  const cancelledWk = useMemo(() => buildCancelledShifts(p.sessions, weekStart, weekEnd, p.shiftSlots), [p.sessions, p.shiftSlots, weekStart, weekEnd]);
   const personColors = useMemo(() => buildPersonColors(p.talents), [p.talents]);
   const inferredRoles = useMemo(() => inferRoleRows(p.sessions), [p.sessions]);
   const brandRules = useMemo(
@@ -363,6 +366,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
   const weekCost = wk.reduce((s, x) => s + shiftCost(x, p.talents, p.talentRateHistory).amount, 0);
   const costMissing = wk.filter((x) => shiftCost(x, p.talents, p.talentRateHistory).missing).length;
   const selected = selectedKey ? shifts.find((s) => s.key === selectedKey) ?? null : null;
+  const selectedCancelled = selectedKey?.startsWith("x:") ? cancelledWk.find((s) => s.key === selectedKey) ?? null : null;
 
   // ---- số theo tháng (dải tháng + giờ cạnh kênh + việc cần làm) ----
   const today = getTodayDate();
@@ -611,6 +615,39 @@ export const RosterBoard: React.FC<Props> = (p) => {
       if (!reason?.trim()) return;
       if (await p.onCancelSession(shift.sessionId!, reason.trim(), false)) setSelectedKey(null);
     });
+
+  /** Mở lại ca đã huỷ (0233). `hostId` có ⇒ khôi phục chính ca; không ⇒ thành ca mở để xếp người như ca mở khác. */
+  const reopenCancelled = (shift: RosterShift, hostId?: string, coHostId?: string) =>
+    run(async () => {
+      const label = `${shift.brandName} ${dayLabel(shift.date)} ${shift.startTime}–${shift.endTime}`;
+      const what = hostId ? `Mở lại ca ${label} với host ${nameOf(hostId)}${coHostId ? `, trợ ${nameOf(coHostId)}` : ", chưa có trợ"}` : `Mở lại ca ${label} thành ca mở để xếp người`;
+      const reason = await prompt(`${what} — lý do (ghi vào nhật ký)`, { choices: ["Brand chạy lại ca này", "Huỷ nhầm", "Lịch sheet đổi lại"], placeholder: "Hoặc gõ lý do khác" });
+      if (!reason?.trim()) return;
+      const r = await rosterReopenCancelled(shift.sessionId!, reason.trim(), hostId, coHostId);
+      await p.onScheduleChanged();
+      setChangesNonce((n) => n + 1);
+      setSelectedKey(r.mode === "open" && r.slotId ? `o:${r.slotId}` : `s:${r.sessionId}`);
+      showToast(r.mode === "open" ? `Đã mở lại ${label} thành ca mở — chọn host/trợ bên phải` : `Đã mở lại ca ${label} — đã báo host/trợ`);
+    });
+
+  /** Xếp người theo đoạn giờ (0233): ca đã lên lịch, chưa qua. Lý do bắt buộc, DB báo từng người vào/ra/đổi giờ đoạn. */
+  const saveSegments = async (shift: RosterShift, segments: Parameters<typeof rosterSetSegments>[1], reason: string): Promise<boolean> => {
+    // Không bắt gõ (luật 21/11 changeReasons): để trống ⇒ lý do mặc định "Xếp lại lịch".
+    const why = effectiveChangeReason(reason);
+    setBusy(true);
+    try {
+      const saved = await rosterSetSegments(shift.sessionId!, segments, why);
+      p.onSessionUpdated(saved);
+      setChangesNonce((n) => n + 1);
+      showToast(segments.length === 0 ? "Đã bỏ chia đoạn — host/trợ làm cả ca" : `Đã xếp ${segments.length} đoạn người ca ${shift.brandName} ${shift.startTime} — đã báo từng người`);
+      return true;
+    } catch (e) {
+      showToast(errorMessage(e));
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  };
 
   // Mở ca lẻ (21/11, gom việc trên ca): Điều Phối là chỗ DUY NHẤT mở thêm một ca — Lịch & Studio / Lịch brand chỉ dẫn sang đây. Dùng
   // chung form OpenSlotModal (trùng phòng, khung giờ hay dùng, cảnh báo ngày đã qua) thay hai ô hỏi giờ cũ không kiểm trùng phòng.
@@ -1149,7 +1186,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
               </>
             )}
           </div>
-          <WeekGrid weekStart={weekStart} month={viewMonth} channels={gridChannels} shifts={wk} cancelled={cancelledWk} analysis={analysis} nameOf={nameOf} roleOf={(id) => talentById.get(id)?.role} colorOf={(id) => personColors.get(id)} selectedKey={selectedKey} canAdd={!readOnly} onSelect={(k) => void onGridSelect(k)} onAdd={addShift} channelMeta={channelMeta} focus={personTalent ? { talentId: personTalent.id, name: nameOf(personTalent.id) } : null} />
+          <WeekGrid weekStart={weekStart} month={viewMonth} channels={gridChannels} shifts={wk} cancelled={cancelledWk} onSelectCancelled={readOnly ? undefined : (k) => setSelectedKey(k)} analysis={analysis} nameOf={nameOf} roleOf={(id) => talentById.get(id)?.role} colorOf={(id) => personColors.get(id)} selectedKey={selectedKey} canAdd={!readOnly} onSelect={(k) => void onGridSelect(k)} onAdd={addShift} channelMeta={channelMeta} focus={personTalent ? { talentId: personTalent.id, name: nameOf(personTalent.id) } : null} />
         </div>
         <details className="group bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 space-y-2" aria-label="Khối lượng nhân sự">
           {/* Gập mặc định (trainer: Điều Phối rối mắt) — chỉ mở khi cần cân giờ. */}
@@ -1355,6 +1392,22 @@ export const RosterBoard: React.FC<Props> = (p) => {
           onRemove={(s) => void remove(s)}
           onFinalizeNow={readOnly ? undefined : (s) => void finalizeNow(s)}
           onMode={changeMode}
+          sessions={p.sessions}
+          onSaveSegments={readOnly ? undefined : saveSegments}
+        />
+      )}
+      {selectedCancelled && (
+        <CancelledShiftPanel
+          key={selectedCancelled.key}
+          shift={selectedCancelled}
+          analysis={analysis}
+          ctx={ctx}
+          talents={p.talents}
+          readOnly={readOnly}
+          busy={busy}
+          onClose={() => setSelectedKey(null)}
+          onRestore={(s, h, c) => void reopenCancelled(s, h, c)}
+          onReopenOpen={(s) => void reopenCancelled(s)}
         />
       )}
     </div>

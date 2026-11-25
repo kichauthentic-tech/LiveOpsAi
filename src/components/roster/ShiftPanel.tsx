@@ -1,7 +1,9 @@
 import React, { useMemo, useState } from "react";
-import { X, CalendarClock, Info } from "lucide-react";
+import { X, CalendarClock, Info, Users } from "lucide-react";
 import { MoreMenu } from "../ui/MoreMenu";
-import type { Talent, TalentRateHistoryEntry } from "../../types";
+import type { LiveSession, StaffSegment, Talent, TalentRateHistoryEntry } from "../../types";
+import { StaffSegmentsEditor } from "../StaffSegmentsEditor";
+import { clockAtOffset, effectiveSegments } from "../../lib/staffSegments";
 import { PlatformChip } from "../common/PlatformChip";
 import { fmtFixed, fmtVndShort } from "../../lib/format";
 import { talentShortName } from "../../lib/talentName";
@@ -45,6 +47,10 @@ interface Props {
   onFinalizeNow?: (shift: RosterShift) => void;
   /** Đổi chế độ gợi ý (Cân bằng / Tiết kiệm chi phí / Tối ưu GMV) — cùng chế độ của thanh công cụ Điều Phối. */
   onMode?: (m: RankMode) => void;
+  /** Mọi ca (để bộ chia đoạn báo trùng người). */
+  sessions?: readonly LiveSession[];
+  /** Xếp người theo đoạn giờ (0233) — ca đã lên lịch, chưa qua. Mảng rỗng = bỏ chia đoạn. */
+  onSaveSegments?: (shift: RosterShift, segments: Pick<StaffSegment, "talentId" | "role" | "fromMin" | "toMin">[], reason: string) => Promise<boolean>;
 }
 
 const MODES: { key: RankMode; label: string; hint: string }[] = [
@@ -53,7 +59,7 @@ const MODES: { key: RankMode; label: string; hint: string }[] = [
   { key: "gmv", label: "Tối ưu GMV", hint: "Host có GMV/giờ cao hơn kỳ vọng cùng kênh × khung giờ lên trước (chỉ số co về ×1,00 theo số ca; lặp lại yếu giữa các tháng, r = 0,23)." }
 ];
 
-export const ShiftPanel: React.FC<Props> = ({ shift, analysis, ctx, talents, history, showCost, readOnly, busy, onClose, onAssign, onNoAssistant, onMove, onRemove, onFinalizeNow, onMode }) => {
+export const ShiftPanel: React.FC<Props> = ({ shift, analysis, ctx, talents, history, showCost, readOnly, busy, onClose, onAssign, onNoAssistant, onMove, onRemove, onFinalizeNow, onMode, sessions, onSaveSegments }) => {
   const talentById = useMemo(() => new Map(talents.map((t) => [t.id, t])), [talents]);
   const nm = (id: string | undefined) => (id ? talentShortName(talentById.get(id)) || "?" : "");
   const issues = analysis.byShift.get(shift.key) ?? [];
@@ -66,10 +72,20 @@ export const ShiftPanel: React.FC<Props> = ({ shift, analysis, ctx, talents, his
   // Cửa sổ gọn 09/11: một vai một lúc (ô chạm Host / Trợ), Dời ca mở từ ⋯.
   const [roleTab, setRoleTab] = useState<RosterRole>(() => (!shift.hostId || shift.coHostId ? "host" : "co_host"));
   const [moving, setMoving] = useState(false);
-  const [everyone, setEveryone] = useState(false);
+  // Ca đã chốt không gắn ca mở nào có lượt đăng ký (ca nhập từ sheet, chốt lẻ…) ⇒ hiện luôn mọi người, không để trống "Chưa ai đăng ký".
+  const [everyone, setEveryone] = useState(shift.kind === "session" && shift.registrants.length === 0);
 
   const past = shift.date < getTodayDate();
   const lockedPeople = readOnly || past || shift.segmented;
+  // Xếp người theo đoạn (0233): ca đã lên lịch, chưa qua. Ca đã chia đoạn thì đây là chỗ đổi người (đổi cả ca bị DB chặn).
+  const canSegment = shift.kind === "session" && !!shift.session && !readOnly && !past && !!onSaveSegments;
+  const [segOpen, setSegOpen] = useState(false);
+  const segSummary = shift.session && shift.segmented
+    ? effectiveSegments(shift.session)
+        .slice()
+        .sort((a, b) => (a.role === b.role ? a.fromMin - b.fromMin : a.role === "host" ? -1 : 1))
+        .map((g) => `${g.role === "host" ? "Host" : "Trợ"} ${nm(g.talentId)} ${clockAtOffset(shift.session!, g.fromMin)}–${clockAtOffset(shift.session!, g.toMin)}`)
+    : [];
   const canMove = !readOnly && !past && !shift.hasData;
   const cost = shiftCost(shift, talents, history);
 
@@ -234,7 +250,12 @@ export const ShiftPanel: React.FC<Props> = ({ shift, analysis, ctx, talents, his
         ) : (
           <p className="text-xs px-2.5 py-1.5 rounded-lg border bg-emerald-500/10 text-emerald-300 border-emerald-500/30">Ca này không phạm luật nào.</p>
         )}
-        {shift.segmented && <p className="text-xs text-[var(--text-muted)]">Ca đã chia đoạn người đứng (đổi người giữa ca) — đổi người ở Cửa sổ Ca Live để giữ đúng giờ từng người.</p>}
+        {shift.segmented && segSummary.length > 0 && (
+          <p className="text-xs text-[var(--text)]">
+            <b>Chia đoạn:</b> {segSummary.join(" · ")}
+            {!canSegment && !past && <span className="block text-[var(--text-muted)]">Đổi người theo đoạn ở Cửa sổ Ca Live.</span>}
+          </p>
+        )}
         {past && <p className="text-xs text-[var(--text-muted)]">Ca ngày đã qua — sửa ở Sổ Ca / Cửa sổ Ca Live.</p>}
         <div className="flex flex-wrap gap-1.5" role="group" aria-label="Vai">
           {(["host", "co_host"] as const).map((r) => {
@@ -246,6 +267,30 @@ export const ShiftPanel: React.FC<Props> = ({ shift, analysis, ctx, talents, his
             );
           })}
         </div>
+        {canSegment && shift.session && (
+          segOpen ? (
+            <StaffSegmentsEditor
+              session={shift.session}
+              talents={talents as Talent[]}
+              allSessions={(sessions ?? []) as LiveSession[]}
+              onSave={(segs, reason) => onSaveSegments!(shift, segs, reason)}
+              onClose={() => setSegOpen(false)}
+            />
+          ) : (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => setSegOpen(true)}
+              className="w-full flex items-center gap-2 text-left text-xs font-bold px-3 py-2 rounded-xl border border-[var(--border)] text-[var(--text)] hover:bg-[var(--surface-hover)] disabled:opacity-40"
+            >
+              <Users className="w-4 h-4 shrink-0 text-[var(--accent)]" />
+              {shift.segmented ? "Sửa người theo đoạn" : "Xếp người theo đoạn (vd host A 18–20h, host B 20–22h)"}
+            </button>
+          )
+        )}
+        {shift.kind === "open" && !readOnly && !past && shift.hostId && onFinalizeNow && (
+          <p className="text-2xs text-[var(--text-faint)]">Chia đoạn người: chốt ca trước (⋯ → Chốt ngay), rồi bấm "Xếp người theo đoạn".</p>
+        )}
         {!lockedPeople && onMode && (
           <div className="flex items-center rounded-xl border border-[var(--border)] bg-[var(--surface-base)] p-1 text-xs font-bold w-fit" role="group" aria-label="Ưu tiên khi gợi ý người">
             {MODES.map((m) => (
@@ -255,7 +300,8 @@ export const ShiftPanel: React.FC<Props> = ({ shift, analysis, ctx, talents, his
             ))}
           </div>
         )}
-        {roleBlock(roleTab)}
+        {!shift.segmented && roleBlock(roleTab)}
+
 
 
         {canMove && moving && (

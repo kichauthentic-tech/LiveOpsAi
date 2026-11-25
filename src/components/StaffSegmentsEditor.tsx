@@ -129,7 +129,7 @@ export const StaffSegmentsEditor: React.FC<Props> = ({ session: s, talents, allS
       <div className="space-y-2">
         {rows.map((r, i) => (
           <div key={i} className="space-y-1">
-            <div className="grid grid-cols-[88px_1fr_88px_88px_28px] gap-1.5 items-center">
+            <div className="grid grid-cols-[88px_minmax(0,1fr)_88px_88px_28px] gap-1.5 items-center">
               <select value={r.role} onChange={(e) => update(i, { role: e.target.value as Row["role"] })} className={inputCls} aria-label="Vai">
                 <option value="host">Host</option>
                 <option value="co_host">Trợ live</option>

@@ -77,7 +77,7 @@ export function monthBounds(month: string): { from: string; to: string } {
 /** Mọi kênh (brand × sàn) có ít nhất 1 ca trong tháng — TikTok trước Shopee, brand theo tên. */
 export function collectScheduleChannels(sessions: readonly LiveSession[], slots: readonly ShiftSlot[], month: string): ScheduleChannel[] {
   const { from, to } = monthBounds(month);
-  const shifts = [...buildRosterShifts(sessions, slots, [], [], from, to), ...buildCancelledShifts(sessions, from, to)];
+  const shifts = [...buildRosterShifts(sessions, slots, [], [], from, to), ...buildCancelledShifts(sessions, from, to, slots)];
   const by = new Map<string, ScheduleChannel>();
   for (const s of shifts) {
     const key = `${s.brandId}|${s.platform}`;

@@ -79,11 +79,20 @@ export interface DraftAssignment {
   noAssistant?: boolean;
 }
 
-/** Ca đã huỷ trong [from, to] — chỉ để HIỂN THỊ (gạch ngang trên lịch, file gửi brand). Không đưa vào phân tích/xếp người. */
-export function buildCancelledShifts(sessions: readonly LiveSession[], from: string, to: string): RosterShift[] {
+/** Ca đã huỷ trong [from, to] — chỉ để HIỂN THỊ (gạch ngang trên lịch, file gửi brand). Không đưa vào phân tích/xếp người.
+ *  Có `slots`: ca huỷ đã được mở lại / tạo lại đúng khung (cùng brand × sàn × ngày × giờ, còn một ca sống hoặc ca mở) thì không vẽ gạch nữa
+ *  — "Mở lại thành ca mở" (0233) giữ ca huỷ làm lịch sử, brand không được thấy cả gạch lẫn ca mới cùng giờ. */
+export function buildCancelledShifts(sessions: readonly LiveSession[], from: string, to: string, slots?: readonly ShiftSlot[]): RosterShift[] {
+  const frame = (brandId: string | undefined, platform: string, date: string, start: string, end: string) => `${brandId ?? ""}|${platform}|${date}|${start.slice(0, 5)}|${end.slice(0, 5)}`;
+  const alive = new Set<string>();
+  if (slots) {
+    for (const s of sessions) if (s.status !== "Cancelled" && s.date >= from && s.date <= to) alive.add(frame(s.brandId, s.platform, s.date, s.startTime, s.endTime));
+    for (const sl of slots) if (sl.status === "open" && !sl.sessionId && sl.date >= from && sl.date <= to) alive.add(frame(sl.brandId, sl.platform, sl.date, sl.startTime, sl.endTime));
+  }
   const out: RosterShift[] = [];
   for (const s of sessions) {
     if (s.status !== "Cancelled" || s.date < from || s.date > to) continue;
+    if (alive.has(frame(s.brandId, s.platform, s.date, s.startTime, s.endTime))) continue;
     out.push({
       key: `x:${s.id}`,
       kind: "session",
@@ -95,7 +104,11 @@ export function buildCancelledShifts(sessions: readonly LiveSession[], from: str
       date: s.date,
       startTime: s.startTime,
       endTime: s.endTime,
+      studioId: s.studioId || undefined,
       studioName: s.studioName ?? "",
+      hostId: s.hostId || undefined,
+      coHostId: s.coHostId || undefined,
+      session: s,
       cancelled: true,
       cancelReason: s.cancelReason || undefined,
       drafted: false,

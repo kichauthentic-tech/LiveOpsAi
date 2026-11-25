@@ -4,6 +4,8 @@ import { fetchSessionById } from "./sessions";
 import type { LiveSession } from "../../types";
 import { DEFAULT_ROSTER_RULES, type RosterRules } from "../roster/rules";
 import { slotDeadline, type MonthMilestones } from "../roster/milestones";
+import { featureOffError } from "../featureOff";
+import type { StaffSegment } from "../../types";
 
 // Điều Phối Lịch Live (migration 0176): tuần xếp lịch (hạn đăng ký, đã công bố), nháp người cho ca mở, ngưỡng luật, nhật ký đổi lịch sau
 // công bố. Đặt hạn / công bố / đổi người / dời giờ chỉ qua RPC (guard + thông báo ở DB); nháp và ngưỡng ghi thẳng bằng RLS.
@@ -29,7 +31,8 @@ const isMissingNoAssistantColumn = (e: unknown): boolean => (e as { code?: strin
 export interface RosterChange {
   id: string;
   sessionId?: string;
-  kind: "reassign" | "move";
+  /** restore = mở lại ca đã huỷ, segments = xếp người theo đoạn (0233). */
+  kind: "reassign" | "move" | "restore" | "segments";
   reason: string;
   before: Record<string, unknown>;
   after: Record<string, unknown>;
@@ -295,6 +298,31 @@ export async function publishRosterRange(from: string, to: string, weekStarts: s
 export async function rosterReassign(sessionId: string, hostId: string, coHostId: string | null, reason: string): Promise<LiveSession> {
   const { error } = await supabase.rpc("roster_reassign", { p_session_id: sessionId, p_host_id: hostId, p_co_host_id: coHostId, p_reason: reason });
   if (error) throw error;
+  return fetchSessionById(sessionId);
+}
+
+/** Mở lại ca đã huỷ (0233). Có host ⇒ khôi phục chính ca (giữ / đổi người), không host ⇒ thành ca mở để xếp người. Bắt buộc lý do. */
+export async function rosterReopenCancelled(sessionId: string, reason: string, hostId?: string, coHostId?: string): Promise<{ mode: "session" | "open"; sessionId: string; slotId?: string }> {
+  const { data, error } = await supabase.rpc("roster_reopen_cancelled", { p_session_id: sessionId, p_reason: reason, p_host_id: hostId ?? null, p_co_host_id: coHostId ?? null });
+  if (error) {
+    if (error.code === "PGRST202") throw featureOffError("mở lại ca đã huỷ", "migration 0233 — rpc roster_reopen_cancelled");
+    throw error;
+  }
+  const r = (data ?? {}) as { mode?: string; session_id?: string; slot_id?: string | null };
+  return { mode: r.mode === "open" ? "open" : "session", sessionId: r.session_id ?? sessionId, slotId: r.slot_id ?? undefined };
+}
+
+/** Xếp người theo đoạn giờ ở Điều Phối (0233): vỏ của set_session_staff_segments — lý do bắt buộc, vào nhật ký, báo từng người. Mảng rỗng = bỏ chia đoạn. */
+export async function rosterSetSegments(sessionId: string, segments: Pick<StaffSegment, "talentId" | "role" | "fromMin" | "toMin">[], reason: string): Promise<LiveSession> {
+  const { error } = await supabase.rpc("roster_set_segments", {
+    p_session_id: sessionId,
+    p_segments: segments.map((g) => ({ talent_id: g.talentId, role: g.role, from_min: g.fromMin, to_min: g.toMin })),
+    p_reason: reason
+  });
+  if (error) {
+    if (error.code === "PGRST202") throw featureOffError("xếp người theo đoạn ở Điều Phối", "migration 0233 — rpc roster_set_segments");
+    throw error;
+  }
   return fetchSessionById(sessionId);
 }
 

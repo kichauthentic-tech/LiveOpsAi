@@ -8,7 +8,7 @@ import type { SchedulePlatform } from "../../lib/reportPlatform";
 import { PlatformChip } from "../common/PlatformChip";
 import { fmtFixed, fmtVndShort } from "../../lib/format";
 import { talentShortName } from "../../lib/talentName";
-import { addDays } from "../../lib/dateUtils";
+import { addDays, getTodayDate } from "../../lib/dateUtils";
 import { ISSUE_SEVERITY, shiftHours, worstSeverity, type IssueCode, type RosterAnalysis, type RosterRole, type RosterRules, type RosterShift } from "../../lib/roster/rules";
 import { famOf, plannedCost, rankCandidates, shiftCost, type CostMove, type FamiliarityMap, type RankContext } from "../../lib/roster/candidates";
 import { dayLabel } from "./ShiftPanel";
@@ -51,9 +51,12 @@ export const WeekGrid: React.FC<{
   channelMeta?: (channel: ChannelRow) => React.ReactNode;
   /** "Xếp theo người": người đang chọn — ca họ đã xếp tô viền xanh lá, ca mở họ đã đăng ký viền xanh dương, ca còn lại mờ đi. */
   focus?: { talentId: string; name: string } | null;
-  /** Ca đã huỷ: vẫn hiện (gạch ngang, không bấm được) để trainer thấy đúng cái sẽ gửi brand. */
+  /** Ca đã huỷ: vẫn hiện gạch ngang để trainer thấy đúng cái sẽ gửi brand. */
   cancelled?: RosterShift[];
-}> = ({ weekStart, month, channels, shifts, analysis, nameOf, roleOf, colorOf, selectedKey, canAdd, onSelect, onAdd, channelMeta, focus, cancelled }) => {
+  /** Có ⇒ ca huỷ từ hôm nay trở đi bấm được để mở lại (0233). Ca huỷ ngày đã qua vẫn chỉ xem. */
+  onSelectCancelled?: (key: string) => void;
+}> = ({ weekStart, month, channels, shifts, analysis, nameOf, roleOf, colorOf, selectedKey, canAdd, onSelect, onAdd, channelMeta, focus, cancelled, onSelectCancelled }) => {
+  const today = getTodayDate();
   // Luôn đủ 7 cột cùng độ rộng (21/11): tuần vắt hai tháng thì ngày ngoài tháng để trống + mờ,
   // thay vì cắt bỏ khiến 1–2 cột còn lại giãn hết chiều ngang.
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
@@ -122,12 +125,24 @@ export const WeekGrid: React.FC<{
                         </button>
                       );
                     })}
-                    {(cancelled ?? []).filter((s) => s.channelKey === ch.key && s.date === d).map((s) => (
-                      <div key={s.key} title={s.cancelReason ? `Ca đã huỷ — ${s.cancelReason}` : "Ca đã huỷ"} className="rounded-lg border border-dashed border-red-400/50 px-1.5 py-1.5 text-red-300/80">
-                        <span className="flex items-center gap-1 whitespace-nowrap font-mono text-xs font-bold line-through">{s.startTime}–{s.endTime}</span>
-                        <span className="text-2xs font-bold">Đã huỷ{s.cancelReason ? ` · ${s.cancelReason}` : ""}</span>
-                      </div>
-                    ))}
+                    {(cancelled ?? []).filter((s) => s.channelKey === ch.key && s.date === d).map((s) => {
+                      const body = (
+                        <>
+                          <span className="flex items-center gap-1 whitespace-nowrap font-mono text-xs font-bold line-through">{s.startTime}–{s.endTime}</span>
+                          <span className="block text-2xs font-bold">Đã huỷ{s.cancelReason ? ` · ${s.cancelReason}` : ""}</span>
+                        </>
+                      );
+                      const cls = `block w-full text-left rounded-lg border border-dashed border-red-400/50 px-1.5 py-1.5 text-red-300/80 ${selectedKey === s.key ? "ring-2 ring-[var(--accent)]" : ""}`;
+                      return onSelectCancelled && s.date >= today ? (
+                        <button key={s.key} type="button" data-shift-key={s.key} onClick={() => onSelectCancelled(s.key)} title="Ca đã huỷ — bấm để mở lại" className={`${cls} hover:bg-red-500/10`}>
+                          {body}
+                        </button>
+                      ) : (
+                        <div key={s.key} title={s.cancelReason ? `Ca đã huỷ — ${s.cancelReason}` : "Ca đã huỷ"} className={cls}>
+                          {body}
+                        </div>
+                      );
+                    })}
                     {canAdd && (
                       <button type="button" onClick={() => onAdd(ch, d)} className="w-full min-h-6 flex items-center justify-center gap-1 rounded-md py-1 text-2xs text-[var(--text-faint)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]/60" aria-label={`Thêm ca ${ch.brandName} ${dayLabel(d)}`}>
                         <Plus className="w-3 h-3" /> ca
@@ -151,7 +166,7 @@ export const WeekGrid: React.FC<{
         <span>Viền đỏ = chặn công bố</span>
         <span>vàng = cảnh báo</span>
         <span>đứt = ca mở</span>
-        <span className="line-through text-red-300/80">gạch = ca huỷ (vẫn gửi brand)</span>
+        <span className="line-through text-red-300/80">gạch = ca huỷ (vẫn gửi brand{onSelectCancelled ? ", bấm để mở lại" : ""})</span>
         <InfoDot label="Chú giải viền ca">
           Viền đỏ: lỗi chặn công bố hoặc ca thiếu host. Chip &quot;cần trợ&quot;: chưa công bố tới khi có trợ live hoặc gắn No Asst.
           Viền đứt: ca mở (nháp / chưa xếp), talent chưa thấy tên người.
@@ -618,6 +633,12 @@ export const RulesPanel: React.FC<{ rules: RosterRules; readOnly: boolean; busy:
 export const ChangeLogPanel: React.FC<{ changes: RosterChange[] | null; sessions: readonly LiveSession[]; nameOf: (id: string) => string }> = ({ changes, sessions, nameOf }) => {
   const byId = new Map(sessions.map((s) => [s.id, s]));
   const str = (v: unknown) => (typeof v === "string" ? v : "");
+  // "people" (0233) = { talent_id: "Host 18:00–20:00, Trợ cả ca" } — giờ đứng từng người sau khi xếp theo đoạn.
+  const segPeople = (o: Record<string, unknown>) => {
+    const ppl = o.people && typeof o.people === "object" ? (o.people as Record<string, unknown>) : {};
+    const parts = Object.entries(ppl).map(([id, r]) => `${nameOf(id)} ${str(r)}`);
+    return parts.length > 0 ? parts.join("; ") : "bỏ chia đoạn";
+  };
   const who = (o: Record<string, unknown>, k: "host" | "co_host") => {
     const id = str(o[`${k}_id`]);
     return id ? nameOf(id) : str(o[`${k}_name`]) || "—";
@@ -625,7 +646,7 @@ export const ChangeLogPanel: React.FC<{ changes: RosterChange[] | null; sessions
   return (
     <section className="space-y-2 border-t border-[var(--border)] pt-4">
       <h4 className="text-sm font-black text-[var(--text)]">Nhật ký đổi lịch (30 ngày)</h4>
-      <p className="text-xs text-[var(--text-muted)]">Mỗi lần đổi người hoặc dời giờ một ca đã lên lịch, kèm lý do.<InfoDot label="Nhật ký ghi những gì">Ghi mọi lần đổi người / dời giờ ca chưa diễn ra, dù làm ở Điều Phối, Cửa sổ ca, Lịch hay Kế Hoạch Tháng. Ca đã qua sửa thẳng, không vào đây.</InfoDot></p>
+      <p className="text-xs text-[var(--text-muted)]">Mỗi lần đổi người, xếp theo đoạn, dời giờ hoặc mở lại ca huỷ, kèm lý do.<InfoDot label="Nhật ký ghi những gì">Ghi mọi lần đổi người / dời giờ ca chưa diễn ra, dù làm ở Điều Phối, Cửa sổ ca, Lịch hay Kế Hoạch Tháng. Ca đã qua sửa thẳng, không vào đây.</InfoDot></p>
       {changes === null && <p className="text-xs text-[var(--text-muted)]">Đang tải…</p>}
       {changes && changes.length === 0 && <p className="text-xs text-[var(--text-muted)]">Chưa có lần đổi nào.</p>}
       {changes && changes.length > 0 && (
@@ -639,6 +660,12 @@ export const ChangeLogPanel: React.FC<{ changes: RosterChange[] | null; sessions
                 <span className="text-[var(--text)]">{s ? `${s.brandName} ${s.platform} ${dayLabel(s.date)} ${s.startTime}` : "ca đã xoá"}</span> ·{" "}
                 {c.kind === "reassign"
                   ? `Host ${who(c.before, "host")} → ${who(c.after, "host")}, trợ ${who(c.before, "co_host")} → ${who(c.after, "co_host")}`
+                  : c.kind === "restore"
+                  ? str(c.after.mode) === "open"
+                    ? "Mở lại ca đã huỷ thành ca mở để xếp người"
+                    : `Mở lại ca đã huỷ · host ${who(c.after, "host")}, trợ ${who(c.after, "co_host")}`
+                  : c.kind === "segments"
+                  ? `Xếp theo đoạn: ${segPeople(c.after)}`
                   : `Dời ${dayLabel(str(c.before.date))} ${str(c.before.start_time).slice(0, 5)} → ${dayLabel(str(c.after.date))} ${str(c.after.start_time).slice(0, 5)}–${str(c.after.end_time).slice(0, 5)}`}{" "}
                 · <i>{c.reason}</i>
               </li>
