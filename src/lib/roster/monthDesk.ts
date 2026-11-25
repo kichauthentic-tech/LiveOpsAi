@@ -14,6 +14,12 @@ import { sessionDurationHours } from "../pnl";
 // giờ cần giao ÷ (1 − hao hụt) — CHIA, không cộng (chuẩn workforce management). Không xếp/gợi ý người theo GMV ở đây.
 
 export const SHRINK_DAYS = 60;
+/**
+ * 26/11 (user): "không cần hao hụt gì cả, giữ đúng số giờ cam kết" — giờ cần mở = giờ cam kết, KHÔNG cộng phòng hờ. Vẫn đo hao hụt 60 ngày
+ * (hiện ở "Tháng này" để biết rủi ro) nhưng `applied` = 0 nên mọi chỗ tính giờ cần xếp (Tháng này/Tháng sau/Mở tháng) đều ra đúng cam kết.
+ * Bật lại = đổi hằng này về true (tính lại kẹp 3–15% như cũ).
+ */
+export const APPLY_SHRINKAGE = false;
 export const SHRINK_FLOOR = 0.03;
 export const SHRINK_CAP = 0.15;
 /** Dưới mức này kênh dùng hao hụt trung bình agency (kênh mới / ít ca). */
@@ -79,13 +85,13 @@ export function channelShrinkage(sums: { byChannel: Map<string, ShrinkSums>; age
   const own = sums.byChannel.get(key) ?? EMPTY;
   if (own.plannedHours >= SHRINK_MIN_HOURS && own.checkedHours > 0) {
     const r = rateOf(own);
-    return { ...own, ...r, applied: clampShrink(r.rate), source: "channel" };
+    return { ...own, ...r, applied: APPLY_SHRINKAGE ? clampShrink(r.rate) : 0, source: "channel" };
   }
   if (sums.agency.plannedHours >= SHRINK_MIN_HOURS && sums.agency.checkedHours > 0) {
     const r = rateOf(sums.agency);
-    return { ...own, ...rateOf(own), rate: r.rate, applied: clampShrink(r.rate), source: "agency" };
+    return { ...own, ...rateOf(own), rate: r.rate, applied: APPLY_SHRINKAGE ? clampShrink(r.rate) : 0, source: "agency" };
   }
-  return { ...own, cancelRate: 0, shortRate: 0, rate: 0, applied: SHRINK_FLOOR, source: "floor" };
+  return { ...own, cancelRate: 0, shortRate: 0, rate: 0, applied: APPLY_SHRINKAGE ? SHRINK_FLOOR : 0, source: "floor" };
 }
 
 /** Giờ phải xếp để giao đủ `hours` giờ live khi `shrink` phần giờ xếp bị mất. */

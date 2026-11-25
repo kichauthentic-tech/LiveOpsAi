@@ -24,7 +24,7 @@ import { featureOffText } from "../../lib/featureOff";
 
 // Điều Phối Lịch Live — hai tab theo tháng (đợt 1, 24/10). "Tháng này": giờ live thật so cam kết, hao hụt kênh, việc nên làm
 // (đọc "Khả năng bù thiếu hụt" của Dashboard qua accountRow — không có dự báo riêng). "Tháng sau": mọi kênh × 6 bước mở lịch,
-// giờ cần mở = cam kết ÷ (1 − hao hụt). Logic ở lib/roster/monthDesk.ts; màn này chỉ vẽ.
+// giờ cần mở = cam kết (26/11: không cộng hao hụt, APPLY_SHRINKAGE). Logic ở lib/roster/monthDesk.ts; màn này chỉ vẽ.
 
 const TONE_PILL: Record<RowTone | DeskTone, string> = {
   bad: "bg-rose-500/15 text-rose-400 border-rose-500/30",
@@ -97,7 +97,7 @@ const ShrinkCell: React.FC<{ s: ChannelShrinkage }> = ({ s }) => (
     className="tabular-nums"
     title={
       s.source === "channel"
-        ? `60 ngày qua: ${h0(s.plannedHours)} giờ xếp · huỷ ${pct1(s.cancelRate)} · live ngắn hơn lịch ${pct1(s.shortRate)}${s.applied !== s.rate ? ` · đo ${pct1(s.rate)}, dùng ${pct1(s.applied)} (kẹp 3–15%)` : ""}`
+        ? `60 ngày qua: ${h0(s.plannedHours)} giờ xếp · huỷ ${pct1(s.cancelRate)} · live ngắn hơn lịch ${pct1(s.shortRate)}${s.applied !== s.rate ? ` · đo ${pct1(s.rate)}, không cộng vào giờ cần mở` : ""}`
         : s.source === "agency"
           ? `Kênh chưa đủ 30 giờ xếp trong 60 ngày — dùng trung bình agency ${pct1(s.rate)}`
           : "Chưa có dữ liệu — dùng mức sàn 3%"
@@ -338,7 +338,7 @@ export const NextDesk: React.FC<DeskProps & { registrations: ShiftRegistration[]
   return (
     <div className="space-y-4">
       <p className="text-xs text-[var(--text-muted)]">
-        {monthLabel(month)} · còn {daysToStart} ngày tới ngày đầu tháng · giờ cần mở = giờ cam kết ÷ (1 − hao hụt của kênh 60 ngày qua, kẹp 3–15%)
+        {monthLabel(month)} · còn {daysToStart} ngày tới ngày đầu tháng · giờ cần mở = đúng giờ cam kết (không cộng hao hụt)
         {paused > 0 && ` · ${paused} kênh tạm dừng không hiện`}
       </p>
       <div className="grid gap-2 grid-cols-2 lg:grid-cols-4">

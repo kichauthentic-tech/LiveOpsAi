@@ -3,7 +3,7 @@ import { expect, test, vi } from "vitest";
 
 // CI không có .env: test import lớp db (signupDeadlineOf) ⇒ phải mock client (WORKSPACE §5.1).
 vi.mock("../src/lib/supabaseClient", () => ({ supabase: {} }));
-import { channelShrinkage, hoursToSchedule, nextRow, nowActions, nowHours, shrinkSums, SHRINK_CAP, SHRINK_FLOOR, type NextInput } from "../src/lib/roster/monthDesk";
+import { APPLY_SHRINKAGE, channelShrinkage, hoursToSchedule, nextRow, nowActions, nowHours, shrinkSums, SHRINK_CAP, SHRINK_FLOOR, type NextInput } from "../src/lib/roster/monthDesk";
 import type { AccountRow } from "../src/lib/performance/accountOverview";
 import type { LiveSession, ShiftSlot } from "../src/types";
 import { brandPlatformKey } from "../src/lib/reportPlatform";
@@ -32,17 +32,17 @@ test("hao hụt = huỷ + live ngắn hơn lịch × (1 − huỷ); bỏ ca nạ
   expect(s.cancelRate).toBeCloseTo(3 / 36, 6);
   expect(s.shortRate).toBeCloseTo(1 / 33, 6);
   expect(s.rate).toBeCloseTo(3 / 36 + (1 / 33) * (33 / 36), 6);
-  expect(s.applied).toBeCloseTo(s.rate, 6);
+  expect(s.applied).toBeCloseTo(APPLY_SHRINKAGE ? s.rate : 0, 6); // 26/11: không cộng hao hụt vào giờ cần mở
 });
 
 test("hao hụt kẹp 3%–15%; kênh ít dữ liệu dùng trung bình agency; không có gì thì sàn 3%", () => {
   const many = Array.from({ length: 12 }, (_, i) => ses(`x${i}`, "2026-10-05", "09:00", "12:00", "Completed", { brandId: "b2", liveDurationMinutes: 90 }));
   const sums = shrinkSums([...many, ses("one", "2026-10-05", "09:00", "12:00", "Completed", { liveDurationMinutes: 180 })], "2026-10-24");
-  expect(channelShrinkage(sums, brandPlatformKey("b2", "TikTok")).applied).toBe(SHRINK_CAP); // 50% → 15%
+  expect(channelShrinkage(sums, brandPlatformKey("b2", "TikTok")).applied).toBe(APPLY_SHRINKAGE ? SHRINK_CAP : 0); // 50% → 15% (khi bật)
   const fallback = channelShrinkage(sums, KEY);
   expect(fallback.source).toBe("agency");
-  expect(fallback.applied).toBe(SHRINK_CAP);
-  expect(channelShrinkage(shrinkSums([], "2026-10-24"), KEY)).toMatchObject({ source: "floor", applied: SHRINK_FLOOR });
+  expect(fallback.applied).toBe(APPLY_SHRINKAGE ? SHRINK_CAP : 0);
+  expect(channelShrinkage(shrinkSums([], "2026-10-24"), KEY)).toMatchObject({ source: "floor", applied: APPLY_SHRINKAGE ? SHRINK_FLOOR : 0 });
 });
 
 test("giờ cần xếp CHIA cho (1 − hao hụt), không cộng", () => {
