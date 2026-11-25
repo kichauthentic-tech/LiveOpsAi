@@ -1576,19 +1576,19 @@ export default function App() {
   // transaction và từ chối nếu slot không còn mở (người khác vừa chốt/huỷ) — trước đó là 2 bước ghi từ
   // client kèm xoá bù khi bước 2 lỗi, và 2 người bấm cùng lúc sinh 2 ca. Target ghi 0: target đổ từ Kế
   // Hoạch Tháng đã chốt xuống từng ca lúc đọc (applyAllocatedTargets), không gán theo phong độ host.
-  const handleFinalizeShiftSlot = async (slot: ShiftSlot, hostId: string, coHostId: string | null): Promise<boolean> => {
+  const handleFinalizeShiftSlot = async (slot: ShiftSlot, hostId: string, coHostId: string | null): Promise<LiveSession | null> => {
     try {
       const created = await finalizeShiftSlot(slot.id, hostId, coHostId);
       setSessions((prev) => [created, ...prev]);
       setShiftSlots((prev) => prev.map((s) => (s.id === slot.id ? { ...s, status: "finalized", sessionId: created.id } : s)));
-      return true;
+      return created;
     } catch (e) {
       showToast(`Không thể chốt lịch: ${errorMessage(e)}`);
       // Thường do máy khác vừa chốt/huỷ ca này (RPC từ chối slot không còn mở) — nạp lại để màn khớp DB thay vì bảo người dùng tự tải lại trang.
       Promise.all([refreshShiftSlots(), fetchSessions()])
         .then(([sl, ss]) => { setShiftSlots(sl); setSessions(ss); })
         .catch(() => {});
-      return false;
+      return null;
     }
   };
 

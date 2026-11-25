@@ -44,7 +44,9 @@ interface Props {
   onRemove: (shift: RosterShift) => void;
   /** Ca mở đã có host nháp: chốt riêng ca này ngay, không đợi công bố tuần (ca gấp). Từ 21/11 là cửa chốt lẻ duy nhất — Bảng Vận Hành /
    *  Lịch & Studio / Lịch brand không còn nút "Chốt Lịch". */
-  onFinalizeNow?: (shift: RosterShift) => void;
+  onFinalizeNow?: (shift: RosterShift, thenSegment?: boolean) => void;
+  /** Vừa chốt từ nút "Xếp người theo đoạn" trên ca mở: mở sẵn bảng chia đoạn của phiên mới. */
+  openSegments?: boolean;
   /** Đổi chế độ gợi ý (Cân bằng / Tiết kiệm chi phí / Tối ưu GMV) — cùng chế độ của thanh công cụ Điều Phối. */
   onMode?: (m: RankMode) => void;
   /** Mọi ca (để bộ chia đoạn báo trùng người). */
@@ -59,7 +61,7 @@ const MODES: { key: RankMode; label: string; hint: string }[] = [
   { key: "gmv", label: "Tối ưu GMV", hint: "Host có GMV/giờ cao hơn kỳ vọng cùng kênh × khung giờ lên trước (chỉ số co về ×1,00 theo số ca; lặp lại yếu giữa các tháng, r = 0,23)." }
 ];
 
-export const ShiftPanel: React.FC<Props> = ({ shift, analysis, ctx, talents, history, showCost, readOnly, busy, onClose, onAssign, onNoAssistant, onMove, onRemove, onFinalizeNow, onMode, sessions, onSaveSegments }) => {
+export const ShiftPanel: React.FC<Props> = ({ shift, analysis, ctx, talents, history, showCost, readOnly, busy, onClose, onAssign, onNoAssistant, onMove, onRemove, onFinalizeNow, onMode, sessions, onSaveSegments, openSegments }) => {
   const talentById = useMemo(() => new Map(talents.map((t) => [t.id, t])), [talents]);
   const nm = (id: string | undefined) => (id ? talentShortName(talentById.get(id)) || "?" : "");
   const issues = analysis.byShift.get(shift.key) ?? [];
@@ -79,7 +81,7 @@ export const ShiftPanel: React.FC<Props> = ({ shift, analysis, ctx, talents, his
   const lockedPeople = readOnly || past || shift.segmented;
   // Xếp người theo đoạn (0233): ca đã lên lịch, chưa qua. Ca đã chia đoạn thì đây là chỗ đổi người (đổi cả ca bị DB chặn).
   const canSegment = shift.kind === "session" && !!shift.session && !readOnly && !past && !!onSaveSegments;
-  const [segOpen, setSegOpen] = useState(false);
+  const [segOpen, setSegOpen] = useState(!!openSegments);
   const segSummary = shift.session && shift.segmented
     ? effectiveSegments(shift.session)
         .slice()
@@ -289,7 +291,16 @@ export const ShiftPanel: React.FC<Props> = ({ shift, analysis, ctx, talents, his
           )
         )}
         {shift.kind === "open" && !readOnly && !past && shift.hostId && onFinalizeNow && (
-          <p className="text-2xs text-[var(--text-faint)]">Chia đoạn người: chốt ca trước (⋯ → Chốt ngay), rồi bấm "Xếp người theo đoạn".</p>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => onFinalizeNow(shift, true)}
+            title="Đoạn người gắn vào phiên nên ca được chốt trước, rồi mở bảng chia đoạn."
+            className="w-full flex items-center gap-2 text-left text-xs font-bold px-3 py-2 rounded-xl border border-[var(--border)] text-[var(--text)] hover:bg-[var(--surface-hover)] disabled:opacity-40"
+          >
+            <Users className="w-4 h-4 shrink-0 text-[var(--accent)]" />
+            Xếp người theo đoạn (chốt ca rồi chia, vd host A 18–20h, host B 20–22h)
+          </button>
         )}
         {!lockedPeople && onMode && (
           <div className="flex items-center rounded-xl border border-[var(--border)] bg-[var(--surface-base)] p-1 text-xs font-bold w-fit" role="group" aria-label="Ưu tiên khi gợi ý người">
