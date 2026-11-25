@@ -317,8 +317,8 @@ export const RosterBoard: React.FC<Props> = (p) => {
   const hostPerf = useMemo(() => buildHostPerformance(p.sessions, getTodayDate()), [p.sessions]);
   const hostChGmv = useMemo(() => buildHostChannelGmv(p.sessions, getTodayDate()), [p.sessions]);
   const ctx: RankContext = useMemo(
-    () => ({ shifts, rules, weekStart, fam, talents: p.talents, history: p.talentRateHistory, mode, nameOf, brandRules, perf: hostPerf, chGmv: hostChGmv }),
-    [shifts, rules, weekStart, fam, p.talents, p.talentRateHistory, mode, nameOf, brandRules, hostPerf, hostChGmv]
+    () => ({ shifts, rules, weekStart, fam, talents: p.talents, history: p.talentRateHistory, mode, nameOf, brandRules, perf: hostPerf, chGmv: hostChGmv, monthRules: tuning.monthRules }),
+    [shifts, rules, weekStart, fam, p.talents, p.talentRateHistory, mode, nameOf, brandRules, hostPerf, hostChGmv, tuning.monthRules]
   );
   const wk = useMemo(() => shifts.filter((s) => s.date >= weekStart && s.date <= weekEnd), [shifts, weekStart, weekEnd]);
   // "Theo người": cả tháng đang xem (+ 7 ngày trước để bắt khoảng nghỉ / chuỗi ngày, + 1 ngày sau cho ca qua đêm).

@@ -250,6 +250,32 @@ describe("familiarity + candidates", () => {
     expect(co.every((c) => c.chGmv === undefined && c.castPct === undefined)).toBe(true);
   });
 
+  test("luật tháng (Luật giờ từng người): x chặn đúng vai + đúng tháng; vượt trần / ngoài loại ngày chỉ cảnh báo", async () => {
+    const M = await import("../src/lib/roster/monthRules");
+    const shifts = R.buildRosterShifts([ca("k1", { hostId: "khanh", coHostId: "loan", date: "2026-10-12", startTime: "10:00", endTime: "13:00" })], [slot("o1")], [], [], WEEK, "2026-10-18");
+    const target = shifts.find((s) => s.key === "o:o1")!; // 14/10 (thứ Tư) 19:00–22:00 CROCS TikTok
+    const an = R.analyzeRoster(shifts, rules, WEEK, name);
+    // Henry: dòng Trợ đánh x ở CROCS ⇒ không làm trợ CROCS, vẫn làm host CROCS được.
+    const henryCo = { ...M.emptyMonthRule("2026-10", "henry", "assistant"), brands: { crocs: { ...M.emptyBrandRule(), hours: "x" as const } } };
+    // Khanh: dòng Host trần 4 giờ ở làn CROCS TikTok (đã có 3 giờ) + chỉ nhận cuối tuần.
+    const khanhHost = { ...M.emptyMonthRule("2026-10", "khanh", "host"), dayKinds: ["weekend" as const], lanes: { "crocs|TikTok": 4 } };
+    const monthRules = M.plannerInputsFromRules([henryCo, khanhHost]).monthRules;
+    const ctx = { ...ctxOf(shifts, "balance"), monthRules };
+    const co = C.rankCandidates(target, "co_host", ctx, an).find((c) => c.talentId === "henry")!;
+    expect(co.blocked).toMatch(/Luật tháng trợ: không nhận brand này/);
+    expect(C.rankCandidates(target, "host", ctx, an).find((c) => c.talentId === "henry")?.blocked).toBeUndefined();
+    const k = C.rankCandidates(target, "host", ctx, an).find((c) => c.talentId === "khanh")!;
+    expect(k.blocked).toBeUndefined();
+    expect(k.issues.some((i) => /vượt trần giờ CROCS TikTok \(6\/4h\)/.test(i))).toBe(true);
+    expect(k.issues.some((i) => /ngoài luật tháng: ngoài loại ngày/.test(i))).toBe(true);
+    // Luật của tháng khác không áp cho ca tháng 10.
+    const nov = M.plannerInputsFromRules([{ ...henryCo, month: "2026-11" }]).monthRules;
+    expect(C.rankCandidates(target, "co_host", { ...ctx, monthRules: nov }, an).find((c) => c.talentId === "henry")?.blocked).toBeUndefined();
+    // Tự lấp tuần cũng không đưa Henry vào trợ.
+    const res = C.autofillWeek(ctx);
+    expect(res.assignments.some((a) => a.role === "co_host" && a.talentId === "henry")).toBe(false);
+  });
+
   test("No Asst (0207): tự lấp bỏ qua vai trợ của ca đã gắn thẻ, ca không gắn vẫn được xếp trợ", () => {
     const slots = [slot("o1"), slot("o2", { startTime: "10:00", endTime: "13:00", studioId: "r-2" })];
     const shifts = R.buildRosterShifts([], slots, [{ slotId: "o1", hostId: "henry", noAssistant: true }, { slotId: "o2", hostId: "khanh" }], [], WEEK, "2026-10-18");

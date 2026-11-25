@@ -3,6 +3,7 @@ import { addDays, dateTimeRangesOverlap } from "../dateUtils";
 import { effectiveSegments } from "../staffSegments";
 import { findTalentRateAsOf } from "../pnl";
 import type { HostPerf } from "./monthPlanner";
+import { hardBlock, hourCapsFor, softFit, type MonthRule } from "./monthRules";
 
 /** GMV/giờ thật của một host Ở MỘT KÊNH (brand × sàn), 90 ngày: tổng GMV ÷ tổng giờ các ca host một người. Khoá: `${hostId}|${brandId}|${platform}`. */
 export interface HostChannelGmv {
@@ -120,6 +121,9 @@ export interface RankContext {
   perf?: ReadonlyMap<string, HostPerf>;
   /** GMV/giờ thật từng host theo kênh (`buildHostChannelGmv`) — cột "GMV/giờ" + cast % trong panel ca. */
   chGmv?: ReadonlyMap<string, HostChannelGmv>;
+  /** Luật đặt giờ theo tháng × người × vai (lưới "Luật giờ từng người", 0229) — cùng dạng `plannerInputsFromRules().monthRules`.
+   *  Chỉ áp cho ca thuộc đúng tháng của luật. "x" brand / làn ⇒ chặn; vượt trần giờ, ngoài loại ngày / ca đêm ⇒ cảnh báo. */
+  monthRules?: Readonly<Record<string, Partial<Record<RosterRole, MonthRule>>>>;
 }
 
 export interface Candidate {
@@ -170,6 +174,27 @@ function whatIf(shift: RosterShift, talentId: string, role: RosterRole, ctx: Ran
     return h * 60 + m;
   })();
   const dayStart = (d: string) => absRange({ date: d, startTime: "00:00", endTime: "00:01" })[0];
+  // Luật tháng (lưới Luật giờ từng người): cùng luật bộ Tự fill đọc ở monthPlanner.ts. "x" = chặn hẳn; phần còn lại chỉ cảnh báo
+  // để trainer vẫn chọn tay được khi cần (Tự fill tuần bỏ qua người có cảnh báo).
+  const month = shift.date.slice(0, 7);
+  const mr = ctx.monthRules?.[talentId]?.[role];
+  if (mr && mr.month === month) {
+    const rs = { date: shift.date, brandId: shift.brandId, platform: shift.platform, night: b - dayStart(shift.date) >= lateMin };
+    const hb = hardBlock(mr, rs);
+    if (hb) return { blocked: `Luật tháng ${role === "host" ? "host" : "trợ"}: ${hb}`, issues: [], weekHours: curWeek };
+    const caps = hourCapsFor(mr, shift);
+    const mine = list.filter((e) => e.role === role && e.shift.date.slice(0, 7) === month);
+    const sum = (rows: typeof mine) => rows.reduce((t, e) => t + e.minutes / 60, 0);
+    const h = shiftHours(shift);
+    const over = (cur: number, cap: number | null, label: string) => {
+      if (cap !== null && cur + h > cap + 1e-6) issues.push(`vượt trần ${label} (${fmtH(cur + h)}/${fmtH(cap)}h)`);
+    };
+    over(sum(mine), caps.role, "giờ vai trong tháng");
+    over(sum(mine.filter((e) => e.shift.brandId === shift.brandId)), caps.brand, `giờ ${shift.brandName}`);
+    over(sum(mine.filter((e) => e.shift.channelKey === shift.channelKey)), caps.lane, `giờ ${shift.brandName} ${shift.platform}`);
+    const sf = softFit(mr, rs);
+    if (!sf.ok) issues.push(`ngoài luật tháng: ${sf.reason}`);
+  }
   for (const e of list) {
     const g1 = a - e.end; // ca của họ trước ca này
     const g2 = e.start - b; // ca của họ sau ca này
