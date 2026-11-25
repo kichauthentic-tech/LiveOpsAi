@@ -606,7 +606,8 @@ export const RosterBoard: React.FC<Props> = (p) => {
   const remove = (shift: RosterShift) =>
     run(async () => {
       if (shift.kind === "open") {
-        if (!(await confirm(`Bỏ ca mở ${shift.brandName} ${dayLabel(shift.date)} ${shift.startTime}–${shift.endTime}? Lượt báo rảnh của ca này cũng mất.`, { danger: true, confirmLabel: "Bỏ ca" }))) return;
+        const planNote = shift.planId ? " Ca này thuộc Kế Hoạch Tháng: dòng kế hoạch và target vẫn giữ, chỉ ca bị gỡ — muốn bỏ hẳn thì xoá dòng ở Kế Hoạch Tháng; bấm Chốt lại ở đó sẽ mở lại ca." : "";
+        if (!(await confirm(`Bỏ ca mở ${shift.brandName} ${dayLabel(shift.date)} ${shift.startTime}–${shift.endTime}? Lượt báo rảnh của ca này cũng mất.${planNote}`, { danger: true, confirmLabel: "Bỏ ca" }))) return;
         await p.onDeleteSlot(shift.slotId!);
         setSelectedKey(null);
         return;

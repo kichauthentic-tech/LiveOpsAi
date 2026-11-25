@@ -228,8 +228,8 @@ export const ShiftPanel: React.FC<Props> = ({ shift, analysis, ctx, talents, his
                 ? [{ label: "Chốt ngay ca này (không đợi công bố tuần)", onClick: () => onFinalizeNow(shift), disabled: busy }]
                 : []),
               ...(canMove ? [{ label: moving ? "Ẩn dời ca" : "Dời ca", onClick: () => setMoving((v) => !v) }] : []),
-              ...(!readOnly && !past && !shift.hasData && (shift.kind === "session" || !shift.planId)
-                ? [{ label: shift.kind === "open" ? "Bỏ ca này (ca thêm, chưa có người)" : "Huỷ ca — vẫn hiện gạch ngang trên lịch gửi brand", onClick: () => onRemove(shift), danger: true, disabled: busy }]
+              ...(!readOnly && !past && !shift.hasData && (shift.kind === "session" || shift.kind === "open")
+                ? [{ label: shift.kind === "open" ? (shift.planId ? "Huỷ ca mở này (ca của kế hoạch tháng)" : "Bỏ ca này (ca thêm, chưa có người)") : "Huỷ ca — vẫn hiện gạch ngang trên lịch gửi brand", onClick: () => onRemove(shift), danger: true, disabled: busy }]
                 : [])
             ]}
           />
