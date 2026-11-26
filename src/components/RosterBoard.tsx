@@ -1231,7 +1231,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
           </div>
           <p className="text-2xs text-[var(--text-muted)]">
             Đậm nhất = đã live · đậm vừa = sắp tới · nhạt = nháp · vạch đứng = giờ tối thiểu
-            <InfoDot label="Chú giải thanh giờ">Nháp là ca chưa công bố. Vạch đứng là giờ tối thiểu (đảm bảo thu nhập), cuối thanh là giờ tối đa.</InfoDot>
+            <InfoDot label="Chú giải thanh giờ">Nháp là ca chưa công bố. Vạch đứng là giờ tối thiểu (đảm bảo thu nhập), cuối thanh là giờ tối đa. Giờ tối đa lấy theo trần của từng người ở Luật giờ (trần tháng, trần riêng của vai); ai chưa đặt thì dùng mức chung.</InfoDot>
           </p>
           <div className="grid gap-3 xl:grid-cols-2">
             {(["host", "assistant"] as const).map((role) => {

@@ -223,3 +223,21 @@ describe("khối lượng tách giờ host / giờ trợ", () => {
     expect(asst.min).toBe(0); // vai phụ không bị báo dưới tối thiểu
   });
 });
+
+describe("khối lượng theo trần ở Luật giờ từng người", () => {
+  test("có luật thì tối đa = trần của người (min trần tháng, trần vai); không có luật thì dùng mặc định chung", async () => {
+    const M = await import("../src/lib/roster/monthRules");
+    const talents = [tal("a", "Host", 200000), tal("b", "Host", 200000), tal("c", "Host", 200000)];
+    const slots = [slot("s1", day(2)), slot("s2", day(3)), slot("s3", day(4))];
+    const drafts = [{ slotId: "s1", hostId: "a" }, { slotId: "s2", hostId: "b" }, { slotId: "s3", hostId: "c" }];
+    const shifts = R.buildRosterShifts([] as LiveSession[], slots, drafts as never, [], "2026-10-25", "2026-12-07");
+    const ra = { ...M.emptyMonthRule(MONTH, "a", "host"), maxHours: 60, roleHours: 50 };
+    const rb = { ...M.emptyMonthRule(MONTH, "b", "host"), maxHours: 70 };
+    const monthRules = M.plannerInputsFromRules([ra, rb]).monthRules;
+    const plan = P.planMonth({ shifts, month: MONTH, today: "2026-10-30", goal: "balance", bounds: { host: { min: 24, max: 80 }, co_host: { min: 30, max: 110 } }, guaranteeMin: false, rules: R.DEFAULT_ROSTER_RULES, talents, history: [], fam: new Map(), perf: new Map(), reportOnly: true, tuning: { params: {} as never, monthRules } });
+    const row = (id: string) => plan.load.find((l) => l.talentId === id && l.role === "host")!;
+    expect(row("a").max).toBe(50);
+    expect(row("b").max).toBe(70);
+    expect(row("c").max).toBe(80);
+  });
+});

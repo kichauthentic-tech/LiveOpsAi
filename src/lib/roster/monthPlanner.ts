@@ -462,6 +462,15 @@ class Roster {
   }
 }
 
+/** Trần giờ tháng của một người ở một vai theo lưới Luật giờ: nhỏ nhất của trần tháng (dùng chung 2 vai) và trần riêng của vai; null = chưa đặt. */
+export function ruleHourCap(byRole: Partial<Record<RosterRole, MonthRule>> | undefined, role: RosterRole): number | null {
+  if (!byRole) return null;
+  const mine = byRole[role];
+  const other = byRole[role === "host" ? "co_host" : "host"];
+  const vals = [mine?.maxHours ?? other?.maxHours ?? null, mine?.roleHours ?? null].filter((v): v is number => v !== null && v > 0);
+  return vals.length > 0 ? Math.min(...vals) : null;
+}
+
 /** Giờ tối thiểu/tối đa của một người, có tính trần giờ riêng (nếu có): trần thay giờ tối đa mặc định của vai, vẫn bị luật giờ/tuần chặn. */
 function boundsWithCap(t: Talent, base: MonthBounds, rules: Pick<RosterRules, "maxWeekHours">, month: string, cap: PersonCap | undefined): HourBounds {
   const b = personBounds(t, base, rules, month);
@@ -687,7 +696,11 @@ export function planMonth(input: PlanInput): MonthPlan {
     if (!l) {
       const main = primaryRole(t) === role;
       const own = boundsWithCap(t, { host: input.bounds.host, co_host: input.bounds.co_host }, rules, month, caps[id]);
-      const b = main ? { min: own.min * minScale, max: own.max } : { min: 0, max: Math.min(input.bounds[role].max, Math.round((rules.maxWeekHours * daysInMonth(month)) / 7)) };
+      // Trần ở lưới Luật giờ từng người (trần tháng dùng chung 2 vai, trần riêng của vai) thay giờ tối đa mặc định; không có luật thì dùng gợi ý chung.
+      const weekCap = Math.round((rules.maxWeekHours * daysInMonth(month)) / 7);
+      const ruleCap = ruleHourCap(input.tuning?.monthRules?.[id], role);
+      const roleMax = ruleCap !== null ? Math.min(ruleCap, weekCap) : Math.min(input.bounds[role].max, weekCap);
+      const b = main ? (ruleCap !== null ? { min: Math.min(personBounds(t, input.bounds, rules, month).min, roleMax) * minScale, max: roleMax } : { min: own.min * minScale, max: own.max }) : { min: 0, max: roleMax };
       l = { talentId: id, role, fixedHours: 0, draftHours: 0, pastHours: 0, plannedHours: 0, hours: 0, min: b.min, max: b.max, shifts: 0, registered: main ? registeredIn.get(id) ?? 0 : 0, registeredHours: main ? registeredHoursIn.get(id) ?? 0 : 0, cost: 0, costMissing: false, perf: role === "host" ? perf.get(id) : undefined, status: "ok" };
       load.set(key, l);
     }
