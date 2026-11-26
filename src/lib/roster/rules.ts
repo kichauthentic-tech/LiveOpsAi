@@ -301,7 +301,7 @@ export function personEntries(shifts: readonly RosterShift[]): Map<string, Perso
 }
 
 export type IssueCode = "clash" | "week_over" | "draft_no_host" | "no_host" | "co_pending" | "no_co" | "week_warn" | "rest" | "room" | "day" | "streak" | "new_channel" | "brand_blocked" | "brand_exclusive" | "brand_role" | "same_brand_day";
-/** block = DB/công bố sẽ chặn; hole = ca còn trống vai (thiếu host ⇒ giữ là ca mở; thiếu trợ vẫn công bố, chốt sau); warn = cảnh báo. */
+/** block = lỗi đỏ phải sửa (trùng người) — từ 0234 công bố KHÔNG còn bị chặn, DB giữ ca và gắn cờ trùng; hole = ca còn trống vai (thiếu host ⇒ giữ là ca mở; thiếu trợ vẫn công bố, chốt sau); warn = cảnh báo. */
 export type IssueSeverity = "block" | "hole" | "warn";
 
 export const ISSUE_SEVERITY: Record<IssueCode, IssueSeverity> = {
@@ -431,10 +431,10 @@ export function analyzeRoster(
       if (prev.shift.key === cur.shift.key) continue;
       const overlap = prev.ranges.some((a) => cur.ranges.some((b) => dateTimeRangesOverlap(a, b)));
       if (overlap) {
-        // Chỉ CHẶN công bố khi một trong hai ca là ca mở (nháp sắp chốt) — đúng chỗ DB (0143) sẽ từ chối. Trùng giữa hai ca đã lên
-        // lịch (giữ có chủ đích bằng cờ 0160, lịch nhập từ sheet) không ảnh hưởng lần công bố: báo vàng để trainer gỡ, không khoá nút.
+        // Đỏ khi một trong hai ca là ca mở (nháp sắp chốt). Trùng giữa hai ca đã lên lịch (cờ 0160: lịch nhập từ sheet, hoặc công bố
+        // giữ lại từ 0234) báo vàng để trainer gỡ. Công bố không bị chặn ở cả hai trường hợp.
         const draftInvolved = cur.shift.kind === "open" || prev.shift.kind === "open";
-        add("clash", cur.shift, `${name} trùng giờ với ca ${prev.shift.brandName} ${prev.shift.startTime}–${prev.shift.endTime} (${ddmm(prev.shift.date)})${draftInvolved ? "" : " — ca đã lên lịch từ trước, không chặn công bố"}`, tid, draftInvolved ? "block" : "warn");
+        add("clash", cur.shift, `${name} trùng giờ với ca ${prev.shift.brandName} ${prev.shift.startTime}–${prev.shift.endTime} (${ddmm(prev.shift.date)})${draftInvolved ? "" : " — hai ca đã chốt, cần đổi người"}`, tid, draftInvolved ? "block" : "warn");
         continue;
       }
       const gap = cur.start - prev.end;

@@ -163,12 +163,12 @@ export const WeekGrid: React.FC<{
         </p>
       )}
       <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-2xs text-[var(--text-muted)]">
-        <span>Viền đỏ = chặn công bố</span>
+        <span>Viền đỏ = trùng người / thiếu host</span>
         <span>vàng = cảnh báo</span>
         <span>đứt = ca mở</span>
         <span className="line-through text-red-300/80">gạch = ca huỷ (vẫn gửi brand{onSelectCancelled ? ", bấm để mở lại" : ""})</span>
         <InfoDot label="Chú giải viền ca">
-          Viền đỏ: lỗi chặn công bố hoặc ca thiếu host. Chip &quot;cần trợ&quot;: chưa công bố tới khi có trợ live hoặc gắn No Asst.
+          Viền đỏ: trùng người hoặc ca thiếu host. Chip &quot;cần trợ&quot;: chưa công bố tới khi có trợ live hoặc gắn No Asst.
           Viền đứt: ca mở (nháp / chưa xếp), talent chưa thấy tên người.
         </InfoDot>
       </p>
@@ -198,7 +198,7 @@ export const ChecksPanel: React.FC<{ analysis: RosterAnalysis; shifts: RosterShi
   return (
     <div className="space-y-2">
       <p className="text-xs text-[var(--text-muted)]">
-        Lỗi đỏ chặn công bố tuần, vàng là cảnh báo.
+        Đỏ cần sửa, vàng là cảnh báo.
         <InfoDot label="Cách đọc kiểm lịch">
           Chạy lại sau mỗi lần đổi người. Ca thiếu host không chặn — ca vẫn mở sau công bố. Mục vàng trainer tự quyết.
           Luật nghỉ và ngày làm liền tính cả tuần trước.
@@ -512,7 +512,7 @@ export const HoursCostPanel: React.FC<{
       <section className="space-y-2">
         <h4 className="text-sm font-black text-[var(--text)]">Giờ từng người tuần này</h4>
         <p className="text-xs text-[var(--text-muted)]">
-          Vạch đỏ = {rules.maxWeekHours} giờ (chặn công bố), vạch mờ = {rules.warnWeekHours} giờ.
+          Vạch đỏ = {rules.maxWeekHours} giờ, vạch mờ = {rules.warnWeekHours} giờ.
           <InfoDot label="Giờ và tiền tính thế nào">
             Giờ theo lịch, cả vai host và trợ live; ca đổi người giữa ca chỉ tính phần người đó đứng.
             {showCost ? " Tiền công = rate × giờ theo lịch, chưa tính live quá giờ (OT) hay kết thúc sớm." : ""}

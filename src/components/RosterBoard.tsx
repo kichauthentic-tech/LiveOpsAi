@@ -36,7 +36,7 @@ import {
 } from "../lib/db/roster";
 import type { BrandTalentRule } from "../lib/commercial/terms";
 import { inferRoleRows, type TalentBrandRole } from "../lib/roster/talentBrandRoles";
-import { analyzeRoster, buildBrandRuleIndex, buildCancelledShifts, buildRosterShifts, channelKeyOf, DEFAULT_ROSTER_RULES, shiftHours, type RosterRole, type RosterRules, type RosterShift } from "../lib/roster/rules";
+import { analyzeRoster, buildBrandRuleIndex, buildCancelledShifts, buildRosterShifts, channelKeyOf, DEFAULT_ROSTER_RULES, shiftHours, type RosterIssue, type RosterRole, type RosterRules, type RosterShift } from "../lib/roster/rules";
 import { buildFamiliarity, famOf, planCostCut, shiftCost, type CostMove, type RankContext, type RankMode } from "../lib/roster/candidates";
 import { ShiftPanel, dayLabel } from "./roster/ShiftPanel";
 import { CancelledShiftPanel } from "./roster/CancelledShiftPanel";
@@ -135,6 +135,9 @@ const SECTION_TITLE: Record<Section, string> = {
 };
 
 const STAFF: UserRole[] = ["ceo", "admin", "operations", "trainer"];
+/** Từ 0234 trùng giờ người không chặn công bố — nêu đích danh trong hộp xác nhận để sửa sau. */
+const clashNotice = (list: readonly RosterIssue[]) =>
+  list.length === 0 ? "" : `⚠ ${list.length} chỗ trùng người (sửa sau): ${list.slice(0, 6).map((i) => i.text).join("; ")}${list.length > 6 ? "…" : ""}.`;
 const loadMode = (): RankMode => {
   try {
     const m = localStorage.getItem("roster.mode");
@@ -829,11 +832,11 @@ export const RosterBoard: React.FC<Props> = (p) => {
       const people = new Set<string>();
       for (const d of drafts) if (p.shiftSlots.some((sl) => sl.id === d.slotId && rangeWeeks.some(([w]) => sl.date >= w && sl.date <= weekEndOf(w)))) [d.hostId, d.coHostId].forEach((x) => x && people.add(x));
       // 0206: quá giờ tuần chỉ cảnh báo — liệt kê từng tuần/người trước khi công bố.
-      const overLines = rangeWeeks.flatMap(([w]) =>
+      const rangeIssues = rangeWeeks.flatMap(([w]) =>
         analyzeRoster(buildRosterShifts(p.sessions, p.shiftSlots, drafts, p.shiftRegistrations, addDays(w, -7), addDays(w, 7)), rules, w, nameOf, undefined, brandRules)
-          .issues.filter((i) => i.code === "week_over")
-          .map((i) => `tuần ${dayLabel(w)}: ${i.text.replace(/ có (.+) trong tuần.*/, " $1")}`)
+          .issues.map((i) => ({ ...i, week: w }))
       );
+      const overLines = rangeIssues.filter((i) => i.code === "week_over").map((i) => `tuần ${dayLabel(i.week)}: ${i.text.replace(/ có (.+) trong tuần.*/, " $1")}`);
       const inRange = p.shiftSlots.filter((sl) => sl.status === "open" && !sl.sessionId && sl.date >= planRange.from && sl.date <= planRange.to);
       const hostOf = (id: string) => drafts.find((d) => d.slotId === id)?.hostId;
       const noHostN = inRange.filter((sl) => !hostOf(sl.id)).length;
@@ -844,6 +847,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
         noCoN > 0 ? `${noCoN} ca chưa có trợ vẫn được chốt — thêm trợ (hoặc No Asst) sau.` : "",
         noHostN > 0 ? `${noHostN} ca chưa có host giữ là ca mở, talent thấy "Cần host" và đăng ký thêm.` : "",
         `Chỉ công bố ca trong ${dayLabel(planRange.from)} – ${dayLabel(planRange.to)}, ca ngoài khoảng này giữ nguyên nháp.`,
+        clashNotice(rangeIssues.filter((i) => i.severity === "block")),
         overLines.length > 0 ? `⚠ Quá ${rules.maxWeekHours} giờ/tuần (không chặn): ${overLines.join("; ")}.` : ""
       ]
         .filter(Boolean)
@@ -915,6 +919,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
         outsideDrafts > 0 ? `Gồm cả ${outsideDrafts} ca nháp ngoài tháng ${Number(viewMonth.slice(5))}.` : "",
         holes > 0 ? `${holes} ca mở chưa có host sẽ vẫn mở (không công bố).` : "",
         holdCoShifts.length > 0 ? `${holdCoShifts.length} ca đã có host nhưng chưa có trợ vẫn được chốt — thêm trợ (hoặc No Asst) sau: ${holdCoShifts.slice(0, 4).map((s) => `${s.brandName} ${dayLabel(s.date)} ${s.startTime}`).join(", ")}${holdCoShifts.length > 4 ? "…" : ""}.` : "",
+        clashNotice(blocks),
         // 0206: quá giờ tuần chỉ cảnh báo — nêu đích danh để người công bố nhìn thấy trước khi bấm.
         overWeek.length > 0 ? `⚠ Quá ${rules.maxWeekHours} giờ/tuần (không chặn): ${overWeek.map((i) => i.text.replace(/ có (.+) trong tuần.*/, " $1")).join("; ")}.` : "",
         warns.length - overWeek.length > 0 ? `Còn ${warns.length - overWeek.length} cảnh báo khác (không chặn).` : ""
@@ -1021,7 +1026,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
     }
   };
 
-  const publishLabel = blocks.length > 0 ? `Công bố tuần này · ${blocks.length} lỗi` : draftedCount > 0 ? `Công bố tuần này · ${draftedCount} ca` : "Tuần này không có nháp";
+  const publishLabel = draftedCount > 0 ? `Công bố tuần này · ${draftedCount} ca${blocks.length > 0 ? ` · ${blocks.length} trùng` : ""}` : "Tuần này không có nháp";
 
   return (
     <div className="space-y-4">
@@ -1042,7 +1047,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>
-            <button type="button" disabled={readOnly || busy || blocks.length > 0 || draftedCount === 0} onClick={publish} title={blocks.length > 0 ? "Còn lỗi chặn — bấm ca viền đỏ để sửa" : draftedCount === 0 ? "Chỉ ca nháp mới cần công bố" : undefined} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--accent)] text-[var(--accent-contrast)] text-xs font-black disabled:opacity-40">
+            <button type="button" disabled={readOnly || busy || draftedCount === 0} onClick={publish} title={draftedCount === 0 ? "Chỉ ca nháp mới cần công bố" : blocks.length > 0 ? "Có ca trùng giờ người — vẫn công bố được, sửa sau" : undefined} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--accent)] text-[var(--accent-contrast)] text-xs font-black disabled:opacity-40">
               <Send className="w-4 h-4" /> {publishLabel}
             </button>
             <details ref={moreRef} className="relative">
