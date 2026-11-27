@@ -33,7 +33,7 @@ import { CHANNELS, DAY_TYPE_SHORT, PAL, alpha, SECTIONS, chartTooltipStyle, useP
 import { chartNum, fmtHours, fmtInt, fmtPct, fmtSessionStart, monthRangeLocal, nextMonthStrLocal, prevMonthStrLocal, promoStatusLabel } from "./report/format";
 import { ChartLegend, PageInsight, KpiTile, Panel, ReportTable, toWaterfall, PageHead, PagePager, PageRail, type PageMetric } from "./report/ui";
 import { dropHeadline, keyMetricsHeadline, observeHeadline, summaryHeadline } from "../../lib/report/pageHeadlines";
-import { bridgePoints, cancelledPlanTarget, planHourRows, skuImageKey, targetBridge, trafficBridge, type ScatterPoint } from "../../lib/report/reportVisuals";
+import { bridgePoints, cancelledPlanTarget, planHourRows, skuImageKey, targetBridge, type ScatterPoint } from "../../lib/report/reportVisuals";
 import "./report/demo.css";
 import { PLATFORM_PROFILES } from "../../lib/platforms/profiles";
 import { DEFAULT_REPORT_SCOPE, outOfScopeLabel, type ReportScope } from "../../lib/report/reportScope";
@@ -661,13 +661,6 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     () => (planRR ? planHourRows(planRR.rr.slots, planRR.rr.through, Object.fromEntries(campDetailRows.map((r) => [r.key, r.gmvPerHour != null && r.gmvPerHour > 0 ? r.gmvPerHour : null]))) : []),
     [planRR, campDetailRows]
   );
-  const trafficBr = useMemo(() => {
-    const row = control.find((r) => r.key === "all");
-    const b = row ? trafficBridge(row) : null;
-    if (!b) return null;
-    const lab = { visitors: t("Lượt truy cập", "Visits"), cvr: t("CVR shop", "Shop CVR"), value: METRIC.aov } as const;
-    return { b, points: bridgePoints(cmp.partial ? `1–${Number(cmp.prevEnd.slice(8))}/${prevMonth.slice(5)}` : monthShort(prevMonth), b.from, b.parts.map((p) => ({ label: lab[p.key === "aov" ? "value" : p.key], delta: p.value })), cmp.partial ? `1–${Number(cmp.curEnd.slice(8))}/${month.slice(5)}` : monthShort(month), b.to) };
-  }, [control, cmp, month, prevMonth]);
   const skuPoints = useMemo<ScatterPoint[]>(
     () =>
       (skuMoveData?.rows ?? [])
@@ -1488,7 +1481,6 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             shopCur={shopCur}
             shopPrev={shopPrevSame}
             window={shopWin}
-            traffic={trafficBr?.b ?? null}
             inhouseLive={scope.inhouseLive}
             liveOnly={liveOnly}
             fallbackHeadline={head("shop").headline}

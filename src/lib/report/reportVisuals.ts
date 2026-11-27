@@ -1,6 +1,5 @@
 import { isBigChange } from "./changeThreshold";
 import type { CampDayBucket } from "../campaignDays";
-import type { ControlRow } from "./deepAnalysis";
 import type { KeyMetricKey } from "./keyMetrics";
 import { keyMetricsTable, type KeyMetricsMonth, type KeyMetricsTab, type ScoreRow } from "./brandReport";
 import type { ChangeTone } from "./brandReport";
@@ -87,26 +86,6 @@ export function planHourRows(slots: PlanRunRateSlot[], _through: string | null, 
     const hours = mine.reduce((a, s) => a + slotHours(s.planSlot.startTime, s.planSlot.endTime), 0);
     return { key: k, planGmvPerHour: hours > 0 && target > 0 ? target / hours : null, actualGmvPerHour: actual[k] ?? null, planHours: hours, planTarget: target, share: total > 0 ? target / total : 0 };
   });
-}
-
-export interface LogBridge {
-  from: number;
-  to: number;
-  parts: { key: "visitors" | "cvr" | "aov"; change: number; value: number }[];
-}
-
-/** Total GMV = lượt truy cập × CVR × giá trị đơn. Giá trị đơn suy ra (GMV ÷ đơn) nên 3 phần cộng đúng mức thay đổi (chia theo log). */
-export function trafficBridge(r: ControlRow): LogBridge | null {
-  const g0 = r.shopLivePrev + r.restPrev;
-  const g1 = r.shopLiveCur + r.restCur;
-  if (!(g0 > 0 && g1 > 0) || !(r.visitorsPrev > 0 && r.visitorsCur > 0) || !r.cvrPrev || !r.cvrCur) return null;
-  const o0 = (r.visitorsPrev * r.cvrPrev) / 100;
-  const o1 = (r.visitorsCur * r.cvrCur) / 100;
-  const a0 = g0 / o0;
-  const a1 = g1 / o1;
-  const lg = g1 === g0 ? g0 : (g1 - g0) / Math.log(g1 / g0);
-  const part = (key: LogBridge["parts"][number]["key"], x0: number, x1: number) => ({ key, change: (x1 / x0 - 1) * 100, value: lg * Math.log(x1 / x0) });
-  return { from: g0, to: g1, parts: [part("visitors", r.visitorsPrev, r.visitorsCur), part("cvr", r.cvrPrev, r.cvrCur), part("aov", a0, a1)] };
 }
 
 // ---------- bảng dọc "Số đo từng loại ngày" ----------

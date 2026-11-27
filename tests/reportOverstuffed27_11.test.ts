@@ -30,24 +30,19 @@ describe("A1 · Insight sửa tay cũ hơn bản chụp", () => {
   });
 });
 
-describe("A2 · Product card cùng một số ở trang 1 và cầu kênh trang 4", () => {
+describe("A2 · trang Toàn shop không còn biểu đồ thác kênh / lượt truy cập", () => {
   // CROCS T10: 4 kênh trong file chỉ cộng 98% Total GMV; card trang 1 giảm ≈ 110M.
   const a: ShopMonthMix = { liveLinked: 5230e6, affiliate: 629e6, video: 436e6, card: 1231e6, shopGmv: 7550e6 };
   const b: ShopMonthMix = { liveLinked: 5020e6, affiliate: 312e6, video: 628e6, card: 1120e6, shopGmv: 7220e6 };
   const base = {
     no: "4", title: "Toàn shop", control: [], mixLabels: ["T7", "T8", "T9", "T10"], attribution: [null, null, null, null],
     yfbGmv: [0, 0, 3500e6, 3400e6], shopCur: { gmv: 7220e6 }, shopPrev: { gmv: 7550e6 },
-    window: { prevStart: "2026-09-01", prevEnd: "2026-09-30", curStart: "2026-10-01", curEnd: "2026-10-31" }, traffic: null, fallbackHeadline: "x", insight: null
+    window: { prevStart: "2026-09-01", prevEnd: "2026-09-30", curStart: "2026-10-01", curEnd: "2026-10-31" }, fallbackHeadline: "x", insight: null
   };
-  it("cột Product card = chênh của chính số card (−111M), phần lệch thành 'Chưa phân kênh'", () => {
+  it("không còn 2 biểu đồ thác (đóng góp kênh, lượt truy cập × CVR × AOV)", () => {
     const html = renderToStaticMarkup(React.createElement(DemoShopPage, { ...base, mixes: [null, null, a, b] }));
-    expect(html).toContain("−111");
-    expect(html).toContain("Chưa");
-    expect(html).toContain("phân kênh");
-    expect(html).toContain("Product card cùng số với trang Tổng quan");
-  });
-  it("thiếu số card ⇒ vẫn lấy phần còn lại như cũ, không có cột 'Chưa phân kênh'", () => {
-    const html = renderToStaticMarkup(React.createElement(DemoShopPage, { ...base, mixes: [null, null, { ...a, card: null }, { ...b, card: null }] }));
+    expect(html).not.toContain("Đóng góp của từng kênh vào thay đổi Total GMV");
+    expect(html).not.toContain("Phân rã Total GMV");
     expect(html).not.toContain("phân kênh");
   });
   it("C2 · bỏ biểu đồ tăng trưởng và 2 ô lặp số (lượt truy cập, Affiliate LIVE)", () => {

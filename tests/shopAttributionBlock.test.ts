@@ -8,7 +8,7 @@ const m = (direct: number, indirect: number, days = 30): AttributionMonth => ({ 
 const base = {
   no: "4", title: "Toàn shop", control: [], mixes: [null, null, null, null], mixLabels: ["T7", "T8", "T9", "T10"], yfbGmv: [0, 0, 0, 0],
   shopCur: null, shopPrev: null, window: { prevStart: "2026-09-01", prevEnd: "2026-09-30", curStart: "2026-10-01", curEnd: "2026-10-28" },
-  traffic: null, fallbackHeadline: "x", insight: null
+  fallbackHeadline: "x", insight: null
 };
 const render = (attribution: (AttributionMonth | null)[]) => renderToStaticMarkup(React.createElement(DemoShopPage, { ...base, attribution }));
 

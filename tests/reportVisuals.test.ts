@@ -1,15 +1,6 @@
 import { expect, test } from "vitest";
-import { bridgePoints, rankBadge, skuImageKey, targetBridge, trafficBridge } from "../src/lib/report/reportVisuals";
-import type { ControlRow } from "../src/lib/report/deepAnalysis";
+import { bridgePoints, rankBadge, skuImageKey, targetBridge } from "../src/lib/report/reportVisuals";
 import type { ScoreRow } from "../src/lib/report/brandReport";
-
-test("cầu traffic × CVR × giá trị đơn cộng đúng mức thay đổi Total GMV", () => {
-  const r = { key: "all", days: 25, liveCur: 0, livePrev: 0, shopLiveCur: 4e9, shopLivePrev: 4.2e9, restCur: 2.4e9, restPrev: 2.3e9, visitorsCur: 980_000, visitorsPrev: 1_000_000, cvrCur: 2.46, cvrPrev: 2.38, liveChg: null, restChg: null, visitorsChg: null } as ControlRow;
-  const b = trafficBridge(r)!;
-  expect(b.parts.reduce((a, p) => a + p.value, 0)).toBeCloseTo(b.to - b.from, 0);
-  expect(b.parts[0].value).toBeLessThan(0);
-  expect(b.parts[1].value).toBeGreaterThan(0);
-});
 
 test("cầu Target → thực tế: đầu + các bước = cuối, phần ngoài lịch thành bước riêng", () => {
   const rows: ScoreRow[] = [

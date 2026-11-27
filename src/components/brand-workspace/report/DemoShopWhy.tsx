@@ -185,7 +185,6 @@ export interface DemoShopProps {
   shopCur: { gmv: number } | null;
   shopPrev: { gmv: number } | null;
   window: { prevStart: string; prevEnd: string; curStart: string; curEnd: string };
-  traffic: { from: number; to: number; parts: { key: string; change: number; value: number }[] } | null;
   fallbackHeadline: string;
   insight: React.ReactNode;
 }
@@ -195,7 +194,7 @@ const VERDICT: Record<ControlVerdict, [string, string]> = byLang(() => ({
   market: [t("tương đương các kênh còn lại", "in line with other channels"), "m"]
 }));
 const chgPct = (v: number) => ({ t: fmtP(v), c: !isBigChange(v) ? "nt" : v > 0 ? "up" : "dn" });
-export const DemoShopPage: React.FC<DemoShopProps> = ({ no, title, control, mixes, mixLabels, attribution, yfbGmv, shopCur, shopPrev, window: w, traffic, inhouseLive = false, liveOnly = false, fallbackHeadline, insight }) => {
+export const DemoShopPage: React.FC<DemoShopProps> = ({ no, title, control, mixes, mixLabels, attribution, yfbGmv, shopCur, shopPrev, window: w, inhouseLive = false, liveOnly = false, fallbackHeadline, insight }) => {
   const rows = (["daily", "camp", "all"] as const).map((k) => control.find((r) => r.key === k)).filter((r): r is ControlRow => !!r);
   const all = control.find((r) => r.key === "all");
   const curLbl = range(w.curStart, w.curEnd), prevLbl = range(w.prevStart, w.prevEnd);
@@ -263,54 +262,6 @@ export const DemoShopPage: React.FC<DemoShopProps> = ({ no, title, control, mixe
     x ? fmtP(x.indirectPct, 1, false) : "—",
     i > 0 ? shift(x, attribution[i - 1]) : "—"
   ]);
-  // cầu đóng góp từng kênh: YFB / Seller LIVE khác / Affiliate / Video / Product card / Chưa phân kênh.
-  // Audit 27/11: trước đây Product card = phần còn lại cho cộng đúng ⇒ CROCS T10 trang 1 ghi Product card −9% (file Sản Phẩm)
-  // còn cầu này ghi +23M (4 kênh chỉ cộng 98% Total GMV, 140M chênh dồn vào card). Nay card lấy đúng số trang 1; phần chênh
-  // thành cột riêng "Chưa phân kênh" (chỉ khi ≥ 1M). Thiếu số card (file Sản Phẩm) thì vẫn lấy phần còn lại như cũ.
-  let br3 = "", br3Axis: number | null = null, br3Residual = false;
-  const a = mixes[2], b = mixes[3];
-  if (a && b && yfbGmv[2] != null && yfbGmv[3] != null) {
-    const dYfb = yfbGmv[3] - yfbGmv[2];
-    const dLive = b.liveLinked - a.liveLinked;
-    const dAff = b.affiliate - a.affiliate, dVid = b.video - a.video;
-    const dTot = b.shopGmv - a.shopGmv;
-    const rest = dTot - dYfb - (dLive - dYfb) - dAff - dVid;
-    const dCard = a.card != null && b.card != null ? b.card - a.card : rest;
-    const unassigned = rest - dCard;
-    br3Residual = Math.abs(unassigned) >= 1_000_000;
-    const steps = [dYfb, dLive - dYfb, dAff, dVid, dCard, ...(br3Residual ? [unassigned] : [])];
-    const ax = axis(a.shopGmv, steps);
-    br3Axis = ax.min;
-    const lab = [t("Livestream\nYFB", "YFB\nlivestream"), inhouseLive ? t("Brand\ntự live", "Brand\nin-house") : t("Seller LIVE\nkhác", "Other\nSeller LIVE"), "Affiliate\nLIVE", "Video", "Product\ncard", t("Chưa\nphân kênh", "Not\nassigned")];
-    br3 = waterfall(
-      [
-        { l: `Total GMV\n${prevLbl}`, v: a.shopGmv, t: "total", txt: fmtM(a.shopGmv) },
-        ...steps.map((s, i) => ({ l: lab[i], v: s, t: "delta", txt: M(s) })),
-        { l: `Total GMV\n${curLbl}`, v: b.shopGmv, t: "total", txt: fmtM(b.shopGmv) }
-      ],
-      { min: ax.min, max: ax.max, h: 290 }
-    );
-  }
-
-  // cầu lượt truy cập × CVR × giá trị đơn
-  let br4 = "", br4Axis: number | null = null, br4Legend = "";
-  if (traffic) {
-    const steps = traffic.parts.map((p) => p.value);
-    const ax = axis(traffic.from, steps);
-    br4Axis = ax.min;
-    const names: Record<string, string> = { visitors: t("Lượt truy cập\nshop", "Shop\nvisits"), cvr: t("CVR shop", "Shop CVR"), aov: `${METRIC.aov}\n${t("(suy ra)", "(derived)")}` };
-    br4 = waterfall(
-      [
-        { l: `Total GMV\n${prevLbl}`, v: traffic.from, t: "total", txt: fmtM(traffic.from) },
-        ...traffic.parts.map((p) => ({ l: names[p.key] ?? p.key, v: p.value, t: "delta", txt: M(p.value) })),
-        { l: `Total GMV\n${curLbl}`, v: traffic.to, t: "total", txt: fmtM(traffic.to) }
-      ],
-      { min: ax.min, max: ax.max, h: 270 }
-    );
-    const [pv, pc, pa] = traffic.parts;
-    br4Legend = `${t("Lượt truy cập", "Visits")} ${fmtP(pv.change, 0)} · ${t("CVR shop", "Shop CVR")} ${all?.cvrPrev != null && all.cvrCur != null ? `${fmtP(all.cvrPrev, 2, false)} → ${fmtP(all.cvrCur, 2, false)} ` : ""}(${fmtP(pc.change, 1)}) · ${METRIC.aov} ${t("suy ra", "derived")} ${fmtP(pa.change, 1)}`;
-  }
-
   return (
     <>
       <DemoHead no={no} title={title} headline={headline} kpis={kpis} />
@@ -347,32 +298,6 @@ export const DemoShopPage: React.FC<DemoShopProps> = ({ no, title, control, mixe
         </div>
         <Tbl html={tbl(mktHead, mktRows, [5])} />
       </div>
-      {br3 && (
-        <div className="pn">
-          <div className="pnh">{t("Đóng góp của từng kênh vào thay đổi Total GMV", "Each channel's contribution to the Total GMV change")}</div>
-          <div className="pns">
-            {prevLbl} → {curLbl}.{" "}
-            {t(
-              `${inhouseLive ? "Brand tự live" : "Seller LIVE khác"} = phần Seller LIVE của tài khoản shop ngoài các phiên YFB. Product card cùng số với trang Tổng quan.${br3Residual ? " Chưa phân kênh = phần Total GMV mà 4 kênh trong file không cộng tới." : ""} Trục bắt đầu từ ${fmtM(br3Axis!)}.`,
-              `${inhouseLive ? "Brand in-house live" : "Other Seller LIVE"} = the shop account's Seller LIVE outside YFB sessions. Product card matches the Overview page.${br3Residual ? " Not assigned = the part of Total GMV the file's 4 channels do not add up to." : ""} Axis starts at ${fmtM(br3Axis!)}.`
-            )}
-          </div>
-          <Html html={br3} />
-        </div>
-      )}
-      {br4 && (
-        <div className="pn">
-          <div className="pnh">{t(`Phân rã Total GMV: lượt truy cập shop × CVR shop × ${METRIC.aov}`, `Total GMV breakdown: shop visits × shop CVR × ${METRIC.aov}`)}</div>
-          <div className="pns">
-            {t(
-              `Cả kỳ ${curLbl} so với ${prevLbl}. ${METRIC.aov} được suy ra từ ba số còn lại nên là ước tính; lượt truy cập làm tròn đến 1% nên mỗi phần có thể lệch vài chục triệu. Trục bắt đầu từ ${fmtM(br4Axis!)}.`,
-              `Whole period ${curLbl} vs ${prevLbl}. ${METRIC.aov} is derived from the other three figures, so it is an estimate; visits are rounded to 1%, so each part may be off by tens of millions. Axis starts at ${fmtM(br4Axis!)}.`
-            )}
-          </div>
-          <Html html={br4} />
-          <div className="legend"><span>{br4Legend}</span></div>
-        </div>
-      )}
       {insight}
     </>
   );
