@@ -77,6 +77,12 @@ const isDateCell = (v: unknown) => /^\d{2}-\d{2}-\d{4}$/.test(cell(v));
 const onlyFirst = (r: unknown[]) => cell(r[0]) !== "" && r.slice(1).every((c) => cell(c) === "");
 const blank = (r: unknown[]) => r.every((c) => cell(c) === "");
 
+/** Shopee đôi khi xuất file khi số liệu tổng hợp chưa sẵn (tải ngay sau nửa đêm, ngày cuối là hôm qua): bảng tổng / danh sách RỖNG hoặc toàn 0
+ *  trong khi bảng theo ngày vẫn có số. Lưu file đó sẽ cho report số 0 sai ⇒ chặn, bảo tải lại. */
+function emptyExport(label: string, what: string): Error {
+  return new Error(`File ${label}: ${what} nhưng bảng theo ngày vẫn có doanh số — Shopee chưa tổng hợp xong số liệu. Tải lại sau vài giờ, hoặc chọn ngày cuối lùi 1 ngày.`);
+}
+
 // ───────── Shop Stats ─────────
 
 /** Một khối "Ngày … + từng ngày": trả về chỉ số cột và các dòng ngày của sheet. */
@@ -209,6 +215,7 @@ function parseStats(sheets: ShopeeSheets): { rows: Row[]; period: { start: strin
   // Kiểm tra: bốn kênh chính cộng đúng Total; tổng ngày đúng Total.
   const warnings: string[] = [];
   const tot = rows.find((r) => r.t === "channelTotal" && r.basis === "placed");
+  if (tot && !(n(tot.total) > 0) && rows.some((r) => r.t === "day" && n(r.placed) > 0)) throw emptyExport("Shop Stats", "doanh số theo kênh bằng 0");
   if (tot) {
     const four = n(tot.card) + n(tot.live) + n(tot.video) + n(tot.affiliate);
     if (Math.abs(four - n(tot.total)) > Math.max(1000, n(tot.total) * 0.001)) {
@@ -248,6 +255,7 @@ function parseVoucher(sheets: ShopeeSheets): { rows: Row[]; period: { start: str
   if (!T || !D || !L) throw new Error("File Voucher không có đúng dòng tiêu đề cột.");
   const rows: Row[] = [];
   const period = shopeePeriod(T.data[0]?.[0]);
+  if (T.data[0] && !(n(T.data[0][T.h["Bán hàng (đặt hàng)"]]) > 0) && D.data.some((r) => n(r[D.h["Bán hàng (đặt hàng)"]]) > 0)) throw emptyExport("Voucher", "tổng và danh sách mã giảm giá rỗng");
   if (T.data[0]) rows.push({ t: "total", ...promoFields(T.data[0], T.h) });
   for (const r of D.data) {
     const date = shopeeDate(r[0]);
@@ -266,6 +274,7 @@ function parseDiscount(sheets: ShopeeSheets): { rows: Row[]; period: { start: st
   if (!T || !D || !L) throw new Error("File Discount không có đúng dòng tiêu đề cột.");
   const rows: Row[] = [];
   const period = shopeePeriod(T.data[0]?.[0]);
+  if (T.data.every((r) => !(n(r[T.h["Bán hàng (đặt hàng)"]]) > 0)) && D.data.some((r) => n(r[D.h["Bán hàng (đặt hàng)"]]) > 0)) throw emptyExport("Discount", "tổng theo loại và danh sách chương trình rỗng");
   for (const r of T.data) rows.push({ t: "type", type: cell(r[T.h["Loại khuyến mãi"]]), ...promoFields(r, T.h) });
   for (const r of D.data) {
     const date = shopeeDate(r[0]);
@@ -299,6 +308,7 @@ function parseComposition(sheets: ShopeeSheets): { rows: Row[]; period: { start:
     }
   }
   if (!rows.some((r) => r.t === "buyerGroup")) throw new Error("File Sales Composition không có bảng người mua mới / hiện tại.");
+  if (!rows.some((r) => r.t === "category")) throw new Error("File Sales Composition: bảng ngành hàng rỗng và người mua = 0 — Shopee chưa tổng hợp xong số liệu. Tải lại sau vài giờ, hoặc chọn ngày cuối lùi 1 ngày.");
   return { rows, period };
 }
 
@@ -366,7 +376,7 @@ export function parseShopeeShopSheets(sheets: ShopeeSheets, kind: ShopeeShopKind
   }
   const label = SHOPEE_SHOP_KIND_LABEL[kind];
   const p = monthOnly(period ?? shopeePeriod(fileName), label);
-  if (rows.length === 0) throw new Error(`File ${label} không có dòng dữ liệu nào.`);
+  if (rows.length === 0) throw new Error(`File ${label} không có dòng dữ liệu nào — Shopee xuất bảng rỗng (chưa tổng hợp xong số liệu). Tải lại sau vài giờ, hoặc chọn ngày cuối lùi 1 ngày.`);
   return {
     periodLabel: `${p.start} ~ ${p.end}`,
     periodStart: p.start,
