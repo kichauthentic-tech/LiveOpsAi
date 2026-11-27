@@ -42,6 +42,15 @@ export function decodeEdits(text: string | undefined | null): InsightEdits {
   }
 }
 
+/** Insight ops sửa tay CŨ hơn bản chụp số liệu: bảng đã đổi theo "Cập nhật số liệu" còn chữ sửa tay giữ số cũ.
+ *  Audit 27/11 (CROCS T10): 7/7 trang có Insight sửa tay đều cũ, ≥47 con số lệch bảng cùng trang ⇒ chặn Phát hành / Tải bản
+ *  gửi brand tới khi ops đọc lại (giữ bản sửa = lưu lại, đổi savedAt) hoặc khôi phục bản tự sinh. Ghi chú chỉ có ô rỗng thì không tính. */
+export function isInsightStale(note: { text: string; savedAt: string } | undefined | null, computedAt: string | null | undefined): boolean {
+  if (!note || !computedAt || Object.keys(decodeEdits(note.text)).length === 0) return false;
+  const a = Date.parse(note.savedAt), b = Date.parse(computedAt);
+  return Number.isFinite(a) && Number.isFinite(b) ? a < b : note.savedAt < computedAt;
+}
+
 /** Khối ops đã sửa ghi đè bản tự sinh; `own` chỉ có khi ops nhập. */
 export function shownBlocks(auto: InsightBlocks, edits: InsightEdits): InsightBlocks & { own: string } {
   return {
@@ -56,7 +65,11 @@ export function shownBlocks(auto: InsightBlocks, edits: InsightEdits): InsightBl
 const money = (v: number) => fmtVndShort(v);
 const sgn = (v: number) => (v >= 0 ? "+" : "−");
 const moneySigned = (v: number) => `${sgn(v)}${money(Math.abs(v))}`;
-const empty = (): InsightBlocks => ({ observe: t("Chưa đủ số liệu của trang này để nêu nhận định.", "Not enough data on this page to draw conclusions yet."), cause: "—", impact: "—", advise: "—" });
+// Audit 27/11: ô không có phát hiện (câu "chưa kết luận", ghi chú cách tính, việc của ops) ⇒ "—" để giao diện ẩn ô đó; trang
+// không còn ô nào thì bản gửi brand không vẽ khung Insight (DemoInsight). Tiêu đề trang đã nói "chưa đủ số liệu" khi thiếu số.
+// Bản tự sinh CROCS T11: 9/27 ô từng là chữ điền cho đủ 4 ô.
+const NONE = "—";
+const empty = (): InsightBlocks => ({ observe: NONE, cause: NONE, impact: NONE, advise: NONE });
 const join = (...xs: (string | null | undefined | false)[]) => xs.filter(Boolean).join(" ");
 
 // ---------- 1. Tổng quan & KPI ----------
@@ -163,12 +176,8 @@ export function keyMetricsBlocks(i: KeyMetricsInsightInput): InsightBlocks {
   const up = rows.filter((r) => r.tone === "up");
   const list = (xs: typeof rows) => xs.map((r) => `${r.label} ${signed(r.change!, 0)}`).join(", ");
   if (down.length === 0 && up.length === 0) {
-    return {
-      observe: t(`Cả tháng so với ${i.prevLabel}: không chỉ số nào tốt lên hay xấu đi từ 10%.`, `Full month vs ${i.prevLabel}: no metric improved or declined by 10% or more.`),
-      cause: t("Các chỉ số được đánh giá tốt hay xấu đều đổi dưới 10%, chưa kết luận được xu hướng.", "Every metric rated good or bad moved by less than 10%; no trend can be concluded yet."),
-      impact: t("Chưa có chỉ số nào cần xử lý riêng.", "No metric needs specific action."),
-      advise: t("Giữ chỉ số theo dõi hiện tại và đánh giá lại ở report tháng sau.", "Keep the current tracking metrics and review again in next month's report.")
-    };
+    // Tiêu đề trang đã nói "không chỉ số nào tốt lên hay xấu đi từ 10%" ⇒ không lặp thành 4 ô.
+    return empty();
   }
   const first = down.find((r) => !r.result) ?? down[0];
   return {
@@ -179,15 +188,14 @@ export function keyMetricsBlocks(i: KeyMetricsInsightInput): InsightBlocks {
     ),
     cause: first
       ? t(`${first.label} là chỉ số phễu đầu tiên suy giảm từ 10% (không tính chỉ số kết quả) (${signed(first.change!, 0)}); các chỉ số phía sau trong phễu thay đổi theo.`, `${first.label} is the first funnel metric to decline by 10% or more (excluding result metrics) (${signed(first.change!, 0)}); metrics further down the funnel follow.`)
-      : t("Các chỉ số cải thiện không kèm chỉ số nào suy giảm từ 10%.", "Metrics improved with no metric declining by 10% or more."),
-    impact: down.length
-      ? t(`${down.length} chỉ số suy giảm từ 10%; chưa suy ra tác động nếu chưa đối chiếu GMV/giờ ở trang Phân tích nguyên nhân.`, `${down.length} metric(s) declined by 10% or more; the impact is assessed against GMV/hour on the Root-cause page.`)
-      : t("Không có chỉ số nào suy giảm từ 10% ở cấp cả tháng.", "No decline of 10% or more at full-month level."),
+      : NONE,
+    // Tác động của chỉ số giảm đọc ở trang Phân tích nguyên nhân (cầu 5 yếu tố) — ô này từng chỉ trỏ sang trang đó.
+    impact: NONE,
     advise: i.mainMetric
       ? t(`Chỉ số theo dõi chính của tháng sau: ${i.mainMetric} (yếu tố kéo GMV/giờ nhiều nhất, trang Phân tích nguyên nhân)${first && first.label !== i.mainMetric ? `; ${first.label} theo dõi kèm, chỉ tiêu bằng mức ${i.prevLabel}` : ""}.`, `Main tracking metric for next month: ${i.mainMetric} (the factor moving GMV/hour the most, Root-cause page)${first && first.label !== i.mainMetric ? `; also track ${first.label} with a goal at the ${i.prevLabel} level` : ""}.`)
       : first
         ? t(`Dùng ${first.label} làm chỉ số theo dõi chính của tháng sau, theo từng loại ngày, với chỉ tiêu bằng mức ${i.prevLabel}.`, `Use ${first.label} as next month's main tracking metric, by day type, with a goal at the ${i.prevLabel} level.`)
-        : t("Giữ chỉ số theo dõi hiện tại.", "Keep the current tracking metrics.")
+        : NONE
   };
 }
 
@@ -232,12 +240,14 @@ export function nmvBlocks(i: NmvInsightInput): InsightBlocks {
             `Refund rate this period ${pctTxt(i.refundCur)}${i.refundPrev != null ? ` (${i.prevLabel}: ${pctTxt(i.refundPrev)}${why ? `, not comparable because ${why}` : ""}${delta != null ? `, ${sgn(delta)}${Math.abs(delta).toLocaleString(numLocale(), { maximumFractionDigits: 1 })} pts` : ""})` : ""}.`
           )
         : t("Chưa có Refund rate của kỳ này.", "No refund rate for this period yet."),
-    cause: t("Refund rate là số ghi nhận tại thời điểm xuất file; kỳ mới còn trong thời gian hoàn trả nên chưa đạt độ chín như kỳ cũ. File hiện chưa tách hoàn và hủy.", "The refund rate is as recorded when the file was exported; the latest period is still within the return window, so it is not as mature as earlier periods. The file does not yet separate returns from cancellations."),
+    // Câu cách tính lặp y hệt mỗi tháng ⇒ để ở "Phương pháp" của trang, không chiếm ô Nguyên nhân.
+    cause: NONE,
     impact: t(
       `NMV là số ước tính theo ${(i.nmvSource ?? "Refund rate thực của cả shop").replace(/^ước tính\s*[—-]\s*/, "").replace(/^theo\s+/, "")}${i.nmvSource && /mặc định/.test(i.nmvSource) && i.refundCur != null ? `, khác Refund rate thực ${pctTxt(i.refundCur)}` : ""} và có thể đổi khi hết thời gian hoàn trả${why ? "; không so chênh trực tiếp hai tháng" : ""}.${atPrevRate != null ? ` Nếu áp tỷ lệ ${pctTxt(i.refundPrev!)} của ${i.prevLabel}, NMV kỳ này khoảng ${money(atPrevRate)} thay vì ${money(i.nmvBase!.liveGmv * (1 - i.nmvBase!.rate / 100))}.` : ""}`,
       `NMV is an estimate based on ${(i.nmvSource ?? "the shop's actual refund rate").replace(/^estimated\s*[—-]\s*/i, "").replace(/^(based on|using)\s+/i, "")}${i.nmvSource && /default/i.test(i.nmvSource) && i.refundCur != null ? `, which differs from the actual refund rate of ${pctTxt(i.refundCur)}` : ""} and may change once the return window closes${why ? "; the two months are not compared directly" : ""}.${atPrevRate != null ? ` At the ${i.prevLabel} rate of ${pctTxt(i.refundPrev!)}, this period's NMV would be about ${money(atPrevRate)} instead of ${money(i.nmvBase!.liveGmv * (1 - i.nmvBase!.rate / 100))}.` : ""}`
     ),
-    advise: t("Ghi ngày xuất file của từng tháng, cập nhật Refund rate sau khi hết thời gian hoàn trả, và bổ sung file Order để tách hoàn và hủy.", "Record each month's file export date, update the refund rate after the return window closes, and add the Order file to separate returns from cancellations.")
+    // Bỏ việc nội bộ của ops (ghi ngày xuất file); giữ phần brand cần biết.
+    advise: t("Cần file Order (lý do hoàn/hủy theo SKU) để tách hoàn và hủy; Refund rate tháng này cập nhật lại sau khi hết thời gian hoàn trả.", "The Order file (return/cancel reasons by SKU) is needed to separate returns from cancellations; this month's refund rate is updated after the return window closes.")
   };
 }
 
@@ -293,7 +303,7 @@ export function shopBlocks(i: ShopInsightPageInput): InsightBlocks {
     ? t(`Rà soát GMV/giờ ở ${weak.map((d) => d.label).join(", ")} (trang Phân tích nguyên nhân) trước khi giữ nguyên số giờ live.`, `Review GMV/hour on ${weak.map((d) => d.label).join(", ")} (Root-cause page) before keeping the same live hours.`)
     : "";
   const neg = byAbs.filter((c) => c.delta < 0)[0];
-  const impact = neg ? t(`${neg.label} là kênh giảm lớn nhất (${moneySigned(neg.delta)}).`, `${neg.label} is the channel with the largest decline (${moneySigned(neg.delta)}).`) : t("Không kênh nào giảm so với kỳ trước.", "No channel declined vs the previous period.");
+  const impact = neg ? t(`${neg.label} là kênh giảm lớn nhất (${moneySigned(neg.delta)}).`, `${neg.label} is the channel with the largest decline (${moneySigned(neg.delta)}).`) : NONE;
   // Kênh giảm lớn nhất (ngoài livestream) luôn có việc riêng, kể cả khi livestream cũng cần rà soát.
   // Shop chỉ nhận livestream: kênh khác do brand vận hành ⇒ chỉ báo số cho brand, không nhận việc thay brand.
   const negAdvice = !neg || neg.yfb
@@ -454,16 +464,19 @@ export function productsBlocks(i: ProductsInsightInput): InsightBlocks {
   const cause = rAll.length || fAll.length
     ? join(rAll.length ? t(`${R} nhóm tăng hạng: ${rates(rAll)}.`, `${R} of risers: ${rates(rAll)}.`) : "", fAll.length ? t(`${R} nhóm giảm hạng: ${rates(fAll)}.`, `${R} of fallers: ${rates(fAll)}.`) : "", split)
     : t(`Chưa có ${R} theo SKU để giải thích thay đổi hạng.`, `No ${R} by SKU yet to explain rank changes.`);
-  const dec2 = (v: number) => v.toLocaleString(numLocale(), { maximumFractionDigits: 2 });
+  // Audit 27/11: "ROI" (GMV ÷ tiền giảm) = 1 ÷ mức giảm nên KHÔNG đo hiệu quả ⇒ nói bằng mức giảm (Giảm giá ÷ GMV, cùng cột
+  // bảng) và tỷ trọng ngân sách giảm giá; không xếp hạng "ROI thấp nhất".
   const p = i.promo;
-  const others = (p?.otherRois ?? []).filter((x) => x > 0);
-  const lowestRoi = !!p && p.roi != null && p.roi > 0 && others.length > 0 && p.roi < Math.min(...others);
+  const rateOf = (roi: number | null | undefined) => (roi != null && roi > 0 ? 100 / roi : null);
+  const pRate = rateOf(p?.roi);
+  const otherRates = (p?.otherRois ?? []).map(rateOf).filter((x): x is number => x != null);
+  const deepest = pRate != null && otherRates.length > 0 && pRate > Math.max(...otherRates);
   const discShare = p?.discount != null && p.discount > 0 && p.totalDiscount != null && p.totalDiscount > 0 ? (p.discount / p.totalDiscount) * 100 : null;
   const impact = i.promoNote != null ? i.promoNote : p
     ? join(
-        t(`Trong các chương trình khuyến mãi có kỳ chạy nằm trong tháng, Total GMV cao nhất thuộc về: ${p.name}`, `Among promotions whose period falls in the month, the highest Total GMV belongs to: ${p.name}`) + `${p.roi != null && p.roi > 0 ? `, ROI ${dec2(p.roi)}` : ""}.`,
-        discShare != null ? t(`Chương trình này dùng ${money(p.discount!)} tiền giảm giá, ${pctTxt(discShare, 0)} của ${money(p.totalDiscount!)} cả tháng.`, `It used ${money(p.discount!)} in discounts, ${pctTxt(discShare, 0)} of the month's ${money(p.totalDiscount!)}.`) : "",
-        lowestRoi ? t(`ROI này thấp nhất trong các chương trình có tiền giảm giá ở bảng (còn lại ${dec2(Math.min(...others))}–${dec2(Math.max(...others))}).`, `This is the lowest ROI among the discounting programmes in the table (the rest ${dec2(Math.min(...others))}–${dec2(Math.max(...others))}).`) : ""
+        t(`Trong các chương trình khuyến mãi có kỳ chạy nằm trong tháng, Total GMV cao nhất thuộc về: ${p.name}.`, `Among promotions whose period falls in the month, the highest Total GMV belongs to: ${p.name}.`),
+        discShare != null ? t(`Chương trình này dùng ${money(p.discount!)} tiền giảm giá${pRate != null ? ` (${pctTxt(pRate, 0)} GMV của chương trình)` : ""}, ${pctTxt(discShare, 0)} của ${money(p.totalDiscount!)} cả tháng.`, `It used ${money(p.discount!)} in discounts${pRate != null ? ` (${pctTxt(pRate, 0)} of its GMV)` : ""}, ${pctTxt(discShare, 0)} of the month's ${money(p.totalDiscount!)}.`) : "",
+        deepest ? t(`Đây là mức giảm sâu nhất trong các chương trình có tiền giảm giá ở bảng (còn lại ${pctTxt(Math.min(...otherRates), 0)}–${pctTxt(Math.max(...otherRates), 0)} GMV).`, `This is the deepest discount among the discounting programmes in the table (the rest ${pctTxt(Math.min(...otherRates), 0)}–${pctTxt(Math.max(...otherRates), 0)} of GMV).`) : ""
       )
     : t("Chưa có số liệu chương trình khuyến mãi của tháng.", "No promotion data for the month yet.");
   const rise = i.risers.find(bigMove);
@@ -472,7 +485,7 @@ export function productsBlocks(i: ProductsInsightInput): InsightBlocks {
     rise ? t(`Tăng thời lượng giới thiệu ${rise.name} trên live.`, `Give ${rise.name} more airtime on live.`) : "",
     drops.length ? t(`Kiểm tra tồn kho, giá và kịch bản chuyển đổi của ${drops.map((f) => f.name).join(", ")}.`, `Check stock, pricing and the conversion script for ${drops.map((f) => f.name).join(", ")}.`) : "",
     !rise && !drops.length ? t("Giữ cơ cấu SKU hiện tại; không SKU nào đổi hạng đáng kể.", "Keep the current SKU mix; no SKU changed rank significantly.") : "",
-    i.promoNote == null && lowestRoi && discShare != null && discShare >= 25 ? t(`Xem lại mức giảm của ${p!.name} trước khi lặp lại: ROI thấp nhất nhưng chiếm ${pctTxt(discShare, 0)} tiền giảm giá.`, `Review the discount level of ${p!.name} before repeating it: lowest ROI yet ${pctTxt(discShare, 0)} of the discount spend.`) : ""
+    i.promoNote == null && deepest && discShare != null && discShare >= 25 ? t(`Xem lại mức giảm của ${p!.name} trước khi lặp lại: giảm sâu nhất và chiếm ${pctTxt(discShare, 0)} tiền giảm giá cả tháng.`, `Review the discount level of ${p!.name} before repeating it: the deepest discount and ${pctTxt(discShare, 0)} of the month's discount spend.`) : ""
   );
   return { observe, cause, impact, advise };
 }
@@ -534,7 +547,7 @@ export function peopleBlocks(i: PeopleInsightInput): InsightBlocks {
     above.some((h) => h.borderline) || below.some((h) => h.borderline) ? t("Có host sát ngưỡng ý nghĩa thống kê, cần thêm dữ liệu tháng sau để kết luận.", "Some hosts are close to the significance threshold; next month's data is needed to conclude.") : "",
     small > 0 ? t(`${small} host dưới ${min} phiên chưa được xếp hạng.`, `${small} host(s) with fewer than ${min} sessions are not ranked.`) : "",
     !above.length && !below.length && small === 0 ? t("Chênh lệch giữa các host chưa đủ lớn để thay đổi cách xếp lịch.", "Differences between hosts are not large enough to change scheduling.") : ""
-  ) || t("Kết luận về host dựa trên so sánh gộp nhiều tháng, không dựa trên một tháng.", "Host conclusions are based on a pooled multi-month comparison, not a single month.");
+  ) || NONE; // câu cách so sánh (gộp nhiều tháng) đã ở chú thích bảng Host PFM
   const advise = join(
     above[0] ? t(`Cân nhắc thêm phiên cho ${above[0].name}.`, `Consider adding sessions for ${above[0].name}.`) : "",
     bestS && worstS && bestS !== worstS && (adjusted ? worstS.index! <= bestS.index! * 0.8 : worstS.gmvPerHour <= bestS.gmvPerHour * 0.8)
@@ -681,7 +694,7 @@ export function nextBlocks(i: NextInsightInput): InsightBlocks {
         creator ? t(`Còn thiếu ${creator}.`, `${creator} still missing.`) : ""
       ),
       cause: t(`Target của các phiên trong Kế Hoạch Tháng đang bằng 0.`, `The sessions in the month plan have a Target of 0.`),
-      impact: t("Chưa đặt Target thì chưa tính được GMV/giờ yêu cầu và chưa chấm được tiến độ.", "Without a Target, required GMV/hour cannot be calculated and progress cannot be tracked."),
+      impact: NONE, // hệ quả hiển nhiên của ô Nguyên nhân
       advise: sched.achieved != null && sched.achieved > 0
         ? t(`YFB đặt Target Live theo phiên; mốc tham chiếu: GMV/giờ ${curVi} ${money(sched.achieved)} × ${hours} giờ ≈ ${money(sched.achieved * sched.hours)}.`, `YFB will set Live Targets per session; reference point: ${curEn} GMV/hour ${money(sched.achieved)} × ${hours} hours ≈ ${money(sched.achieved * sched.hours)}.`)
         : t("YFB đặt Target Live theo phiên trong Kế Hoạch Tháng.", "YFB will set Live Targets per session in the month plan.")

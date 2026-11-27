@@ -497,15 +497,19 @@ export interface ShopeeTopSession {
   ctr: number | null;
   /** Orders/ATC (%) */
   ctor: number | null;
+  dayType?: string;
 }
 
+const TOP_DAY_LABEL = { daily: "Daily", dday: "D-Day", midmonth: "Mid-Month", payday: "Pay Day" } as const;
 export function shopeeTopSessions(s: ShopeeReportSnapshot, n = 10): ShopeeTopSession[] {
   return [...s.streams]
-    .filter((x) => x.hours > 0)
-    .sort((a, b) => b.gmv - a.gmv)
+    // Cùng luật trang Host TikTok (audit 27/11): xếp theo GMV/giờ, phiên từ 1 giờ, kèm loại ngày.
+    .filter((x) => x.hours >= 1)
+    .sort((a, b) => b.gmv / b.hours - a.gmv / a.hours)
     .slice(0, n)
     .map((x) => ({
       startTime: `${x.date}T${x.time || "00:00"}:00+07:00`,
+      dayType: TOP_DAY_LABEL[s.campDays?.[x.date] ?? "daily"],
       hours: x.hours,
       gmv: x.gmv,
       gmvPerHour: x.gmv / x.hours,

@@ -220,7 +220,8 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
   const h = s.headline;
   const o = s.overview;
   const { showToast } = useToast();
-  const [kmTab, setKmTab] = useState<ShopeeTab>("all");
+  // Audit 27/11 (cùng TikTok): Key Metrics chỉ "Cả tháng" — tab loại ngày trùng bảng "Số đo từng loại ngày" ở trang Nguyên nhân.
+  const kmTab: ShopeeTab = "all";
   const pm = useMemo(() => shopeePageModel(s), [s]);
   // Ads ngoài phạm vi dịch vụ (0190) ⇒ bỏ lời nhắc thiếu file Ads.
   const opsNotes = useMemo(() => (canManage ? shopeeNotes(s, "ops").filter((t) => scope.ads || !/file Ads/.test(t)) : []), [canManage, s, scope.ads]);
@@ -398,6 +399,7 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
   const insight = (page: ShopeeInsightPage) => (
     <DemoInsight
       auto={auto[page]}
+      label={PAGE_LABEL[page]}
       note={report?.sectionNotes?.[pageNoteKey(page)]}
       computedAt={s.computedAt}
       canManage={canManage}
@@ -481,7 +483,6 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
     }
   }
   const kmHead = [tr("Chỉ số", "Metric"), ...months.map((m) => monthShortLabel(m.month)), ...months.slice(1).map((m, i) => `${monthShortLabel(m.month)} ${tr("so", "vs")} ${monthShortLabel(months[i].month)}`)];
-  const kmTabs = SHOPEE_TABS.filter((t) => t === "all" || pm.km[t].sessions[pm.km[t].sessions.length - 1] > 0);
 
   // ======================= 3 · Đơn huỷ =======================
   const cancelCur = cancel[cancel.length - 1];
@@ -730,13 +731,6 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
                   `Green (better) / red (worse) when a metric changes 10% or more vs the month before. ${METRIC.liveHours} and volume metrics that follow hours (${SM.gmv}, ${METRIC.orders}, ${METRIC.itemsSoldShopee}, ${METRIC.viewers}, ${METRIC.atc}) are not rated good or bad.`
                 )}
               >
-                <div className="tabs" role="tablist">
-                  {kmTabs.map((t) => (
-                    <button key={t} type="button" role="tab" aria-selected={kmTab === t} className={kmTab === t ? "seg-on" : undefined} onClick={() => setKmTab(t)}>
-                      {SHOPEE_TAB_LABEL[t]} · {pm.km[t].sessions[pm.km[t].sessions.length - 1]} {tr("phiên", "sessions")}
-                    </button>
-                  ))}
-                </div>
                 <DemoTable html={tbl(kmHead, kmRows)} id="km" />
                 <DemoLegend>
                   <span>

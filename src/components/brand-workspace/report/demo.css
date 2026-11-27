@@ -61,7 +61,7 @@
 .rt .ic.r{--c: var(--blue);}
 .rt .ic.i{--c: var(--gold);}
 .rt .ic.a{--c: var(--green);}
-.rt .insbar{display: flex; align-items: center; gap: 8px; margin: 16px 0 -4px; font-size: 12px; font-weight: 700; color: var(--gold-dim);}
+.rt .insbar{display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 16px 0 -4px; font-size: 12px; font-weight: 700; color: var(--gold-dim);}
 .rt .insbar .sp{flex: 1;}
 .rt .insbar button{font: inherit; font-size: 12px; font-weight: 600; color: var(--muted); background: transparent; border: 1px solid var(--line); border-radius: 8px; padding: 4px 10px; cursor: pointer;}
 .rt .insbar button:hover{color: var(--cream);}

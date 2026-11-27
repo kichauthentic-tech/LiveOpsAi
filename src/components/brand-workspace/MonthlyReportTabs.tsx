@@ -233,7 +233,20 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     [month, prevMonth, bucketCur, bucketPrev]
   );
 
-  const topSessions = useMemo(() => [...(liveCurrent?.rows ?? [])].sort((a, b) => b.gmv - a.gmv).slice(0, 10), [liveCurrent]);
+  // Top 10 phiên (audit 27/11): xếp theo GMV/giờ (phiên từ 1 giờ) kèm host + loại ngày. Xếp theo GMV thì phiên dài lọt top dù
+  // GMV/giờ dưới trung vị (CROCS T10 #9: 5,4h, 15,2M/giờ < trung vị 18,9M), và bảng không nói phiên của ai, loại ngày nào.
+  const topSessions = useMemo(
+    () =>
+      [...(liveCurrent?.rows ?? [])]
+        .filter((r) => r.hours >= 1)
+        .sort((a, b) => b.gmvPerHour - a.gmvPerHour)
+        .slice(0, 10)
+        .map((r) => {
+          const host = String((r.sourceRow as Record<string, unknown> | undefined)?.hostName ?? "").trim();
+          return { ...r, host: host || undefined, dayType: DAY_TYPE_SHORT[bucketCur(vnDateOf(r.startTime))] };
+        }),
+    [liveCurrent, bucketCur]
+  );
 
   const completedInPeriod = useMemo(
     () => sessions.filter((s) => s.brandId === brandId && s.date >= start && s.date <= end && s.status === "Completed"),
@@ -433,12 +446,6 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     () => last4Months.map((m) => attributionMonth(shopDaysOf(m), monthRangeLocal(m).start, cutEndOf(m))),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [last4Months, view, hiddenMonths, trendDay]
-  );
-  // Cùng số liệu cắt theo loại ngày, khung camp của chính từng tháng.
-  const attributionTypes = useMemo(
-    () => last4Months.map((m) => attributionByType(shopDaysOf(m), monthRangeLocal(m).start, cutEndOf(m), bucketAny)),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [last4Months, view, hiddenMonths, trendDay, bucketAny]
   );
   const shopPiecesMissing = !Object.values(view.shopDays).some(Boolean) && !Object.values(view.cardGmv).some(Boolean);
 
@@ -925,6 +932,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   const pageInsight = (page: InsightPage) => (
     <PageInsight
       auto={insightAuto(page)}
+      label={SECTIONS.find((x) => x.id === page)?.label}
       note={monthlyReportRow?.sectionNotes?.[pageNoteKey(page)]}
       computedAt={snapshot.computedAt}
       canManage={canManage}
@@ -955,6 +963,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   const demoInsight = (page: InsightPage) => (
     <DemoInsight
       auto={insightAuto(page)}
+      label={SECTIONS.find((x) => x.id === page)?.label}
       note={monthlyReportRow?.sectionNotes?.[pageNoteKey(page)]}
       computedAt={snapshot.computedAt}
       canManage={canManage}
@@ -1370,6 +1379,8 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
           rows: topSessions.map((s, idx) => ({
             "#": idx + 1,
             "Bắt Đầu": fmtSessionStart(s.startTime),
+            "Host": s.host ?? "",
+            "Loại ngày": s.dayType ?? "",
             "Giờ live": n(s.hours),
             "GMV": n(s.gmv),
             "GMV/giờ": n(s.gmvPerHour),
@@ -1453,7 +1464,6 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             mixes={channelMixes.map((c) => (c ? { liveLinked: c.liveLinked, affiliate: c.affiliate, video: c.video, card: c.card, shopGmv: c.shopGmv } : null))}
             mixLabels={last4Months.map(trendColLabel)}
             attribution={attribution}
-            attributionTypes={attributionTypes}
             yfbGmv={trendStats.map((x) => x.stats.gmv)}
             shopCur={shopCur}
             shopPrev={shopPrevSame}

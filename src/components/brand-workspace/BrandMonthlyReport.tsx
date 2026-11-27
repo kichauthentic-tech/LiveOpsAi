@@ -1,6 +1,7 @@
 import { createPortal } from "react-dom";
 import { RtSkinContext } from "./report/theme";
-import React, { Suspense, useEffect, useMemo, useState } from "react";
+import React, { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { StaleInsightContext, staleInsightBlocker } from "./report/staleInsights";
 import { defaultReportMonth } from "../../lib/defaultMonth";
 import { LiveSession, ShiftSlot, UserRole, BrandMonthlyReport as BrandMonthlyReportType, BrandPlatformRate } from "../../types";
 import {
@@ -189,6 +190,18 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
   const [loading, setLoading] = useState(true);
   const [publishing, setPublishing] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // Khung Insight sửa tay đang cũ hơn bản chụp (đang hiện trên màn ops) ⇒ chặn Phát hành / Tải bản gửi brand (audit 27/11).
+  const [staleInsights, setStaleInsights] = useState<Record<string, string>>({});
+  const registerStale = useCallback((id: string, label: string | null) => {
+    setStaleInsights((cur) => {
+      if ((cur[id] ?? null) === label) return cur;
+      const next = { ...cur };
+      if (label == null) delete next[id];
+      else next[id] = label;
+      return next;
+    });
+  }, []);
+  const staleBlocker = staleInsightBlocker(Object.values(staleInsights));
 
   // Bản chụp số liệu (0119) — Report Tháng chỉ đọc bản này. Chưa có thì ops bấm "Tạo report" (quyết
   // định 2026-09-25: không tự dựng khi mở, ai bấm mới tốn tài nguyên).
@@ -323,6 +336,10 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
   const handlePublish = async () => {
     // Chốt tháng (27/10): file toàn shop phủ thiếu ngày ⇒ không phát hành (số shop và số livestream khác kỳ). Đọc dấu file mới nhất.
     setErrorMsg(null);
+    if (staleBlocker) {
+      setErrorMsg(staleBlocker);
+      return;
+    }
     try {
       const dates = sessions.filter((s) => s.brandId === brandId && platformOf(s) === platform && s.status !== "Cancelled").map((s) => s.date);
       const blocker = publishBlocker(platform, month, await fetchDataRawImportStamps(brandId), todayVn(), dates);
@@ -369,6 +386,10 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
   // PDF: mỗi trang report = 1 trang PDF dài (không ngắt A4), in qua hộp thoại của trình duyệt — chỉ khung có `pdf` (REPORT_VIEWS).
   const handleExport = async (kind: "html" | "pdf") => {
     if (exportHost || !stored) return;
+    if (staleBlocker) {
+      showToast(staleBlocker, "error");
+      return;
+    }
     const host = document.createElement("div");
     host.setAttribute("aria-hidden", "true");
     host.style.cssText = "position:fixed;left:-10000px;top:0;width:1180px;pointer-events:none";
@@ -587,6 +608,9 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
       {errorMsg && (
         <div className="p-3 bg-red-950/80 border border-red-800/50 rounded-xl text-red-300 text-xs font-semibold">{errorMsg}</div>
       )}
+      {canManage && staleBlocker && errorMsg !== staleBlocker && (
+        <div className="p-3 bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl text-[var(--danger)] text-xs font-semibold" data-testid="stale-insight-warn">{staleBlocker}</div>
+      )}
 
       {/* FIX L4 (audit 2026-08-21): banner này là cảnh báo cho Ops tự đối soát trước khi phát hành,
           không phải nội dung cho brand — trước đây hiện cho mọi role kể cả brand, khiến brand đọc
@@ -655,6 +679,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
               </div>
             }
           >
+            <StaleInsightContext.Provider value={registerStale}>
             <View.Render
               key={shownLang}
               brandId={brandId}
@@ -668,6 +693,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
               shiftSlots={shiftSlots}
               scope={reportScope}
             />
+            </StaleInsightContext.Provider>
           </Suspense>
 
             </>

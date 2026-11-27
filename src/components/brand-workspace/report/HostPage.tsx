@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { fmtVndShort } from "../../../lib/format";
 import { METRIC as BASE_METRIC, METRIC_SHOPEE } from "../../../lib/metricGlossary";
-import { HOST_DAY_TYPE_ORDER, MIN_SESSIONS_TO_COMPARE, DAY_TYPE_DIFF_THRESHOLD, dayTypeMetrics, sumDayTypeParts, vsTeam, type DayTypeMetrics, type DayTypePart, type HostDayTypeRow } from "../../../lib/performance/hostPerformance";
+import { HOST_DAY_TYPE_ORDER, DAY_TYPE_DIFF_THRESHOLD, dayTypeMetrics, sumDayTypeParts, vsTeam, type DayTypeMetrics, type DayTypePart, type HostDayTypeRow } from "../../../lib/performance/hostPerformance";
 import { reliabilityText, type HostReliability } from "../../../lib/report/deepAnalysis";
 import type { CampDayBucket } from "../../../lib/campaignDays";
 import type { SessionSpread } from "../../../lib/report/rhythm";
@@ -36,6 +36,10 @@ export interface HostSlotRow {
 export interface HostTopSession {
   roomId?: string | null;
   startTime: string;
+  /** Tên host của phiên (TikTok: từ ca; Shopee Live List không có host). */
+  host?: string;
+  /** Nhãn loại ngày (Daily / D-Day / …). */
+  dayType?: string;
   hours: number;
   gmv: number;
   gmvPerHour: number;
@@ -208,15 +212,17 @@ function hostDayTableHtml(d: HostPageData, b: CampDayBucket): string {
   const part = (r: HostDayTypeRow) => dayTypeMetrics(r.byBucket[b]);
   const t = dayTypeMetrics(d.team[b]);
   const hs = d.rows.map((r) => ({ name: r.name, m: part(r) })).filter((h) => h.m.sessions > 0).sort((a, b2) => b2.m.gmv - a.m.gmv);
+  // Audit 27/11 (CROCS T10): 44/53 mũi tên của bảng này đến từ host 1–4 phiên trong loại ngày (35/35 ở 3 tab Campaign) ⇒
+  // mũi tên chỉ cho host từ MIN_RANK_SESSIONS phiên, cùng luật biểu đồ phân tán; host ít phiên vẫn hiện số kèm số phiên.
   const cell = (txt: string, h: { m: DayTypeMetrics }, key?: "gmvPerHour" | "viewsPerHour" | "liveCtr" | "ctor") => {
-    const dv = key ? vsTeam(h.m, t, key) : null;
+    const dv = key && h.m.sessions >= MIN_RANK_SESSIONS ? vsTeam(h.m, t, key) : null;
     if (dv == null || Math.abs(dv) < DAY_TYPE_DIFF_THRESHOLD) return txt;
     return { t: `${txt} ${dv > 0 ? "▲" : "▼"}`, c: dv > 0 ? "up" : "dn" };
   };
   const rowOf = (label: string, f: (m: DayTypeMetrics) => string, key?: "gmvPerHour" | "viewsPerHour" | "liveCtr" | "ctor") => [label, f(t), ...hs.map((h) => cell(f(h.m), h, key))];
   const shopee = d.variant === "shopee";
   return tbl(
-    [tr("Chỉ số", "Metric"), tr("Cả team", "Whole team"), ...hs.map((h) => esc(`${d.shortName(h.name)}${h.m.sessions < MIN_SESSIONS_TO_COMPARE ? ` · ${h.m.sessions}` : ""}`))],
+    [tr("Chỉ số", "Metric"), tr("Cả team", "Whole team"), ...hs.map((h) => esc(`${d.shortName(h.name)}${h.m.sessions < MIN_RANK_SESSIONS ? ` · ${h.m.sessions}` : ""}`))],
     [
       rowOf(METRIC.gmv, (m) => fmtVndShort(m.gmv)),
       rowOf(`${METRIC.liveHours} · ${tr("phiên", "sessions")}`, (m) => `${fmtHours(m.hours)} · ${m.sessions}`),
@@ -247,6 +253,7 @@ export const HostPageBody: React.FC<{ data: HostPageData; children?: React.React
   const hs = hostsAll(d.rows);
   const team = teamAll(d.team);
   const shopee = d.variant === "shopee";
+  const topHasHost = d.top.some((s) => !!s.host);
   const viewsLabel = shopee ? METRIC.viewersPerHour : METRIC.viewsPerHour;
   const dayTabs = HOST_DAY_TYPE_ORDER.filter((b) => d.team[b].sessions > 0);
   const activeDay = dayTab && dayTabs.includes(dayTab) ? dayTab : dayTabs[0] ?? null;
@@ -306,7 +313,7 @@ export const HostPageBody: React.FC<{ data: HostPageData; children?: React.React
             ))}
           </div>
           <div className="tw"><table dangerouslySetInnerHTML={{ __html: hostDayTableHtml(d, activeDay) }} /></div>
-          <div className="legend"><span>{tr(`▲ ▼ = cao hơn / thấp hơn trung bình team từ ${DAY_TYPE_DIFF_THRESHOLD}% trở lên trong loại ngày đó (host từ ${MIN_SESSIONS_TO_COMPARE} phiên). Chưa loại trừ biến động ngẫu nhiên: ít phiên thì chỉ để tham khảo.`, `▲ ▼ = ${DAY_TYPE_DIFF_THRESHOLD}% or more above / below the team average for that day type (hosts with ${MIN_SESSIONS_TO_COMPARE}+ sessions). Random variation is not ruled out: treat small samples as indicative only.`)}</span></div>
+          <div className="legend"><span>{tr(`▲ ▼ = cao hơn / thấp hơn trung bình team từ ${DAY_TYPE_DIFF_THRESHOLD}% trở lên trong loại ngày đó (chỉ host từ ${MIN_RANK_SESSIONS} phiên; tên kèm số = số phiên khi chưa đủ). Chưa loại trừ biến động ngẫu nhiên.`, `▲ ▼ = ${DAY_TYPE_DIFF_THRESHOLD}% or more above / below the team average for that day type (only hosts with ${MIN_RANK_SESSIONS}+ sessions; a number after the name = sessions when fewer). Random variation is not ruled out.`)}</span></div>
         </div>
       )}
       <div className="stk">
@@ -340,13 +347,14 @@ export const HostPageBody: React.FC<{ data: HostPageData; children?: React.React
         )}
       </div>
       <div className="pn">
-        <div className="pnh">{tr(`Top ${d.top.length} phiên theo ${METRIC.gmv}`, `Top ${d.top.length} sessions by ${METRIC.gmv}`)}</div>
+        <div className="pnh">{tr(`Top ${d.top.length} phiên theo ${METRIC.gmvPerHour}`, `Top ${d.top.length} sessions by ${METRIC.gmvPerHour}`)}</div>
+        <div className="pns">{tr("Phiên từ 1 giờ trở lên.", "Sessions of 1 hour or longer.")}</div>
         <div className="tw">
           <table
             dangerouslySetInnerHTML={{
               __html: tbl(
-                ["#", tr("Bắt đầu", "Start"), tr("Giờ", "Hours"), METRIC.gmv, METRIC.gmvPerHour, "Orders", shopee ? METRIC.viewers : "Views", shopee ? METRIC.atcRate : METRIC.productCtr, shopee ? `${METRIC.orders}/${METRIC.atc}` : METRIC.ctor],
-                d.top.map((s, i) => [String(i + 1), fmtSessionStart(s.startTime), dec(s.hours, 1), fmtVndShort(s.gmv), fmtVndShort(s.gmvPerHour), fmtInt(s.orders), fmtInt(s.views), s.ctr != null ? fmtPct(s.ctr) : "—", s.ctor != null ? { t: fmtPct(s.ctor), c: !shopee && s.ctor >= 1.6 ? "up" : "" } : "—"])
+                ["#", tr("Bắt đầu", "Start"), ...(topHasHost ? ["Host"] : []), tr("Loại ngày", "Day type"), tr("Giờ", "Hours"), METRIC.gmvPerHour, METRIC.gmv, "Orders", shopee ? METRIC.viewers : "Views", shopee ? METRIC.atcRate : METRIC.productCtr, shopee ? `${METRIC.orders}/${METRIC.atc}` : METRIC.ctor],
+                d.top.map((s, i) => [String(i + 1), fmtSessionStart(s.startTime), ...(topHasHost ? [s.host ? esc(d.shortName(s.host)) : "—"] : []), s.dayType ?? "—", dec(s.hours, 1), fmtVndShort(s.gmvPerHour), fmtVndShort(s.gmv), fmtInt(s.orders), fmtInt(s.views), s.ctr != null ? fmtPct(s.ctr) : "—", s.ctor != null ? { t: fmtPct(s.ctor), c: !shopee && s.ctor >= 1.6 ? "up" : "" } : "—"])
               )
             }}
           />

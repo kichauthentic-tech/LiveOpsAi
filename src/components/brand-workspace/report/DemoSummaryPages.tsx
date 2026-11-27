@@ -3,14 +3,14 @@ import React, { useState } from "react";
 import { fmtFixed, fmtNum } from "../../../lib/format";
 import { CHANNEL, METRIC, metricFor } from "../../../lib/metricGlossary";
 import { fmtKeyMetric, KEY_METRIC_GROUPS, KEY_METRICS, type KeyMetricKey } from "../../../lib/report/keyMetrics";
-import { KEY_METRICS_TABS, keyMetricsTable, type KeyMetricsMonth, type KeyMetricsTab, type ScoreRow } from "../../../lib/report/brandReport";
+import { keyMetricsTable, type KeyMetricsMonth, type KeyMetricsTab, type ScoreRow } from "../../../lib/report/brandReport";
 import type { BridgePoint, PlanHourRow } from "../../../lib/report/reportVisuals";
 import type { CampDayBucket } from "../../../lib/campaignDays";
 import { parseRatePct, type RefundTrackRow } from "../../../lib/report/nextMonthPlan";
 import { DAY_TYPE_SHORT } from "./theme";
 import { columns, fmtP, hbars, pill, tbl, waterfall, type TableRow } from "./demoCharts";
 import { DemoHead, DemoKpis, DemoLegend, DemoPage, DemoPanel, DemoStack, DemoTable, Html, pcTone, type DemoKpi } from "./DemoBlocks";
-import { byLang, t, monthLong } from "../../../lib/displayLang";
+import { t, monthLong } from "../../../lib/displayLang";
 
 // Ba trang dựng đúng theo bản demo Report Tháng (scratchpad/build/template.html): Tổng quan & KPI (#p1), Key Metrics (#p10),
 // Hủy, hoàn & NMV (#p2). Component chỉ nhận số đã tính ở MonthlyReportTabs.tsx và trình bày; không tự tính nghiệp vụ.
@@ -66,7 +66,9 @@ export interface SummaryDemoProps {
 }
 
 export interface ChannelNames { total: string; live: string; sellerLive: string; affiliateLive: string; video: string; card: string }
-const TIKTOK_CHANNEL_NAMES: ChannelNames = { total: METRIC.totalGmv, live: "LIVE", sellerLive: CHANNEL.sellerLive, affiliateLive: CHANNEL.affiliateLive, video: CHANNEL.video, card: CHANNEL.productCard };
+// Dòng "live" = Seller LIVE + Affiliate LIVE. Audit 27/11: nhãn trơn "LIVE" (5,33B) nằm cạnh ô "LIVE GMV" (4,9B, chỉ phiên YFB)
+// đọc như cùng một số ⇒ ghi rõ là tổng hai kênh. Hàm (không hằng) để đổi theo ngôn ngữ report.
+const tiktokChannelNames = (): ChannelNames => ({ total: METRIC.totalGmv, live: t("Tổng LIVE (Seller + Affiliate)", "Total LIVE (Seller + Affiliate)"), sellerLive: CHANNEL.sellerLive, affiliateLive: CHANNEL.affiliateLive, video: CHANNEL.video, card: CHANNEL.productCard });
 
 /** GMV cả shop và 4 kênh của một kỳ (cùng ngày trong tháng) — lib/report/monthlyReportInsights.ts ChannelMix. */
 export interface ChannelSplit {
@@ -219,7 +221,7 @@ export const SummaryDemoPage: React.FC<SummaryDemoProps> = (p) => {
 
   if (p.channels) {
     const { cur, prev, throughDay } = p.channels;
-    const N = p.channelNames ?? TIKTOK_CHANNEL_NAMES;
+    const N = p.channelNames ?? tiktokChannelNames();
     const chg = (v: number | null | undefined) =>
       v == null ? null : <span style={{ color: !isBigChange(v) ? undefined : v >= 0 ? "var(--green)" : "var(--red)" }}>{v >= 0 ? "+" : "−"}{fmtNum(Math.abs(v), 0)}%</span>;
     const growth = (a: number | null | undefined, b: number | null | undefined) => (a != null && b != null && a > 0 ? (b / a - 1) * 100 : null);
@@ -401,7 +403,6 @@ const KM_ORDER: { grp?: string; key: KeyMetricKey }[] = [
   { grp: "conversion", key: "productImpressions" }, { key: "productClicks" }, { key: "ctr" }, { key: "liveCtr" }, { key: "ctor" },
   { grp: "basket", key: "upt" }, { key: "avgPrice" }, { key: "aov" }
 ];
-const TAB_NAME: Record<KeyMetricsTab, string> = byLang(() => ({ all: t("Cả tháng", "Whole month"), ...DAY_TYPE_SHORT }));
 
 export const KeyMetricsDemoPage: React.FC<{
   no: string;
@@ -415,8 +416,8 @@ export const KeyMetricsDemoPage: React.FC<{
   windowNote?: string;
   insight: React.ReactNode;
 }> = ({ no, title, headline, months, directShare, monthLabel, windowNote, insight }) => {
-  const [tab, setTab] = useState<KeyMetricsTab>("all");
-  const last = months.length - 1;
+  // Audit 27/11: chỉ còn "Cả tháng". 4 tab loại ngày trùng từng ô với bảng "Số đo từng loại ngày" ở trang Phân tích nguyên nhân.
+  const tab: KeyMetricsTab = "all";
   const table = keyMetricsTable(months, tab);
   const byKey = new Map(table.rows.map((r) => [r.def.key, r]));
   const rows: TableRow[] = [];
@@ -429,7 +430,9 @@ export const KeyMetricsDemoPage: React.FC<{
       ...r.values.map((v) => fmtKeyMetric(r.def, v)),
       ...r.changes.slice(1).map((c, i) => {
         if (c == null) return "—";
-        const neutral = o.key === "hours" || r.tones[i + 1] === "noise";
+        // Audit 27/11: chỉ số không có chiều tốt (Giờ live, UPT gồm quà tặng, Avg. price) không tô xanh/đỏ — Pay Day T10 UPT +31%
+        // từng tô xanh đậm dù tăng vì 2 chương trình tặng quà 24–25/10.
+        const neutral = r.def.goodWhenUp == null || r.tones[i + 1] === "noise";
         return { t: fmtP(c, 0), c: neutral ? "nt" : c > 0 ? "up" : "dn" };
       })
     ]);
@@ -459,17 +462,10 @@ export const KeyMetricsDemoPage: React.FC<{
       <DemoPanel
         title={t(`${KEY_METRICS.length} chỉ số, ${months.length === 3 ? "ba" : months.length} tháng ${windowNote ? `cùng kỳ ${windowNote}` : "cả tháng"}`, `${KEY_METRICS.length} metrics, ${months.length} months, ${windowNote ? `same period ${windowNote}` : "full month"}`)}
         sub={t(
-          `Tỷ lệ và số theo giờ tô xanh (tốt lên) / đỏ (xấu đi) khi đổi từ 10% trở lên so với tháng liền trước. ${METRIC.liveHours} và các chỉ số số lượng đi theo giờ (${METRIC.gmv}, ${METRIC.orders}, ${METRIC.itemsSold}, ${METRIC.productImpressions}, ${METRIC.productClicks}, ${METRIC.views}, ${METRIC.liveImpressions}) không đánh giá tốt hay xấu.`,
-          `Rates and per-hour figures turn green (better) / red (worse) when they change 10% or more vs the month before. ${METRIC.liveHours} and volume metrics that follow hours (${METRIC.gmv}, ${METRIC.orders}, ${METRIC.itemsSold}, ${METRIC.productImpressions}, ${METRIC.productClicks}, ${METRIC.views}, ${METRIC.liveImpressions}) are not rated good or bad.`
+          `Tỷ lệ và số theo giờ tô xanh (tốt lên) / đỏ (xấu đi) khi đổi từ 10% trở lên so với tháng liền trước. ${METRIC.liveHours} và các chỉ số số lượng đi theo giờ (${METRIC.gmv}, ${METRIC.orders}, ${METRIC.itemsSold}, ${METRIC.productImpressions}, ${METRIC.productClicks}, ${METRIC.views}, ${METRIC.liveImpressions}) không đánh giá tốt hay xấu; ${METRIC.upt} (gồm quà tặng) và ${METRIC.avgPrice} cũng không.`,
+          `Rates and per-hour figures turn green (better) / red (worse) when they change 10% or more vs the month before. ${METRIC.liveHours} and volume metrics that follow hours (${METRIC.gmv}, ${METRIC.orders}, ${METRIC.itemsSold}, ${METRIC.productImpressions}, ${METRIC.productClicks}, ${METRIC.views}, ${METRIC.liveImpressions}) are not rated good or bad; nor are ${METRIC.upt} (includes free gifts) and ${METRIC.avgPrice}.`
         )}
       >
-        <div className="tabs" role="tablist">
-          {KEY_METRICS_TABS.map((k) => (
-            <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? "seg-on" : undefined} onClick={() => setTab(k)}>
-              {TAB_NAME[k]} · {months[last].stats[k].sessions} {t("phiên", "sessions")}
-            </button>
-          ))}
-        </div>
         <DemoTable html={tbl(head, rows)} id="km" />
         <DemoLegend>
           {directShare && <span>{t("Dòng Direct vs Indirect lấy từ file Shop Analytics, tính trên mọi phiên của tài khoản shop.", "The Direct vs Indirect row comes from the Shop Analytics file, across all sessions of the shop account.")}</span>}
@@ -564,7 +560,7 @@ export const NmvDemoPage: React.FC<{
       const tail = old(m) || (!isCur && m.exportedAt) ? ` · ${fileTag(m)}` : isCur && curProv ? t(" · tạm tính, chưa chốt", " · provisional, not final") : "";
       const rateNote = isCur && nmvSource && nmvRate != null ? ` · ${t("tỷ lệ", "rate")} ${nmvSource}` : "";
       return `<div class="nm">${monthLong(m.month)}<small>${METRIC.liveGmv} ${amt(m.nmvGmv)} · ${t("hoàn", "refunds")} ${pct1(r * 100)}${tail}${rateNote}</small></div>
-    <div class="trk" style="height:26px${old(m) ? ";opacity:.45" : ""}"><div class="fill stk" style="width:${(nmv / mx) * 100}%"></div><div class="fill stk red" style="left:${(nmv / mx) * 100}%;width:${(ref / mx) * 100}%;opacity:.7"></div></div>
+    <div class="trk" style="height:26px${old(m) ? ";opacity:.45" : isCur && curProv ? ";opacity:.6" : ""}"><div class="fill stk" style="width:${(nmv / mx) * 100}%"></div><div class="fill stk red" style="left:${(nmv / mx) * 100}%;width:${(ref / mx) * 100}%;opacity:.7"></div></div>
     <div class="v">NMV ${amt(nmv)}${isCur && curProv ? t(" (tạm)", " (provisional)") : ""}</div>`;
     })
     .join("");
@@ -623,7 +619,9 @@ export const NmvDemoPage: React.FC<{
           </DemoPanel>
         )}
       </DemoStack>
-      {/* Bảng nhập Refund rate chốt là công cụ của ops — không vào file gửi brand (audit 30/10). */}
+      {/* Bảng nhập Refund rate chốt là công cụ của ops — không vào file gửi brand (audit 30/10), brand mở app cũng không thấy
+          (audit 27/11: Refund rate đã ở ô số + biểu đồ, bảng này là lần thứ ba). */}
+      {canManage && (
       <div data-export-hide>
       <DemoPanel
         title={t(`Theo dõi ${METRIC.refundRate} chính xác theo tháng`, `Final ${METRIC.refundRate} by month`)}
@@ -693,6 +691,7 @@ export const NmvDemoPage: React.FC<{
         </DemoLegend>
       </DemoPanel>
       </div>
+      )}
       <div className="pn">
         <details>
           <summary>{t("Phương pháp", "Methodology")}</summary>

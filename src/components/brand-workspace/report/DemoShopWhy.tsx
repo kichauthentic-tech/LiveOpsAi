@@ -1,8 +1,8 @@
 import { isBigChange } from "../../../lib/report/changeThreshold";
 import React, { useState } from "react";
-import { BLOCK_KEYS, BLOCK_LABEL, decodeEdits, encodeEdits, shownBlocks, whyHeadline, type BlockKey, type InsightBlocks, type InsightEdits } from "../../../lib/report/pageInsights";
+import { BLOCK_KEYS, BLOCK_LABEL, decodeEdits, encodeEdits, isInsightStale, shownBlocks, whyHeadline, type BlockKey, type InsightBlocks, type InsightEdits } from "../../../lib/report/pageInsights";
 import { errorMessage } from "../../../lib/errorMessage";
-import { DAY_TYPE, METRIC } from "../../../lib/metricGlossary";
+import { METRIC } from "../../../lib/metricGlossary";
 import type { ControlRow, ControlVerdict } from "../../../lib/report/deepAnalysis";
 import { controlLabel, controlVerdict } from "../../../lib/report/deepAnalysis";
 import type { DriverBreakdown } from "../../../lib/report/monthlyReportInsights";
@@ -14,12 +14,13 @@ import { dayAbsRows, DAY_ABS_METRICS } from "../../../lib/report/reportVisuals";
 import { KEY_METRICS, fmtKeyMetric } from "../../../lib/report/keyMetrics";
 import { fmtFixed } from "../../../lib/format";
 import { DAY_TYPE_SHORT } from "./theme";
-import { type AttributionByType, type AttributionMonth } from "../../../lib/report/liveAttribution";
+import { type AttributionMonth } from "../../../lib/report/liveAttribution";
 import { numLocale, byLang, t } from "../../../lib/displayLang";
 
 const BLUE = "#7fb0e0";
-import { W, columns, fmtM, fmtP, heat, hbars, pill, stack100, tbl, waterfall, type Cell } from "./demoCharts";
+import { W, fmtM, fmtP, heat, hbars, pill, stack100, tbl, waterfall, type Cell } from "./demoCharts";
 import { featureOffText } from "../../../lib/featureOff";
+import { useRegisterStaleInsight } from "./staleInsights";
 
 // Hai trang "Toàn shop & đóng góp của livestream YFB" và "Phân tích nguyên nhân" dựng theo demo Report Tháng đã chốt
 // (scratchpad/build/template.html, trang 3 và 4): cùng thứ tự khối, cùng class (demo.css, tiền tố .rt), số lấy từ dữ liệu app.
@@ -65,7 +66,9 @@ export const DemoInsight: React.FC<{
   computedAt: string;
   canManage: boolean;
   onSave: (text: string | null) => Promise<void>;
-}> = ({ auto, note, computedAt, canManage, onSave }) => {
+  /** Tên trang — để câu chặn Phát hành nêu đúng trang có Insight sửa tay cũ. */
+  label?: string;
+}> = ({ auto, note, computedAt, canManage, onSave, label }) => {
   const saved = decodeEdits(note?.text);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Record<BlockKey | "own", string>>({ observe: "", cause: "", impact: "", advise: "", own: "" });
@@ -73,6 +76,8 @@ export const DemoInsight: React.FC<{
   const [msg, setMsg] = useState<string | null>(null);
   const shown = shownBlocks(auto, saved);
   const edited = Object.keys(saved).length > 0;
+  const stale = canManage && isInsightStale(note, computedAt);
+  useRegisterStaleInsight(stale, label);
   const save = async (text: string | null) => {
     setSaving(true);
     setMsg(null);
@@ -106,11 +111,12 @@ export const DemoInsight: React.FC<{
     <>
       <div className="insbar">
         <span>{t("Insight tổng hợp", "Key insights")}</span>
-        <span className="st" aria-live="polite">{msg ?? (canManage && note && note.savedAt < computedAt && edited ? "Số liệu đã cập nhật sau lần sửa — đọc lại cho khớp" : "")}</span>
+        <span className="st" aria-live="polite" style={!msg && stale ? { color: "var(--red)" } : undefined}>{msg ?? (stale ? "Số liệu đã cập nhật sau lần sửa — đọc lại cho khớp, chưa phát hành được" : "")}</span>
         <span className="sp" />
         {canManage && (
           <>
             <button type="button" onClick={toggle} disabled={saving}>{editing ? (saving ? "Đang lưu…" : "Xong") : "Sửa insight"}</button>
+            {stale && !editing && note && <button type="button" onClick={() => void save(note.text)} disabled={saving}>Đã đọc lại, giữ bản sửa</button>}
             {edited && !editing && <button type="button" onClick={() => void save(null)} disabled={saving}>Khôi phục bản gốc</button>}
           </>
         )}
@@ -156,7 +162,6 @@ function axis(from: number, steps: number[]) {
   const lo = Math.min(...runs), hi = Math.max(...runs), span = Math.max(hi - lo, 1e7);
   return { min: Math.floor((lo - 0.7 * span) / 1e8) * 1e8, max: Math.ceil((hi + 0.33 * span) / 1e7) * 1e7 };
 }
-const m1 = (v: number) => fmtFixed(v / 1e6, 1) + "M";
 const M = (v: number, forceSign = true) => (forceSign && v >= 0 ? "+" : "") + fmtM(v);
 
 // ============ TRANG: Toàn shop & đóng góp của livestream YFB ============
@@ -176,8 +181,6 @@ export interface DemoShopProps {
   mixLabels: string[];
   /** Direct/Indirect Seller LIVE của 4 tháng (cùng thứ tự `mixes`); null = thiếu file hoặc bản chụp cũ. */
   attribution: (AttributionMonth | null)[];
-  /** Cùng số liệu cắt theo loại ngày, mỗi phần tử một tháng (cùng thứ tự `attribution`). */
-  attributionTypes: AttributionByType[];
   /** LIVE GMV YFB của 4 tháng ở cùng kỳ cắt với mixes. */
   yfbGmv: number[];
   shopCur: { gmv: number } | null;
@@ -192,30 +195,24 @@ const VERDICT: Record<ControlVerdict, [string, string]> = byLang(() => ({
   ops: [t("kém hơn các kênh còn lại", "worse than other channels"), "r"],
   market: [t("tương đương các kênh còn lại", "in line with other channels"), "m"]
 }));
-/** % đổi so kỳ trước: chỉ tô từ 10% (changeThreshold). */
-const chgColor = (v: number | null | undefined): "red" | "green" | undefined => (v == null || !isBigChange(v) ? undefined : v < 0 ? "red" : "green");
 const chgPct = (v: number) => ({ t: fmtP(v), c: !isBigChange(v) ? "nt" : v > 0 ? "up" : "dn" });
-export const DemoShopPage: React.FC<DemoShopProps> = ({ no, title, control, mixes, mixLabels, attribution, attributionTypes, yfbGmv, shopCur, shopPrev, window: w, traffic, inhouseLive = false, liveOnly = false, fallbackHeadline, insight }) => {
+export const DemoShopPage: React.FC<DemoShopProps> = ({ no, title, control, mixes, mixLabels, attribution, yfbGmv, shopCur, shopPrev, window: w, traffic, inhouseLive = false, liveOnly = false, fallbackHeadline, insight }) => {
   const rows = (["daily", "camp", "all"] as const).map((k) => control.find((r) => r.key === k)).filter((r): r is ControlRow => !!r);
   const all = control.find((r) => r.key === "all");
-  const camp = control.find((r) => r.key === "camp");
   const curLbl = range(w.curStart, w.curEnd), prevLbl = range(w.prevStart, w.prevEnd);
   const shopChg = pctOf(shopPrev?.gmv, shopCur?.gmv);
   const shareCur = all && shopCur && shopCur.gmv > 0 ? (all.liveCur / shopCur.gmv) * 100 : null;
   const sharePrev = all && shopPrev && shopPrev.gmv > 0 ? (all.livePrev / shopPrev.gmv) * 100 : null;
-  const aff = [mixes[2]?.affiliate ?? null, mixes[3]?.affiliate ?? null] as const;
-  const affChg = pctOf(aff[0], aff[1]);
-  const visRow = camp ?? all;
   // Brand tự live = Seller LIVE của tài khoản shop ngoài các phiên YFB (cùng cửa sổ ngày với nhóm đối chứng).
   const own = all ? [Math.max(0, all.shopLivePrev - all.livePrev), Math.max(0, all.shopLiveCur - all.liveCur)] as const : null;
   const ownChg = own ? pctOf(own[0], own[1]) : null;
   const kpis: DemoKpi[] = [
     { label: `Total GMV · ${curLbl}`, value: shopCur ? fmtM(shopCur.gmv) : "—", note: shopChg != null ? `${fmtP(shopChg, 1)} ${t("so với", "vs")} ${prevLbl}` : t("chưa có số kỳ trước", "no previous-period data") },
     { label: t("Tỷ trọng livestream YFB", "YFB livestream share"), value: shareCur != null ? fmtP(shareCur, 1, false) : "—", note: sharePrev != null && shareCur != null ? `${prevLbl}: ${fmtP(sharePrev, 1, false)} (${shareCur - sharePrev < 0 ? "−" : "+"}${fmtFixed(Math.abs(shareCur - sharePrev), 1)} ${t("điểm", "pts")})` : "" },
-    { label: `${t("Lượt truy cập shop", "Shop visits")} · ${visRow ? controlLabel(visRow.key) : ""}`, value: visRow?.visitorsChg != null ? fmtP(visRow.visitorsChg) : "—", note: visRow?.cvrPrev != null && visRow.cvrCur != null ? `${t("CVR shop", "Shop CVR")} ${fmtP(visRow.cvrPrev, 2, false)} → ${fmtP(visRow.cvrCur, 2, false)}` : "", color: chgColor(visRow?.visitorsChg) },
-    inhouseLive
-      ? { label: t("Brand tự live (Seller LIVE ngoài phiên YFB)", "Brand in-house live (Seller LIVE outside YFB sessions)"), value: own ? fmtM(own[1]) : "—", note: own ? `${prevLbl}: ${fmtM(own[0])}${ownChg != null ? ` (${fmtP(ownChg)})` : ""}` : "" }
-      : { label: "Affiliate LIVE", value: affChg != null ? fmtP(affChg) : "—", note: aff[0] != null && aff[1] != null ? `${m1(aff[0])} → ${m1(aff[1])}` : "", color: chgColor(affChg) }
+    // Audit 27/11: bỏ ô "Lượt truy cập shop" và ô "Affiliate LIVE" — cùng số đã có ở bảng so sánh và cầu kênh ngay dưới.
+    ...(inhouseLive
+      ? [{ label: t("Brand tự live (Seller LIVE ngoài phiên YFB)", "Brand in-house live (Seller LIVE outside YFB sessions)"), value: own ? fmtM(own[1]) : "—", note: own ? `${prevLbl}: ${fmtM(own[0])}${ownChg != null ? ` (${fmtP(ownChg)})` : ""}` : "" }]
+      : [])
   ];
   const headline = rows.length
     ? rows
@@ -224,11 +221,7 @@ export const DemoShopPage: React.FC<DemoShopProps> = ({ no, title, control, mixe
         .join(". ") || fallbackHeadline
     : fallbackHeadline;
 
-  // biểu đồ tăng trưởng
-  const grp = rows.map((r) => ({ l: `${controlLabel(r.key)} · ${r.days} ${t("ngày", "days")}`, v: [r.liveChg, r.restChg, r.visitorsChg] }));
-  const vals = grp.flatMap((g) => g.v).filter((v): v is number => v != null);
-  const cmpHtml = grp.length ? columns(grp, [{ color: "var(--gold)" }, { color: BLUE }, { color: "#8a8a94" }], { min: Math.floor(Math.min(0, ...vals) - 6), max: Math.ceil(Math.max(0, ...vals) + 8), h: 260, fmt: (v: number) => fmtP(v) }) : "";
-
+  // Audit 27/11: bỏ biểu đồ "Tăng trưởng GMV…" — in đúng 9 con số của bảng "So sánh livestream YFB với các kênh còn lại".
   // cơ cấu
   // Brand tự live: Seller LIVE tách thành livestream YFB + brand tự live (tháng thiếu số phiên YFB thì giữ một khối).
   const split = (c: ShopMonthMix, i: number) => (!inhouseLive ? [c.liveLinked] : yfbGmv[i] != null ? [Math.min(yfbGmv[i]!, c.liveLinked), Math.max(0, c.liveLinked - yfbGmv[i]!)] : [c.liveLinked, 0]);
@@ -271,28 +264,25 @@ export const DemoShopPage: React.FC<DemoShopProps> = ({ no, title, control, mixe
     x ? fmtP(x.indirectPct, 1, false) : "—",
     i > 0 ? shift(x, attribution[i - 1]) : "—"
   ]);
-  // Chi tiết theo loại ngày của tháng gần nhất, đặt cạnh tháng trước.
-  const lastIdx = attributionTypes.length - 1;
-  const typeKeys = (["daily", "dday", "midmonth", "payday"] as const).filter((k) => attributionTypes[lastIdx]?.[k]);
-  const typeHead = [t("Loại ngày", "Day type"), t("Số ngày", "Days"), "Direct GMV", "Indirect GMV", "Attributed GMV", "Indirect %", t("So tháng trước", "vs last month")];
-  const typeRows = typeKeys.map((k) => {
-    const x = attributionTypes[lastIdx][k]!;
-    return [DAY_TYPE_SHORT[k], `${x.days}`, fmtM(x.direct), fmtM(x.indirect), fmtM(x.attributed), fmtP(x.indirectPct, 1, false), shift(x, attributionTypes[lastIdx - 1]?.[k])];
-  });
-
-  // cầu đóng góp từng kênh: YFB / Seller LIVE khác / Affiliate / Video / Product card (card = phần còn lại cho cộng đúng)
-  let br3 = "", br3Axis: number | null = null;
+  // cầu đóng góp từng kênh: YFB / Seller LIVE khác / Affiliate / Video / Product card / Chưa phân kênh.
+  // Audit 27/11: trước đây Product card = phần còn lại cho cộng đúng ⇒ CROCS T10 trang 1 ghi Product card −9% (file Sản Phẩm)
+  // còn cầu này ghi +23M (4 kênh chỉ cộng 98% Total GMV, 140M chênh dồn vào card). Nay card lấy đúng số trang 1; phần chênh
+  // thành cột riêng "Chưa phân kênh" (chỉ khi ≥ 1M). Thiếu số card (file Sản Phẩm) thì vẫn lấy phần còn lại như cũ.
+  let br3 = "", br3Axis: number | null = null, br3Residual = false;
   const a = mixes[2], b = mixes[3];
   if (a && b && yfbGmv[2] != null && yfbGmv[3] != null) {
     const dYfb = yfbGmv[3] - yfbGmv[2];
     const dLive = b.liveLinked - a.liveLinked;
     const dAff = b.affiliate - a.affiliate, dVid = b.video - a.video;
     const dTot = b.shopGmv - a.shopGmv;
-    const dCard = dTot - dYfb - (dLive - dYfb) - dAff - dVid;
-    const steps = [dYfb, dLive - dYfb, dAff, dVid, dCard];
+    const rest = dTot - dYfb - (dLive - dYfb) - dAff - dVid;
+    const dCard = a.card != null && b.card != null ? b.card - a.card : rest;
+    const unassigned = rest - dCard;
+    br3Residual = Math.abs(unassigned) >= 1_000_000;
+    const steps = [dYfb, dLive - dYfb, dAff, dVid, dCard, ...(br3Residual ? [unassigned] : [])];
     const ax = axis(a.shopGmv, steps);
     br3Axis = ax.min;
-    const lab = [t("Livestream\nYFB", "YFB\nlivestream"), inhouseLive ? t("Brand\ntự live", "Brand\nin-house") : t("Seller LIVE\nkhác", "Other\nSeller LIVE"), "Affiliate\nLIVE", "Video", "Product\ncard"];
+    const lab = [t("Livestream\nYFB", "YFB\nlivestream"), inhouseLive ? t("Brand\ntự live", "Brand\nin-house") : t("Seller LIVE\nkhác", "Other\nSeller LIVE"), "Affiliate\nLIVE", "Video", "Product\ncard", t("Chưa\nphân kênh", "Not\nassigned")];
     br3 = waterfall(
       [
         { l: `Total GMV\n${prevLbl}`, v: a.shopGmv, t: "total", txt: fmtM(a.shopGmv) },
@@ -325,23 +315,6 @@ export const DemoShopPage: React.FC<DemoShopProps> = ({ no, title, control, mixe
   return (
     <>
       <DemoHead no={no} title={title} headline={headline} kpis={kpis} />
-      <div className="stk">
-        <div className="pn">
-          <div className="pnh">{t("Tăng trưởng GMV: livestream YFB, các kênh còn lại và lượt truy cập shop", "GMV growth: YFB livestream, other channels and shop visits")}</div>
-          <div className="pns">
-            {curLbl} {t("so với", "vs")} {prevLbl}.{" "}
-            {liveOnly
-              ? t("Các kênh còn lại (Affiliate LIVE, Video, Product card) là nhóm đối chứng: YFB chỉ vận hành livestream, không tác động các kênh này.", "The other channels (Affiliate LIVE, Video, Product card) are the control group: YFB runs livestream only and does not influence them.")
-              : t("Các kênh còn lại (Affiliate LIVE, Video, Product card) là nhóm đối chứng gần đúng: YFB không vận hành trực tiếp nhưng có đặt lịch creator và chạy Ads cho Product, Creator.", "The other channels (Affiliate LIVE, Video, Product card) are an approximate control group: YFB does not run them directly but books creators and runs Product and Creator Ads.")}
-            {inhouseLive ? t(" Phiên brand tự live không tính vào bên nào.", " Brand in-house live sessions are counted on neither side.") : ""}
-          </div>
-          <Html html={cmpHtml} />
-          <div className="legend">
-            <span><i style={{ background: "var(--gold)" }} />{t("Livestream YFB", "YFB livestream")}</span>
-            <span><i style={{ background: BLUE }} />{t("Các kênh còn lại", "Other channels")}</span>
-            <span><i style={{ background: "#8a8a94" }} />{t("Lượt truy cập shop", "Shop visits")}</span>
-          </div>
-        </div>
         <div className="pn">
           <div className="pnh">{t("Cơ cấu Total GMV theo kênh", "Total GMV mix by channel")}</div>
           <div className="pns">
@@ -351,19 +324,11 @@ export const DemoShopPage: React.FC<DemoShopProps> = ({ no, title, control, mixe
           <Html html={mixHtml} />
           <div className="legend">{segs.map((s) => <span key={s.name}><i style={{ background: s.color }} />{s.name}</span>)}</div>
         </div>
-      </div>
       {inhouseLive ? null : attribution.some(Boolean) ? (
         <div className="pn">
           <div className="pnh">{t("Direct GMV và Indirect GMV qua các tháng", "Direct GMV and Indirect GMV by month")}</div>
           <div className="pns">{t("Direct = đơn chốt ngay trong phiên; Indirect = đơn về sau từ người đã xem phiên. Số của mọi phiên trên tài khoản shop, cùng số ngày mỗi tháng. Tô màu khi Indirect đổi từ 5 điểm trở lên so với tháng trước.", "Direct = orders placed during the session; Indirect = later orders from people who watched. Covers every session on the shop account, same days each month. Highlighted when Indirect moves 5 pts or more vs last month.")}</div>
           <Tbl html={tbl(attrHead, attrRows)} />
-          {typeRows.length > 0 && (
-            <>
-              <div className="pnh" style={{ marginTop: 14 }}>{t("Chi tiết theo loại ngày", "Detail by day type")} · {mixLabels[lastIdx]}</div>
-              <div className="pns">{t(`${DAY_TYPE.daily} và từng loại ngày ${DAY_TYPE.campaign} (D-Day, Mid-Month, Pay Day), khung Campaign theo từng tháng. Mỗi loại chỉ vài ngày nên số dao động mạnh.`, `${DAY_TYPE.daily} and each ${DAY_TYPE.campaign} day type (D-Day, Mid-Month, Pay Day), using each month's Campaign windows. Each type covers only a few days, so figures swing widely.`)}</div>
-              <Tbl html={tbl(typeHead, typeRows)} />
-            </>
-          )}
         </div>
       ) : (
         <div className="pn">
@@ -373,7 +338,14 @@ export const DemoShopPage: React.FC<DemoShopProps> = ({ no, title, control, mixe
       )}
       <div className="pn">
         <div className="pnh">{t("So sánh livestream YFB với các kênh còn lại", "YFB livestream vs other channels")}</div>
-        <div className="pns">{t("Chênh lệch từ 10 điểm phần trăm trở lên mới xem là khác xu hướng chung của shop (15 điểm khi nhóm 4–6 ngày, 20 điểm khi dưới 4 ngày).", "Only a gap of 10 percentage points or more counts as differing from the shop's overall trend (15 pts for groups of 4–6 days, 20 pts under 4 days).")}</div>
+        <div className="pns">
+          {curLbl} {t("so với", "vs")} {prevLbl}.{" "}
+          {liveOnly
+            ? t("Các kênh còn lại (Affiliate LIVE, Video, Product card) là nhóm đối chứng: YFB chỉ vận hành livestream, không tác động các kênh này.", "The other channels (Affiliate LIVE, Video, Product card) are the control group: YFB runs livestream only and does not influence them.")
+            : t("Các kênh còn lại (Affiliate LIVE, Video, Product card) là nhóm đối chứng gần đúng: YFB không vận hành trực tiếp nhưng có đặt lịch creator và chạy Ads cho Product, Creator.", "The other channels (Affiliate LIVE, Video, Product card) are an approximate control group: YFB does not run them directly but books creators and runs Product and Creator Ads.")}
+          {inhouseLive ? t(" Phiên brand tự live không tính vào bên nào.", " Brand in-house live sessions are counted on neither side.") : ""}{" "}
+          {t("Chênh lệch từ 10 điểm phần trăm trở lên mới xem là khác xu hướng chung của shop (15 điểm khi nhóm 4–6 ngày, 20 điểm khi dưới 4 ngày).", "Only a gap of 10 percentage points or more counts as differing from the shop's overall trend (15 pts for groups of 4–6 days, 20 pts under 4 days).")}
+        </div>
         <Tbl html={tbl(mktHead, mktRows, [5])} />
       </div>
       {br3 && (
@@ -382,8 +354,8 @@ export const DemoShopPage: React.FC<DemoShopProps> = ({ no, title, control, mixe
           <div className="pns">
             {prevLbl} → {curLbl}.{" "}
             {t(
-              `${inhouseLive ? "Brand tự live" : "Seller LIVE khác"} = phần Seller LIVE của tài khoản shop ngoài các phiên YFB, Product card là số ước tính từ số làm tròn; hai cột này sai lệch vài chục triệu. Trục bắt đầu từ ${fmtM(br3Axis!)}.`,
-              `${inhouseLive ? "Brand in-house live" : "Other Seller LIVE"} = the shop account's Seller LIVE outside YFB sessions; Product card is estimated from rounded figures, so these two bars may be off by tens of millions. Axis starts at ${fmtM(br3Axis!)}.`
+              `${inhouseLive ? "Brand tự live" : "Seller LIVE khác"} = phần Seller LIVE của tài khoản shop ngoài các phiên YFB. Product card cùng số với trang Tổng quan.${br3Residual ? " Chưa phân kênh = phần Total GMV mà 4 kênh trong file không cộng tới." : ""} Trục bắt đầu từ ${fmtM(br3Axis!)}.`,
+              `${inhouseLive ? "Brand in-house live" : "Other Seller LIVE"} = the shop account's Seller LIVE outside YFB sessions. Product card matches the Overview page.${br3Residual ? " Not assigned = the part of Total GMV the file's 4 channels do not add up to." : ""} Axis starts at ${fmtM(br3Axis!)}.`
             )}
           </div>
           <Html html={br3} />
@@ -591,7 +563,8 @@ export const DemoWhyPage: React.FC<DemoWhyProps> = ({ no, title, fallbackHeadlin
                     const txt = cell.value != null ? fmtKeyMetric(def(r.key), cell.value) : "—";
                     if (i === 0) return `<td class="cellc base gs ${TAB_CLS[t]}">${txt}</td>`;
                     const v = cell.change;
-                    const neutral = r.key === "hours" || !!def(r.key).volume;
+                    // UPT gồm quà tặng (goodWhenUp null) tô xanh dương như Giờ live — không đánh giá tốt/xấu (audit 27/11).
+                    const neutral = r.key === "hours" || !!def(r.key).volume || def(r.key).goodWhenUp == null;
                     const st = v == null || !isBigChange(v) ? "" : (neutral ? heat(v, 40, BLUE, BLUE) : heat(v, 30)) + (cell.significant ? ";box-shadow:inset 0 0 0 1.5px var(--cream);font-weight:800" : "");
                     return `<td class="cellc" style="${st}">${txt}${v != null ? `<small>${fmtP(v)}</small>` : ""}</td>`;
                   })
@@ -636,8 +609,8 @@ export const DemoWhyPage: React.FC<DemoWhyProps> = ({ no, title, fallbackHeadlin
           <div className="legend">
             <span>
               {t(
-                `${keyMonths[1] ? monthShort(keyMonths[1].month) : ""} tô màu theo thay đổi so với ${first}, ${keyMonths[2] ? `${monthShort(keyMonths[2].month)} theo thay đổi so với ${monthShort(keyMonths[1].month)}` : ""} · ${first} là mốc, không tô · chỉ tô khi đổi từ 10% · xanh dương = ${METRIC.liveHours}`,
-                `${keyMonths[1] ? monthShort(keyMonths[1].month) : ""} coloured by change vs ${first}${keyMonths[2] ? `, ${monthShort(keyMonths[2].month)} by change vs ${monthShort(keyMonths[1].month)}` : ""} · ${first} is the baseline, not coloured · coloured only from 10% · blue = ${METRIC.liveHours}`
+                `${keyMonths[1] ? monthShort(keyMonths[1].month) : ""} tô màu theo thay đổi so với ${first}, ${keyMonths[2] ? `${monthShort(keyMonths[2].month)} theo thay đổi so với ${monthShort(keyMonths[1].month)}` : ""} · ${first} là mốc, không tô · chỉ tô khi đổi từ 10% · xanh dương = ${METRIC.liveHours}, ${METRIC.upt} (gồm quà tặng), không đánh giá tốt hay xấu`,
+                `${keyMonths[1] ? monthShort(keyMonths[1].month) : ""} coloured by change vs ${first}${keyMonths[2] ? `, ${monthShort(keyMonths[2].month)} by change vs ${monthShort(keyMonths[1].month)}` : ""} · ${first} is the baseline, not coloured · coloured only from 10% · blue = ${METRIC.liveHours}, ${METRIC.upt} (includes free gifts), not rated good or bad`
               )}
             </span>
           </div>

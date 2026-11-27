@@ -28,7 +28,8 @@ test("Tổng quan: nêu loại ngày thấp nhất so với Target và yếu t�
 
 test("Key Metrics: không chỉ số đổi từ 10% thì câu nói rõ điều đó", () => {
   const quiet = keyMetricsBlocks({ rows: [{ label: "GMV", change: -3, tone: "noise" }], prevLabel: "T9" });
-  expect(quiet.observe).toContain("không chỉ số nào tốt lên hay xấu đi từ 10%");
+  // Audit 27/11: tiêu đề trang đã nói điều này ⇒ 4 ô đều "—" (ẩn), không điền chữ cho đủ.
+  expect([quiet.observe, quiet.cause, quiet.impact, quiet.advise]).toEqual(["—", "—", "—", "—"]);
   const down = keyMetricsBlocks({ rows: [{ label: "LIVE impressions", change: 13, tone: "up" }, { label: "ERR", change: -15, tone: "down" }], prevLabel: "T9" });
   expect(down.observe).toContain("ERR −15%");
   expect(down.cause).toContain("ERR là chỉ số phễu đầu tiên suy giảm từ 10%");
@@ -45,7 +46,7 @@ test("Nguyên nhân: chọn yếu tố có đóng góp tuyệt đối lớn nh�
   expect(r.observe).toContain("Pay Day (−29%)");
   expect(r.impact).toContain("không ở lịch live");
   expect(whyBlocks({ gmvPerHourChange: -7, parts, significantDays: [], mix: null }).observe).toContain("Không loại ngày nào");
-  expect(whyBlocks({ gmvPerHourChange: null, parts: [], significantDays: [], mix: null }).observe).toContain("Chưa đủ số liệu");
+  expect(whyBlocks({ gmvPerHourChange: null, parts: [], significantDays: [], mix: null }).observe).toBe("—");
 });
 
 test("Host: chỉ nêu host có khoảng tin cậy không cắt trung bình và đủ 5 phiên", () => {
@@ -78,7 +79,7 @@ test("Shop / Ads / Affiliate / NMV / Kế hoạch: câu mẫu theo quy tắc, th
   const ads = adsBlocks({ cost: 342e6, target: 360e6, liveRoas: 14.7, buckets: [{ label: "Pay Day", cost: 72.6e6, target: 68e6, roas: 8.9 }, { label: "Daily", cost: 100e6, target: 120e6, roas: 21.7 }], zeroOrderDays: 0 });
   expect(ads.cause).toContain("Pay Day chi");
   expect(ads.impact).toContain("Không ngày nào");
-  expect(affiliateBlocks({ sessions: 0, creators: 0, gmv: 0, pctTarget: null, top: null, gmvPerHour: null, lowest: null }).observe).toContain("Chưa đủ");
+  expect(affiliateBlocks({ sessions: 0, creators: 0, gmv: 0, pctTarget: null, top: null, gmvPerHour: null, lowest: null }).observe).toBe("—");
   expect(nmvBlocks({ refundCur: 37.7, refundPrev: 36.9, prevLabel: "T9", nmvSource: null, usesCrmRate: false }).observe).toContain("37,7%");
   expect(nextBlocks({ nextLabel: "Tháng 11", hasLivePlan: false, hasCreatorPlan: true }).observe).toContain("chưa có Target Live");
 });

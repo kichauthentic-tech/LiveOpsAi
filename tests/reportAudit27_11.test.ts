@@ -119,10 +119,14 @@ describe("trang Sản phẩm", () => {
   it("có mã phản ví dụ ⇒ nói tỷ lệ không tách được hai nhóm", () => {
     expect(productsBlocks(base).cause).toContain("không tách được hai nhóm: B tăng hạng");
   });
-  it("chương trình GMV cao nhất nhưng ROI thấp nhất và tốn nhiều tiền giảm ⇒ nêu và đề xuất xem lại", () => {
+  it("chương trình GMV cao nhất, giảm sâu nhất và tốn nhiều tiền giảm ⇒ nêu bằng mức giảm, không bằng ROI", () => {
     const b = productsBlocks(base);
-    expect(b.impact).toContain("ROI này thấp nhất");
+    // roi 1,32 = GMV ÷ tiền giảm ⇒ mức giảm 76% GMV; chương trình khác 20–33%.
+    expect(b.impact).toContain("76% GMV của chương trình");
+    expect(b.impact).toContain("mức giảm sâu nhất");
+    expect(b.impact).not.toContain("ROI");
     expect(b.advise).toContain("Xem lại mức giảm của MD 3.11");
+    expect(b.advise).not.toContain("ROI");
   });
 });
 

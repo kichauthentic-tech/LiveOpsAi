@@ -2,7 +2,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { DemoShopPage } from "../src/components/brand-workspace/report/DemoShopWhy";
-import type { AttributionByType, AttributionMonth } from "../src/lib/report/liveAttribution";
+import type { AttributionMonth } from "../src/lib/report/liveAttribution";
 
 const m = (direct: number, indirect: number, days = 30): AttributionMonth => ({ direct, indirect, attributed: direct + indirect, indirectPct: (indirect / (direct + indirect)) * 100, days });
 const base = {
@@ -10,9 +10,7 @@ const base = {
   shopCur: null, shopPrev: null, window: { prevStart: "2026-09-01", prevEnd: "2026-09-30", curStart: "2026-10-01", curEnd: "2026-10-28" },
   traffic: null, fallbackHeadline: "x", insight: null
 };
-const noTypes: AttributionByType = { all: null, daily: null, dday: null, midmonth: null, payday: null };
-const render = (attribution: (AttributionMonth | null)[], attributionTypes: AttributionByType[] = attribution.map(() => noTypes)) =>
-  renderToStaticMarkup(React.createElement(DemoShopPage, { ...base, attribution, attributionTypes }));
+const render = (attribution: (AttributionMonth | null)[]) => renderToStaticMarkup(React.createElement(DemoShopPage, { ...base, attribution }));
 
 describe("khối Direct vs Indirect ở trang Toàn shop", () => {
   it("liệt kê từng tháng: Direct, Indirect, Attributed, Indirect %, chênh so tháng trước", () => {
@@ -27,15 +25,9 @@ describe("khối Direct vs Indirect ở trang Toàn shop", () => {
     expect(html).toMatch(/class="dn[^"]*"[^>]*>\+6,4 điểm/);
     expect(html).toMatch(/class="nt[^"]*"[^>]*>−2,4 điểm/);
   });
-  it("chi tiết theo loại ngày của tháng gần nhất, chỉ loại ngày có số", () => {
-    const cur: AttributionByType = { ...noTypes, daily: m(700, 300, 16), payday: m(100, 50, 3) };
-    const prev: AttributionByType = { ...noTypes, daily: m(800, 200, 16) };
-    const html = render([null, null, m(1, 1), m(1, 1)], [noTypes, noTypes, prev, cur]);
-    expect(html).toContain("Chi tiết theo loại ngày · T10");
-    expect(html).toContain("Daily");
-    expect(html).toContain("Pay Day");
-    expect(html).not.toContain("<td>D-Day</td>");
-    expect(html).toMatch(/class="dn[^"]*"[^>]*>\+10,0 điểm/);
+  it("không còn bảng con theo loại ngày (audit 27/11: 3–4 ngày mỗi nhóm, số dao động mạnh)", () => {
+    const html = render([null, null, m(1, 1), m(1, 1)]);
+    expect(html).not.toContain("Chi tiết theo loại ngày");
   });
   it("chưa có số ⇒ nhắc bấm Cập nhật, không vẽ 0%", () => {
     const html = render([null, null, null, null]);

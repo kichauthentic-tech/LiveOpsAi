@@ -166,10 +166,12 @@ export function skuTableHtml(sku: SkuMoves, images: (name: string) => string | u
 }
 
 // ---- Bảng khuyến mãi ----
+// Audit 27/11: cột "ROI = GMV ÷ tiền giảm" chỉ là 1 ÷ mức giảm (VC 5% → 14,9; VC 10% → 7,1; MD giảm sâu → 1,7) nên xếp chương
+// trình theo độ sâu ưu đãi chứ không theo hiệu quả ⇒ in thẳng tỷ lệ "Giảm giá ÷ GMV", không tô tốt/xấu.
 export function promoTableHtml(promo: PromotionMonthSlice): string {
   return tbl(
-    [tr("Chương trình", "Programme"), "GMV", "Orders", "AOV", tr("Giảm giá", "Discount"), "ROI"],
-    promo.items.map((p) => [esc(p.name), fmtVndShort(p.gmv), fmtInt(p.orders), fmtVndShort(p.aov), p.discount != null ? fmtVndShort(p.discount) : "—", p.roi != null && p.roi > 0 ? { t: dec(p.roi, 2), c: p.roi < 2 ? "dn" : "" } : "—"])
+    [tr("Chương trình", "Programme"), "GMV", "Orders", "AOV", tr("Giảm giá", "Discount"), tr("Giảm giá ÷ GMV", "Discount ÷ GMV")],
+    promo.items.map((p) => [esc(p.name), fmtVndShort(p.gmv), fmtInt(p.orders), fmtVndShort(p.aov), p.discount != null ? fmtVndShort(p.discount) : "—", p.discount != null && p.discount > 0 && p.gmv > 0 ? `${dec((p.discount / p.gmv) * 100, 1)}%` : "—"])
   );
 }
 
@@ -316,7 +318,7 @@ export const ProductsPageBody: React.FC<{
       {data.promo && data.promo.items.length > 0 && (
         <div className="pn">
           <div className="pnh">{tr("Top chương trình khuyến mãi", "Top promotions")}</div>
-          <div className="pns">{tr("Chỉ chương trình có kỳ chạy nằm trong tháng (chương trình chưa kết thúc tính tới ngày xuất file) · cột GMV là Total GMV của chương trình · ROI = GMV ÷ tiền giảm giá · chương trình tặng quà có tiền giảm giá bằng 0 vì là quà tặng.", "Only programmes whose period falls in the month (unfinished ones count up to the file export date) · the GMV column is the programme's Total GMV · ROI = GMV ÷ discount · gift programmes show zero discount because the item is a gift.")}</div>
+          <div className="pns">{tr("Chỉ chương trình có kỳ chạy nằm trong tháng (chương trình chưa kết thúc tính tới ngày xuất file) · cột GMV là Total GMV của chương trình · Giảm giá ÷ GMV = mức ưu đãi thực của chương trình, không phải hiệu quả (GMV gồm cả đơn sẽ có dù không có chương trình) · chương trình tặng quà có tiền giảm giá bằng 0 vì là quà tặng.", "Only programmes whose period falls in the month (unfinished ones count up to the file export date) · the GMV column is the programme's Total GMV · Discount ÷ GMV = the programme's effective discount depth, not its effectiveness (GMV includes orders that would have happened anyway) · gift programmes show zero discount because the item is a gift.")}</div>
           <div className="tw">
             <table dangerouslySetInnerHTML={{ __html: promoTableHtml(data.promo) }} />
           </div>

@@ -53,7 +53,7 @@ export function keyMetricsHeadline(i: KeyMetricsHeadlineInput): string {
 /** Trang khác: câu đầu của khối Quan sát (đã là câu có số); trang chưa đủ số thì nói thẳng. */
 export function observeHeadline(b: InsightBlocks, fallback: string): string {
   const first = b.observe.split(/(?<=[.!?])\s+(?=[A-ZÀ-Ỵ0-9])/)[0]?.trim();
-  if (!first || /^(Chưa đủ số liệu|Not enough data)/.test(first)) return fallback;
+  if (!first || first === "—" || /^(Chưa đủ số liệu|Not enough data)/.test(first)) return fallback;
   return first;
 }
 
