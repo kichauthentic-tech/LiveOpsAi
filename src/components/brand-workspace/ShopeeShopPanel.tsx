@@ -176,7 +176,7 @@ export function ShopeeShopPanel({ brandId, brandName, canManage }: Props) {
           </h3>
           <p className="text-2xs text-[var(--text-faint)] mt-1 max-w-3xl">
             Chỉ cần với brand dùng dịch vụ <b>whole shop</b>. Mỗi tháng tải 5 file từ Seller Centre (một tháng trọn, tải sau khi hết tháng, cùng một ngày): <b>Shop Stats</b>, <b>Voucher</b>, <b>Discount</b>,{" "}
-            <b>Sales Composition</b>, <b>Sản phẩm cả shop</b>. Thả cả 5 file vào một ô, app tự nhận loại. Giao diện Seller Centre phải để tiếng Việt.
+            <b>Sales Composition</b>, <b>Sản phẩm cả shop</b>. Thả cả 5 file vào một ô, app tự nhận loại. Giao diện Seller Centre để tiếng Việt hoặc tiếng Anh đều được.
           </p>
         </div>
         <MonthPicker value={month} onChange={setMonth} size="sm" ariaLabel="Tháng" />

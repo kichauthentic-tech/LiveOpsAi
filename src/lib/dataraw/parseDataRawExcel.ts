@@ -3,6 +3,7 @@ import { buildProductListAgg } from "./productListAgg";
 import { parseAdsCampaignOverview } from "./adsCampaignOverview";
 import { parseCsvRows, parseShopeeRows, type ShopeeFileType } from "./shopeeFiles";
 import { detectShopeeShopKind, parseShopeeShopSheets, SHOPEE_SHOP_KINDS, type ShopeeShopKind, type ShopeeSheets } from "./shopeeShop";
+import { translateShopeeSheets } from "./shopeeEnglish";
 import { detectShopeeAdsKind, parseShopeeAdsRows, parseShopeeProductAdsRows, parseShopeeShopAdsRows, type ShopeeAdsKind } from "./shopeeAds";
 
 // Parser cho module Dataraw Brand Workspace (migration 0052) — 4 report Excel export tay từ
@@ -284,7 +285,7 @@ export async function parseDataRawExcel(file: File, reportType: DataRawReportTyp
     case "shopee_voucher":
     case "shopee_discount":
     case "shopee_composition":
-    case "shopee_shop_products": return parseShopeeShopSheets(await readAllSheets(buf), reportType as ShopeeShopKind, file.name);
+    case "shopee_shop_products": return parseShopeeShopSheets(translateShopeeSheets(await readAllSheets(buf)), reportType as ShopeeShopKind, file.name);
     case "shop_promotion": return parseShopPromotion(rows);
     case "product_list": return parseProductList(rows);
     case "live_analysis":
@@ -309,8 +310,8 @@ export async function parseShopeeAdsAuto(file: File): Promise<{ kind: ShopeeAdsK
 /** File cả shop Shopee: tự nhận 1 trong 5 loại theo tên sheet / cột rồi đọc — thả cả 5 file vào một ô. */
 export async function parseShopeeShopAuto(file: File): Promise<{ kind: ShopeeShopKind; parsed: ParsedDataRawImport }> {
   if (/\.csv$/i.test(file.name)) throw new Error(`"${file.name}" là file .csv — 5 file cả shop đều là .xlsx.`);
-  const sheets = await readAllSheets(await file.arrayBuffer());
+  const sheets = translateShopeeSheets(await readAllSheets(await file.arrayBuffer()));
   const kind = detectShopeeShopKind(sheets);
-  if (!kind) throw new Error(`"${file.name}" không phải 1 trong ${SHOPEE_SHOP_KINDS.length} file cả shop Shopee (Shop Stats, Voucher, Discount, Sales Composition, Sản phẩm cả shop). File phải xuất từ Seller Centre bằng giao diện tiếng Việt.`);
+  if (!kind) throw new Error(`"${file.name}" không phải 1 trong ${SHOPEE_SHOP_KINDS.length} file cả shop Shopee (Shop Stats, Voucher, Discount, Sales Composition, Sản phẩm cả shop). File phải xuất từ Seller Centre (giao diện tiếng Việt hoặc tiếng Anh).`);
   return { kind, parsed: parseShopeeShopSheets(sheets, kind, file.name) };
 }
