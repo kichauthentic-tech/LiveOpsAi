@@ -18,7 +18,7 @@ const CAMPAIGN_DAY_ICONS: Record<CampaignDayType, typeof Flame> = {
 };
 
 /** Preset theo từng lưới lịch: bù đúng padding ngang của ô + khe lưới (`--camp-gap`). */
-export type CampaignRibbonVariant = "poster" | "liveMonth" | "liveWeek";
+export type CampaignRibbonVariant = "poster" | "liveMonth" | "liveWeek" | "liveMonthCompact";
 
 const RIBBON_PRESETS: Record<
   CampaignRibbonVariant,
@@ -47,6 +47,16 @@ const RIBBON_PRESETS: Record<
     iconSize: "w-3 h-3",
     capStart: "rounded-tl-2xl",
     capEnd: "rounded-tr-2xl"
+  },
+  // LiveCalendar month cell ô gọn (màn hẹp, lib/calendarFit.ts): p-1, lưới gap-1, bo góc `rounded-xl` ở mọi cỡ.
+  liveMonthCompact: {
+    wrapper: "-mx-1 -mt-1 [--camp-gap:4px]",
+    height: "h-[19px]",
+    ribbonHeight: "h-[23px]",
+    text: "text-2xs",
+    iconSize: "w-3 h-3",
+    capStart: "rounded-tl-xl",
+    capEnd: "rounded-tr-xl"
   },
   // LiveCalendar week cell: p-3, lưới gap-3, bo góc ô `rounded-2xl` — mỗi ô là 1 card viền riêng
   // (không dùng chung nền lưới như month), nhưng kỹ thuật bù âm margin/khe lưới vẫn giống hệt.

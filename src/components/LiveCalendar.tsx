@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo, useContext } from "react";
+import React, { useState, useEffect, useMemo, useContext, useCallback, useRef } from "react";
+import { MONTH_FULL_MIN, addDays, shortTime, visibleDayCount, windowDays } from "../lib/calendarFit";
 import SearchSelect from "./ui/SearchSelect";
 import { LiveSession, ShiftSlot, ShiftRegistration, Studio, Talent, Brand, PromoScheme, UserRole, BrandStudio, AuditLogEntry } from "../types";
 import { planTargetOf } from "../lib/performance/targetAllocation";
@@ -120,6 +121,21 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   const talentView = currentRole === "talent";
   const [viewMode, setViewMode] = useState<"month" | "week" | "day" | "talent_workload">(talentView ? "week" : "day");
   const [onlyMine, setOnlyMine] = useState(true);
+  // Lịch vừa màn (26/11, lib/calendarFit.ts): đo bề rộng thật của lưới thay vì ép min-w-[1080px] rồi bắt vuốt ngang.
+  const [gridW, setGridW] = useState(0);
+  const gridObserver = useRef<ResizeObserver | null>(null);
+  const gridBoxRef = useCallback((el: HTMLDivElement | null) => {
+    gridObserver.current?.disconnect();
+    gridObserver.current = null;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver((entries) => setGridW(Math.round(entries[0].contentRect.width)));
+    ro.observe(el);
+    gridObserver.current = ro;
+  }, []);
+  // Ngày đầu của khung Lịch Tuần khi màn chỉ đủ chỗ < 7 ngày (null = theo ngày đang chọn).
+  const [weekWinStart, setWeekWinStart] = useState<string | null>(null);
+  const weekCols = visibleDayCount(gridW);
+  const monthCompact = gridW > 0 && gridW < MONTH_FULL_MIN;
   // Đồng hồ phút cho app talent: ca đang live nhưng đoạn của riêng họ đã hết (đổi người giữa ca) phải chuyển "Đã xong" đúng giờ,
   // trong khi `sessions` giữ nguyên tham chiếu (withEffectiveStatus chỉ đổi khi cả ca đổi trạng thái).
   const [clockMs, setClockMs] = useState(() => Date.now());
@@ -464,6 +480,8 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
       } else {
         setCurrentMonth(currentMonth - 1);
       }
+    } else if (viewMode === "week" && weekCols < 7) {
+      moveWeekWindow(-weekCols);
     } else if (viewMode === "week") {
       const d = toLocalDate(selectedDate);
       d.setDate(d.getDate() - 7);
@@ -490,6 +508,8 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
       } else {
         setCurrentMonth(currentMonth + 1);
       }
+    } else if (viewMode === "week" && weekCols < 7) {
+      moveWeekWindow(weekCols);
     } else if (viewMode === "week") {
       const d = toLocalDate(selectedDate);
       d.setDate(d.getDate() + 7);
@@ -508,8 +528,19 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
     }
   };
 
+  // Lịch Tuần ít hơn 7 ngày: lùi/tới đúng số ngày đang hiện, ngày đầu khung thành ngày đang chọn.
+  const moveWeekWindow = (delta: number) => {
+    const next = addDays(weekWinStart ?? selectedDate, delta);
+    setWeekWinStart(next);
+    setSelectedDate(next);
+    const parsed = parseDateString(next);
+    setCurrentYear(parsed.year);
+    setCurrentMonth(parsed.month);
+  };
+
   const handleGoToday = () => {
     const today = getTodayDateString();
+    setWeekWinStart(null);
     setSelectedDate(today);
     const parsed = parseDateString(today);
     setCurrentYear(parsed.year);
@@ -570,6 +601,18 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
 
   // Current Week dates for Week View
   const currentWeekDates = getWeekDates(selectedDate);
+  // Khung Lịch Tuần đang hiện: đủ chỗ 7 ngày ⇒ y như cũ (T2–CN); hẹp hơn ⇒ weekCols ngày liền nhau từ ngày đầu khung.
+  const WEEK_DAY_NAMES = ["Chủ Nhật", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"];
+  const weekStripDays = getWeekDates(weekWinStart ?? selectedDate);
+  const weekShownDates =
+    weekCols >= 7
+      ? currentWeekDates
+      : windowDays(weekWinStart ?? selectedDate, weekCols).map((d) => ({ dateStr: d, dayName: WEEK_DAY_NAMES[toLocalDate(d).getDay()], dayNum: Number(d.slice(8)) }));
+  // Bấm một ngày trong khung hẹp: chỉ đánh dấu ngày, khung đứng yên (không nhảy theo ngày vừa bấm).
+  const pickWeekDay = (d: string) => {
+    if (weekCols < 7 && !weekWinStart) setWeekWinStart(weekShownDates[0]?.dateStr ?? d);
+    setSelectedDate(d);
+  };
 
   // Month Grid Days for Month View
   const monthGridDays = getMonthGridDays(currentYear, currentMonth);
@@ -714,7 +757,8 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
 
               <span className="font-mono font-bold text-[var(--text)] px-2.5 text-xs text-center min-w-[140px]">
                 {viewMode === "month" && `Tháng ${currentMonth < 10 ? '0' + currentMonth : currentMonth} / ${currentYear}`}
-                {viewMode === "week" && `Tuần (${currentWeekDates[0]?.dayNum}/${parseDateString(currentWeekDates[0]?.dateStr || '').month} - ${currentWeekDates[6]?.dayNum}/${parseDateString(currentWeekDates[6]?.dateStr || '').month})`}
+                {viewMode === "week" && weekCols >= 7 && `Tuần (${currentWeekDates[0]?.dayNum}/${parseDateString(currentWeekDates[0]?.dateStr || '').month} - ${currentWeekDates[6]?.dayNum}/${parseDateString(currentWeekDates[6]?.dateStr || '').month})`}
+                {viewMode === "week" && weekCols < 7 && `${weekShownDates[0]?.dayNum}/${parseDateString(weekShownDates[0]?.dateStr || '').month} – ${weekShownDates[weekShownDates.length - 1]?.dayNum}/${parseDateString(weekShownDates[weekShownDates.length - 1]?.dateStr || '').month}`}
                 {(viewMode === "day" || viewMode === "talent_workload") && `${getDayOfWeekName(selectedDate)}, ${fmtDateVn(selectedDate)}`}
               </span>
 
@@ -741,6 +785,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                 onChange={(e) => {
                   const val = e.target.value;
                   if (val) {
+                    setWeekWinStart(null);
                     setSelectedDate(val);
                     const parsed = parseDateString(val);
                     setCurrentYear(parsed.year);
@@ -907,8 +952,8 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
 
           {/* Month Calendar Grid — dưới xl, 7 cột chia nhau <100px/ô thì card session không còn đọc
               được, nên cho cuộn ngang với bề rộng tối thiểu thay vì bóp card thành sọc vô nghĩa. */}
-          <div className="overflow-x-auto -mx-1 px-1 pb-1">
-          <div className="grid grid-cols-7 gap-1 sm:gap-2 min-w-[1080px] xl:min-w-0">
+          <div ref={gridBoxRef}>
+          <div className={`grid grid-cols-7 ${monthCompact ? "gap-1" : "gap-1 sm:gap-2"}`}>
             {/* Header days of week */}
             {["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ Nhật"].map((d, idx) => (
               <div
@@ -953,7 +998,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                     if (!talentView) setViewMode("day");
                   }}
                   title={campaignDay?.label}
-                  className={`min-h-[110px] sm:min-h-[215px] p-1 sm:p-2.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between relative overflow-visible ${
+                  className={`${monthCompact ? "min-h-[72px] p-1 rounded-xl" : "min-h-[110px] sm:min-h-[215px] p-1 sm:p-2.5 rounded-2xl"} border transition-all cursor-pointer flex flex-col justify-between relative overflow-visible ${
                     isMonthHovered
                       ? "bg-[var(--accent)]/15 border-2 border-dashed border-[var(--accent)] scale-[1.02] shadow-xl shadow-[var(--accent)]/20"
                       : !cell.isCurrentMonth
@@ -967,7 +1012,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                       : "bg-[var(--surface)] border-[var(--border)] hover:border-[var(--text-faint)] hover:bg-[var(--surface-hover)]"
                   }`}
                 >
-                  {isToday && (
+                  {isToday && !monthCompact && (
                     // z-30 > z-20 của CampaignDayRibbon — ngày "hôm nay" rơi vào dải camp (D-Day/
                     // Mid-Month/Pay Day) vẫn phải đọc được chữ "HÔM NAY", không bị dải banner đè lên.
                     <span className="absolute -top-2 right-1.5 shrink-0 text-2xs sm:text-2xs font-black px-2 py-0.5 rounded-full bg-orange-500 text-white leading-none shadow-md z-30 tracking-wide">
@@ -981,7 +1026,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                     columnIndex={idx % 7}
                     isGridStart={idx === 0}
                     cellsRemainingInGrid={monthGridDays.length - idx}
-                    variant="liveMonth"
+                    variant={monthCompact ? "liveMonthCompact" : "liveMonth"}
                   />
 
                   <div className="flex justify-between items-start flex-wrap gap-1">
@@ -1005,7 +1050,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                           <Tag className="w-2.5 h-2.5" />
                         </span>
                       )}
-                      {hasLiveNow && (
+                      {hasLiveNow && !monthCompact && (
                         <span className="text-2xs sm:text-2xs font-black px-1.5 py-0.5 rounded-full bg-rose-600 text-white animate-pulse tracking-wide">
                           LIVE
                         </span>
@@ -1015,6 +1060,36 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
 
                   {/* Session badges in cell — card to theo màu brand (lib/brandTheme.ts).
                       Ô lịch tự cao ra theo số thẻ (07/10: bỏ cuộn trong ô — thẻ nằm dưới bị che là mất thông tin). */}
+                  {monthCompact ? (
+                    // Ô hẹp (lib/calendarFit.ts): mỗi ca một vạch màu brand + giờ bắt đầu; bấm ô ⇒ thẻ đầy đủ ở danh sách dưới lưới.
+                    <div className="space-y-0.5 my-1 flex-1 min-w-0">
+                      {daySessions.map((ds) => {
+                        const mineHere = talentView && !!myTalentId && isMine(ds, myTalentId);
+                        return (
+                          <span
+                            key={ds.id}
+                            title={`${ds.brandName} ${cardTime(ds).startTime}–${cardTime(ds).endTime} · Host ${ds.hostName}`}
+                            style={{ "--b": getBrandTheme(ds.brandName).accent } as React.CSSProperties}
+                            className={`block truncate rounded-md pl-0.5 text-2xs font-black leading-4 text-[var(--text)] border-l-[3px] border-[var(--b)] bg-[color-mix(in_srgb,var(--b)_22%,var(--surface))] ${
+                              mineHere ? "ring-1 ring-[var(--accent)]" : ""
+                            }`}
+                          >
+                            {shortTime(cardTime(ds).startTime)}
+                          </span>
+                        );
+                      })}
+                      {daySlots.map((sl) => (
+                        <span
+                          key={sl.id}
+                          title={`Ca chờ đăng ký · ${sl.brandName} ${sl.startTime}–${sl.endTime}`}
+                          style={{ "--b": getBrandTheme(sl.brandName).accent } as React.CSSProperties}
+                          className="block truncate rounded-md pl-0.5 text-2xs font-bold leading-4 text-[var(--text-muted)] border border-dashed border-[var(--b)]"
+                        >
+                          {shortTime(sl.startTime)}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
                   <div className="space-y-1.5 my-1 flex-1">
                     {daySessions.map((ds) => (
                       <SessionEventCard
@@ -1063,8 +1138,10 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                     ))}
                   </div>
 
-                  {/* Day total GMV */}
-                  {dayTargetPlatforms.length > 0 ? (
+                  )}
+
+                  {/* Day total GMV — ô hẹp bỏ (thẻ đầy đủ ở danh sách dưới lưới). */}
+                  {monthCompact ? null : dayTargetPlatforms.length > 0 ? (
                     <div className="text-2xs font-mono font-bold text-[var(--success)] pt-1 border-t border-[var(--border-muted)]">
                       {dayTargetPlatforms.map((p) => (
                         <div key={p} className="truncate flex items-center gap-1" title={`Target ${p}`}>Target <PlatformLogo platform={p} size="xs" /> {fmtVndShort(dayTarget[p])}</div>
@@ -1094,10 +1171,66 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
             </div>
           </div>
 
-          {/* Luôn 7 cột như Lịch Tháng (user 08/11) — dưới xl cuộn ngang thay vì xếp 7 ngày thành một cột dọc dài. */}
-          <div className="overflow-x-auto -mx-1 px-1 pb-1">
-          <div className="grid grid-cols-7 gap-3 min-w-[1080px] xl:min-w-0">
-            {currentWeekDates.map((wDay, wIdx) => {
+          {/* Vừa màn (26/11): đủ chỗ thì 7 cột T2–CN như cũ; hẹp hơn thì hiện ít ngày hơn, thẻ ca giữ nguyên cỡ, không vuốt ngang.
+              Khi ít hơn 7 ngày: dải 7 ngày của tuần ở trên để biết đang xem ngày nào và nhảy ngày. */}
+          {weekCols < 7 && (
+            <div className="grid grid-cols-7 p-1 rounded-2xl bg-[var(--surface-base)] border border-[var(--border)]" role="group" aria-label="Chọn ngày trong tuần">
+              {weekStripDays.map((wd, i) => {
+                const inWin = (d?: string) => !!d && weekShownDates.some((x) => x.dateStr === d);
+                const on = inWin(wd.dateStr);
+                const joinLeft = on && inWin(weekStripDays[i - 1]?.dateStr);
+                const joinRight = on && inWin(weekStripDays[i + 1]?.dateStr);
+                const isToday = wd.dateStr === getTodayDateString();
+                // Mỗi ca một chấm màu brand (ca chờ đăng ký: chấm rỗng) — thay chữ "2 ca" cho dải gọn.
+                const dots = [
+                  ...filteredSessions.filter((s) => s.date === wd.dateStr && s.status !== "Cancelled").map((s) => ({ c: getBrandTheme(s.brandName).accent, open: false })),
+                  ...openSlots.filter((sl) => sl.date === wd.dateStr).map((sl) => ({ c: getBrandTheme(sl.brandName).accent, open: true }))
+                ];
+                return (
+                  <button
+                    key={wd.dateStr}
+                    type="button"
+                    aria-pressed={on}
+                    aria-label={`${wd.dayName} ${wd.dayNum}/${parseDateString(wd.dateStr).month}, ${dots.length} ca`}
+                    title={`${dots.length} ca`}
+                    onClick={() => {
+                      setWeekWinStart(wd.dateStr);
+                      setSelectedDate(wd.dateStr);
+                    }}
+                    className={`min-h-[52px] py-1.5 flex flex-col items-center justify-center gap-1 transition-colors ${
+                      on
+                        ? `bg-[color-mix(in_srgb,var(--accent)_18%,transparent)] ${joinLeft ? "" : "rounded-l-xl"} ${joinRight ? "" : "rounded-r-xl"}`
+                        : "rounded-xl hover:bg-[var(--surface-hover)]"
+                    }`}
+                  >
+                    <span className={`text-2xs font-bold leading-none ${i >= 5 ? "text-rose-600 dark:text-rose-400" : "text-[var(--text-muted)]"}`}>
+                      {wd.dayName === "Chủ Nhật" ? "CN" : wd.dayName.replace("Thứ ", "T")}
+                    </span>
+                    <span
+                      className={`text-base font-black leading-none tabular-nums ${
+                        isToday ? "text-[var(--accent-text)] underline decoration-2 underline-offset-4" : "text-[var(--text)]"
+                      }`}
+                    >
+                      {wd.dayNum}
+                    </span>
+                    <span className="flex items-center gap-0.5 h-1.5">
+                      {dots.slice(0, 4).map((d, k) => (
+                        <i
+                          key={k}
+                          className="w-1.5 h-1.5 rounded-full"
+                          style={d.open ? { boxShadow: `inset 0 0 0 1.5px ${d.c}` } : { background: d.c }}
+                        />
+                      ))}
+                      {dots.length > 4 && <span className="text-2xs font-bold leading-none text-[var(--text-faint)]">+</span>}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          <div ref={gridBoxRef}>
+          <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${weekShownDates.length}, minmax(0, 1fr))` }}>
+            {weekShownDates.map((wDay, wIdx) => {
               const daySessions = filteredSessions.filter((s) => s.date === wDay.dateStr && s.status !== "Cancelled");
               const daySlots = openSlots.filter((sl) => sl.date === wDay.dateStr);
               const isSelected = wDay.dateStr === selectedDate;
@@ -1114,7 +1247,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   onDragOver={(e) => handleDragOver(e, weekCellKey)}
                   onDragLeave={(e) => handleDragLeave(e, weekCellKey)}
                   onDrop={(e) => handleDropOnWeekDay(e, wDay.dateStr)}
-                  onClick={() => setSelectedDate(wDay.dateStr)}
+                  onClick={() => pickWeekDay(wDay.dateStr)}
                   title={campaignDay?.label}
                   className={`bg-[var(--surface)] rounded-2xl p-3 border space-y-3 transition-all overflow-visible ${
                     isWeekHovered
@@ -1134,12 +1267,12 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                       info={campaignDay}
                       columnIndex={wIdx}
                       isGridStart={wIdx === 0}
-                      cellsRemainingInGrid={currentWeekDates.length - wIdx}
+                      cellsRemainingInGrid={weekShownDates.length - wIdx}
                       variant="liveWeek"
                     />
                   </div>
                   <div
-                    onClick={() => setSelectedDate(wDay.dateStr)}
+                    onClick={() => pickWeekDay(wDay.dateStr)}
                     className="flex justify-between items-center border-b border-[var(--border-muted)] pb-2 cursor-pointer"
                   >
                     <div>
@@ -1229,7 +1362,6 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
             })}
           </div>
           </div>
-          {renderDayList()}
         </div>
       )}
 

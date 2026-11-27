@@ -1,6 +1,6 @@
 import { SwapInbox } from "../shiftSwap/SwapInbox";
 import React, { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, Clock, X } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock } from "lucide-react";
 import type { Brand, LiveSession, ShiftSlot, Talent, UserRole } from "../../types";
 import { getTodayDate } from "../../lib/dateUtils";
 import { fmtDateVn, fmtFixed, fmtVndShort } from "../../lib/format";
@@ -14,7 +14,6 @@ import type { ShiftAck } from "../../lib/db/shiftAcks";
 import { PlatformChip } from "../common/PlatformChip";
 import { BrandLogo } from "../ui/BrandLogo";
 import { SessionWindow } from "../SessionWindow";
-import { CalendarFeedCard } from "./CalendarFeedCard";
 
 // Tab "Ca của tôi" của app talent (bản 2, 16/10; id cũ `my_shifts` — thông báo + localStorage trỏ vào). Trả lời MỘT câu: ca tới
 // lúc mấy giờ, phòng nào, đi với ai. Đo bản 1 trên app thật (375×812, host Huỳnh Tấn Khanh): màn dài 3.451px, ca kế tiếp bắt
@@ -57,14 +56,6 @@ function duration(min: number): string {
   return m ? `${h} giờ ${String(m).padStart(2, "0")} phút` : `${h} giờ`;
 }
 
-const TIP_KEY = (uid: string) => `talent_calendar_tip_done:${uid}`;
-function readFlag(key: string): boolean {
-  try {
-    return localStorage.getItem(key) === "1";
-  } catch {
-    return false;
-  }
-}
 
 export const TalentToday: React.FC<Props> = ({
   sessions,
@@ -96,15 +87,6 @@ export const TalentToday: React.FC<Props> = ({
   const setOpenId = (id: string | null) => {
     setPickedId(id);
     if (id === null) onOpenRequestHandled?.();
-  };
-  const [tipDone, setTipDone] = useState(() => readFlag(TIP_KEY(currentUserId)));
-  const closeTip = () => {
-    setTipDone(true);
-    try {
-      localStorage.setItem(TIP_KEY(currentUserId), "1");
-    } catch {
-      /* chế độ riêng tư: chỉ ẩn trong phiên này */
-    }
   };
 
   const brandById = useMemo(() => new Map(brands.map((b) => [b.id, b])), [brands]);
@@ -173,15 +155,6 @@ export const TalentToday: React.FC<Props> = ({
           <SwapInbox sessions={sessions} myTalentId={myTalentId} />
 
           {pendingAcks.length > 0 && onAck && <AckBar pending={pendingAcks} onAck={onAck} />}
-
-          {pendingAcks.length === 0 && myTalentId && mine.length > 0 && !tipDone && (
-            <div className="relative">
-              <CalendarFeedCard compact />
-              <button type="button" onClick={closeTip} aria-label="Ẩn gợi ý" className="absolute top-2 right-2 p-1.5 min-h-8 min-w-8 flex items-center justify-center rounded-lg text-[var(--text-faint)] hover:text-[var(--text)]">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          )}
         </div>
       </div>
 

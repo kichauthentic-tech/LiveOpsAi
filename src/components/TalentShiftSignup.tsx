@@ -161,40 +161,45 @@ export default function TalentShiftSignup({ mode, onOpenTab, brands, shiftSlots,
     setBusy(null);
   };
 
+  // Thẻ ca gọn (26/11, user: "làm nhỏ lại cho vừa vặn"): một hàng logo | giờ + brand | sàn, cao ~60px thay ~105px.
   const slotTile = (slot: ShiftSlot) => {
     const mine = mineBySlot.has(slot.id);
     const locked = closed(slot);
-    const head = (
-      <>
-        <div className="flex items-center gap-2 min-w-0">
-          <BrandLogo brand={slot.brandId ? brandById.get(slot.brandId) : { name: slot.brandName, logo: "" }} size="sm" />
-          <span className="font-bold text-sm text-[var(--text)] truncate">{slot.brandName}</span>
-          {mine && myTalentId && !locked ? (
-            <span className="ml-auto shrink-0 w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center" aria-label="Bạn đã đăng ký">
-              <Check className="w-3.5 h-3.5" strokeWidth={3} />
-            </span>
-          ) : null}
-          <PlatformLogo platform={slot.platform} size="sm" className={`shrink-0 ${mine && myTalentId && !locked ? "" : "ml-auto"}`} />
-        </div>
-        <p className="mt-2 font-mono text-lg font-black leading-none text-[var(--text)]">
-          {slot.startTime.slice(0, 5)} – {slot.endTime.slice(0, 5)}
-          <span className="ml-2 font-sans text-xs font-medium text-[var(--text-faint)]">{hoursText(slotHours(slot))}</span>
-        </p>
-        {/* 0207: ca đã có người nháp nhưng còn thiếu đúng vai này — không lộ tên người, chỉ vai cần. */}
-        {slot.openNeed && (
-          <p className="mt-1.5">
-            <span className="inline-flex text-2xs font-bold px-2 py-0.5 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-300">
-              {slot.openNeed === "co_host" ? "Cần trợ live" : "Cần host"}
-            </span>
+    const checked = mine && !!myTalentId && !locked;
+    const note = !myTalentId ? "Tài khoản chưa gắn hồ sơ" : locked ? (mine ? outcomeOf(slot) : "Đã hết hạn đăng ký") : null;
+    const body = (
+      <div className="flex items-center gap-2.5 min-w-0">
+        <BrandLogo brand={slot.brandId ? brandById.get(slot.brandId) : { name: slot.brandName, logo: "" }} size="sm" />
+        <div className="min-w-0 flex-1">
+          <p className="font-mono text-base font-black leading-tight text-[var(--text)] whitespace-nowrap">
+            {slot.startTime.slice(0, 5)}–{slot.endTime.slice(0, 5)}
+            <span className="ml-1.5 font-sans text-2xs font-medium text-[var(--text-faint)]">{hoursText(slotHours(slot))}</span>
           </p>
+          <p className="flex items-center gap-1.5 min-w-0 text-xs leading-tight">
+            <span className="shrink-0 font-bold text-[var(--text-muted)]">{slot.brandName}</span>
+            {/* 0207: ca đã có người nháp nhưng còn thiếu đúng vai này — không lộ tên người, chỉ vai cần. */}
+            {slot.openNeed && (
+              <span className="shrink-0 text-2xs font-bold px-1.5 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-300">
+                {slot.openNeed === "co_host" ? "Cần trợ live" : "Cần host"}
+              </span>
+            )}
+            {note && (
+              <span className={`min-w-0 truncate text-2xs ${note.startsWith("✓") ? "font-bold text-emerald-500" : "text-[var(--text-faint)]"}`}>· {note}</span>
+            )}
+          </p>
+        </div>
+        <PlatformLogo platform={slot.platform} size="sm" className="shrink-0" />
+        {checked && (
+          <span className="shrink-0 w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center" aria-label="Bạn đã đăng ký">
+            <Check className="w-3.5 h-3.5" strokeWidth={3} />
+          </span>
         )}
-      </>
+      </div>
     );
     if (!myTalentId || locked)
       return (
-        <div key={slot.id} className={`rounded-2xl border p-3 ${mine ? (slot.status === "cancelled" ? "border-[var(--border)] bg-[var(--surface)] opacity-60" : "border-emerald-700 bg-emerald-500/5") : "border-[var(--border)] bg-[var(--surface)] opacity-60"}`}>
-          {head}
-          <p className="mt-3 text-xs text-[var(--text-muted)]">{!myTalentId ? "Tài khoản chưa gắn hồ sơ" : mine ? outcomeOf(slot) : "Đã hết hạn đăng ký"}</p>
+        <div key={slot.id} className={`rounded-xl border px-2.5 py-2 ${mine ? (slot.status === "cancelled" ? "border-[var(--border)] bg-[var(--surface)] opacity-60" : "border-emerald-700 bg-emerald-500/5") : "border-[var(--border)] bg-[var(--surface)] opacity-60"}`}>
+          {body}
         </div>
       );
     return (
@@ -204,13 +209,13 @@ export default function TalentShiftSignup({ mode, onOpenTab, brands, shiftSlots,
         onClick={() => toggle(slot)}
         disabled={!!busy}
         aria-pressed={mine}
-        className={`group w-full text-left rounded-2xl border-2 p-3 transition-colors disabled:cursor-wait ${
+        className={`group w-full text-left rounded-xl border-2 px-2.5 py-2 transition-colors disabled:cursor-wait ${
           mine
             ? "border-emerald-500 bg-emerald-500/10"
             : "border-dashed border-[var(--text-faint)]/40 bg-[var(--surface)] hover:border-[var(--accent)] hover:bg-[var(--accent)]/5"
         } ${busy === slot.id ? "opacity-60" : ""}`}
       >
-        {head}
+        {body}
         <span className="sr-only">{mine ? "Chạm để huỷ" : "Chạm để đăng ký"}</span>
       </button>
     );
@@ -388,7 +393,7 @@ export default function TalentShiftSignup({ mode, onOpenTab, brands, shiftSlots,
                         <span className="ml-auto text-xs font-bold text-[var(--text-faint)]">{xs.length} ca</span>
                       </h3>
                     </div>
-                    <div className="p-2 space-y-2 flex-1">{xs.map(slotTile)}</div>
+                    <div className="p-1.5 space-y-1.5 flex-1">{xs.map(slotTile)}</div>
                     {have.length > 0 && (
                       <p className="border-t border-[var(--text-faint)]/25 px-3 py-2 text-xs text-[var(--text-faint)]">
                         <b className="font-bold text-[var(--text-muted)]">Bạn đã có:</b> {have.map((s) => `${s.startTime.slice(0, 5)}–${s.endTime.slice(0, 5)} ${s.brandName}`).join(" · ")}
