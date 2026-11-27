@@ -126,6 +126,7 @@ test("Hàng — SKU dẫn đầu giảm mạnh: nêu ở kết luận, không l�
     ],
     perDay: true,
     curDays: 22,
+    gmvNotComparable: false,
     prevDays: 31,
     prevLimit: 30
   };

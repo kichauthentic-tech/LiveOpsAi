@@ -229,3 +229,13 @@ test("KPI cả shop: tháng đủ so thẳng (deck Crocs T8 9,1 tỷ vs KPI 8,4 
   expect(autoSummary({ ...base, shopKpi: full })[0]).toContain("Total GMV đạt 108% KPI 8,4B (vượt 700M).");
   expect(autoSummary({ ...base, shopKpi: sep })[0]).toMatch(/Total GMV đạt 65% KPI 8B; theo tốc độ cùng kỳ tháng trước, dự báo cuối tháng ~7,02B \(88% KPI\)\./);
 });
+
+test("hạng SKU: file tháng trước phủ nhiều tháng (04/05–31/10) ⇒ không so % GMV (không phình ~6 lần thành −80% khắp bảng), hạng vẫn hiện", () => {
+  const sku = (name: string, rank: number, gmv: number) => ({ name, rank, gmv, gmvLive: 0, orders: 10 });
+  const prev = { items: [sku("A", 1, 600_000), sku("B", 2, 300_000)], sellingSkus: 2, limit: 30, hasAnyBatch: true, periodStart: "2026-10-01", periodEnd: "2026-10-31", spansBeyondMonth: true };
+  const cur = { items: [sku("A", 1, 90_000), sku("B", 2, 60_000)], sellingSkus: 2, limit: 30, hasAnyBatch: true, periodStart: "2026-11-01", periodEnd: "2026-11-27" };
+  const m = skuMoves(cur, prev)!;
+  expect(m.gmvNotComparable).toBe(true);
+  expect(m.rows.map((r) => r.gmvChange)).toEqual([null, null]);
+  expect(m.rows[1]).toMatchObject({ rank: 2, prevRank: 2 });
+});

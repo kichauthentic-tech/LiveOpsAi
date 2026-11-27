@@ -306,8 +306,8 @@ export const ProductsPageBody: React.FC<{
           <div className="pnh">{tr(`Top ${sku.rows.length} SKU theo ${shopee ? METRIC_SHOPEE.gmv : METRIC.gmv}`, `Top ${sku.rows.length} SKUs by ${shopee ? METRIC_SHOPEE.gmv : METRIC.gmv}`)}</div>
           <div className="pns">
             {tr(
-              `Nguồn file ${shopee ? "Product List của Shopee Live · Sales(Placed Order)" : "Sản Phẩm"}${curDaysLabel} · hạng so với tháng ${data.prevMonthNo}${sku.perDay ? ` · % tính trên ${shopee ? METRIC_SHOPEE.gmv : METRIC.gmv} mỗi ngày` : ""}${shopee ? "" : " · Seller LIVE Direct chỉ tính đơn chốt ngay trong phiên, không gồm đơn về sau như Seller LIVE ở trang Toàn shop"}.`,
-              `Source: ${shopee ? "Shopee Live Product List · Sales(Placed Order)" : "Product file"}${curDaysLabel} · rank vs month ${data.prevMonthNo}${sku.perDay ? ` · % based on ${shopee ? METRIC_SHOPEE.gmv : METRIC.gmv} per day` : ""}${shopee ? "" : " · Seller LIVE Direct counts only orders closed during the session, not later orders as in Seller LIVE on the shop page"}.`
+              `Nguồn file ${shopee ? "Product List của Shopee Live · Sales(Placed Order)" : "Sản Phẩm"}${curDaysLabel} · hạng so với tháng ${data.prevMonthNo}${sku.gmvNotComparable ? ` · cột ± GMV để trống vì file tháng trước phủ nhiều tháng, GMV không tách riêng được từng tháng` : sku.perDay ? ` · % tính trên ${shopee ? METRIC_SHOPEE.gmv : METRIC.gmv} mỗi ngày` : ""}${shopee ? "" : " · Seller LIVE Direct chỉ tính đơn chốt ngay trong phiên, không gồm đơn về sau như Seller LIVE ở trang Toàn shop"}.`,
+              `Source: ${shopee ? "Shopee Live Product List · Sales(Placed Order)" : "Product file"}${curDaysLabel} · rank vs month ${data.prevMonthNo}${sku.gmvNotComparable ? ` · ± GMV left blank: the previous file spans several months, so GMV can't be split by month` : sku.perDay ? ` · % based on ${shopee ? METRIC_SHOPEE.gmv : METRIC.gmv} per day` : ""}${shopee ? "" : " · Seller LIVE Direct counts only orders closed during the session, not later orders as in Seller LIVE on the shop page"}.`
             )}
           </div>
           <div

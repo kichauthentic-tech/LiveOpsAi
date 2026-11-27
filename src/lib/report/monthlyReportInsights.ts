@@ -240,6 +240,8 @@ export interface SkuMoves {
   rows: SkuMove[];
   /** File tháng này và tháng trước phủ số ngày khác nhau ⇒ % đổi GMV tính trên GMV mỗi ngày. */
   perDay: boolean;
+  /** Một trong hai file phủ nhiều tháng ⇒ GMV không so được, cột ± GMV để trống (hạng vẫn hiện). */
+  gmvNotComparable: boolean;
   curDays: number | null;
   prevDays: number | null;
   prevLimit: number | null;
@@ -255,10 +257,11 @@ export function skuMoves(cur: SkuRankSlice | null, prev: SkuRankSlice | null, to
   const curDays = daysIn(cur.periodStart, cur.periodEnd);
   const prevDays = prev?.hasAnyBatch ? daysIn(prev.periodStart, prev.periodEnd) : null;
   const perDay = curDays != null && prevDays != null && curDays !== prevDays;
+  const gmvNotComparable = !!cur.spansBeyondMonth || !!(prev?.hasAnyBatch && prev.spansBeyondMonth);
   const prevBy = new Map((prev?.hasAnyBatch ? prev.items : []).map((r) => [r.name, r]));
   const rows = cur.items.slice(0, top).map((r) => {
     const p = prevBy.get(r.name) ?? null;
-    const gmvChange = !p ? null : perDay ? pctChange(p.gmv / prevDays!, r.gmv / curDays!) : pctChange(p.gmv, r.gmv);
+    const gmvChange = !p || gmvNotComparable ? null : perDay ? pctChange(p.gmv / prevDays!, r.gmv / curDays!) : pctChange(p.gmv, r.gmv);
     return {
       name: r.name,
       rank: r.rank,
@@ -274,7 +277,7 @@ export function skuMoves(cur: SkuRankSlice | null, prev: SkuRankSlice | null, to
       ctor: r.clicks ? (r.orders / r.clicks) * 100 : null
     };
   });
-  return { rows, perDay, curDays, prevDays, prevLimit: prev?.hasAnyBatch ? prev.limit : null };
+  return { rows, perDay, gmvNotComparable, curDays, prevDays, prevLimit: prev?.hasAnyBatch ? prev.limit : null };
 }
 
 /** MỌI mã đổi hạng trong bảng (đúng các mũi tên người đọc thấy), mức đổi lớn xếp trước. `includeNew`: mã mới vào top

@@ -89,12 +89,14 @@ export async function fetchProductListAggWithPeriod(
   brandId: string,
   monthStart: string,
   monthEnd: string
-): Promise<{ agg: ProductListAgg; periodStart: string; periodEnd: string } | null> {
+): Promise<{ agg: ProductListAgg; periodStart: string; periodEnd: string; spansBeyondMonth: boolean } | null> {
   const best = await pickOverlappingBatch(brandId, "product_list", monthStart, monthEnd);
   if (!best) return null;
   const period = {
     periodStart: best.period_start! < monthStart ? monthStart : best.period_start!,
-    periodEnd: best.period_end! > monthEnd ? monthEnd : best.period_end!
+    periodEnd: best.period_end! > monthEnd ? monthEnd : best.period_end!,
+    // File phủ nhiều tháng (vd 04/05–31/10): kỳ bị cắt về trong tháng nhưng GMV trong file vẫn là tổng cả kỳ ⇒ không chia theo ngày được.
+    spansBeyondMonth: best.period_start! < monthStart || best.period_end! > monthEnd
   };
 
   return { agg: await readProductAggOfBatch(best.id, best.imported_at), ...period };
@@ -199,9 +201,11 @@ export interface SkuRankSlice {
   /** Kỳ file phủ trong tháng (vd 2026-09-01..2026-09-22). */
   periodStart?: string;
   periodEnd?: string;
+  /** File phủ vượt ngoài tháng này (file nhiều tháng) ⇒ GMV không phải của riêng tháng, không so % GMV được. */
+  spansBeyondMonth?: boolean;
 }
 
-export function skuRankFromAgg(src: { agg: ProductListAgg; periodStart: string; periodEnd: string } | null, limit = 30): SkuRankSlice {
+export function skuRankFromAgg(src: { agg: ProductListAgg; periodStart: string; periodEnd: string; spansBeyondMonth?: boolean } | null, limit = 30): SkuRankSlice {
   const { byName, hasAnyBatch } = skuPerfFromAgg(src?.agg ?? null);
   const selling = Array.from(byName.values()).filter((r) => r.gmv > 0).sort((a, b) => b.gmv - a.gmv);
   const total = selling.reduce((a, r) => a + r.gmv, 0);
@@ -221,7 +225,8 @@ export function skuRankFromAgg(src: { agg: ProductListAgg; periodStart: string; 
     limit,
     hasAnyBatch,
     periodStart: src?.periodStart,
-    periodEnd: src?.periodEnd
+    periodEnd: src?.periodEnd,
+    spansBeyondMonth: src?.spansBeyondMonth
   };
 }
 
