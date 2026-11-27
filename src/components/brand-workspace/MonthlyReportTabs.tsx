@@ -54,6 +54,7 @@ import { KeyMetricsDemoPage, NmvDemoPage, SummaryDemoPage, type NmvMonth } from 
 import { REFUND_FINAL_DATE_KEY, decodeRefundFinalDate, encodeRefundFinalDate } from "../../lib/report/refundFinalDate";
 import { affiliateTrackColumns, affiliateTrackTotals } from "../../lib/report/affiliateTrack";
 import { byLang, t, monthShort, monthLong } from "../../lib/displayLang";
+import { PROMO_KIND_LABEL, promoGroups, promoKind, promoRate, promoReach } from "../../lib/report/promoGroups";
 
 const INSIGHT_PAGES: [InsightPage, string][] = byLang(
   () => [["summary", t("Tổng quan", "Overview")], ["keymetrics", "Key Metrics"], ["shop", t("Toàn shop", "Whole shop")], ["why", t("Nguyên nhân", "Root cause")], ["products", t("Sản phẩm", "Products")], ["people", "Host"], ["ads", t("Quảng cáo", "Advertising")], ["affiliate", "Affiliate"], ["next", t("Kế hoạch tháng sau", "Next month's plan")]],
@@ -728,6 +729,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     giftPeriodLabel: trendDay && giftSameWindow ? t(`4 kỳ 1–${trendDay}`, `4 periods 1–${trendDay}`) : t("4 tháng, theo kỳ file Sản Phẩm", "4 months, by Product file period"),
     giftMaxPriceLabel: fmtVndShort(GIFT_MAX_PRICE),
     promo: topPromo,
+    promoShop: view.shopDays[month]?.days?.length ? { days: view.shopDays[month]!.days.map((d) => ({ date: d.date, gmv: d.gmv, orders: d.orders })), monthStart: start } : null,
     prevMonthNo: Number(prevMonth.slice(5)),
     points: skuPoints
   };
@@ -877,10 +879,24 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
         promo: topPromo?.items?.[0]
           ? {
               name: topPromo.items[0].name,
-              roi: topPromo.items[0].roi ?? null,
+              rate: promoRate(topPromo.items[0]),
               discount: topPromo.items[0].discount ?? null,
               totalDiscount: topPromo.totalDiscount ?? null,
-              otherRois: topPromo.items.slice(1).flatMap((p) => (p.roi != null && p.roi > 0 && (p.discount ?? 0) > 0 ? [p.roi] : []))
+              otherRates: topPromo.items.slice(1).flatMap((p) => { const r = promoRate(p); return r != null ? [r] : []; }),
+              groups: topPromo.complete ? promoGroups(topPromo.items).map((g) => ({ label: g.label, count: g.count, discount: g.discount, share: g.share })) : undefined,
+              reach: (() => {
+                const days = view.shopDays[month]?.days ?? [];
+                // Voucher tốn tiền giảm nhất trước (có ngưỡng đơn ⇒ đề xuất "nâng ngưỡng" mới có nghĩa); không có voucher đo được
+                // thì chương trình tốn tiền nhất bất kỳ. CROCS T11: VC 10% Double Day 48% đơn, giỏ −8% (MD đã nêu ở câu trước).
+                const shopDays = days.map((d) => ({ date: d.date, gmv: d.gmv, orders: d.orders }));
+                const ranked = [...topPromo.items]
+                  .filter((p) => (p.discount ?? 0) > 0)
+                  .sort((a, b) => (b.discount ?? 0) - (a.discount ?? 0))
+                  .map((p) => ({ p, r: promoReach(p, shopDays, start, topPromo.fileEnd) }))
+                  .filter((x) => x.r != null);
+                const best = ranked.find((x) => promoKind(x.p) === "voucher") ?? ranked[0];
+                return best ? { name: best.p.name, rate: promoRate(best.p), reach: best.r!.reach, aovVsShop: best.r!.aovVsShop } : null;
+              })()
             }
           : null
       }),
@@ -1294,14 +1310,17 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
           }))
         },
         {
-          name: "4 Top Promotion",
+          name: "4 Khuyen mai",
           rows: (topPromo?.items ?? []).map((p, idx) => ({
             "#": idx + 1,
+            "Loại": PROMO_KIND_LABEL[promoKind(p)],
             "Chương Trình": p.name,
             "Trạng Thái": promoStatusLabel(p.status).label,
             "GMV": n(p.gmv),
             "Orders": n(p.orders),
-            "AOV": n(p.aov)
+            "AOV": n(p.aov),
+            "Giảm giá": n(p.discount ?? null),
+            "Mức giảm (%)": n(promoRate(p))
           }))
         },
         {

@@ -10,6 +10,7 @@ import { fmtInt, fmtPct } from "./format";
 import { downscaleImage } from "./Visuals";
 import { fmtP, heat, scatter, tbl } from "./demoCharts";
 import type { PageMetric } from "./ui";
+import { promoGroups, promoRate, promoReach, type PromoReach, type ShopDayOrders } from "../../../lib/report/promoGroups";
 import { numLocale, t as tr } from "../../../lib/displayLang";
 
 // Trang 5 "Sản phẩm & khuyến mãi" dựng theo demo (scratchpad/build/template.html, #p5): KPI → phân tán + quà tặng → bảng Top SKU (ảnh tải lên)
@@ -33,6 +34,8 @@ export interface ProductsPageData {
   giftPeriodLabel: string;
   giftMaxPriceLabel: string;
   promo: PromotionMonthSlice | null;
+  /** Shop Analytics theo ngày của tháng (GMV, Orders) — để tính % đơn shop dùng từng CTKM; null = chưa có file. */
+  promoShop?: { days: ShopDayOrders[]; monthStart: string } | null;
   prevMonthNo: number;
   points: ScatterPoint[];
   /** Report Shopee: Product List không có Product Impressions/Seller LIVE ⇒ bảng dùng Orders/Product Clicks, biểu đồ = tỷ trọng Product Clicks × Orders/Product Clicks. */
@@ -166,12 +169,53 @@ export function skuTableHtml(sku: SkuMoves, images: (name: string) => string | u
 }
 
 // ---- Bảng khuyến mãi ----
-// Audit 27/11: cột "ROI = GMV ÷ tiền giảm" chỉ là 1 ÷ mức giảm (VC 5% → 14,9; VC 10% → 7,1; MD giảm sâu → 1,7) nên xếp chương
-// trình theo độ sâu ưu đãi chứ không theo hiệu quả ⇒ in thẳng tỷ lệ "Giảm giá ÷ GMV", không tô tốt/xấu.
-export function promoTableHtml(promo: PromotionMonthSlice): string {
+// Cột mức giảm (27/11): "ROI = GMV ÷ tiền giảm" chỉ là 1 ÷ mức giảm nên đã bỏ; nay lấy thẳng "Tỷ lệ giảm giá trung bình" của
+// TikTok (tiền giảm ÷ giá trước giảm — cùng số Seller Center), không tô tốt/xấu.
+const rateTxt = (v: number | null) => (v == null ? "—" : `${dec(v, v < 10 ? 1 : 0)}%`);
+const signedPct = (v: number) => `${v >= 0 ? "+" : "−"}${dec(Math.abs(v), 0)}%`;
+const range = (xs: number[], f: (v: number) => string) => (!xs.length ? "—" : Math.round(Math.min(...xs)) === Math.round(Math.max(...xs)) ? f(xs[0]) : `${f(Math.min(...xs))} … ${f(Math.max(...xs))}`);
+type PromoCtx = { days: ShopDayOrders[]; monthStart: string; fileEnd?: string } | null;
+const reachOf = (p: PromotionMonthSlice["items"][number], ctx: PromoCtx): PromoReach | null => (ctx ? promoReach(p, ctx.days, ctx.monthStart, ctx.fileEnd) : null);
+const REACH_HEAD = () => [tr("% đơn shop dùng", "% of shop orders"), tr("Giảm / đơn", "Discount / order"), tr("GMV/đơn so với shop", "GMV/order vs shop")];
+export function promoTableHtml(items: PromotionMonthSlice["items"], ctx: PromoCtx = null): string {
   return tbl(
-    [tr("Chương trình", "Programme"), "GMV", "Orders", "AOV", tr("Giảm giá", "Discount"), tr("Giảm giá ÷ GMV", "Discount ÷ GMV")],
-    promo.items.map((p) => [esc(p.name), fmtVndShort(p.gmv), fmtInt(p.orders), fmtVndShort(p.aov), p.discount != null ? fmtVndShort(p.discount) : "—", p.discount != null && p.discount > 0 && p.gmv > 0 ? `${dec((p.discount / p.gmv) * 100, 1)}%` : "—"])
+    [tr("Chương trình", "Programme"), "GMV", "Orders", tr("Giảm giá", "Discount"), tr("Mức giảm", "Discount rate"), ...(ctx ? REACH_HEAD() : [])],
+    items.map((p) => {
+      const r = reachOf(p, ctx);
+      return [
+        esc(p.name), fmtVndShort(p.gmv), fmtInt(p.orders), p.discount ? fmtVndShort(p.discount) : "—", rateTxt(promoRate(p)),
+        ...(ctx ? [r ? `${dec(r.reach, 0)}%` : "—", r?.perOrder != null ? fmtVndShort(r.perOrder) : "—", r ? signedPct(r.aovVsShop) : "—"] : [])
+      ];
+    })
+  );
+}
+
+/** Bảng gom theo loại (user 27/11): mỗi loại một dòng; danh sách chương trình của từng loại mở ở <details> bên dưới (gốc HTML,
+ *  bản gửi brand vẫn mở được). Không cộng GMV giữa các loại — một đơn có thể dùng nhiều chương trình. */
+export function promoGroupsHtml(items: PromotionMonthSlice["items"], ctx: PromoCtx = null): string {
+  const groups = promoGroups(items);
+  return tbl(
+    [tr("Loại", "Type"), tr("Số chương trình", "Programmes"), tr("Tiền giảm", "Discount"), tr("% tiền giảm", "% of discount"), tr("Mức giảm", "Discount rate"), ...(ctx ? REACH_HEAD() : [])],
+    groups.map((g) => {
+      // % đơn và GMV/đơn KHÔNG cộng được giữa các chương trình (đơn trùng, kỳ khác nhau) ⇒ dòng nhóm ghi khoảng thấp nhất … cao nhất.
+      const rs = ctx ? g.items.map((p) => reachOf(p, ctx)).filter((r): r is PromoReach => r != null) : [];
+      const paid = g.items.filter((p) => (p.discount ?? 0) > 0);
+      const paidOrders = paid.reduce((a, p) => a + p.orders, 0);
+      return [
+        `<b>${esc(g.label)}</b>`,
+        fmtInt(g.count),
+        g.discount > 0 ? fmtVndShort(g.discount) : "—",
+        g.share != null && g.discount > 0 ? `${dec(g.share, 0)}%` : "—",
+        g.rateMin == null ? "—" : Math.round(g.rateMin) === Math.round(g.rateMax!) ? rateTxt(g.rateMin) : `${dec(g.rateMin, 0)}–${dec(g.rateMax!, 0)}%`,
+        ...(ctx
+          ? [
+              range(rs.map((r) => r.reach), (v) => `${dec(v, 0)}%`),
+              paidOrders > 0 ? fmtVndShort(g.discount / paidOrders) : "—",
+              range(rs.map((r) => r.aovVsShop), signedPct)
+            ]
+          : [])
+      ];
+    })
   );
 }
 
@@ -185,6 +229,7 @@ export const ProductsPageBody: React.FC<{
   empty?: React.ReactNode;
 }> = ({ data, images, canManage, onSaveImage, curDaysLabel, empty }) => {
   const [status, setStatus] = useState("");
+  const promoCtx: PromoCtx = data.promoShop && data.promoShop.days.length ? { ...data.promoShop, fileEnd: data.promo?.fileEnd } : null;
   const sku = data.sku;
   const shopee = data.variant === "shopee";
   const giftHas = data.giftByMonth.some((g) => g && g.giftPerOrder != null);
@@ -317,11 +362,21 @@ export const ProductsPageBody: React.FC<{
       )}
       {data.promo && data.promo.items.length > 0 && (
         <div className="pn">
-          <div className="pnh">{tr("Top chương trình khuyến mãi", "Top promotions")}</div>
-          <div className="pns">{tr("Chỉ chương trình có kỳ chạy nằm trong tháng (chương trình chưa kết thúc tính tới ngày xuất file) · cột GMV là Total GMV của chương trình · Giảm giá ÷ GMV = mức ưu đãi thực của chương trình, không phải hiệu quả (GMV gồm cả đơn sẽ có dù không có chương trình) · chương trình tặng quà có tiền giảm giá bằng 0 vì là quà tặng.", "Only programmes whose period falls in the month (unfinished ones count up to the file export date) · the GMV column is the programme's Total GMV · Discount ÷ GMV = the programme's effective discount depth, not its effectiveness (GMV includes orders that would have happened anyway) · gift programmes show zero discount because the item is a gift.")}</div>
+          <div className="pnh">{tr("Chương trình khuyến mãi theo loại", "Promotions by type")}</div>
+          <div className="pns">{tr("Chỉ chương trình có kỳ chạy nằm trong tháng (chương trình chưa kết thúc tính tới ngày xuất file) · Mức giảm = Tỷ lệ giảm giá trung bình của TikTok (tiền giảm ÷ giá trước giảm) · quà tặng có tiền giảm bằng 0 vì file không ghi giá quà · không cộng GMV giữa các loại vì một đơn có thể dùng nhiều chương trình.", "Only programmes whose period falls in the month (unfinished ones count up to the file export date) · Discount rate = TikTok's average discount rate (discount ÷ pre-discount price) · free gifts show zero discount because the file has no gift cost · GMV is not summed across types because one order can use several programmes.")}</div>
+          {data.promoShop && <p className="pns">{tr("% đơn shop dùng = đơn dùng chương trình ÷ đơn cả shop trong kỳ chạy · GMV/đơn so với shop = giỏ hàng so với đơn trung bình cùng kỳ · chỉ tính chương trình chạy từ 24 giờ · không phải số đơn tăng thêm nhờ chương trình.", "% of shop orders = programme orders ÷ all shop orders during its run · GMV/order vs shop = basket vs the average order in the same period · programmes running 24 hours or more only · not the extra orders the programme created.")}</p>}
+          {canManage && !data.promo.complete && <p className="pns" style={{ color: "var(--gold)" }}>Bản chụp này chỉ lưu Top 10 chương trình — bấm "Cập nhật số liệu" để gom đủ mọi chương trình trong tháng.</p>}
           <div className="tw">
-            <table dangerouslySetInnerHTML={{ __html: promoTableHtml(data.promo) }} />
+            <table dangerouslySetInnerHTML={{ __html: promoGroupsHtml(data.promo.items, promoCtx) }} />
           </div>
+          {promoGroups(data.promo.items).map((g) => (
+            <details key={g.kind}>
+              <summary>{tr(`${g.label} · ${g.count} chương trình`, `${g.label} · ${g.count} programmes`)}</summary>
+              <div className="tw">
+                <table dangerouslySetInnerHTML={{ __html: promoTableHtml(g.items, promoCtx) }} />
+              </div>
+            </details>
+          ))}
         </div>
       )}
     </>

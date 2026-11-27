@@ -107,7 +107,6 @@ const PAGES: { id: ShopeePageId; label: string; title: string }[] = byLang(
 const PAGE_LABEL = Object.fromEntries(PAGES.filter((p) => p.id !== "growth" && p.id !== "channels" && p.id !== "promo").map((p) => [p.id, p.label])) as Record<ShopeeInsightPage, string>;
 const SHOPEE = PLATFORM_PROFILES.Shopee.id;
 
-const BLUE = "#7fb0e0";
 const TAB_CLS: Record<string, string> = { daily: "g-daily", dday: "g-dday", midmonth: "g-mm", payday: "g-pd" };
 const pct = (v: number | null | undefined, d = 1) => (v == null ? "—" : `${fmtFixed(v, d)}%`);
 const sgnP = (v: number | null | undefined) => (v == null ? "—" : fmtP(v, 0));
@@ -140,25 +139,15 @@ function bridgeAxis(from: number, steps: number[]) {
 
 /** Phễu theo phiên (Live List): Viewers → ATC → Orders, cùng hai cách xem với Phễu LIVE của TikTok. */
 const FunnelPanel: React.FC<{ stages: { label: string; prev: number; cur: number }[]; ratios: { n: string; d: string; p: number | null; c: number | null }[]; prevShort: string }> = ({ stages, ratios, prevShort }) => {
-  const [mode, setMode] = useState<"p" | "i">("p");
   const chg = (p: number, c: number) => (p > 0 ? (c / p - 1) * 100 : null);
   const rch = ratios.map((r) => (r.p != null && r.c != null && r.p > 0 ? (r.c / r.p - 1) * 100 : null));
   const sig = isBigChange;
-  const idx = (s: { prev: number; cur: number }) => (s.prev > 0 ? (s.cur / s.prev) * 100 : 0);
-  const hb = hbars(
-    stages.map((s) => ({ name: s.label, sub: `${nf(s.prev)} → ${nf(s.cur)}`, value: idx(s), text: String(Math.round(idx(s))), cls: idx(s) < 100 && sig(idx(s) - 100) ? "red" : "", mark: 100 })),
-    Math.max(120, Math.ceil(Math.max(...stages.map(idx)) / 10) * 10 + 7)
-  );
+  // 27/11: bỏ kiểu xem "Chỉ số hoá" (cùng TikTok).
   const cls = (v: number | null) => (v == null || !sig(v) ? "nt" : v > 0 ? "up" : "dn");
   return (
     <div className="pn">
       <div className="pnh">{tr("Phễu của phiên live", "Live session funnel")}</div>
-      <div className="pns">{tr("Live List theo phiên. Hai cách xem: chuỗi chuyển đổi (số tuyệt đối và tỷ lệ giữa các bậc) hoặc chỉ số hoá (tháng trước = 100, vạch trắng = tháng trước).", "Live List by session. Two views: conversion chain (absolute numbers and step rates) or indexed (last month = 100, white mark = last month).")}</div>
-      <div className="tabs">
-        <button type="button" className={mode === "p" ? "seg-on" : ""} onClick={() => setMode("p")}>{tr("Chuỗi chuyển đổi", "Conversion chain")}</button>
-        <button type="button" className={mode === "i" ? "seg-on" : ""} onClick={() => setMode("i")}>{tr("Chỉ số hoá", "Indexed")} ({prevShort} = 100)</button>
-      </div>
-      {mode === "p" ? (
+      <div className="pns">{tr("Live List theo phiên. Chuỗi chuyển đổi: số tuyệt đối của từng bậc và tỷ lệ giữa các bậc, so với tháng trước.", "Live List by session. Conversion chain: absolute numbers per step and the rates between steps, vs last month.")}</div>
         <div className="pipe" style={{ display: "flex" }}>
           {stages.map((s, i) => {
             const r = ratios[i];
@@ -184,9 +173,6 @@ const FunnelPanel: React.FC<{ stages: { label: string; prev: number; cur: number
             );
           })}
         </div>
-      ) : (
-        <Html className="hb" html={hb} />
-      )}
       <DemoTable
         html={tbl(
           [tr("Tỷ lệ", "Rate"), prevShort, tr("Tháng này", "This month"), "±"],
@@ -558,7 +544,7 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
             ...[...factorCols, "gmvPerHour" as const].map((f, i) => {
               const v = r.change[f];
               if (v == null) return "—";
-              return { t: fmtP(v), c: "hm", s: !isBigChange(v) ? "" : i === 0 ? heat(v, 40, BLUE, BLUE) : heat(v, 30) + ";box-shadow:inset 0 0 0 1.5px var(--cream);font-weight:800" };
+              return { t: fmtP(v), c: "hm", s: !isBigChange(v) ? "" : i === 0 ? heat(v, 30) : heat(v, 30) + ";box-shadow:inset 0 0 0 1.5px var(--cream);font-weight:800" };
             }),
             W(pill(t, k))
           ];
@@ -588,7 +574,7 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
                     if (i === 0) return `<td class="cellc base gs ${TAB_CLS[t]}">${txt}</td>`;
                     const c = r?.changes[i] ?? null;
                     const tone = r?.tones[i];
-                    const st = c == null || !isBigChange(c) ? "" : (k === "hours" ? heat(c, 40, BLUE, BLUE) : heat(c, 30)) + (tone === "up" || tone === "down" ? ";box-shadow:inset 0 0 0 1.5px var(--cream);font-weight:800" : "");
+                    const st = c == null || !isBigChange(c) ? "" : heat(c, 30) + (tone === "up" || tone === "down" ? ";box-shadow:inset 0 0 0 1.5px var(--cream);font-weight:800" : "");
                     return `<td class="cellc" style="${st}">${txt}${c != null ? `<small>${fmtP(c)}</small>` : ""}</td>`;
                   })
                   .join("");
@@ -768,7 +754,7 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
               <div className="pnh">{tr("Thay đổi các yếu tố theo loại ngày", "Factor changes by day type")}</div>
               <div className="pns">{tr("% thay đổi tháng này so với tháng trước; mỗi loại ngày so với chính nó theo lịch Campaign. Chỉ tô ô đổi từ 10% trở lên.", "% change this month vs last month; each day type compared with itself per the Campaign calendar. Only changes of 10% or more are coloured.")}</div>
               <DemoTable html={dayFactorHtml} />
-              <div className="legend"><span>{tr(`Màu xanh: tăng · màu đỏ: giảm · màu xanh dương: ${METRIC.liveHours} (do lịch quyết định, không đánh giá tốt hay xấu)`, `Green: up · red: down · blue: ${METRIC.liveHours} (set by the schedule, not rated good or bad)`)}</span></div>
+              <div className="legend"><span>{tr(`Màu xanh: tăng · màu đỏ: giảm. ${METRIC.liveHours} do lịch quyết định nên đọc kèm số giờ, không coi là tốt hay xấu.`, `Green: up · red: down. ${METRIC.liveHours} is set by the schedule, so read it alongside the hours, not as good or bad.`)}</span></div>
             </div>
           )}
           {absHtml && (
@@ -781,7 +767,7 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
                 )}
               </div>
               <div className="tw"><table id="dayAbs" className="vt" dangerouslySetInnerHTML={{ __html: absHtml }} /></div>
-              <div className="legend"><span>{tr(`${monthShortLabel(months[0].month)} là mốc, không tô · chỉ tô khi đổi từ 10% · xanh dương = ${METRIC.liveHours}`, `${monthShortLabel(months[0].month)} is the baseline, not coloured · coloured only from 10% · blue = ${METRIC.liveHours}`)}</span></div>
+              <div className="legend"><span>{tr(`${monthShortLabel(months[0].month)} là mốc, không tô · chỉ tô khi đổi từ 10% · xanh tăng, đỏ giảm`, `${monthShortLabel(months[0].month)} is the baseline, not coloured · coloured only from 10% · blue = ${METRIC.liveHours}`)}</span></div>
             </div>
           )}
           {o ? (

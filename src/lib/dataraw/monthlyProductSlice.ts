@@ -70,9 +70,9 @@ async function readBatch(batchId: string): Promise<{ rows: Record<string, unknow
 
 export async function fetchOverlappingBatchRows(brandId: string, reportType: DataRawReportType, monthStart: string, monthEnd: string) {
   const best = await pickOverlappingBatch(brandId, reportType, monthStart, monthEnd);
-  if (!best) return { rows: [] as Record<string, unknown>[], columns: [] as DataRawColumn[], hasAnyBatch: false, importedAt: null as string | null };
+  if (!best) return { rows: [] as Record<string, unknown>[], columns: [] as DataRawColumn[], hasAnyBatch: false, importedAt: null as string | null, periodEnd: null as string | null };
   const { rows, columns } = await readBatch(best.id);
-  return { rows, columns, hasAnyBatch: true, importedAt: best.imported_at ?? null };
+  return { rows, columns, hasAnyBatch: true, importedAt: best.imported_at ?? null, periodEnd: best.period_end ?? null };
 }
 
 // product_list của tháng ở dạng ĐÃ TỔNG HỢP (xem productListAgg.ts). Đọc `summary.productAgg` của batch
@@ -257,6 +257,11 @@ export interface PromotionRow {
   /** "Discount amount" và "ROI" của TikTok — undefined ở bản chụp trước 2026-09-27. */
   discount?: number;
   roi?: number;
+  /** Cột "Loại" của file (fix price / bmsm / percentage off / creator flash sale…) — TikTok để trống phần lớn voucher & quà
+   *  (CROCS T11: 43/49 dòng trống) nên nhóm CTKM còn suy theo tên (lib/report/promoGroups.ts). Thiếu ở bản chụp trước 27/11. */
+  type?: string;
+  /** "Tỷ lệ giảm giá trung bình" (%) của TikTok = tiền giảm ÷ giá trước giảm — cùng số Seller Center. */
+  discountRate?: number;
 }
 
 export interface PromotionMonthSlice {
@@ -273,6 +278,10 @@ export interface PromotionMonthSlice {
   openCount?: number;
   /** Top chương trình vắt qua nhiều tháng theo GMV LUỸ KẾ — không xếp hạng cùng bảng chính vì không cắt được theo tháng. */
   longTerm?: PromotionRow[];
+  /** true = `items` là MỌI chương trình có kỳ chạy trong tháng (bản chụp từ 27/11); thiếu = chỉ Top 10 (bản cũ). */
+  complete?: boolean;
+  /** Ngày cuối (LOẠI TRỪ, 00:00) của "[Phạm vi ngày]" file: "2026-11-01 ~ 2026-11-26" ⇒ số tới hết 25/11. */
+  fileEnd?: string;
 }
 
 /** "2026-06-08 09:22 - 2026-07-05 23:58" -> {start,end}. */
@@ -282,7 +291,7 @@ function promoPeriodBounds(label: string): { start?: string; end?: string } {
 }
 
 export async function fetchTopPromotionsMonthSlice(brandId: string, monthStart: string, monthEnd: string, limit = 10): Promise<PromotionMonthSlice> {
-  const { rows, columns, hasAnyBatch } = await fetchOverlappingBatchRows(brandId, "shop_promotion", monthStart, monthEnd);
+  const { rows, columns, hasAnyBatch, periodEnd } = await fetchOverlappingBatchRows(brandId, "shop_promotion", monthStart, monthEnd);
   if (!hasAnyBatch) return { items: [], hasAnyBatch: false, excludedMultiMonth: 0 };
 
   const c = {
@@ -295,7 +304,9 @@ export async function fetchTopPromotionsMonthSlice(brandId: string, monthStart: 
     aov: findCol(columns, /^(?:Giá trị trung bình đơn|Avg\. order value)/i),
     itemsSold: findCol(columns, /^(?:Số món bán ra|Items sold)$/i),
     discount: findCol(columns, /^(?:Số tiền giảm giá|Discount amount)/i),
-    roi: findCol(columns, /^(?:Tỉ suất lợi nhuận|ROI)$/i)
+    roi: findCol(columns, /^(?:Tỉ suất lợi nhuận|ROI)$/i),
+    type: findCol(columns, /^(?:Loại|Type|Promotion type)$/i),
+    discountRate: findCol(columns, /^(?:Tỷ lệ giảm giá trung bình|Avg\.? discount rate|Average discount rate)/i)
   };
   if (!c.name || !c.gmv) return { items: [], hasAnyBatch: true, excludedMultiMonth: 0 };
   // ROI là số thập phân kiểu "7.02" — `num` bỏ cả dấu chấm (nghìn) nên đọc riêng.
@@ -315,7 +326,9 @@ export async function fetchTopPromotionsMonthSlice(brandId: string, monthStart: 
       aov: num(c.aov && raw[c.aov]),
       itemsSold: num(c.itemsSold && raw[c.itemsSold]),
       discount: num(c.discount && raw[c.discount]),
-      roi: c.roi ? decimal(raw[c.roi]) : undefined
+      roi: c.roi ? decimal(raw[c.roi]) : undefined,
+      type: c.type ? String(raw[c.type] ?? "").trim() || undefined : undefined,
+      discountRate: c.discountRate && String(raw[c.discountRate] ?? "").trim() !== "" ? decimal(raw[c.discountRate]) : undefined
     }))
     .filter((r) => r.name && r.gmv > 0);
 
@@ -337,6 +350,8 @@ export async function fetchTopPromotionsMonthSlice(brandId: string, monthStart: 
   const inside = new Set(insideMonth);
   return {
     items: insideMonth.sort((a, b) => b.gmv - a.gmv).slice(0, limit),
+    complete: insideMonth.length <= limit,
+    fileEnd: periodEnd ?? undefined,
     hasAnyBatch: true,
     excludedMultiMonth: parsed.length - insideMonth.length,
     totalDiscount: insideMonth.reduce((a, r) => a + (r.discount ?? 0), 0),

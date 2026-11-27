@@ -148,7 +148,7 @@
 .rt .cellc{text-align: center; line-height: 1.25;}
 .rt .cellc small{display: block; font-size: 10px; opacity: .85;}
 .rt #dayAbs th, .rt #dayAbs td{padding: 6px 7px;}
-.rt #dayAbs.vt th, .rt #dayAbs.vt td{font-size: 11px; padding: 5px 5px;}
+.rt #dayAbs.vt th, .rt #dayAbs.vt td{font-size: 12px; padding: 5px 5px;}
 .rt #dayAbs th.grpH{text-align: center; color: var(--gold); border-bottom: 1px solid var(--gold-dim);}
 .rt .tabs{display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px;}
 .rt .tabs button{font: inherit; font-size: 12px; font-weight: 600; color: var(--muted); background: transparent; border: 1px solid var(--line); border-radius: 10px; padding: 6px 12px; cursor: pointer;}
@@ -173,12 +173,15 @@
 .rt details summary{cursor: pointer; font-size: 12px; font-weight: 600; color: var(--muted);}
 .rt details p, .rt details li{font-size: 12px; color: var(--muted); margin: 6px 0 0; max-width: 84ch;}
 .rt .tw{overflow-x: auto;}
-.rt table{border-collapse: collapse; width: 100%; font-size: 12px;}
+/* 27/11: user thấy số trong bảng "mờ nhạt khó nhìn" — đo: 87% ô số 11–12px nét 400 (tương phản vẫn ~21:1) ⇒ 13px, nét 500. */
+.rt table{border-collapse: collapse; width: 100%; font-size: 13px;}
 .rt th, .rt td{text-align: right; padding: 7px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; font-variant-numeric: tabular-nums;}
+.rt td{font-weight: 500;}
 .rt th:first-child, .rt td:first-child{text-align: left;}
-.rt th{color: var(--muted); font-weight: 600;}
+.rt th{color: var(--muted); font-weight: 600; font-size: 12px;}
 .rt td.w, .rt th.w{white-space: normal; text-align: left; min-width: 170px;}
-.rt tr.grp td{color: var(--gold-dim); font-weight: 700; font-size: 11px; padding-top: 12px;}
+/* Dòng nhóm (Kết quả / Lưu lượng / Chuyển đổi …) thành dải nền cả dòng — user 27/11: các phần trong bảng không tách rõ. */
+.rt tr.grp td{color: var(--gold); font-weight: 800; font-size: 12px; text-align: left; padding: 8px 10px; background: color-mix(in srgb, var(--gold) 12%, transparent); border-top: 1px solid color-mix(in srgb, var(--gold) 35%, var(--line)); border-bottom: 1px solid color-mix(in srgb, var(--gold) 35%, var(--line)); box-shadow: inset 3px 0 0 var(--gold);}
 .rt tr.hl td{background: color-mix(in srgb, var(--gold) 8%, transparent);}
 .rt .up{color: var(--green); font-weight: 700;}
 .rt .dn{color: var(--red); font-weight: 700;}

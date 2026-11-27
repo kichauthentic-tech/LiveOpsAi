@@ -25,7 +25,7 @@ describe("Sản phẩm: câu đếm khớp mũi tên trong bảng", () => {
   const rows = [row("A", 1, 2), row("B", 2, 1), row("C", 3, 5), row("D", 4, 7), row("E", 5, 9), row("F", 6, 6), row("G", 10, 4)];
   const { risers, fallers } = skuRankMoves(rows, true);
   const toInput = (x: SkuMove) => ({ name: x.name, from: x.prevRank, to: x.rank, ctor: x.ctor, ctr: x.ctr });
-  const b = productsBlocks({ topN: 7, risers: risers.map(toInput), fallers: fallers.map(toInput), lead: { name: "A", share: 30 }, promo: { name: "BF", roi: null } });
+  const b = productsBlocks({ topN: 7, risers: risers.map(toInput), fallers: fallers.map(toInput), lead: { name: "A", share: 30 }, promo: { name: "BF", rate: null } });
   it("đếm mọi mã đổi hạng, chỉ liệt kê 3", () => {
     expect(b.observe).toContain("4 mã tăng hạng, 2 mã giảm hạng");
     expect(b.observe).toContain("và 1 mã khác");

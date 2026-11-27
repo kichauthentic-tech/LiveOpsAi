@@ -50,7 +50,8 @@ export const SNAPSHOT_VERSION = 3;
 // discount/ROI từng chương trình, tổng giảm giá, top chương trình dài hạn. Bản chụp piece v1 báo "công thức
 // đổi" ⇒ bấm Cập nhật số liệu là có; trước đó các cột mới hiện "—".
 // v3 (2026-10-28): ShopDayLite thêm liveDirect/liveIndirect/affDirect/affIndirect (khối Direct vs Indirect ở trang Toàn shop).
-const PIECE_VERSION = 3;
+// v4 (2026-11-27): topPromo lưu đủ mọi chương trình trong tháng + cột Loại + Tỷ lệ giảm giá trung bình (CTKM gom theo loại).
+const PIECE_VERSION = 4;
 
 export interface SnapshotPiece<T = unknown> {
   stamp: string;
@@ -287,7 +288,8 @@ async function fetchPiece(kind: PieceKind, brandId: string, month: string, aggMe
     case "gifts":
       return giftSliceFromAgg(await agg());
     case "topPromo":
-      return fetchTopPromotionsMonthSlice(brandId, start, end);
+      // Lưu MỌI chương trình trong tháng (bảng CTKM gom theo loại, 27/11) — trước đây chỉ Top 10.
+      return fetchTopPromotionsMonthSlice(brandId, start, end, 500);
     case "shopDays":
       return fetchShopDaysMonthSlice(brandId, start, end);
     case "cardGmv":

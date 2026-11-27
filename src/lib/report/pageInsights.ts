@@ -426,7 +426,17 @@ export interface ProductsInsightInput {
   noPrev?: boolean;
   lead: { name: string; share: number } | null;
   /** Chương trình có Total GMV cao nhất; kèm tiền giảm giá và ROI các chương trình khác trong bảng để không khen mỗi GMV. */
-  promo: { name: string; roi: number | null; discount?: number | null; totalDiscount?: number | null; otherRois?: number[] } | null;
+  /** `rate`/`otherRates` = mức giảm (%) theo "Tỷ lệ giảm giá trung bình" của TikTok (promoRate); `groups` = CTKM gom theo loại. */
+  promo: {
+    name: string;
+    rate: number | null;
+    discount?: number | null;
+    totalDiscount?: number | null;
+    otherRates?: number[];
+    groups?: { label: string; count: number; discount: number; share: number | null }[];
+    /** Chương trình tốn nhiều tiền giảm nhất mà đo được độ phủ (promoReach): % đơn shop dùng + giỏ hàng so với đơn thường. */
+    reach?: { name: string; rate: number | null; reach: number; aovVsShop: number } | null;
+  } | null;
   /** Tên tỷ lệ chuyển đổi theo SKU (mặc định CTOR; Shopee: Orders/Product Clicks). */
   rateLabel?: string;
   /** Khối Tác động khi không có bảng khuyến mãi theo chương trình (Shopee: xu/voucher đã nhận). */
@@ -467,16 +477,37 @@ export function productsBlocks(i: ProductsInsightInput): InsightBlocks {
   // Audit 27/11: "ROI" (GMV ÷ tiền giảm) = 1 ÷ mức giảm nên KHÔNG đo hiệu quả ⇒ nói bằng mức giảm (Giảm giá ÷ GMV, cùng cột
   // bảng) và tỷ trọng ngân sách giảm giá; không xếp hạng "ROI thấp nhất".
   const p = i.promo;
-  const rateOf = (roi: number | null | undefined) => (roi != null && roi > 0 ? 100 / roi : null);
-  const pRate = rateOf(p?.roi);
-  const otherRates = (p?.otherRois ?? []).map(rateOf).filter((x): x is number => x != null);
+  const pRate = p?.rate ?? null;
+  const otherRates = (p?.otherRates ?? []).filter((x) => x > 0);
   const deepest = pRate != null && otherRates.length > 0 && pRate > Math.max(...otherRates);
   const discShare = p?.discount != null && p.discount > 0 && p.totalDiscount != null && p.totalDiscount > 0 ? (p.discount / p.totalDiscount) * 100 : null;
+  // Gom theo loại (27/11): nói tiền giảm giá đi vào loại nào trước, rồi mới tới chương trình GMV cao nhất.
+  const paid = (p?.groups ?? []).filter((g) => g.discount > 0 && g.share != null);
+  const free = (p?.groups ?? []).filter((g) => g.discount <= 0);
+  const groupLine = paid.length && p?.totalDiscount
+    ? t(
+        `Tiền giảm giá ${money(p.totalDiscount)}: ${paid.map((g) => `${g.label} ${pctTxt(g.share!, 0)} (${g.count} chương trình)`).join(", ")}${free.length ? `; ${free.map((g) => `${g.label} ${g.count} chương trình`).join(", ")} không có tiền giảm trong file` : ""}.`,
+        `Discounts of ${money(p.totalDiscount)}: ${paid.map((g) => `${g.label} ${pctTxt(g.share!, 0)} (${g.count} programmes)`).join(", ")}${free.length ? `; ${free.map((g) => `${g.label} ${g.count} programmes`).join(", ")} with no discount in the file` : ""}.`
+      )
+    : "";
+  const rc = p?.reach ?? null;
+  const reachLine = rc
+    ? t(
+        `${rc.name}${rc.rate != null ? ` (mức giảm ${pctTxt(rc.rate, 0)})` : ""} được dùng ở ${pctTxt(rc.reach, 0)} đơn của shop trong kỳ chạy; giỏ hàng của các đơn này ${Math.abs(rc.aovVsShop) < 3 ? "ngang" : rc.aovVsShop < 0 ? `thấp hơn ${pctTxt(-rc.aovVsShop, 0)} so với` : `cao hơn ${pctTxt(rc.aovVsShop, 0)} so với`} đơn trung bình cùng kỳ.`,
+        `${rc.name}${rc.rate != null ? ` (discount rate ${pctTxt(rc.rate, 0)})` : ""} was used in ${pctTxt(rc.reach, 0)} of shop orders during its run; these orders' basket was ${Math.abs(rc.aovVsShop) < 3 ? "in line with" : rc.aovVsShop < 0 ? `${pctTxt(-rc.aovVsShop, 0)} below` : `${pctTxt(rc.aovVsShop, 0)} above`} the average order in the same period.`
+      )
+    : "";
+  // Phủ rộng mà giỏ không lớn hơn ⇒ chủ yếu là giảm cho đơn vốn có (không đo được đơn tăng thêm, nên chỉ đề xuất xem lại ngưỡng).
+  const thresholdAdvice = rc && rc.reach >= 30 && rc.aovVsShop < 3
+    ? t(`Cân nhắc nâng ngưỡng đơn tối thiểu của ${rc.name}: ${pctTxt(rc.reach, 0)} đơn dùng nhưng giỏ hàng không lớn hơn đơn thường.`, `Consider raising the minimum spend of ${rc.name}: ${pctTxt(rc.reach, 0)} of orders used it but their basket was not larger than usual.`)
+    : "";
   const impact = i.promoNote != null ? i.promoNote : p
     ? join(
+        groupLine,
         t(`Trong các chương trình khuyến mãi có kỳ chạy nằm trong tháng, Total GMV cao nhất thuộc về: ${p.name}.`, `Among promotions whose period falls in the month, the highest Total GMV belongs to: ${p.name}.`),
-        discShare != null ? t(`Chương trình này dùng ${money(p.discount!)} tiền giảm giá${pRate != null ? ` (${pctTxt(pRate, 0)} GMV của chương trình)` : ""}, ${pctTxt(discShare, 0)} của ${money(p.totalDiscount!)} cả tháng.`, `It used ${money(p.discount!)} in discounts${pRate != null ? ` (${pctTxt(pRate, 0)} of its GMV)` : ""}, ${pctTxt(discShare, 0)} of the month's ${money(p.totalDiscount!)}.`) : "",
-        deepest ? t(`Đây là mức giảm sâu nhất trong các chương trình có tiền giảm giá ở bảng (còn lại ${pctTxt(Math.min(...otherRates), 0)}–${pctTxt(Math.max(...otherRates), 0)} GMV).`, `This is the deepest discount among the discounting programmes in the table (the rest ${pctTxt(Math.min(...otherRates), 0)}–${pctTxt(Math.max(...otherRates), 0)} of GMV).`) : ""
+        discShare != null ? t(`Chương trình này dùng ${money(p.discount!)} tiền giảm giá${pRate != null ? ` (mức giảm ${pctTxt(pRate, 0)})` : ""}, ${pctTxt(discShare, 0)} của ${money(p.totalDiscount!)} cả tháng.`, `It used ${money(p.discount!)} in discounts${pRate != null ? ` (discount rate ${pctTxt(pRate, 0)})` : ""}, ${pctTxt(discShare, 0)} of the month's ${money(p.totalDiscount!)}.`) : "",
+        deepest ? t(`Đây là mức giảm sâu nhất trong các chương trình có tiền giảm giá (còn lại ${pctTxt(Math.min(...otherRates), 0)}–${pctTxt(Math.max(...otherRates), 0)}).`, `This is the deepest discount among the discounting programmes (the rest ${pctTxt(Math.min(...otherRates), 0)}–${pctTxt(Math.max(...otherRates), 0)}).`) : "",
+        reachLine
       )
     : t("Chưa có số liệu chương trình khuyến mãi của tháng.", "No promotion data for the month yet.");
   const rise = i.risers.find(bigMove);
@@ -485,7 +516,8 @@ export function productsBlocks(i: ProductsInsightInput): InsightBlocks {
     rise ? t(`Tăng thời lượng giới thiệu ${rise.name} trên live.`, `Give ${rise.name} more airtime on live.`) : "",
     drops.length ? t(`Kiểm tra tồn kho, giá và kịch bản chuyển đổi của ${drops.map((f) => f.name).join(", ")}.`, `Check stock, pricing and the conversion script for ${drops.map((f) => f.name).join(", ")}.`) : "",
     !rise && !drops.length ? t("Giữ cơ cấu SKU hiện tại; không SKU nào đổi hạng đáng kể.", "Keep the current SKU mix; no SKU changed rank significantly.") : "",
-    i.promoNote == null && deepest && discShare != null && discShare >= 25 ? t(`Xem lại mức giảm của ${p!.name} trước khi lặp lại: giảm sâu nhất và chiếm ${pctTxt(discShare, 0)} tiền giảm giá cả tháng.`, `Review the discount level of ${p!.name} before repeating it: the deepest discount and ${pctTxt(discShare, 0)} of the month's discount spend.`) : ""
+    i.promoNote == null && deepest && discShare != null && discShare >= 25 ? t(`Xem lại mức giảm của ${p!.name} trước khi lặp lại: giảm sâu nhất và chiếm ${pctTxt(discShare, 0)} tiền giảm giá cả tháng.`, `Review the discount level of ${p!.name} before repeating it: the deepest discount and ${pctTxt(discShare, 0)} of the month's discount spend.`) : "",
+    i.promoNote == null ? thresholdAdvice : ""
   );
   return { observe, cause, impact, advise };
 }

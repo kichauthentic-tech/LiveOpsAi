@@ -60,19 +60,16 @@ describe("A2 · Product card cùng một số ở trang 1 và cầu kênh trang 
   });
 });
 
-describe("B1 · khuyến mãi: Giảm giá ÷ GMV thay cho ROI", () => {
-  it("in mức giảm thật, không còn cột ROI", () => {
-    const html = promoTableHtml({
-      hasAnyBatch: true, excludedMultiMonth: 0,
-      items: [
-        { name: "VC 5% bill 1M", status: "", period: "", gmv: 484.8e6, orders: 422, aov: 1.15e6, itemsSold: 430, discount: 32.5e6, roi: 14.9 },
-        { name: "MD 1.10", status: "", period: "", gmv: 434.6e6, orders: 450, aov: 966e3, itemsSold: 460, discount: 253.6e6, roi: 1.71 }
-      ]
-    });
-    expect(html).toContain("Giảm giá ÷ GMV");
+describe("B1 · khuyến mãi: mức giảm thay cho ROI", () => {
+  it("dùng Tỷ lệ giảm giá trung bình của TikTok; thiếu cột thì tính tiền giảm ÷ giá trước giảm; không còn cột ROI", () => {
+    const html = promoTableHtml([
+      { name: "VC 5% bill 1M", status: "", period: "", gmv: 484.8e6, orders: 422, aov: 1.15e6, itemsSold: 430, discount: 32.5e6, roi: 14.9, discountRate: 6 },
+      { name: "MD 1.10", status: "", period: "", gmv: 434.6e6, orders: 450, aov: 966e3, itemsSold: 460, discount: 253.6e6, roi: 1.71 }
+    ]);
+    expect(html).toContain("Mức giảm");
     expect(html).not.toContain(">ROI<");
-    expect(html).toContain("6,7%");
-    expect(html).toContain("58,4%");
+    expect(html).toContain("6,0%");
+    expect(html).toContain("37%"); // 253,6 ÷ (434,6 + 253,6)
   });
 });
 

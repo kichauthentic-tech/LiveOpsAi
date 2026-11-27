@@ -7,7 +7,7 @@ import type { CampDayBucket } from "../../../lib/campaignDays";
 import type { SessionSpread } from "../../../lib/report/rhythm";
 import { DAY_TYPE_SHORT } from "./theme";
 import { fmtHours, fmtInt, fmtPct, fmtSessionStart } from "./format";
-import { ch, columns, scatter, tbl } from "./demoCharts";
+import { ch, columns, scatter, tbl, type Cell } from "./demoCharts";
 import type { PageMetric } from "./ui";
 import { numLocale, t as tr } from "../../../lib/displayLang";
 
@@ -176,34 +176,39 @@ function pairHtml(k: PairKey, hs: HostAll[], t: DayTypeMetrics, shortName: (n: s
 const shortNameOf = (shortName: (n: string) => string, h: HostAll) => shortName(h.name);
 
 // ---- Bảng Host PFM ----
+// 27/11 (user: "theo layout ngang như bảng Host PFM theo loại ngày"): host là CỘT, chỉ số là DÒNG, cột "Cả team" đứng đầu —
+// cùng khung với hostDayTableHtml. Host xếp theo GMV/giờ; host dưới MIN_RANK_SESSIONS phiên ghi kèm số phiên ở tên cột.
 function hostTableHtml(d: HostPageData, hs: HostAll[]): string {
   const METRIC = metricOf(d);
   const shopee = d.variant === "shopee";
-  const best = [...hs].filter((h) => h.m.sessions >= MIN_RANK_SESSIONS && h.m.gmvPerHour != null).sort((a, b) => b.m.gmvPerHour! - a.m.gmvPerHour!)[0];
+  const team = teamAll(d.team);
   const sorted = [...hs].sort((a, b) => (b.m.gmvPerHour ?? 0) - (a.m.gmvPerHour ?? 0));
+  const row = (label: string, teamCell: Cell, f: (h: HostAll) => Cell): Cell[] => [label, teamCell, ...sorted.map(f)];
+  const rel = (h: HostAll): Cell => {
+    const r = d.reliability.get(h.key);
+    return r ? { t: `${reliabilityText({ ratio: r.ratio, lo: null, hi: null })} · ${r.sessions}`, c: r.verdict === "above" ? "up" : r.verdict === "below" ? "dn" : "" } : "—";
+  };
+  const peer = (h: HostAll): Cell => {
+    const vp = d.vsPeer.get(h.key);
+    return vp == null ? "—" : ch(pctSigned(vp), 15);
+  };
   return tbl(
-    shopee
-      ? ["Host", `${METRIC.liveHours} · ${tr("phiên", "sessions")}`, METRIC.gmv, METRIC.gmvPerHour, METRIC.viewersPerHour, METRIC.upt, tr(`So trung bình ${d.relMonths} tháng`, `vs ${d.relMonths}-month average`), tr("So trung bình tháng này", "vs this month's average")]
-      : ["Host", `${METRIC.liveHours} · ${tr("phiên", "sessions")}`, METRIC.gmv, METRIC.gmvPerHour, METRIC.viewsPerHour, METRIC.liveCtr, METRIC.ctor, METRIC.upt, tr(`So trung bình ${d.relMonths} tháng`, `vs ${d.relMonths}-month average`), tr("So trung bình tháng này", "vs this month's average")],
-    sorted.map((h) => {
-      const r = d.reliability.get(h.key);
-      const vp = d.vsPeer.get(h.key);
-      const rel = r ? { t: `${reliabilityText({ ratio: r.ratio, lo: null, hi: null })} · ${r.sessions} ${tr("phiên", "sessions")}`, c: r.verdict === "above" ? "up" : r.verdict === "below" ? "dn" : "" } : "—";
-      return {
-        c: [
-          esc(d.shortName(h.name)),
-          `${fmtHours(h.m.hours)} · ${h.m.sessions}`,
-          fmtVndShort(h.m.gmv),
-          M1(h.m.gmvPerHour ?? 0),
-          fmtInt(h.m.viewsPerHour ?? 0),
-          ...(shopee ? [] : [dec(h.m.liveCtr ?? 0, 1) + "%", fmtPct(h.m.ctor)]),
-          dec(h.m.upt ?? 0, 2),
-          rel,
-          vp == null ? "—" : ch(pctSigned(vp), 15)
-        ],
-        hl: !!best && best.key === h.key
-      };
-    })
+    [tr("Chỉ số", "Metric"), tr("Cả team", "Whole team"), ...sorted.map((h) => esc(`${d.shortName(h.name)}${h.m.sessions < MIN_RANK_SESSIONS ? ` · ${h.m.sessions}` : ""}`))],
+    [
+      row(METRIC.gmv, fmtVndShort(team.gmv), (h) => fmtVndShort(h.m.gmv)),
+      row(`${METRIC.liveHours} · ${tr("phiên", "sessions")}`, `${fmtHours(team.hours)} · ${team.sessions}`, (h) => `${fmtHours(h.m.hours)} · ${h.m.sessions}`),
+      row(METRIC.gmvPerHour, M1(team.gmvPerHour ?? 0), (h) => M1(h.m.gmvPerHour ?? 0)),
+      row(shopee ? METRIC.viewersPerHour : METRIC.viewsPerHour, fmtInt(team.viewsPerHour ?? 0), (h) => fmtInt(h.m.viewsPerHour ?? 0)),
+      ...(shopee
+        ? []
+        : [
+            row(METRIC.liveCtr, dec(team.liveCtr ?? 0, 1) + "%", (h) => dec(h.m.liveCtr ?? 0, 1) + "%"),
+            row(METRIC.ctor, fmtPct(team.ctor), (h) => fmtPct(h.m.ctor))
+          ]),
+      row(METRIC.upt, dec(team.upt ?? 0, 2), (h) => dec(h.m.upt ?? 0, 2)),
+      row(tr(`So trung bình ${d.relMonths} tháng · phiên`, `vs ${d.relMonths}-month average · sessions`), "—", rel),
+      row(tr("So trung bình tháng này", "vs this month's average"), "—", peer)
+    ]
   );
 }
 

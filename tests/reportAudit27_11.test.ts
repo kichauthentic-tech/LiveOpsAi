@@ -114,15 +114,15 @@ describe("trang Sản phẩm", () => {
     risers: [{ name: "A", from: 5, to: 2, ctor: 1.5 }, { name: "B", from: 9, to: 6, ctor: 0.84 }],
     fallers: [{ name: "C", from: 2, to: 5, ctor: 0.93, ctr: 3 }],
     lead: null,
-    promo: { name: "MD 3.11", roi: 1.32, discount: 50, totalDiscount: 100, otherRois: [3, 5] }
+    promo: { name: "MD 3.11", rate: 43, discount: 50, totalDiscount: 100, otherRates: [12, 6] }
   };
   it("có mã phản ví dụ ⇒ nói tỷ lệ không tách được hai nhóm", () => {
     expect(productsBlocks(base).cause).toContain("không tách được hai nhóm: B tăng hạng");
   });
   it("chương trình GMV cao nhất, giảm sâu nhất và tốn nhiều tiền giảm ⇒ nêu bằng mức giảm, không bằng ROI", () => {
     const b = productsBlocks(base);
-    // roi 1,32 = GMV ÷ tiền giảm ⇒ mức giảm 76% GMV; chương trình khác 20–33%.
-    expect(b.impact).toContain("76% GMV của chương trình");
+    // Mức giảm theo "Tỷ lệ giảm giá trung bình" của TikTok (MD price 3.11 CROCS T11: 43%); chương trình khác 6–12%.
+    expect(b.impact).toContain("mức giảm 43%");
     expect(b.impact).toContain("mức giảm sâu nhất");
     expect(b.impact).not.toContain("ROI");
     expect(b.advise).toContain("Xem lại mức giảm của MD 3.11");

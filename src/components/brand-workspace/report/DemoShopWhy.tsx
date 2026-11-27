@@ -17,8 +17,7 @@ import { DAY_TYPE_SHORT } from "./theme";
 import { type AttributionMonth } from "../../../lib/report/liveAttribution";
 import { numLocale, byLang, t } from "../../../lib/displayLang";
 
-const BLUE = "#7fb0e0";
-import { W, fmtM, fmtP, heat, hbars, pill, stack100, tbl, waterfall, type Cell } from "./demoCharts";
+import { W, fmtM, fmtP, heat, pill, stack100, tbl, waterfall, type Cell } from "./demoCharts";
 import { featureOffText } from "../../../lib/featureOff";
 import { useRegisterStaleInsight } from "./staleInsights";
 
@@ -404,12 +403,10 @@ const TAB_CLS: Record<string, string> = { daily: "g-daily", dday: "g-dday", midm
 const ABS_ORDER = ["gmv", "hours", "gmvPerHour", "err", "viewsPerHour", "liveCtr", "ctor", "aov", "upt"];
 
 const FunnelPanel: React.FC<{ funnel: NonNullable<DemoWhyProps["funnel"]>; prevShort: string }> = ({ funnel, prevShort }) => {
-  const [mode, setMode] = useState<"p" | "i">("p");
   const { impressions: im, views: vw, productImpressions: pi, productClicks: pc, orders: od } = funnel;
   const chg = (p: number, c: number) => (p > 0 ? (c / p - 1) * 100 : null);
   const rate = (n: number, d: number) => (d > 0 ? (n / d) * 100 : null);
   const sig = isBigChange;
-  const down = (i: number) => i < 100 && isBigChange(i - 100);
   const ratio = [
     { n: METRIC.err, d: "Views ÷ LIVE impressions", p: rate(vw.prev, im.prev), c: rate(vw.cur, im.cur) },
     { n: METRIC.liveCtr, d: "Product clicks ÷ Views", p: rate(pc.prev, vw.prev), c: rate(pc.cur, vw.cur) },
@@ -417,19 +414,9 @@ const FunnelPanel: React.FC<{ funnel: NonNullable<DemoWhyProps["funnel"]>; prevS
   ].map((r) => ({ ...r, chg: r.p != null && r.c != null && r.p > 0 ? (r.c / r.p - 1) * 100 : null }));
   const stages = [im, vw, pc, od];
   const ratioFor = [ratio[0], ratio[1], ratio[2]];
-  const idx = (s: FunnelStageLite) => (s.prev > 0 ? (s.cur / s.prev) * 100 : 0);
   const chgCls = (v: number | null, neutral: boolean) => (v == null || neutral || !sig(v) ? "nt" : v > 0 ? "up" : "dn");
   const productCtrChg = rate(pc.prev, pi.prev) && rate(pc.cur, pi.cur) ? ((rate(pc.cur, pi.cur) as number) / (rate(pc.prev, pi.prev) as number) - 1) * 100 : null;
-  const hbHtml = hbars(
-    [
-      { name: im.label, sub: `${fmtM(im.prev)} → ${fmtM(im.cur)}`, value: idx(im), text: String(Math.round(idx(im))), cls: idx(im) > 100 ? "blue" : "" },
-      { name: vw.label, sub: `${nf(vw.prev)} → ${nf(vw.cur)}`, value: idx(vw), text: String(Math.round(idx(vw))), cls: down(idx(vw)) ? "red" : "" },
-      { name: pi.label, sub: `${fmtM(pi.prev)} → ${fmtM(pi.cur)}`, value: idx(pi), text: String(Math.round(idx(pi))), dim: true },
-      { name: pc.label, sub: `${nf(pc.prev)} → ${nf(pc.cur)}`, value: idx(pc), text: String(Math.round(idx(pc))), cls: down(idx(pc)) ? "red" : "" },
-      { name: od.label, sub: `${nf(od.prev)} → ${nf(od.cur)}`, value: idx(od), text: String(Math.round(idx(od))), dim: true }
-    ].map((r) => ({ ...r, mark: 100 })),
-    Math.max(120, Math.ceil(Math.max(...[im, vw, pi, pc, od].map(idx)) / 10) * 10 + 7)
-  );
+  // 27/11: bỏ kiểu xem "Chỉ số hoá (tháng trước = 100)" theo yêu cầu user — chỉ còn chuỗi chuyển đổi.
   const tableHtml = tbl(
     [t("Tỷ lệ", "Rate"), prevShort, t("Tháng này", "This month"), "±"],
     [
@@ -441,12 +428,7 @@ const FunnelPanel: React.FC<{ funnel: NonNullable<DemoWhyProps["funnel"]>; prevS
   return (
     <div className="pn">
       <div className="pnh">{t("Phễu LIVE", "LIVE funnel")}</div>
-      <div className="pns">{t("Hai cách xem: chuỗi chuyển đổi (số tuyệt đối và tỷ lệ giữa các bậc) hoặc chỉ số hoá (tháng trước = 100, vạch trắng = tháng trước).", "Two views: conversion chain (absolute numbers and step rates) or indexed (last month = 100, white mark = last month).")}</div>
-      <div className="tabs" id="funnelMode">
-        <button type="button" className={mode === "p" ? "seg-on" : ""} onClick={() => setMode("p")}>{t("Chuỗi chuyển đổi", "Conversion chain")}</button>
-        <button type="button" className={mode === "i" ? "seg-on" : ""} onClick={() => setMode("i")}>{t("Chỉ số hoá", "Indexed")} ({prevShort} = 100)</button>
-      </div>
-      {mode === "p" ? (
+      <div className="pns">{t("Chuỗi chuyển đổi: số tuyệt đối của từng bậc và tỷ lệ giữa các bậc, so với tháng trước.", "Conversion chain: absolute numbers per step and the rates between steps, vs last month.")}</div>
         <div className="pipe" style={{ display: "flex" }}>
           {stages.map((s, i) => {
             const c = chg(s.prev, s.cur);
@@ -473,9 +455,6 @@ const FunnelPanel: React.FC<{ funnel: NonNullable<DemoWhyProps["funnel"]>; prevS
             );
           })}
         </div>
-      ) : (
-        <Html className="hb" html={hbHtml} />
-      )}
       <div className="tw" style={{ marginTop: 12 }}>
         <table dangerouslySetInnerHTML={{ __html: tableHtml }} />
       </div>
@@ -534,7 +513,7 @@ export const DemoWhyPage: React.FC<DemoWhyProps> = ({ no, title, fallbackHeadlin
             ...FACTOR_ORDER.map((f, i) => {
               const v = r.change[f];
               if (v == null) return "—";
-              return { t: fmtP(v), c: "hm", s: !isBigChange(v) ? "" : i === 0 ? heat(v, 40, BLUE, BLUE) : heat(v, 30) + ";box-shadow:inset 0 0 0 1.5px var(--cream);font-weight:800" };
+              return { t: fmtP(v), c: "hm", s: !isBigChange(v) ? "" : i === 0 ? heat(v, 30) : heat(v, 30) + ";box-shadow:inset 0 0 0 1.5px var(--cream);font-weight:800" };
             }),
             W(pill(verdict, k))
           ];
@@ -563,9 +542,9 @@ export const DemoWhyPage: React.FC<DemoWhyProps> = ({ no, title, fallbackHeadlin
                     const txt = cell.value != null ? fmtKeyMetric(def(r.key), cell.value) : "—";
                     if (i === 0) return `<td class="cellc base gs ${TAB_CLS[t]}">${txt}</td>`;
                     const v = cell.change;
-                    // UPT gồm quà tặng (goodWhenUp null) tô xanh dương như Giờ live — không đánh giá tốt/xấu (audit 27/11).
-                    const neutral = r.key === "hours" || !!def(r.key).volume || def(r.key).goodWhenUp == null;
-                    const st = v == null || !isBigChange(v) ? "" : (neutral ? heat(v, 40, BLUE, BLUE) : heat(v, 30)) + (cell.significant ? ";box-shadow:inset 0 0 0 1.5px var(--cream);font-weight:800" : "");
+                    // 27/11 (user: "màu xanh dương là sao?"): bỏ xanh dương — mọi ô đổi từ 10% tô theo chiều, tăng xanh lá / giảm đỏ,
+                    // cùng luật Key Metrics (Giờ live, GMV, UPT gồm quà tặng không còn màu riêng).
+                    const st = v == null || !isBigChange(v) ? "" : heat(v, 30) + (cell.significant ? ";box-shadow:inset 0 0 0 1.5px var(--cream);font-weight:800" : "");
                     return `<td class="cellc" style="${st}">${txt}${v != null ? `<small>${fmtP(v)}</small>` : ""}</td>`;
                   })
                   .join("")
@@ -593,7 +572,7 @@ export const DemoWhyPage: React.FC<DemoWhyProps> = ({ no, title, fallbackHeadlin
           <div className="pnh">{t("Thay đổi các yếu tố theo loại ngày", "Factor changes by day type")}</div>
           <div className="pns">{t("% thay đổi tháng này so với tháng trước; mỗi loại ngày so với chính nó theo lịch Campaign. Chỉ tô ô đổi từ 10% trở lên.", "% change this month vs last month; each day type compared with itself per the Campaign calendar. Only changes of 10% or more are coloured.")}</div>
           <Tbl html={dayHtml} />
-          <div className="legend"><span>{t(`Màu xanh: tăng · màu đỏ: giảm · màu xanh dương: ${METRIC.liveHours} (do lịch quyết định, không đánh giá tốt hay xấu)`, `Green: up · red: down · blue: ${METRIC.liveHours} (set by the schedule, not rated good or bad)`)}</span></div>
+          <div className="legend"><span>{t(`Màu xanh: tăng · màu đỏ: giảm. ${METRIC.liveHours} do lịch quyết định nên đọc kèm số giờ, không coi là tốt hay xấu.`, `Green: up · red: down. ${METRIC.liveHours} is set by the schedule, so read it alongside the hours, not as good or bad.`)}</span></div>
         </div>
       )}
       {absHtml && (
@@ -609,8 +588,8 @@ export const DemoWhyPage: React.FC<DemoWhyProps> = ({ no, title, fallbackHeadlin
           <div className="legend">
             <span>
               {t(
-                `${keyMonths[1] ? monthShort(keyMonths[1].month) : ""} tô màu theo thay đổi so với ${first}, ${keyMonths[2] ? `${monthShort(keyMonths[2].month)} theo thay đổi so với ${monthShort(keyMonths[1].month)}` : ""} · ${first} là mốc, không tô · chỉ tô khi đổi từ 10% · xanh dương = ${METRIC.liveHours}, ${METRIC.upt} (gồm quà tặng), không đánh giá tốt hay xấu`,
-                `${keyMonths[1] ? monthShort(keyMonths[1].month) : ""} coloured by change vs ${first}${keyMonths[2] ? `, ${monthShort(keyMonths[2].month)} by change vs ${monthShort(keyMonths[1].month)}` : ""} · ${first} is the baseline, not coloured · coloured only from 10% · blue = ${METRIC.liveHours}, ${METRIC.upt} (includes free gifts), not rated good or bad`
+                `${keyMonths[1] ? monthShort(keyMonths[1].month) : ""} tô màu theo thay đổi so với ${first}, ${keyMonths[2] ? `${monthShort(keyMonths[2].month)} theo thay đổi so với ${monthShort(keyMonths[1].month)}` : ""} · ${first} là mốc, không tô · chỉ tô khi đổi từ 10% · xanh tăng, đỏ giảm`,
+                `${keyMonths[1] ? monthShort(keyMonths[1].month) : ""} coloured by change vs ${first}${keyMonths[2] ? `, ${monthShort(keyMonths[2].month)} by change vs ${monthShort(keyMonths[1].month)}` : ""} · ${first} is the baseline, not coloured · coloured only from 10% · green up, red down`
               )}
             </span>
           </div>
