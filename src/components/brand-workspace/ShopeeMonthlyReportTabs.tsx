@@ -478,7 +478,7 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
       kmRows.push([
         r.def.label,
         ...r.values.map((v) => fmtShopeeKm(r.def.kind, v)),
-        ...r.changes.slice(1).map((c, i) => (c == null ? "—" : { t: fmtP(c, 0), c: r.tones[i + 1] === "up" ? "up" : r.tones[i + 1] === "down" ? "dn" : "nt" }))
+        ...r.changes.slice(1).map((c, i) => (c == null ? "—" : { t: fmtP(c, 0), c: r.tones[i + 1] === "up" ? "up" : r.tones[i + 1] === "down" ? "dn" : r.tones[i + 1] === "neutral" && isBigChange(c) ? (c > 0 ? "up" : "dn") : "nt" }))
       ]);
     }
   }
@@ -727,8 +727,8 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
               <DemoPanel
                 title={tr(`${pm.km.all.rows.length} chỉ số, ${months.length === 3 ? "ba" : months.length} tháng ${winNote ? `cùng kỳ ${winNote}` : "cả tháng"}`, `${pm.km.all.rows.length} metrics, ${months.length} months, ${winNote ? `same period ${winNote}` : "full month"}`)}
                 sub={tr(
-                  `Màu xanh (tốt lên) / đỏ (xấu đi) khi đổi từ 10% trở lên so với tháng liền trước. ${METRIC.liveHours} và chỉ số quy mô đi theo giờ (${SM.gmv}, ${METRIC.orders}, ${METRIC.itemsSoldShopee}, ${METRIC.viewers}, ${METRIC.atc}) không đánh giá tốt hay xấu.`,
-                  `Green (better) / red (worse) when a metric changes 10% or more vs the month before. ${METRIC.liveHours} and volume metrics that follow hours (${SM.gmv}, ${METRIC.orders}, ${METRIC.itemsSoldShopee}, ${METRIC.viewers}, ${METRIC.atc}) are not rated good or bad.`
+                  `Màu xanh (tốt lên) / đỏ (xấu đi) khi đổi từ 10% trở lên so với tháng liền trước. ${METRIC.liveHours} và chỉ số quy mô đi theo giờ (${SM.gmv}, ${METRIC.orders}, ${METRIC.itemsSoldShopee}, ${METRIC.viewers}, ${METRIC.atc}) tô theo chiều: tăng xanh, giảm đỏ.`,
+                  `Green (better) / red (worse) when a metric changes 10% or more vs the month before. ${METRIC.liveHours} and volume metrics that follow hours (${SM.gmv}, ${METRIC.orders}, ${METRIC.itemsSoldShopee}, ${METRIC.viewers}, ${METRIC.atc}) are coloured by direction: green up, red down.`
                 )}
               >
                 <DemoTable html={tbl(kmHead, kmRows)} id="km" />

@@ -56,7 +56,7 @@ import { affiliateTrackColumns, affiliateTrackTotals } from "../../lib/report/af
 import { byLang, t, monthShort, monthLong } from "../../lib/displayLang";
 
 const INSIGHT_PAGES: [InsightPage, string][] = byLang(
-  () => [["summary", t("Tổng quan", "Overview")], ["keymetrics", "Key Metrics"], ["nmv", "NMV"], ["shop", t("Toàn shop", "Whole shop")], ["why", t("Nguyên nhân", "Root cause")], ["products", t("Sản phẩm", "Products")], ["people", "Host"], ["ads", t("Quảng cáo", "Advertising")], ["affiliate", "Affiliate"], ["next", t("Kế hoạch tháng sau", "Next month's plan")]],
+  () => [["summary", t("Tổng quan", "Overview")], ["keymetrics", "Key Metrics"], ["shop", t("Toàn shop", "Whole shop")], ["why", t("Nguyên nhân", "Root cause")], ["products", t("Sản phẩm", "Products")], ["people", "Host"], ["ads", t("Quảng cáo", "Advertising")], ["affiliate", "Affiliate"], ["next", t("Kế hoạch tháng sau", "Next month's plan")]],
   []
 );
 
@@ -1032,7 +1032,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     const adsCreatorRow = adsPlan && adsPlanRows ? adsTypeRows(adsPlanRows.rows, month).find((r) => r.key === "creator") : undefined;
     const bookingSum = bookingTotals(creatorPlan);
     const metrics: Record<InsightPage, PageMetric[]> = {
-      summary: [totalGmv, liveGmv, nmv, gmvPerHour],
+      summary: [totalGmv, liveGmv, gmvPerHour],
       keymetrics: [
         { ...kmMetric("gmv"), badge: kmTarget ? (km.gmvForTarget.all / kmTarget) * 100 : null, note: kmTarget ? `Target ${fmtVndShort(kmTarget)}` : undefined },
         kmMetric("orders"),
@@ -1125,7 +1125,9 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     why: true,
     products: canManage || !!topSku?.hasAnyBatch || !!topPromo?.hasAnyBatch,
     ads: scope.ads && (canManage || !!adsCur || !!adsPlan),
-    nmv: canManage || refundRateShop != null || nmvRate != null,
+    // User 27/11: "bỏ phần NMV trong Report tháng" — trang Hoàn & NMV không hiện (cả ops lẫn brand, cả file xuất). Code trang giữ
+    // nguyên để bật lại = đổi về `canManage || refundRateShop != null || nmvRate != null`.
+    nmv: false,
     people: true,
     affiliate: scope.affiliate && (canManage || creatorRows.length > 0),
     next: true,
@@ -1237,8 +1239,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             "Seller LIVE (cả tài khoản shop)": n(c?.liveLinked),
             "Affiliate LIVE": n(c?.affiliate),
             "Video": n(c?.video),
-            [trendDay ? "Product card (Total GMV trừ 3 kênh)" : "Product card"]: n(c?.card),
-            "Refund rate (%)": n(c?.refundRate)
+            [trendDay ? "Product card (Total GMV trừ 3 kênh)" : "Product card"]: n(c?.card)
           }))
         },
         {

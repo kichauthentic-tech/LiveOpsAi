@@ -430,10 +430,11 @@ export const KeyMetricsDemoPage: React.FC<{
       ...r.values.map((v) => fmtKeyMetric(r.def, v)),
       ...r.changes.slice(1).map((c, i) => {
         if (c == null) return "—";
-        // Audit 27/11: chỉ số không có chiều tốt (Giờ live, UPT gồm quà tặng, Avg. price) không tô xanh/đỏ — Pay Day T10 UPT +31%
-        // từng tô xanh đậm dù tăng vì 2 chương trình tặng quà 24–25/10.
-        const neutral = r.def.goodWhenUp == null || r.tones[i + 1] === "noise";
-        return { t: fmtP(c, 0), c: neutral ? "nt" : c > 0 ? "up" : "dn" };
+        // Chỉ số không có chiều tốt (Giờ live, chỉ số quy mô, UPT gồm quà tặng, Avg. price): đổi từ 10% tô theo CHIỀU — tăng xanh lá,
+        // giảm đỏ (user 27/11: "xanh lá chứ sao để xanh dương"; trước đó cả bảng CROCS T11 xám dù Items sold +56%, UPT +34%).
+        const unrated = o.key === "hours" || r.def.goodWhenUp == null || !!r.def.volume;
+        if (unrated) return { t: fmtP(c, 0), c: !isBigChange(c) ? "nt" : c > 0 ? "up" : "dn" };
+        return { t: fmtP(c, 0), c: r.tones[i + 1] === "noise" ? "nt" : c > 0 ? "up" : "dn" };
       })
     ]);
   }
@@ -462,8 +463,8 @@ export const KeyMetricsDemoPage: React.FC<{
       <DemoPanel
         title={t(`${KEY_METRICS.length} chỉ số, ${months.length === 3 ? "ba" : months.length} tháng ${windowNote ? `cùng kỳ ${windowNote}` : "cả tháng"}`, `${KEY_METRICS.length} metrics, ${months.length} months, ${windowNote ? `same period ${windowNote}` : "full month"}`)}
         sub={t(
-          `Tỷ lệ và số theo giờ tô xanh (tốt lên) / đỏ (xấu đi) khi đổi từ 10% trở lên so với tháng liền trước. ${METRIC.liveHours} và các chỉ số số lượng đi theo giờ (${METRIC.gmv}, ${METRIC.orders}, ${METRIC.itemsSold}, ${METRIC.productImpressions}, ${METRIC.productClicks}, ${METRIC.views}, ${METRIC.liveImpressions}) không đánh giá tốt hay xấu; ${METRIC.upt} (gồm quà tặng) và ${METRIC.avgPrice} cũng không.`,
-          `Rates and per-hour figures turn green (better) / red (worse) when they change 10% or more vs the month before. ${METRIC.liveHours} and volume metrics that follow hours (${METRIC.gmv}, ${METRIC.orders}, ${METRIC.itemsSold}, ${METRIC.productImpressions}, ${METRIC.productClicks}, ${METRIC.views}, ${METRIC.liveImpressions}) are not rated good or bad; nor are ${METRIC.upt} (includes free gifts) and ${METRIC.avgPrice}.`
+          `Tỷ lệ và số theo giờ tô xanh (tốt lên) / đỏ (xấu đi) khi đổi từ 10% trở lên so với tháng liền trước. ${METRIC.liveHours} và các chỉ số số lượng đi theo giờ (${METRIC.gmv}, ${METRIC.orders}, ${METRIC.itemsSold}, ${METRIC.productImpressions}, ${METRIC.productClicks}, ${METRIC.views}, ${METRIC.liveImpressions}) cùng ${METRIC.upt} (gồm quà tặng) và ${METRIC.avgPrice} tô theo chiều: tăng xanh, giảm đỏ.`,
+          `Rates and per-hour figures turn green (better) / red (worse) when they change 10% or more vs the month before. ${METRIC.liveHours} and volume metrics that follow hours (${METRIC.gmv}, ${METRIC.orders}, ${METRIC.itemsSold}, ${METRIC.productImpressions}, ${METRIC.productClicks}, ${METRIC.views}, ${METRIC.liveImpressions}) together with ${METRIC.upt} (includes free gifts) and ${METRIC.avgPrice}, are coloured by direction: green up, red down.`
         )}
       >
         <DemoTable html={tbl(head, rows)} id="km" />
