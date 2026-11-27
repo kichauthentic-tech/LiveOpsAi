@@ -1,3 +1,4 @@
+import { isBigChange } from "../../../lib/report/changeThreshold";
 import React, { useState } from "react";
 import { fmtFixed, fmtNum } from "../../../lib/format";
 import { CHANNEL, METRIC, metricFor } from "../../../lib/metricGlossary";
@@ -45,8 +46,6 @@ export interface SummaryDemoProps {
   shop: { actual: number; throughDay: number | null; target: number; projected: number | null; projectedPct: number | null } | null;
   gmvPerHour: number | null;
   gmvPerHourChange: number | null;
-  /** Ngưỡng dao động (%) của GMV/giờ cả tháng — đổi trong ngưỡng thì không tô đỏ (khớp Key Metrics). */
-  gmvPerHourBand?: number | null;
   hoursChange: number | null;
   bridge: BridgePoint[] | null;
   score: ScoreRow[];
@@ -222,7 +221,7 @@ export const SummaryDemoPage: React.FC<SummaryDemoProps> = (p) => {
     const { cur, prev, throughDay } = p.channels;
     const N = p.channelNames ?? TIKTOK_CHANNEL_NAMES;
     const chg = (v: number | null | undefined) =>
-      v == null ? null : <span style={{ color: v >= 0 ? "var(--green)" : "var(--red)" }}>{v >= 0 ? "+" : "−"}{fmtNum(Math.abs(v), 1)}%</span>;
+      v == null ? null : <span style={{ color: !isBigChange(v) ? undefined : v >= 0 ? "var(--green)" : "var(--red)" }}>{v >= 0 ? "+" : "−"}{fmtNum(Math.abs(v), 0)}%</span>;
     const growth = (a: number | null | undefined, b: number | null | undefined) => (a != null && b != null && a > 0 ? (b / a - 1) * 100 : null);
     const vs = `${t("so với", "vs")} ${p.prevMonthShort}`;
     const planGph = tHours > 0 ? tTarget / tHours : null;
@@ -411,17 +410,14 @@ export const KeyMetricsDemoPage: React.FC<{
   months: KeyMetricsMonth[];
   /** Direct ÷ (Direct + Indirect) của Seller LIVE, điểm %, từng tab × từng tháng (cùng thứ tự `months`). */
   directShare?: Record<KeyMetricsTab, (number | null)[]>;
-  /** CV GMV/giờ một phiên dùng cho ngưỡng dao động; `cvMeasured` = đo trên phiên của brand (không phải mặc định CROCS). */
-  cv?: number;
-  cvMeasured?: boolean;
   monthLabel: (m: string) => string;
   /** "1–26" khi tháng còn dở. */
   windowNote?: string;
   insight: React.ReactNode;
-}> = ({ no, title, headline, months, directShare, cv, cvMeasured, monthLabel, windowNote, insight }) => {
+}> = ({ no, title, headline, months, directShare, monthLabel, windowNote, insight }) => {
   const [tab, setTab] = useState<KeyMetricsTab>("all");
   const last = months.length - 1;
-  const table = keyMetricsTable(months, tab, cv);
+  const table = keyMetricsTable(months, tab);
   const byKey = new Map(table.rows.map((r) => [r.def.key, r]));
   const rows: TableRow[] = [];
   for (const o of KM_ORDER) {
@@ -454,7 +450,7 @@ export const KeyMetricsDemoPage: React.FC<{
   const head = [
     t("Chỉ số", "Metric"),
     ...months.map((m) => monthLabel(m.month)),
-    ...months.slice(1).map((m, i) => `${monthLabel(m.month)} ${t("so", "vs")} ${monthLabel(months[i].month)} (${table.bands[i + 1] == null ? "—" : "±" + Math.round(table.bands[i + 1]!) + "%"})`)
+    ...months.slice(1).map((m, i) => `${monthLabel(m.month)} ${t("so", "vs")} ${monthLabel(months[i].month)}`)
   ];
   const sessionsLine = months.map((m) => m.stats[tab].sessions).join(" → ");
   return (
@@ -463,8 +459,8 @@ export const KeyMetricsDemoPage: React.FC<{
       <DemoPanel
         title={t(`${KEY_METRICS.length} chỉ số, ${months.length === 3 ? "ba" : months.length} tháng ${windowNote ? `cùng kỳ ${windowNote}` : "cả tháng"}`, `${KEY_METRICS.length} metrics, ${months.length} months, ${windowNote ? `same period ${windowNote}` : "full month"}`)}
         sub={t(
-          `Màu xanh / đỏ khi thay đổi vượt ngưỡng dao động của tab đó${cv != null ? ` (độ lệch GMV/giờ mỗi phiên ±${Math.round(cv * 100)}%, ${cvMeasured ? "đo trên phiên của brand" : "mức mặc định, chưa đủ phiên để đo riêng"})` : ""}. ${METRIC.liveHours} không đánh giá tốt hay xấu.`,
-          `Green / red when a change exceeds that tab's normal range${cv != null ? ` (GMV/hour deviation per session ±${Math.round(cv * 100)}%, ${cvMeasured ? "measured on the brand's sessions" : "default level, not enough sessions to measure"})` : ""}. ${METRIC.liveHours} are not rated good or bad.`
+          `Tỷ lệ và số theo giờ tô xanh (tốt lên) / đỏ (xấu đi) khi đổi từ 10% trở lên so với tháng liền trước. ${METRIC.liveHours} và các chỉ số số lượng đi theo giờ (${METRIC.gmv}, ${METRIC.orders}, ${METRIC.itemsSold}, ${METRIC.productImpressions}, ${METRIC.productClicks}, ${METRIC.views}, ${METRIC.liveImpressions}) không đánh giá tốt hay xấu.`,
+          `Rates and per-hour figures turn green (better) / red (worse) when they change 10% or more vs the month before. ${METRIC.liveHours} and volume metrics that follow hours (${METRIC.gmv}, ${METRIC.orders}, ${METRIC.itemsSold}, ${METRIC.productImpressions}, ${METRIC.productClicks}, ${METRIC.views}, ${METRIC.liveImpressions}) are not rated good or bad.`
         )}
       >
         <div className="tabs" role="tablist">
@@ -588,6 +584,7 @@ export const NmvDemoPage: React.FC<{
   }
   const fileNote = [...byFile.entries()].filter(([k]) => k).map(([k, ms]) => `${ms.join(", ")} ${t("từ file xuất", "from the file exported")} ${k}`).join("; ");
   const anyOld = months.some(old);
+  const oldMonths = rr.filter(old).map((m) => m.short).join(", ");
 
   const save = async (fn: () => Promise<void>) => {
     setMsg("");
@@ -609,8 +606,8 @@ export const NmvDemoPage: React.FC<{
           <DemoPanel
             title={t(`${METRIC.liveGmv} tách thành NMV ước tính và phần hoàn ước tính`, `${METRIC.liveGmv} split into estimated NMV and estimated refunds`)}
             sub={t(
-              `1–${curEndDay} mỗi tháng (cùng cửa sổ với Refund rate, tới ngày cuối file Shop Analytics) · phần hoàn = ${METRIC.liveGmv} × ${METRIC.refundRate} toàn shop (áp cho livestream, chưa gồm đơn hủy). Các tháng trước dùng tỷ lệ tại ngày xuất file${nmvSource ? `; tháng này dùng tỷ lệ ${nmvSource}` : ""}.${anyOld ? " Thanh mờ = Refund rate từ file xuất sớm hơn, chưa so sánh được." : ""}`,
-              `1–${curEndDay} of each month (same window as the refund rate, through the last day of the Shop Analytics file) · refunds = ${METRIC.liveGmv} × whole-shop ${METRIC.refundRate} (applied to livestream, excluding cancellations). Earlier months use the rate as of the file export date${nmvSource ? `; this month uses ${nmvSource}` : ""}.${anyOld ? " Faded bars = refund rate from an earlier export, not yet comparable." : ""}`
+              `1–${curEndDay} mỗi tháng (cùng cửa sổ với Refund rate, tới ngày cuối file Shop Analytics) · phần hoàn = ${METRIC.liveGmv} × ${METRIC.refundRate} toàn shop (áp cho livestream, chưa gồm đơn hủy). Các tháng trước dùng tỷ lệ tại ngày xuất file${nmvSource ? `; tháng này dùng tỷ lệ ${nmvSource}` : ""}.${anyOld ? " Thanh mờ = tháng xuất bằng mẫu file Shop Analytics cũ, chưa so sánh được." : ""}`,
+              `1–${curEndDay} of each month (same window as the refund rate, through the last day of the Shop Analytics file) · refunds = ${METRIC.liveGmv} × whole-shop ${METRIC.refundRate} (applied to livestream, excluding cancellations). Earlier months use the rate as of the file export date${nmvSource ? `; this month uses ${nmvSource}` : ""}.${anyOld ? " Faded bars = months exported with the old Shop Analytics template, not comparable." : ""}`
             )}
           >
             <Html className="hb" html={nmvHtml} />
@@ -621,7 +618,7 @@ export const NmvDemoPage: React.FC<{
           </DemoPanel>
         )}
         {rr.length > 0 && (
-          <DemoPanel title={t(`${METRIC.refundRate} toàn shop`, `Whole-shop ${METRIC.refundRate}`)} sub={t(`Refunds ÷ ${METRIC.totalGmv}, 1–${curEndDay} mỗi tháng.${fileNote ? ` Cột ${fileNote}.` : ""}`, `Refunds ÷ ${METRIC.totalGmv}, 1–${curEndDay} of each month.${fileNote ? ` Bars: ${fileNote}.` : ""}`)}>
+          <DemoPanel title={t(`${METRIC.refundRate} toàn shop`, `Whole-shop ${METRIC.refundRate}`)} sub={t(`Refunds ÷ ${METRIC.totalGmv}, 1–${curEndDay} mỗi tháng.${fileNote ? ` Cột ${fileNote}.` : ""}${oldMonths ? ` Cột xám (${oldMonths}) từ mẫu file cũ, cột Hoàn tiền tính khác nên không so với tháng khác.` : ""}`, `Refunds ÷ ${METRIC.totalGmv}, 1–${curEndDay} of each month.${fileNote ? ` Bars: ${fileNote}.` : ""}${oldMonths ? ` Grey bars (${oldMonths}) come from the old file template, whose Refunds column differs, so do not compare them with other months.` : ""}`)}>
             <Html html={refundHtml} />
           </DemoPanel>
         )}

@@ -11,7 +11,7 @@ describe("pageHeadlines", () => {
     expect(summaryHeadline({ liveActual: 1e6, liveTarget: null, days: [] })).toContain("chưa có Target LIVE");
   });
   it("key metrics: tháng không có gì nổi bật thì nói rõ", () => {
-    expect(keyMetricsHeadline({ rows: [{ label: "GMV", change: 3, tone: "noise" }], prevLabel: "T9" })).toContain("chưa có thay đổi nổi bật");
+    expect(keyMetricsHeadline({ rows: [{ label: "GMV", change: 3, tone: "noise" }], prevLabel: "T9" })).toContain("không chỉ số nào tốt lên hay xấu đi");
   });
   it("trang khác lấy câu đầu của Quan sát, thiếu số thì dùng câu dự phòng", () => {
     expect(observeHeadline({ observe: "Refund rate 5%. Cao hơn tháng trước.", cause: "", impact: "", advise: "" }, "x")).toBe("Refund rate 5%.");

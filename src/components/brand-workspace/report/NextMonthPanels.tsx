@@ -6,8 +6,8 @@ import { fmtFixed, fmtVndShort } from "../../../lib/format";
 import { errorMessage } from "../../../lib/errorMessage";
 import { salesTerm } from "../../../lib/metricGlossary";
 import { monthLong, monthShort, t as tr } from "../../../lib/displayLang";
-import { noiseBand } from "../../../lib/report/brandReport";
-import { parseRatePct, type RefundTrackRow } from "../../../lib/report/nextMonthPlan";
+import { isBigChange } from "../../../lib/report/changeThreshold";
+import { parseRatePct, planSums, type RefundTrackRow } from "../../../lib/report/nextMonthPlan";
 import { featureOffText } from "../../../lib/featureOff";
 
 // Các khối của trang "Kế hoạch tháng sau" theo bản demo Report Tháng (#p9) — markup/class nguyên từ demo.css (tiền tố .rt):
@@ -58,10 +58,10 @@ export interface LivePlanRow {
   plan?: { hours: number; target: number; slots: number };
 }
 
-function liveVerdict(d: number | null, band: number | null) {
+function liveVerdict(d: number | null) {
   if (d == null) return <span className="pill m">{tr("chưa nhập", "not entered")}</span>;
-  if (band == null || Math.abs(d) <= band) return <span className="pill g">{tr("trong ngưỡng dao động", "within normal range")}</span>;
-  return d > 0 ? <span className="pill r">{tr("vượt ngưỡng: cần tăng hiệu suất", "beyond range: performance must improve")}</span> : <span className="pill y">{tr("thấp hơn đáng kể mức đã đạt", "well below the level achieved")}</span>;
+  if (!isBigChange(d)) return <span className="pill g">{tr("chênh dưới 10%", "within 10%")}</span>;
+  return d > 0 ? <span className="pill r">{tr("cao hơn từ 10%: cần tăng hiệu suất", "10% or more higher: performance must improve")}</span> : <span className="pill y">{tr("thấp hơn mức đã đạt từ 10%", "10% or more below the level achieved")}</span>;
 }
 
 export type LiveTargetTyped = Record<string, { h?: string; t?: string }>;
@@ -79,9 +79,8 @@ export function decodeLiveTarget(text: string | undefined | null): LiveTargetTyp
   }
 }
 
-/** `saved`/`onSave`: số tự điền lưu vào dữ liệu report (brand thấy, bản xuất có); thiếu thì chỉ nháp trong trình duyệt. `canEdit`=false: chỉ hiện số đã lưu.
- *  `cv`: độ lệch GMV/giờ một phiên đo trên brand (estimateSessionCv) — cùng hệ số với ngưỡng ở trang Nguyên nhân và Key Metrics. */
-export const NextLivePlanPanel: React.FC<{ nextMonth: string; curLabel: string; nextLabel: string; rows: LivePlanRow[]; total: LivePlanRow; saved?: LiveTargetTyped; onSave?: (m: LiveTargetTyped) => Promise<void>; canEdit?: boolean; cv?: number; platform?: "Shopee" }> = ({ nextMonth, curLabel, nextLabel, rows, total, saved, onSave, canEdit = true, cv, platform }) => {
+/** `saved`/`onSave`: số tự điền lưu vào dữ liệu report (brand thấy, bản xuất có); thiếu thì chỉ nháp trong trình duyệt. `canEdit`=false: chỉ hiện số đã lưu. */
+export const NextLivePlanPanel: React.FC<{ nextMonth: string; curLabel: string; nextLabel: string; rows: LivePlanRow[]; total: LivePlanRow; saved?: LiveTargetTyped; onSave?: (m: LiveTargetTyped) => Promise<void>; canEdit?: boolean; platform?: "Shopee"; /** Ca đã huỷ của Kế Hoạch Tháng sau: không tính giờ, target vẫn cộng. */ cancelled?: { count: number; target: number } }> = ({ nextMonth, curLabel, nextLabel, rows, total, saved, onSave, canEdit = true, platform, cancelled }) => {
   const S = salesTerm(platform); // tên doanh số theo sàn: TikTok "GMV", Shopee "Sales"
   const perH = tr("giờ", "hour");
   const cT = monthShort(Number(curLabel)), nT = monthShort(Number(nextLabel));
@@ -108,23 +107,25 @@ export const NextLivePlanPanel: React.FC<{ nextMonth: string; curLabel: string; 
   const calc = (r: LivePlanRow, hours: number | null, target: number | null) => {
     const req = hours && target ? target / hours : null;
     const d = req != null && r.achieved ? (req / r.achieved - 1) * 100 : null;
-    return { req, d, band: noiseBand(r.sessionsCur, r.plan?.slots ?? r.sessionsCur, cv) };
+    return { req, d };
   };
   const vals = (r: LivePlanRow) => (r.plan ? { hours: r.plan.hours, target: r.plan.target } : { hours: parseNum(typed[r.key]?.h), target: (parseNum(typed[r.key]?.t) ?? 0) * 1e6 || null });
   const body = rows.map((r) => ({ r, ...vals(r) })).map((x) => ({ ...x, ...calc(x.r, x.hours, x.target) }));
   const filled = body.filter((x) => x.hours && x.target);
-  const all = filled.length === rows.length && rows.length > 0;
-  const sumH = filled.reduce((a, x) => a + (x.hours ?? 0), 0);
-  const sumT = filled.reduce((a, x) => a + (x.target ?? 0), 0);
+  // Số từ Kế Hoạch Tháng: không có ô nhập, nên không đòi "nhập đủ" — dòng thiếu thì nói thiếu cái gì.
+  const planned = planSums(rows);
+  const all = fromApp ? planned.complete : filled.length === rows.length && rows.length > 0;
+  const sumH = fromApp ? planned.hours : filled.reduce((a, x) => a + (x.hours ?? 0), 0);
+  const sumT = fromApp ? planned.target : filled.reduce((a, x) => a + (x.target ?? 0), 0);
   const totCalc = all ? calc(total, sumH, sumT) : null;
-  const cls = (d: number | null, band: number | null) => (d == null || band == null || Math.abs(d) <= band ? "nt" : d > 0 ? "dn" : "up");
+  const noTarget = <span className="pill m">{tr("chưa đặt Target", "no Target set")}</span>;
+  const cls = (d: number | null) => (d == null || !isBigChange(d) ? "nt" : d > 0 ? "dn" : "up");
   const set = (key: string, f: "h" | "t", v: string) => {
     const ok = saveTyped({ ...typed, [key]: { ...typed[key], [f]: v } });
     if (!onSave) setStatus(ok ? SAVED : NOT_SAVED);
   };
   const cell = (key: string, f: "h" | "t", ph: string, label: string) =>
     canEdit ? <input className="rr" inputMode="decimal" placeholder={ph} value={typed[key]?.[f] ?? ""} onChange={(e) => set(key, f, e.target.value)} onBlur={commit} aria-label={label} /> : <>{typed[key]?.[f] || "—"}</>;
-  const bands = [...body.map((x) => `${x.r.name} ±${x.band != null ? fmtFixed(x.band, 0) : "—"}%`), `${tr("cả tháng", "whole month")} ±${totCalc?.band != null ? fmtFixed(totCalc.band, 0) : (noiseBand(total.sessionsCur, total.sessionsCur, cv) != null ? fmtFixed(noiseBand(total.sessionsCur, total.sessionsCur, cv)!, 0) : "—")}%`];
   // Brand chưa có kế hoạch Chốt và ops chưa lưu số tự điền nào ⇒ chỉ còn hàng "—" / "chưa nhập", không có gì để đọc.
   if (!fromApp && !canEdit && filled.length === 0) return null;
   return (
@@ -135,8 +136,8 @@ export const NextLivePlanPanel: React.FC<{ nextMonth: string; curLabel: string; 
           ? tr(`Giờ live và Target ${S} cộng từ các phiên trong Kế Hoạch Tháng ${nextLabel}. `, `Live hours and Target ${S} summed from the sessions in the ${monthLong(Number(nextLabel))} month plan. `)
           : tr(`Tự điền Giờ live và Target ${S} cho từng loại ngày (chưa có Kế Hoạch Tháng chốt). `, `Live hours and Target ${S} entered per day type (no locked month plan yet). `)}
         {tr(
-          `Bảng tính ${S}/giờ yêu cầu và so với ${S}/giờ đã đạt tháng ${curLabel}; đánh giá theo ngưỡng dao động của từng loại ngày.`,
-          `The table calculates the required ${S}/hour and compares it with the ${S}/hour achieved in ${monthLong(Number(curLabel))}, assessed against each day type's normal range.`
+          `Bảng tính ${S}/giờ yêu cầu và so với ${S}/giờ đã đạt tháng ${curLabel}; đánh dấu khi chênh từ 10% trở lên.`,
+          `The table calculates the required ${S}/hour and compares it with the ${S}/hour achieved in ${monthLong(Number(curLabel))}, flagging gaps of 10% or more.`
         )}
         {fromApp ? "" : onSave ? tr(" Số tự điền lưu cùng report.", " Entered figures are saved with the report.") : " Giá trị nhập lưu trong trình duyệt này."}
       </div>
@@ -158,21 +159,21 @@ export const NextLivePlanPanel: React.FC<{ nextMonth: string; curLabel: string; 
               <tr key={x.r.key}>
                 <td><b>{x.r.name}</b></td>
                 <td>{mvn(x.r.achieved)}</td>
-                <td>{x.r.plan ? fmtFixed(x.r.plan.hours, 1) : cell(x.r.key, "h", "giờ", `Giờ live tháng ${nextLabel} ${x.r.name}`)}</td>
-                <td>{x.r.plan ? fmtFixed(Math.round(x.r.plan.target / 1e6), 0) : cell(x.r.key, "t", "triệu đồng", `Target ${S} tháng ${nextLabel} ${x.r.name}`)}</td>
+                <td>{x.r.plan ? fmtFixed(x.r.plan.hours, 1) : fromApp ? "—" : cell(x.r.key, "h", "giờ", `Giờ live tháng ${nextLabel} ${x.r.name}`)}</td>
+                <td>{x.r.plan ? (x.r.plan.target > 0 ? fmtFixed(Math.round(x.r.plan.target / 1e6), 0) : "—") : fromApp ? "—" : cell(x.r.key, "t", "triệu đồng", `Target ${S} tháng ${nextLabel} ${x.r.name}`)}</td>
                 <td>{mvn(x.req)}</td>
-                <td className={cls(x.d, x.band)}>{sd(x.d)}</td>
-                <td className="w">{liveVerdict(x.d, x.band)}</td>
+                <td className={cls(x.d)}>{sd(x.d)}</td>
+                <td className="w">{!fromApp || x.d != null ? liveVerdict(x.d) : !x.hours ? <span className="pill m">{tr("không có phiên", "no sessions")}</span> : !x.target ? noTarget : <span className="pill m">{tr("chưa có số đã đạt", "no achieved figure yet")}</span>}</td>
               </tr>
             ))}
             <tr className="hl">
               <td><b>{tr("Cả tháng", "Whole month")}</b></td>
               <td>{mvn(total.achieved)}</td>
-              <td>{all ? fmtFixed(sumH, 1) : "—"}</td>
-              <td>{all ? fmtFixed(Math.round(sumT / 1e6), 0) : "—"}</td>
+              <td>{all || (fromApp && sumH > 0) ? fmtFixed(sumH, 1) : "—"}</td>
+              <td>{all || (fromApp && sumT > 0) ? fmtFixed(Math.round(sumT / 1e6), 0) : "—"}</td>
               <td>{mvn(totCalc?.req ?? null)}</td>
-              <td className={cls(totCalc?.d ?? null, totCalc?.band ?? null)}>{sd(totCalc?.d ?? null)}</td>
-              <td className="w">{all ? liveVerdict(totCalc?.d ?? null, totCalc?.band ?? null) : <span className="pill m">{tr(`nhập đủ ${rows.length} loại ngày`, `enter all ${rows.length} day types`)}</span>}</td>
+              <td className={cls(totCalc?.d ?? null)}>{sd(totCalc?.d ?? null)}</td>
+              <td className="w">{all ? liveVerdict(totCalc?.d ?? null) : fromApp ? (sumT > 0 ? <span className="pill m">{tr("còn loại ngày chưa đặt Target", "some day types have no Target")}</span> : noTarget) : <span className="pill m">{tr(`nhập đủ ${rows.length} loại ngày`, `enter all ${rows.length} day types`)}</span>}</td>
             </tr>
           </tbody>
         </table>
@@ -180,7 +181,13 @@ export const NextLivePlanPanel: React.FC<{ nextMonth: string; curLabel: string; 
       <div className="legend">
         <span>
           {fromApp ? "" : tr("Target nhập theo triệu đồng (ví dụ 2300 = 2,3B). ", "Target in millions (e.g. 2300 = 2.3B). ")}
-          {tr(`${S}/giờ yêu cầu = Target ÷ Giờ live. Ngưỡng dao động: ${bands.join(", ")}.`, `Required ${S}/${perH} = Target ÷ live hours. Normal range: ${bands.join(", ")}.`)}
+          {tr(`${S}/giờ yêu cầu = Target ÷ Giờ live.`, `Required ${S}/${perH} = Target ÷ live hours.`)}
+          {fromApp && cancelled && cancelled.count > 0
+            ? tr(
+                ` Giờ live không gồm ${cancelled.count} phiên đã huỷ${cancelled.target > 0 ? `; Target vẫn gồm ${mvn(cancelled.target)} của các phiên này theo Kế Hoạch Tháng` : ""}.`,
+                ` Live hours exclude ${cancelled.count} cancelled session(s)${cancelled.target > 0 ? `; the Target still includes their ${mvn(cancelled.target)} as in the month plan` : ""}.`
+              )
+            : ""}
         </span>
         <span className="st" aria-live="polite">{status}</span>
       </div>
@@ -276,7 +283,7 @@ export const BookingPlanPanel: React.FC<{
                   <td>{fromApp ? mvn(r.budgetAds) : <input className="rr" inputMode="decimal" placeholder="triệu" value={t?.a ?? ""} onChange={(e) => patch(r.idx, { a: e.target.value })} aria-label="Budget Ads" />}</td>
                   <td>{mvn(g)}</td>
                   <td>{ro == null ? "—" : `${fmtFixed(ro, 1)}x`}</td>
-                  <td className={g != null && r.ref ? (g / r.ref > 1 ? "dn" : "up") : "nt"}>{r.ref ? `${mvn(r.ref)}${d != null ? ` (${sd(d)})` : ""}` : "—"}</td>
+                  <td className={d == null || !isBigChange(d) ? "nt" : d > 0 ? "dn" : "up"}>{r.ref ? `${mvn(r.ref)}${d != null ? ` (${sd(d)})` : ""}` : "—"}</td>
                   <td>{fromApp ? null : <button type="button" className="delbk" aria-label="Xoá phiên" onClick={() => commit(typed.filter((_, k) => k !== r.idx))}>×</button>}</td>
                 </tr>
               );
@@ -290,8 +297,8 @@ export const BookingPlanPanel: React.FC<{
           {n ? (
             <>
               <b style={{ color: "var(--cream)" }}>{n} {tr("phiên", "sessions")} · {fmtFixed(hours, 1)} {tr("giờ", "hours")} · Target {mvn(target)} · Ads {mvn(ads)}{roas != null ? ` · ROAS ${fmtFixed(roas, 1)}x` : ""}</b>
-              {gph != null && <> · {tr("GMV/giờ yêu cầu", "Required GMV/hour")} {mvn(gph)} <span className={cur.gmvPerHour && gph > cur.gmvPerHour ? "dn" : "up"}>({sd(vs(gph, cur.gmvPerHour))} {tr(`so với tháng ${curLabel}`, `vs ${cL}`)}: {mvn(cur.gmvPerHour)})</span></>}
-              {roas != null && cur.roas != null && <> · ROAS <span className={roas > cur.roas ? "up" : "dn"}>{sd(vs(roas, cur.roas))}</span> {tr("so với", "vs")} {fmtFixed(cur.roas, 1)}x</>}
+              {gph != null && <> · {tr("GMV/giờ yêu cầu", "Required GMV/hour")} {mvn(gph)} <span className={!cur.gmvPerHour || !isBigChange(vs(gph, cur.gmvPerHour)) ? "nt" : gph > cur.gmvPerHour ? "dn" : "up"}>({sd(vs(gph, cur.gmvPerHour))} {tr(`so với tháng ${curLabel}`, `vs ${cL}`)}: {mvn(cur.gmvPerHour)})</span></>}
+              {roas != null && cur.roas != null && <> · ROAS <span className={!isBigChange(vs(roas, cur.roas)) ? "nt" : roas > cur.roas ? "up" : "dn"}>{sd(vs(roas, cur.roas))}</span> {tr("so với", "vs")} {fmtFixed(cur.roas, 1)}x</>}
             </>
           ) : tr("Chưa có phiên nào có Target", "No sessions with a Target yet")}
         </span>

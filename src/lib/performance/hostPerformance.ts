@@ -305,13 +305,19 @@ export function byHostDayType(sessions: LiveSession[], bucketOf: (date: string) 
 
 // Dòng "Cả team" — mốc để so GMV/giờ từng host trong CÙNG một loại ngày (so chéo loại ngày thì camp
 // luôn thắng, không nói được gì về người).
-export function dayTypeTeamTotals(rows: HostDayTypeRow[]): Record<CampDayBucket, DayTypePart> {
+// Số ca của team đếm theo CA, không cộng số ca từng host: ca đổi host giữa chừng nằm ở cả hai dòng (CROCS
+// T11 từng ra 88 phiên thay vì 83). Truyền `counted` để đếm đúng; ca chưa gán host nào vẫn không tính.
+export function dayTypeTeamTotals(rows: HostDayTypeRow[], counted?: { sessions: LiveSession[]; bucketOf: (date: string) => CampDayBucket }): Record<CampDayBucket, DayTypePart> {
   const out = emptyBuckets();
   for (const r of rows) {
     for (const b of HOST_DAY_TYPE_ORDER) {
       const p = r.byBucket[b];
       for (const k of Object.keys(p) as (keyof DayTypePart)[]) out[b][k] += p[k];
     }
+  }
+  if (counted) {
+    for (const b of HOST_DAY_TYPE_ORDER) out[b].sessions = 0;
+    for (const s of counted.sessions) if (hostPortions(s).some((h) => hostKey(h) !== UNASSIGNED_HOST_KEY)) out[counted.bucketOf(s.date)].sessions += 1;
   }
   return out;
 }

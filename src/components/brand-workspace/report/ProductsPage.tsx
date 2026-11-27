@@ -27,6 +27,8 @@ export interface ProductsPageData {
   gift: GiftStats | null;
   giftSlice: { giftItems: number } | null;
   giftByMonth: (GiftStats | null)[];
+  /** Tháng không tính được quà/UPT vì file Shop Analytics thiếu ngày so với file Sản Phẩm — câu nhắc cho ops. */
+  giftGapNote?: string | null;
   giftMonthLabels: string[];
   giftPeriodLabel: string;
   giftMaxPriceLabel: string;
@@ -39,6 +41,17 @@ export interface ProductsPageData {
 
 const SHOPEE_CONV = `${METRIC.orders}/Product Clicks`;
 
+/** Danh sách chỉ giữ top 10 ⇒ bản chụp cũ (không có insideCount) mà đủ 10 dòng thì không nêu số. */
+export function promoCountNote(promo: PromotionMonthSlice): string {
+  const n = promo.insideCount ?? (promo.items.length < 10 ? promo.items.length : null);
+  const open = promo.openCount ?? 0;
+  if (n == null) return tr("các chương trình có kỳ chạy trong tháng", "programmes whose period falls in the month");
+  return (
+    tr(`${n} chương trình có kỳ chạy trong tháng`, `${n} programmes whose period falls in the month`) +
+    (open > 0 ? tr(`, ${open} còn đang chạy`, `, ${open} still running`) : "")
+  );
+}
+
 /** Bốn ô KPI đầu trang (đúng thứ tự demo): Top 1 SKU · Độ tập trung SKU · Quà tặng kèm · Tiền giảm giá khuyến mãi. */
 export function productsKpis(d: ProductsPageData): PageMetric[] {
   const out: PageMetric[] = [];
@@ -49,7 +62,7 @@ export function productsKpis(d: ProductsPageData): PageMetric[] {
     out.push({ label: tr("Độ tập trung SKU", "SKU concentration"), value: `${fmtInt(d.skuRank.skusFor80Pct)} / ${fmtInt(d.skuRank.sellingSkus)}`, note: tr(`SKU đầu bảng tạo 80% ${g} (${share}%)`, `top SKUs making 80% of ${g} (${share}%)`) });
   }
   if (d.promo?.totalDiscount != null && d.promo.totalDiscount > 0) {
-    out.push({ label: tr("Tiền giảm giá khuyến mãi", "Promotion discounts"), value: fmtVndShort(d.promo.totalDiscount), note: tr(`${d.promo.items.length} chương trình chạy trọn tháng`, `${d.promo.items.length} programmes running the full month`) });
+    out.push({ label: tr("Tiền giảm giá khuyến mãi", "Promotion discounts"), value: fmtVndShort(d.promo.totalDiscount), note: promoCountNote(d.promo) });
   }
   return out;
 }
@@ -135,7 +148,7 @@ export function skuTableHtml(sku: SkuMoves, images: (name: string) => string | u
     );
   }
   return tbl(
-    [tr("Ảnh sản phẩm", "Image"), `${tr("Hạng", "Rank")} · ${prevLabel}`, tr("Sản phẩm", "Product"), "GMV", sku.perDay ? tr("± GMV/ngày", "± GMV/day") : "± GMV", tr("Tỷ trọng Seller LIVE", "Seller LIVE share"), "Orders", "Items sold", METRIC.productCtr, METRIC.ctor],
+    [tr("Ảnh sản phẩm", "Image"), `${tr("Hạng", "Rank")} · ${prevLabel}`, tr("Sản phẩm", "Product"), "GMV", sku.perDay ? tr("± GMV/ngày", "± GMV/day") : "± GMV", tr("Tỷ trọng Seller LIVE Direct", "Seller LIVE Direct share"), "Orders", "Items sold", METRIC.productCtr, METRIC.ctor],
     sku.rows.map((r) => [
       thumbCell(r.name, images(r.name), editable),
       { t: rankCell(r.rank, r.prevRank), c: "hm" },
@@ -201,6 +214,7 @@ export const ProductsPageBody: React.FC<{
   ];
   return (
     <>
+      {canManage && data.giftGapNote && <p className="pns" style={{ color: "var(--gold)" }}>{data.giftGapNote}</p>}
       <div className="stk">
         {data.points.length >= 3 && (
           <div className="pn">
@@ -245,8 +259,8 @@ export const ProductsPageBody: React.FC<{
           <div className="pnh">{tr(`Top ${sku.rows.length} SKU theo ${shopee ? METRIC_SHOPEE.gmv : METRIC.gmv}`, `Top ${sku.rows.length} SKUs by ${shopee ? METRIC_SHOPEE.gmv : METRIC.gmv}`)}</div>
           <div className="pns">
             {tr(
-              `Nguồn file ${shopee ? "Product List của Shopee Live · Sales(Placed Order)" : "Sản Phẩm"}${curDaysLabel} · hạng so với tháng ${data.prevMonthNo}${sku.perDay ? ` · % tính trên ${shopee ? METRIC_SHOPEE.gmv : METRIC.gmv} mỗi ngày` : ""}.`,
-              `Source: ${shopee ? "Shopee Live Product List · Sales(Placed Order)" : "Product file"}${curDaysLabel} · rank vs month ${data.prevMonthNo}${sku.perDay ? ` · % based on ${shopee ? METRIC_SHOPEE.gmv : METRIC.gmv} per day` : ""}.`
+              `Nguồn file ${shopee ? "Product List của Shopee Live · Sales(Placed Order)" : "Sản Phẩm"}${curDaysLabel} · hạng so với tháng ${data.prevMonthNo}${sku.perDay ? ` · % tính trên ${shopee ? METRIC_SHOPEE.gmv : METRIC.gmv} mỗi ngày` : ""}${shopee ? "" : " · Seller LIVE Direct chỉ tính đơn chốt ngay trong phiên, không gồm đơn về sau như Seller LIVE ở trang Toàn shop"}.`,
+              `Source: ${shopee ? "Shopee Live Product List · Sales(Placed Order)" : "Product file"}${curDaysLabel} · rank vs month ${data.prevMonthNo}${sku.perDay ? ` · % based on ${shopee ? METRIC_SHOPEE.gmv : METRIC.gmv} per day` : ""}${shopee ? "" : " · Seller LIVE Direct counts only orders closed during the session, not later orders as in Seller LIVE on the shop page"}.`
             )}
           </div>
           <div
@@ -302,7 +316,7 @@ export const ProductsPageBody: React.FC<{
       {data.promo && data.promo.items.length > 0 && (
         <div className="pn">
           <div className="pnh">{tr("Top chương trình khuyến mãi", "Top promotions")}</div>
-          <div className="pns">{tr("Chỉ các chương trình chạy trọn tháng · ROI = GMV ÷ tiền giảm giá · chương trình tặng quà có tiền giảm giá bằng 0 vì là quà tặng.", "Only programmes running the full month · ROI = GMV ÷ discount · gift programmes show zero discount because the item is a gift.")}</div>
+          <div className="pns">{tr("Chỉ chương trình có kỳ chạy nằm trong tháng (chương trình chưa kết thúc tính tới ngày xuất file) · cột GMV là Total GMV của chương trình · ROI = GMV ÷ tiền giảm giá · chương trình tặng quà có tiền giảm giá bằng 0 vì là quà tặng.", "Only programmes whose period falls in the month (unfinished ones count up to the file export date) · the GMV column is the programme's Total GMV · ROI = GMV ÷ discount · gift programmes show zero discount because the item is a gift.")}</div>
           <div className="tw">
             <table dangerouslySetInnerHTML={{ __html: promoTableHtml(data.promo) }} />
           </div>

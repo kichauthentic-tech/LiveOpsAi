@@ -173,6 +173,9 @@ export interface KeyMetricDef {
   kind: Kind;
   /** true = tăng là tốt; null = trung tính (không tô màu). */
   goodWhenUp: boolean | null;
+  /** Chỉ số quy mô (số tổng đi theo Giờ live) ⇒ Report Tháng không tô tốt/xấu: số tổng tăng giảm theo số giờ live,
+   *  hiệu suất đọc ở tỷ lệ và số theo giờ (CROCS T11: GMV +15% tô xanh trong khi GMV/giờ chỉ +7,5%). */
+  volume?: boolean;
   /** Nhóm phân tầng khi hiển thị (xem KEY_METRIC_GROUPS). */
   group: KeyMetricGroup;
   /** Dòng bổ sung ngoài 18 chỉ số (AOV). */
@@ -181,21 +184,21 @@ export interface KeyMetricDef {
 
 /** 18 chỉ số đúng thứ tự user chốt 2026-09-29, rồi AOV (bổ sung). */
 export const KEY_METRICS: KeyMetricDef[] = byLang(() => [
-  { key: "gmv", label: METRIC.gmv, kind: "money", goodWhenUp: true, group: "result" },
-  { key: "itemsSold", label: METRIC.itemsSold, kind: "int", goodWhenUp: true, group: "result" },
-  { key: "orders", label: METRIC.orders, kind: "int", goodWhenUp: true, group: "result" },
+  { key: "gmv", label: METRIC.gmv, kind: "money", goodWhenUp: true, volume: true, group: "result" },
+  { key: "itemsSold", label: METRIC.itemsSold, kind: "int", goodWhenUp: true, volume: true, group: "result" },
+  { key: "orders", label: METRIC.orders, kind: "int", goodWhenUp: true, volume: true, group: "result" },
   // UPT live đổi theo quà tặng kèm ⇒ trung tính (Report Tháng có thêm dòng UPT bỏ quà).
   { key: "upt", label: METRIC.upt, kind: "dec2", goodWhenUp: null, group: "basket" },
   { key: "err", label: METRIC.err, kind: "pct2", goodWhenUp: true, group: "traffic" },
   { key: "avgPrice", label: METRIC.avgPrice, kind: "money", goodWhenUp: null, group: "basket" },
-  { key: "productImpressions", label: METRIC.productImpressions, kind: "int", goodWhenUp: true, group: "conversion" },
-  { key: "productClicks", label: METRIC.productClicks, kind: "int", goodWhenUp: true, group: "conversion" },
+  { key: "productImpressions", label: METRIC.productImpressions, kind: "int", goodWhenUp: true, volume: true, group: "conversion" },
+  { key: "productClicks", label: METRIC.productClicks, kind: "int", goodWhenUp: true, volume: true, group: "conversion" },
   { key: "ctr", label: METRIC.productCtr, kind: "pct2", goodWhenUp: true, group: "conversion" },
   { key: "liveCtr", label: METRIC.liveCtr, kind: "pct1", goodWhenUp: true, group: "conversion" },
   { key: "ctor", label: METRIC.ctor, kind: "pct2", goodWhenUp: true, group: "conversion" },
   { key: "avgViewSec", label: METRIC.avgView, kind: "sec", goodWhenUp: true, group: "traffic" },
-  { key: "views", label: METRIC.views, kind: "int", goodWhenUp: true, group: "traffic" },
-  { key: "impressions", label: METRIC.liveImpressions, kind: "int", goodWhenUp: true, group: "traffic" },
+  { key: "views", label: METRIC.views, kind: "int", goodWhenUp: true, volume: true, group: "traffic" },
+  { key: "impressions", label: METRIC.liveImpressions, kind: "int", goodWhenUp: true, volume: true, group: "traffic" },
   { key: "hours", label: METRIC.liveHours, kind: "hours", goodWhenUp: null, group: "result" },
   { key: "viewsPerHour", label: METRIC.viewsPerHour, kind: "int", goodWhenUp: true, group: "traffic" },
   { key: "impressionsPerHour", label: METRIC.impressionsPerHour, kind: "int", goodWhenUp: true, group: "traffic" },

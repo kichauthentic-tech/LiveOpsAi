@@ -1,4 +1,5 @@
 import React from "react";
+import { isBigChange } from "../../../lib/report/changeThreshold";
 import { fmtFixed } from "../../../lib/format";
 import { SHOPEE_SHOP as SS } from "../../../lib/metricGlossary";
 import { shopeeShopMonthThrough, shopeeShopSourcesThrough, shopeeShopSpikeDays, type ShopeeShopMonth, type ShopeeShopDay, type ShopeeShopSnapshot } from "../../../lib/report/shopeeShopReport";
@@ -14,8 +15,10 @@ const COLOR = { live: "#e0b43c", aff: "#d95926", video: "#199e70", card: "#3987e
 const pc = (v: number | null, d = 1) => (v == null ? "—" : `${fmtFixed(v, d)}%`);
 const ratio = (a: number, b: number) => (b > 0 ? (a / b) * 100 : null);
 const growth = (prev: number | null | undefined, cur: number | null | undefined) => (prev != null && cur != null && prev > 0 ? (cur / prev - 1) * 100 : null);
-const chgCell = (v: number | null) => (v == null ? "—" : { t: fmtP(v, 0), c: v >= 0 ? "up" : "dn" });
-const chgNote = (v: number | null, vs: string) => (v == null ? null : <span style={{ color: v >= 0 ? "var(--green)" : "var(--red)" }}>{v >= 0 ? "+" : "−"}{fmtFixed(Math.abs(v), 1)}% {vs}</span>);
+// % đổi so kỳ trước: chỉ tô từ 10% (changeThreshold). Chênh theo ĐIỂM (ptTxt) có luật riêng.
+const toneCls = (v: number | null) => (v == null || !isBigChange(v) ? "nt" : v > 0 ? "up" : "dn");
+const chgCell = (v: number | null) => (v == null ? "—" : { t: fmtP(v, 0), c: toneCls(v) });
+const chgNote = (v: number | null, vs: string) => (v == null ? null : <span style={{ color: !isBigChange(v) ? undefined : v >= 0 ? "var(--green)" : "var(--red)" }}>{v >= 0 ? "+" : "−"}{fmtFixed(Math.abs(v), 0)}% {vs}</span>);
 /** "478000~1.738e+06" (Shopee ghi số khoa học) → "478K – 1,74M". */
 const bandLabel = (band: string) => band.split("~").map((x) => (x.trim() === "∞" ? "∞" : Number.isFinite(Number(x)) ? fmtM(Number(x)) : x)).join(" – ");
 
@@ -105,7 +108,6 @@ const Empty: React.FC<PageProps> = (p) => (
 const monthName = (m: ShopeeShopMonth) => monthLong(m.month);
 const pctChange = (a: number | null | undefined, b: number | null | undefined) => (a != null && b != null && a > 0 ? (b / a - 1) * 100 : null);
 const pointDiff = (a: number | null, b: number | null) => (a != null && b != null ? b - a : null);
-const toneCls = (v: number | null) => (v == null ? "nt" : Math.abs(v) < 1 ? "nt" : v > 0 ? "up" : "dn");
 const chgTxt = (v: number | null) => (v == null ? "—" : { t: Math.abs(v) < 0.5 ? "0%" : fmtP(v, 0), c: toneCls(v) });
 const ptTxt = (v: number | null) => (v == null ? "—" : { t: `${v >= 0 ? "+" : "−"}${fmtFixed(Math.abs(v), 1)} ${tr("điểm", "pts")}`, c: Math.abs(v) < 0.5 ? "nt" : v > 0 ? "up" : "dn" });
 const cut = (trend: ShopeeShopMonth[]) => trend[trend.length - 1].throughDay;
@@ -161,7 +163,10 @@ const TrendGrowthPanel: React.FC<{ trend: ShopeeShopMonth[] }> = ({ trend }) => 
     chart += `<rect x="${cx - bw / 2}" y="${H - b - h}" width="${bw}" height="${h}" rx="4" style="fill:${COLOR.card};opacity:${last ? 0.95 : 0.55}"/>`;
     if (hl > 0) chart += `<rect x="${cx - bw / 2}" y="${H - b - hl}" width="${bw}" height="${hl}" rx="4" style="fill:${COLOR.live}"/>`;
     chart += TX(cx, H - b - h - 6, fmtM(x.placed), { s: 12, w: 700, c: "var(--cream)" }) + TX(cx, H - 10, monthName(trend[i]), { s: 12 });
-    if (i > 0) chart += TX(cx, H - b - h - 20, fmtP(pctChange(th[i - 1].placed, x.placed) ?? 0, 0), { s: 11, c: (pctChange(th[i - 1].placed, x.placed) ?? 0) >= 0 ? "var(--green)" : "var(--red)", w: 700 });
+    if (i > 0) {
+      const g = pctChange(th[i - 1].placed, x.placed) ?? 0;
+      chart += TX(cx, H - b - h - 20, fmtP(g, 0), { s: 11, c: !isBigChange(g) ? "var(--muted)" : g > 0 ? "var(--green)" : "var(--red)", w: 700 });
+    }
   });
   const html = trendTable(trend, [
     { name: SS.visits, vals: trend.map((m) => m.visits), fmt: nf },

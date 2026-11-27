@@ -81,24 +81,25 @@ describe("B5 · Toàn shop: phần Seller LIVE ngoài YFB không bị coi là k�
   });
 });
 
-describe("B6 · Host: khung đổi vượt ngưỡng phải được giải thích", () => {
+describe("B6 · Host: khung đổi từ 10% phải được giải thích", () => {
   const hosts = [{ name: "A", verdict: "unclear" as const, ci: "", sessions: 10, borderline: false }];
-  it("VERA T10 Tối −32% (±18%) nhưng 97% trung bình cùng loại ngày ⇒ giảm chung cả tháng", () => {
+  it("VERA T10 Tối −32% nhưng 97% trung bình cùng loại ngày ⇒ giảm chung cả tháng", () => {
     const b = peopleBlocks({
       hosts,
       months: 4,
+      monthChange: -28,
       slots: [
-        { label: "sáng (trước 12h)", gmvPerHour: 1.6e6, n: 21, index: 0.97, change: -28, band: 25 },
-        { label: "chiều (12h–17h)", gmvPerHour: 1.8e6, n: 8, index: 1.04, change: -17, band: 41 },
-        { label: "tối (từ 17h)", gmvPerHour: 1.6e6, n: 35, index: 0.98, change: -32, band: 18 }
+        { label: "sáng (trước 12h)", gmvPerHour: 1.6e6, n: 21, index: 0.97, change: -28 },
+        { label: "chiều (12h–17h)", gmvPerHour: 1.8e6, n: 8, index: 1.04, change: -17 },
+        { label: "tối (từ 17h)", gmvPerHour: 1.6e6, n: 35, index: 0.98, change: -32 }
       ]
     });
-    expect(b.cause).toContain("Khung tối (từ 17h) −32% so với tháng trước (vượt ngưỡng ±18%)");
+    expect(b.cause).toContain("Khung tối (từ 17h) −32% so với tháng trước");
     expect(b.cause).toContain("giảm chung cả tháng");
   });
-  it("không khung nào vượt ngưỡng ⇒ không thêm câu", () => {
-    const b = peopleBlocks({ hosts, months: 4, slots: [{ label: "sáng", gmvPerHour: 1e6, n: 5, index: 1, change: -5, band: 20 }, { label: "tối", gmvPerHour: 1e6, n: 5, index: 1, change: 3, band: 20 }] });
-    expect(b.cause).not.toContain("vượt ngưỡng");
+  it("không khung nào đổi từ 10% ⇒ không thêm câu", () => {
+    const b = peopleBlocks({ hosts, months: 4, slots: [{ label: "sáng", gmvPerHour: 1e6, n: 5, index: 1, change: -5 }, { label: "tối", gmvPerHour: 1e6, n: 5, index: 1, change: 3 }] });
+    expect(b.cause).not.toContain("so với tháng trước");
   });
 });
 

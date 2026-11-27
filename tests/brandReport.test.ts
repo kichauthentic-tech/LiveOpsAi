@@ -15,7 +15,6 @@ import {
   creatorTotals,
   dayTypeFactorRows,
   keyMetricsTable,
-  noiseBand,
   scoreRows,
   type KeyMetricsMonth
 } from "../src/lib/report/brandReport";
@@ -33,19 +32,18 @@ function many(days: string[], n: number, gmv: number, hours: number, views: numb
   return Array.from({ length: n }, (_, i) => ca(days[i % days.length], gmv / n, hours / n, views / n, clicks / n, orders / n));
 }
 
-test("ngưỡng dao động: 4 ca mỗi bên ±36%, 55 ca ±10%; một bên không có ca ⇒ null", () => {
-  expect(Math.round(noiseBand(4, 4)!)).toBe(36);
-  expect(Math.round(noiseBand(55, 55)!)).toBe(10);
-  expect(Math.round(noiseBand(36, 55)!)).toBe(11);
-  expect(noiseBand(0, 14)).toBeNull();
-  expect(changeTone(-30, 11, true)).toBe("down");
-  expect(changeTone(-15, 27, true)).toBe("noise");
-  expect(changeTone(+20, 11, true)).toBe("up");
-  expect(changeTone(-29, 27, null)).toBe("shift"); // UPT D-Day: đổi thật nhưng không đánh giá tốt/xấu
-  expect(changeTone(null, 10, true)).toBe("noise");
+test("quy tắc 10% (user chốt 27/11): đổi từ 10% mới tô, so trên số làm tròn; không có số ⇒ không tô", () => {
+  expect(changeTone(-30, true)).toBe("down");
+  expect(changeTone(-9, true)).toBe("noise");
+  expect(changeTone(-9.4, true)).toBe("noise");
+  expect(changeTone(-9.6, true)).toBe("down"); // ô hiện "−10%" phải được tô
+  expect(changeTone(+10, true)).toBe("up");
+  expect(changeTone(+20, false)).toBe("down");
+  expect(changeTone(-29, null)).toBe("shift"); // UPT D-Day: đổi nhiều nhưng không đánh giá tốt/xấu
+  expect(changeTone(null, true)).toBe("noise");
 });
 
-test("bảng nhiệt CROCS T8 → T9: chỉ Daily giảm GMV/giờ vượt ngưỡng, 3 đợt camp nằm trong ngưỡng; Daily đứng đầu", () => {
+test("bảng nhiệt CROCS T8 → T9: GMV/giờ đổi từ 10% thì đánh dấu, đợt camp ít ca cũng vậy; Daily đứng đầu", () => {
   const aug = [
     ...many(["2026-08-04", "2026-08-05"], 36, 2.81e9, 107.9, 356_606, 207_018, 2579),
     ...many(["2026-08-07"], 5, 1.17e9, 37.5, 141_593, 75_889, 1066),
@@ -68,10 +66,8 @@ test("bảng nhiệt CROCS T8 → T9: chỉ Daily giảm GMV/giờ vượt ngư�
   expect(Math.round(by.daily.change.gmvPerHour!)).toBe(-30);
   expect(Math.round(by.daily.change.viewsPerHour!)).toBe(-22);
   expect(Math.round(by.daily.change.liveCtr!)).toBe(-16);
-  expect(Math.round(by.daily.band!)).toBe(11);
   expect(by.daily.significant).toBe(true);
-  expect([by.dday.significant, by.midmonth.significant, by.payday.significant]).toEqual([false, false, false]);
-  expect(Math.round(by.dday.band!)).toBe(27);
+  for (const r of rows) expect(r.significant).toBe(Math.round(Math.abs(r.change.gmvPerHour!)) >= 10);
 });
 
 test("Key Metrics 3 tháng: bảng theo loại ngày, % so tháng trước tô theo ngưỡng; giờ live không đánh giá; đếm chỉ số suy giảm", () => {
@@ -85,7 +81,6 @@ test("Key Metrics 3 tháng: bảng theo loại ngày, % so tháng trước tô t
   expect(gph.changes.map((c) => (c == null ? null : Math.round(c)))).toEqual([null, 14, -30]);
   expect(gph.tones).toEqual(["noise", "up", "down"]);
   expect(t.rows.find((r) => r.def.key === "hours")!.tones[2]).toBe("noise"); // +32% giờ live nhưng không tô
-  expect(t.bands.map((b) => (b == null ? null : Math.round(b)))).toEqual([null, 12, 11]);
   expect(t.downCount).toBeGreaterThan(0);
   // Bảng đợt camp trống (không có ca) ⇒ mọi giá trị null, không có tông màu.
   const empty = keyMetricsTable([month("2026-08", 36, 2.81e9, 107.9, 356_606), month("2026-09", 55, 2.61e9, 142.6, 368_209)], "dday");

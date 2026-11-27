@@ -35,15 +35,15 @@ const signedPct = (v: number | null, digits = 0) => (v == null ? "—" : `${v >=
 const rowStyle = (idx: number) => ({ borderBottom: `1px solid ${PAL.line}`, background: idx % 2 ? `${alpha(PAL.panel2, 33)}` : "transparent" });
 const TAB_LABEL: Record<KeyMetricsTab, string> = { all: "Cả tháng", ...DAY_TYPE_SHORT };
 
-/** Chú thích màu dùng chung cho mọi bảng có ngưỡng dao động. */
+/** Chú thích màu dùng chung cho mọi bảng tô theo thay đổi từ 10%. */
 export const ToneLegend: React.FC<{ extra?: string }> = ({ extra }) => (
   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs mt-2" style={{ color: PAL.muted }}>
     {(
       [
-        ["down", "suy giảm có ý nghĩa"],
-        ["up", "cải thiện có ý nghĩa"],
-        ["shift", "thay đổi có ý nghĩa, không đánh giá tốt/xấu"],
-        ["noise", "trong ngưỡng dao động"]
+        ["down", "suy giảm từ 10%"],
+        ["up", "cải thiện từ 10%"],
+        ["shift", "đổi từ 10%, không đánh giá tốt/xấu"],
+        ["noise", "đổi dưới 10%"]
       ] as [ChangeTone, string][]
     ).map(([t, l]) => (
       <span key={t} className="px-1.5 py-0.5 rounded font-bold" style={{ color: TONE_COLOR[t], background: TONE_BG[t], border: t === "noise" ? `1px solid ${PAL.line}` : undefined }}>
@@ -109,31 +109,29 @@ const FACTOR_LABEL: Record<DayTypeFactor, string> = {
 
 export const DayTypeHeatPanel: React.FC<{ rows: DayTypeFactorRow[]; windowLabel: string }> = ({ rows, windowLabel }) => (
   <Panel title="Phân rã theo loại ngày" icon={<Flame className="w-4 h-4" />} sub={`% thay đổi · ${windowLabel} · mỗi loại ngày so với chính loại ngày đó, theo lịch campaign của từng tháng`}>
-    <ReportTable head={["Loại ngày", ...DAY_TYPE_FACTORS.map((f) => FACTOR_LABEL[f]), "Ngưỡng dao động", "Đánh giá"]}>
+    <ReportTable head={["Loại ngày", ...DAY_TYPE_FACTORS.map((f) => FACTOR_LABEL[f]), "Đánh giá"]}>
       {rows.map((r, idx) => (
         <tr key={r.key} style={rowStyle(idx)}>
           <td className="py-2 px-3 font-semibold whitespace-nowrap" style={{ color: PAL.gold }}>
             {DAY_TYPE_SHORT[r.key]} <span className="text-2xs font-normal" style={{ color: PAL.muted }}>· {r.sessionsPrev} → {r.sessionsCur} phiên</span>
           </td>
           {DAY_TYPE_FACTORS.map((f) => {
-            const tone = f === "hours" ? "noise" : changeTone(r.change[f], r.band, true);
+            const tone = f === "hours" ? "noise" : changeTone(r.change[f], true);
             return (
               <td key={f} className="py-2 px-3 text-right font-mono font-bold" style={{ color: TONE_COLOR[tone], background: TONE_BG[tone] }}>
                 {signedPct(r.change[f])}
               </td>
             );
           })}
-          <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{r.band == null ? "—" : `±${fmtFixed(r.band, 0)}%`}</td>
-          <td className="py-2 px-3 text-right whitespace-nowrap font-semibold" style={{ color: r.significant ? TONE_COLOR[changeTone(r.change.gmvPerHour, r.band, true)] : PAL.muted }}>
-            {r.band == null ? "chưa đủ phiên" : r.significant ? ((r.change.gmvPerHour ?? 0) < 0 ? "giảm có ý nghĩa" : "tăng có ý nghĩa") : "trong ngưỡng dao động"}
+          <td className="py-2 px-3 text-right whitespace-nowrap font-semibold" style={{ color: r.significant ? TONE_COLOR[changeTone(r.change.gmvPerHour, true)] : PAL.muted }}>
+            {r.sessionsPrev === 0 || r.sessionsCur === 0 ? "chưa đủ phiên" : r.significant ? ((r.change.gmvPerHour ?? 0) < 0 ? "giảm từ 10%" : "tăng từ 10%") : "đổi dưới 10%"}
           </td>
         </tr>
       ))}
     </ReportTable>
     <ToneLegend extra={`· ${METRIC.liveHours} không đánh giá tốt/xấu vì do lịch quyết định`} />
     <MethodNote>
-      Ngưỡng dao động 95% = 1,96 × 26% × √(1/n₁ + 1/n₂), n là số phiên của hai tháng đem so; 26% là độ lệch {METRIC.gmvPerHour} của một phiên so với
-      mức kỳ vọng. Thay đổi nhỏ hơn ngưỡng có thể chỉ là biến động ngẫu nhiên giữa các phiên nên không kết luận. {METRIC.gmvPerHour} = {METRIC.viewsPerHour} ×{" "}
+      Chỉ tô khi đổi từ 10% trở lên so với tháng trước. {METRIC.gmvPerHour} = {METRIC.viewsPerHour} ×{" "}
       {METRIC.liveCtr} × {METRIC.ctor} × {METRIC.aov}.
     </MethodNote>
   </Panel>
@@ -176,8 +174,8 @@ export const KeyMetricsPanel: React.FC<{ months: KeyMetricsMonth[]; monthLabel: 
       <p className="text-[12px] font-bold mb-2" style={{ color: bad.length ? PAL.red : PAL.muted }}>
         {months.length > 1
           ? bad.length
-            ? `${monthLabel(months[last].month)} so ${monthLabel(months[last - 1].month)}: ${bad.length} chỉ số suy giảm có ý nghĩa — ${bad.join(", ")}`
-            : `${monthLabel(months[last].month)} so ${monthLabel(months[last - 1].month)}: không chỉ số nào suy giảm có ý nghĩa`
+            ? `${monthLabel(months[last].month)} so ${monthLabel(months[last - 1].month)}: ${bad.length} chỉ số suy giảm từ 10% — ${bad.join(", ")}`
+            : `${monthLabel(months[last].month)} so ${monthLabel(months[last - 1].month)}: không chỉ số nào suy giảm từ 10%`
           : "Chưa có tháng trước để so."}
       </p>
       <div className="overflow-x-auto -mx-1">
@@ -194,7 +192,6 @@ export const KeyMetricsPanel: React.FC<{ months: KeyMetricsMonth[]; monthLabel: 
               {months.slice(1).map((m, i) => (
                 <th key={`c${m.month}`} className="py-2 px-3 text-right text-2xs font-semibold whitespace-nowrap" style={{ color: PAL.muted }}>
                   {monthLabel(m.month)} so {monthLabel(months[i].month)}
-                  <span className="block font-normal">ngưỡng {cur.bands[i + 1] == null ? "—" : `±${fmtFixed(cur.bands[i + 1]!, 0)}%`}</span>
                 </th>
               ))}
             </tr>
@@ -252,9 +249,9 @@ export const KeyMetricsPanel: React.FC<{ months: KeyMetricsMonth[]; monthLabel: 
           </tbody>
         </table>
       </div>
-      <ToneLegend extra={`· ${METRIC.liveHours} không đánh giá tốt/xấu vì do lịch quyết định · số trên mỗi tab = chỉ số suy giảm có ý nghĩa`} />
+      <ToneLegend extra={`· ${METRIC.liveHours} không đánh giá tốt/xấu vì do lịch quyết định · số trên mỗi tab = chỉ số suy giảm từ 10%`} />
       <MethodNote>
-        Ngưỡng dao động tính theo số phiên của hai tháng đem so (như trang 3) — đợt campaign chỉ có vài phiên nên ngưỡng rộng. {METRIC.upt} và {METRIC.avgPrice}{" "}
+        Chỉ tô khi đổi từ 10% trở lên so với tháng liền trước. {METRIC.upt} và {METRIC.avgPrice}{" "}
         đổi theo quà tặng kèm (trang 4) nên không đánh giá tốt/xấu. % Target tính trên {METRIC.liveGmv} của mọi phiên, cùng số trang 1.
       </MethodNote>
     </Panel>

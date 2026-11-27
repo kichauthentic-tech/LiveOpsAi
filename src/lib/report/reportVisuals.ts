@@ -1,3 +1,4 @@
+import { isBigChange } from "./changeThreshold";
 import type { CampDayBucket } from "../campaignDays";
 import type { ControlRow } from "./deepAnalysis";
 import type { KeyMetricKey } from "./keyMetrics";
@@ -119,7 +120,7 @@ export interface DayAbsCell {
   /** % thay đổi so với tháng liền trước trong bảng; null ở tháng đầu (mốc, không tô). */
   change: number | null;
   tone: ChangeTone;
-  /** Vượt ngưỡng dao động (sáng viền). */
+  /** Chỉ số được đánh giá đổi từ 10% trở lên (sáng viền). */
   significant: boolean;
 }
 export interface DayAbsRow {
@@ -137,11 +138,10 @@ export function dayAbsRows(months: KeyMetricsMonth[], tabs: KeyMetricsTab[]): Da
       const tbl = tables[t];
       const row = tbl.rows.find((x) => x.def.key === key);
       if (!row) continue;
-      neutral = row.def.goodWhenUp == null;
+      neutral = row.def.goodWhenUp == null || !!row.def.volume;
       cells[t] = row.values.map((v, i) => {
-        const band = tbl.bands[i];
         const change = row.changes[i];
-        return { value: v, change, tone: row.tones[i], significant: i > 0 && change != null && band != null && Math.abs(change) > band };
+        return { value: v, change, tone: row.tones[i], significant: i > 0 && !neutral && isBigChange(change) };
       });
     }
     return { key, neutral, cells };

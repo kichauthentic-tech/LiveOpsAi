@@ -15,19 +15,16 @@ import { chooseNmvRate, refundMonthStatus } from "../src/lib/refundStatus";
 
 describe("liveRequirement", () => {
   it("cần thấp hơn mức đã đạt → reach", () => {
-    expect(liveRequirement(9, 10, 20, 20).tone).toBe("reach");
+    expect(liveRequirement(9, 10).tone).toBe("reach");
   });
-  it("cao hơn nhưng trong dải nhiễu → stretch; vượt dải → beyond", () => {
-    // band = 196*0.26*sqrt(1/20+1/20) ≈ 16%
-    expect(liveRequirement(11, 10, 20, 20).tone).toBe("stretch");
-    expect(liveRequirement(13, 10, 20, 20).tone).toBe("beyond");
+  it("cao hơn dưới 10% → stretch; từ 10% → beyond", () => {
+    expect(liveRequirement(10.9, 10).tone).toBe("stretch");
+    expect(liveRequirement(11, 10).tone).toBe("beyond");
+    expect(liveRequirement(13, 10).tone).toBe("beyond");
   });
   it("thiếu số → nodata", () => {
-    expect(liveRequirement(null, 10, 20, 20).tone).toBe("nodata");
-    expect(liveRequirement(10, null, 20, 20).tone).toBe("nodata");
-  });
-  it("ít phiên ⇒ dải rộng hơn nên cùng chênh lệch dễ rơi vào stretch", () => {
-    expect(liveRequirement(13, 10, 4, 4).tone).toBe("stretch");
+    expect(liveRequirement(null, 10).tone).toBe("nodata");
+    expect(liveRequirement(10, null).tone).toBe("nodata");
   });
 });
 

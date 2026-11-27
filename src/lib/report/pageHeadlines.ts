@@ -42,11 +42,11 @@ export function keyMetricsHeadline(i: KeyMetricsHeadlineInput): string {
   const down = rows.filter((r) => r.tone === "down");
   const up = rows.filter((r) => r.tone === "up");
   if (down.length === 0 && up.length === 0)
-    return t(`Cả tháng so với ${i.prevLabel}: không chỉ số nào đổi vượt ngưỡng dao động, chưa có thay đổi nổi bật.`, `Full month vs ${i.prevLabel}: no metric moved beyond its normal range; no notable change.`);
+    return t(`Cả tháng so với ${i.prevLabel}: không chỉ số nào tốt lên hay xấu đi từ 10%.`, `Full month vs ${i.prevLabel}: no metric improved or declined by 10% or more.`);
   const first = down.find((r) => !r.result) ?? down[0];
   const parts: string[] = [];
-  if (down.length) parts.push(t(`${down.length} chỉ số suy giảm vượt ngưỡng (đầu tiên trong phễu: ${first.label} ${Math.round(first.change!)}%)`, `${down.length} metric(s) declined beyond range (first in the funnel: ${first.label} ${Math.round(first.change!)}%)`));
-  if (up.length) parts.push(t(`${up.length} chỉ số cải thiện vượt ngưỡng`, `${up.length} metric(s) improved beyond range`));
+  if (down.length) parts.push(t(`${down.length} chỉ số suy giảm từ 10% (đầu tiên trong phễu: ${first.label} ${Math.round(first.change!)}%)`, `${down.length} metric(s) declined 10% or more (first in the funnel: ${first.label} ${Math.round(first.change!)}%)`));
+  if (up.length) parts.push(t(`${up.length} chỉ số cải thiện từ 10%`, `${up.length} metric(s) improved 10% or more`));
   return t(`Cả tháng so với ${i.prevLabel}: ${parts.join(", ")}.`, `Full month vs ${i.prevLabel}: ${parts.join(", ")}.`);
 }
 

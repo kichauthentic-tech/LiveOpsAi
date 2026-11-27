@@ -1,9 +1,9 @@
-import { noiseBand } from "./brandReport";
+import { isBigChange } from "./changeThreshold";
 import type { RefundMonthStatus } from "../refundStatus";
 import { byLang, t } from "../displayLang";
 
 // Trang "Kế hoạch tháng sau" của Report Tháng (GĐ4, 28/10/2026, demo scratchpad/report_t10_v3.html): hàm thuần cho
-//  (a) Target Live theo loại ngày so với GMV/giờ đã đạt, kèm dải nhiễu; (b) Booking Creator (đọc từ tab Affiliate) so với tháng này;
+//  (a) Target Live theo loại ngày so với GMV/giờ đã đạt; (b) Booking Creator (đọc từ tab Affiliate) so với tháng này;
 //  (c) Deadline + PIC chính của việc tháng sau và (d) Refund rate đã chốt do ops nhập — (c)(d) lưu ở section_notes, không migration.
 
 // ---------- (a) Target Live theo loại ngày ----------
@@ -13,31 +13,79 @@ export type LiveRequirementTone = "reach" | "stretch" | "beyond" | "nodata";
 export interface LiveRequirement {
   /** (GMV/giờ cần − GMV/giờ đã đạt) ÷ GMV/giờ đã đạt, đơn vị %. null khi thiếu một vế. */
   gapPct: number | null;
-  /** Dải nhiễu 95% (±%) của GMV/giờ loại ngày đó: so số phiên đã đạt với số phiên kế hoạch. null khi một vế chưa có phiên. */
-  band: number | null;
   /**
    * reach = cần ≤ đã đạt (không đòi hơn tháng này);
-   * stretch = cần cao hơn nhưng trong dải nhiễu (chênh lệch này một tháng ngẫu nhiên cũng có thể tự đạt);
-   * beyond = cần cao hơn quá dải nhiễu (phải cải thiện thật);
+   * stretch = cần cao hơn nhưng dưới 10%;
+   * beyond = cần cao hơn từ 10% trở lên (phải cải thiện thật);
    * nodata = thiếu Giờ live/Target hoặc chưa có phiên tháng này.
    */
   tone: LiveRequirementTone;
 }
 
-export function liveRequirement(requiredGmvPerHour: number | null, actualGmvPerHour: number | null, actualSessions: number, plannedSessions: number): LiveRequirement {
-  if (requiredGmvPerHour == null || actualGmvPerHour == null || actualGmvPerHour <= 0) return { gapPct: null, band: null, tone: "nodata" };
+export function liveRequirement(requiredGmvPerHour: number | null, actualGmvPerHour: number | null): LiveRequirement {
+  if (requiredGmvPerHour == null || actualGmvPerHour == null || actualGmvPerHour <= 0) return { gapPct: null, tone: "nodata" };
   const gapPct = ((requiredGmvPerHour - actualGmvPerHour) / actualGmvPerHour) * 100;
-  const band = noiseBand(actualSessions, plannedSessions);
-  const tone: LiveRequirementTone = gapPct <= 0 ? "reach" : band != null && gapPct <= band ? "stretch" : "beyond";
-  return { gapPct, band, tone };
+  const tone: LiveRequirementTone = gapPct <= 0 ? "reach" : isBigChange(gapPct) ? "beyond" : "stretch";
+  return { gapPct, tone };
 }
 
 export const LIVE_TONE_LABEL: Record<LiveRequirementTone, string> = byLang(() => ({
   reach: t("thấp hơn mức đã đạt", "below the level achieved"),
-  stretch: t("cao hơn, trong dải nhiễu", "higher, within the noise band"),
-  beyond: t("cao hơn, vượt dải nhiễu", "higher, beyond the noise band"),
+  stretch: t("cao hơn dưới 10%", "less than 10% higher"),
+  beyond: t("cao hơn từ 10%", "10% or more higher"),
   nodata: t("chưa đủ số", "not enough data")
 }));
+
+export interface PlanGapRow {
+  name: string;
+  /** GMV/giờ đã đạt ở tháng report; null = chưa có phiên. */
+  achieved: number | null;
+  sessionsCur: number;
+  plan?: { hours: number; target: number; slots: number };
+}
+
+export interface PlanGap {
+  name: string;
+  hours: number;
+  target: number;
+  required: number;
+  achieved: number;
+  gapPct: number;
+}
+
+export interface PlanGaps {
+  /** Cả tháng, chỉ khi cao hơn từ 10%. */
+  total: PlanGap | null;
+  /** Các loại ngày cao hơn từ 10%, chênh lớn nhất đứng đầu. */
+  days: PlanGap[];
+}
+
+/** Phần của kế hoạch tháng sau đòi GMV/giờ cao hơn mức đã đạt từ 10% — cùng phép tính và cùng điều kiện "cả tháng"
+ *  (mọi loại ngày đều có giờ và Target) với bảng Kế hoạch Target Live, để khối Insight không nói ngược bảng. */
+export function planGaps(rows: PlanGapRow[], total: PlanGapRow): PlanGaps {
+  const one = (name: string, achieved: number | null, hours: number, target: number): PlanGap | null => {
+    if (!(hours > 0) || !(target > 0)) return null;
+    const required = target / hours;
+    const r = liveRequirement(required, achieved);
+    return r.tone === "beyond" ? { name, hours, target, required, achieved: achieved!, gapPct: r.gapPct! } : null;
+  };
+  const days = rows
+    .flatMap((r) => {
+      const g = r.plan ? one(r.name, r.achieved, r.plan.hours, r.plan.target) : null;
+      return g ? [g] : [];
+    })
+    .sort((a, b) => b.gapPct - a.gapPct);
+  const sum = planSums(rows);
+  return { total: sum.complete ? one(total.name, total.achieved, sum.hours, sum.target) : null, days };
+}
+
+/** Cộng kế hoạch trong app. `complete` = có giờ, có Target và không loại ngày nào có giờ mà thiếu Target — loại ngày không
+ *  có phiên nào thì không chặn dòng "Cả tháng". */
+export function planSums(rows: Pick<PlanGapRow, "plan">[]): { hours: number; target: number; complete: boolean } {
+  const hours = rows.reduce((a, r) => a + (r.plan?.hours ?? 0), 0);
+  const target = rows.reduce((a, r) => a + (r.plan?.target ?? 0), 0);
+  return { hours, target, complete: hours > 0 && target > 0 && rows.every((r) => !r.plan || r.plan.hours <= 0 || r.plan.target > 0) };
+}
 
 // ---------- (b) Booking Creator so với tháng này ----------
 

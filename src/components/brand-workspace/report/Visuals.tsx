@@ -97,7 +97,7 @@ export const DayAbsPanel: React.FC<{ months: KeyMetricsMonth[]; monthLabel: (m: 
   const rows = dayAbsRows(months, tabs);
   const label = (k: string) => KEY_METRICS.find((d) => d.key === k)!;
   return (
-    <Panel title="Số đo từng loại ngày" icon={<Table2 className="w-4 h-4" />} sub={`Mỗi loại ngày là một nhóm cột ${months.map((m) => monthLabel(m.month)).join(", ")} cùng màu nhận diện · ô tô màu theo thay đổi so với tháng liền trước (xanh tăng, đỏ giảm, đậm hơn khi lớn) · viền sáng = vượt ngưỡng dao động`}>
+    <Panel title="Số đo từng loại ngày" icon={<Table2 className="w-4 h-4" />} sub={`Mỗi loại ngày là một nhóm cột ${months.map((m) => monthLabel(m.month)).join(", ")} cùng màu nhận diện · ô tô màu theo thay đổi so với tháng liền trước (xanh tăng, đỏ giảm, đậm hơn khi lớn) · viền sáng = đổi từ 10%`}>
       <div className="overflow-x-auto -mx-1">
         <table className="w-full text-2xs border-collapse" style={{ minWidth: 220 + tabs.length * months.length * 74 }}>
           <thead>

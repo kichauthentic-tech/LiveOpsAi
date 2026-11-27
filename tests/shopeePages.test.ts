@@ -37,17 +37,16 @@ describe("so cùng kỳ", () => {
   });
 });
 
-describe("Key Metrics + ngưỡng dao động", () => {
-  test("Viewers/giờ −30% vượt ngưỡng ⇒ down; ATC/Viewer không đổi ⇒ noise; Giờ live trung tính", () => {
+describe("Key Metrics + quy tắc 10%", () => {
+  test("Viewers/giờ −30% ⇒ down; ATC/Viewer không đổi ⇒ noise; Giờ live trung tính", () => {
     const s = snap();
-    const t = shopeeKmTable(shopeeMonths(s), "all", 0.35);
+    const t = shopeeKmTable(shopeeMonths(s), "all");
     const row = (k: string) => t.rows.find((r) => r.def.key === k)!;
-    expect(t.bands[1]).toBeCloseTo(196 * 0.35 * Math.sqrt(2 / 26), 5);
     expect(row("viewersPerHour").changes[1]).toBeCloseTo(-30, 5);
     expect(row("viewersPerHour").tones[1]).toBe("down");
     expect(row("atcRate").tones[1]).toBe("noise");
     expect(row("hours").tones[1]).toBe("neutral");
-    // chỉ số quy mô đi theo Giờ live ⇒ không tô tốt/xấu dù đổi vượt ngưỡng
+    // chỉ số quy mô đi theo Giờ live ⇒ không tô tốt/xấu dù đổi từ 10%
     expect(row("viewers").changes[1]).toBeCloseTo(-30, 5);
     expect(row("viewers").tones[1]).toBe("neutral");
   });

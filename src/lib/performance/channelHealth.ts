@@ -3,7 +3,6 @@ import { addDays, eachDay, isoWeekStart } from "../dateUtils";
 import { sessionDurationHours } from "../pnl";
 import { CampDayBucket, resolveCampBucketType } from "../campaignDays";
 import { METRIC } from "../metricGlossary";
-import { noiseBand } from "../report/brandReport";
 import { fmtVndShort } from "../format";
 import type { MetricTotals, PlatformMetricSet } from "../platforms/profiles";
 import { assertOnePlatform } from "../platforms/perf";
@@ -282,6 +281,12 @@ export function estimateFunnelCv(sessions: LiveSession[]): FunnelCv {
 }
 
 const Z95 = 1.96, Z80 = 1.28;
+
+/** Dao động 95% (đơn vị %) khi so một tỷ lệ của hai kỳ có n₁ và n₂ ca: 1,96 × CV × √(1/n₁ + 1/n₂). Kỳ không có ca ⇒ null. */
+export function noiseBand(n1: number, n2: number, cv: number): number | null {
+  if (n1 < 1 || n2 < 1) return null;
+  return 196 * cv * Math.sqrt(1 / n1 + 1 / n2);
+}
 
 function funnelRate(def: FunnelRateDef, pn: number, pd: number, cn: number, cd: number, nPrev: number, nCur: number, cvs: FunnelCv): FunnelRate {
   const a = pd > 0 ? (pn / pd) * 100 : null, b = cd > 0 ? (cn / cd) * 100 : null;

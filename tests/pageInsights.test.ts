@@ -15,7 +15,7 @@ test("bản ops sửa ghi đè đúng khối đã sửa, khối còn lại theo 
   expect(shownBlocks(auto, {}).own).toBe("");
 });
 
-test("Tổng quan: nêu loại ngày thấp nhất so với Target và yếu tố giảm; không vượt ngưỡng thì nói rõ", () => {
+test("Tổng quan: nêu loại ngày thấp nhất so với Target và yếu tố giảm; không đổi từ 10% thì nói rõ", () => {
   const base = { liveActual: 4_430_000_000, liveTarget: 4_660_000_000, days: [{ label: "Daily", target: 1_800_000_000, actual: 1_890_000_000 }, { label: "Pay Day", target: 925_000_000, actual: 647_000_000 }], shopKpi: { target: 8_400_000_000, projected: 7_390_000_000 } };
   const a = summaryBlocks({ ...base, worstFactor: { dayLabel: "Pay Day", factorLabel: "LIVE CTR", change: -14 } });
   expect(a.observe).toContain("Pay Day chiếm");
@@ -26,26 +26,26 @@ test("Tổng quan: nêu loại ngày thấp nhất so với Target và yếu t�
   expect(summaryBlocks({ ...base, liveTarget: null, worstFactor: null }).advise).toBe("");
 });
 
-test("Key Metrics: không chỉ số vượt ngưỡng thì câu nói rõ điều đó", () => {
-  const quiet = keyMetricsBlocks({ rows: [{ label: "GMV", change: -3, tone: "noise" }], band: 8, prevLabel: "T9" });
-  expect(quiet.observe).toContain("không chỉ số nào đổi vượt ngưỡng");
-  const down = keyMetricsBlocks({ rows: [{ label: "LIVE impressions", change: 13, tone: "up" }, { label: "ERR", change: -15, tone: "down" }], band: 8, prevLabel: "T9" });
+test("Key Metrics: không chỉ số đổi từ 10% thì câu nói rõ điều đó", () => {
+  const quiet = keyMetricsBlocks({ rows: [{ label: "GMV", change: -3, tone: "noise" }], prevLabel: "T9" });
+  expect(quiet.observe).toContain("không chỉ số nào tốt lên hay xấu đi từ 10%");
+  const down = keyMetricsBlocks({ rows: [{ label: "LIVE impressions", change: 13, tone: "up" }, { label: "ERR", change: -15, tone: "down" }], prevLabel: "T9" });
   expect(down.observe).toContain("ERR −15%");
-  expect(down.cause).toContain("ERR là chỉ số phễu suy giảm");
+  expect(down.cause).toContain("ERR là chỉ số phễu đầu tiên suy giảm từ 10%");
 });
 
-test("Nguyên nhân: chọn yếu tố có đóng góp tuyệt đối lớn nhất cùng chiều; loại ngày chỉ nêu khi vượt ngưỡng", () => {
+test("Nguyên nhân: chọn yếu tố có đóng góp tuyệt đối lớn nhất cùng chiều; loại ngày chỉ nêu khi đổi từ 10%", () => {
   const parts = [
     { label: "Giờ live", value: 125e6, change: 10 },
-    { label: "Views/giờ", value: -295e6, change: -6 },
+    { label: "Views/giờ", value: -295e6, change: -16 },
     { label: "AOV", value: -199e6, change: -4 }
   ];
-  const r = whyBlocks({ gmvPerHourChange: -7, parts, significantDays: [{ label: "Pay Day", change: -29 }], band: 22, mix: { mix: 482e3, rate: -1.9e6 } });
+  const r = whyBlocks({ gmvPerHourChange: -7, parts, significantDays: [{ label: "Pay Day", change: -29 }], mix: { mix: 482e3, rate: -1.9e6 } });
   expect(r.cause).toContain("Views/giờ là yếu tố hiệu suất đóng góp tuyệt đối lớn nhất");
   expect(r.observe).toContain("Pay Day (−29%)");
   expect(r.impact).toContain("không ở lịch live");
-  expect(whyBlocks({ gmvPerHourChange: -7, parts, significantDays: [], band: null, mix: null }).observe).toContain("Không loại ngày nào");
-  expect(whyBlocks({ gmvPerHourChange: null, parts: [], significantDays: [], band: null, mix: null }).observe).toContain("Chưa đủ số liệu");
+  expect(whyBlocks({ gmvPerHourChange: -7, parts, significantDays: [], mix: null }).observe).toContain("Không loại ngày nào");
+  expect(whyBlocks({ gmvPerHourChange: null, parts: [], significantDays: [], mix: null }).observe).toContain("Chưa đủ số liệu");
 });
 
 test("Host: chỉ nêu host có khoảng tin cậy không cắt trung bình và đủ 5 phiên", () => {
@@ -85,7 +85,7 @@ test("Shop / Ads / Affiliate / NMV / Kế hoạch: câu mẫu theo quy tắc, th
 
 test("mọi hàm sinh trả đủ 4 khối không rỗng, kể cả khi thiếu dữ liệu", () => {
   const empties = [
-    keyMetricsBlocks({ rows: [], band: null, prevLabel: "T9" }),
+    keyMetricsBlocks({ rows: [], prevLabel: "T9" }),
     shopBlocks({ totalChange: null, windowLabel: "", channels: [], control: [] }),
     productsBlocks({ topN: 0, risers: [], fallers: [], lead: null, promo: null }),
     peopleBlocks({ hosts: [], months: 0, slots: [] }),
@@ -118,14 +118,14 @@ test("audit trùng lặp 30/10: trang 1 nói thiếu do GMV/giờ hay Giờ live
 
 test("audit trùng lặp 30/10: Key Metrics đề xuất cùng chỉ số chính với trang Nguyên nhân", () => {
   const rows = [{ label: "Product impressions", change: -13, tone: "down" as const }];
-  const b = keyMetricsBlocks({ rows, band: 12, prevLabel: "T8", mainMetric: "Views/giờ" });
+  const b = keyMetricsBlocks({ rows, prevLabel: "T8", mainMetric: "Views/giờ" });
   expect(b.advise).toContain("Chỉ số theo dõi chính của tháng sau: Views/giờ");
   expect(b.advise).toContain("Product impressions theo dõi kèm");
 });
 
-test("audit trùng lặp 30/10: whyMainMetric = yếu tố kéo giảm vượt ngưỡng, yếu thì null", async () => {
+test("audit trùng lặp 30/10: whyMainMetric = yếu tố kéo giảm từ 10%, dưới 10% thì null", async () => {
   const { whyMainMetric } = await import("../src/lib/report/pageInsights");
   const parts = [{ key: "hours", label: "Giờ live", value: 760e6, change: 15 }, { key: "viewsPerHour", label: "Views/giờ", value: -1.03e9, change: -17 }];
-  expect(whyMainMetric({ gmvPerHourChange: -23, parts, significantDays: [], band: null, factorBand: 12, mix: null })).toBe("Views/giờ");
-  expect(whyMainMetric({ gmvPerHourChange: -23, parts, significantDays: [], band: null, factorBand: 20, mix: null })).toBeNull();
+  expect(whyMainMetric({ gmvPerHourChange: -23, parts, significantDays: [], mix: null })).toBe("Views/giờ");
+  expect(whyMainMetric({ gmvPerHourChange: -23, parts: parts.map((p) => ({ ...p, change: p.key === "viewsPerHour" ? -8 : p.change })), significantDays: [], mix: null })).toBeNull();
 });

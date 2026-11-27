@@ -6719,3 +6719,19 @@ rút WORKSPACE) · Đợt 1 hàng đợi "ca chưa số" theo trợ + nạp bù 
 
 **6 quyết định chờ user:** gom menu 5 chỗ; bỏ workspace brand; ẩn mục 0 dữ liệu; gộp Trainer vào Vận hành; thông báo tin tổng; nạp bù 1 file/ngày.
 **Giữ nguyên:** app talent + tab Đăng ký, giao ca TikTok bằng file 3 bước, Report Tháng, đối soát bản 2, OP giữ cửa chốt người/mở/huỷ/dời ca.
+
+## Report Tháng: ngưỡng 10% thay ngưỡng dao động (2026-11-27)
+
+User: "Các ngưỡng dao động trong report tháng tôi đang thấy không ổn" → "cứ cao hơn chỉ số tháng trước 10% thì highlight" → chọn "10% mọi nơi".
+
+Đo trên phiên thật TikTok (VERA/CROCS/Franklin/JOCKEY, 17 cặp tháng × 9 chỉ số tỷ lệ, lấy mẫu lại phiên theo loại ngày):
+ngưỡng cũ (1,96 × CV GMV/giờ × √(1/n₁+1/n₂), dùng chung mọi chỉ số) tô 46/153; ngưỡng riêng từng chỉ số tô ~75 (cũ giấu 30, tô nhầm 1);
+mốc phẳng 10% tô 58 (4 nằm trong dao động ngẫu nhiên, bỏ sót 21; Product CTR sót 7/9). Tab Campaign ~9 phiên: 127/248 ô được tô nằm trong
+dao động ngẫu nhiên; Daily 27/70. User chấp nhận đánh đổi này. Shopee chưa đo.
+
+Đổi: `changeThreshold.ts` (mới); brandReport, shopeePages, reportVisuals, nextMonthPlan, pageHeadlines, pageInsights, các trang report TikTok +
+Shopee (bỏ cột "Ngưỡng", % hiện 0 số lẻ). Gom luôn chỗ tô theo dấu/≥1%: ô Lượt truy cập + Affiliate trang Toàn shop, trang shop Shopee, thẻ đầu
+trang, bảng booking Tháng sau. Dashboard giữ ngưỡng CV riêng (`channelHealth.noiseBand`).
+
+Chưa đổi (ngưỡng chọn tay, không phải % so tháng trước): host so team ▲▼ ≥5% và cột so đồng nghiệp ≥15%, chênh theo ĐIỂM (Shopee ≥0,5; Direct/
+Indirect ≥5), SKU in đậm ≥30%, khoảng tin cậy 95% của host.

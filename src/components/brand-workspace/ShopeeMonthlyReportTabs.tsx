@@ -1,6 +1,6 @@
 import { METRIC_SHOPEE as SM } from "../../lib/metricGlossary";
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import type { BrandMonthlyReport, BrandMonthPlan, BrandMonthPlanSlot, LiveSession } from "../../types";
+import type { BrandMonthlyReport, BrandMonthPlan, BrandMonthPlanSlot, ShiftSlot, LiveSession } from "../../types";
 import { fmtFixed, fmtVndFull, fmtVndShort } from "../../lib/format";
 import { METRIC } from "../../lib/metricGlossary";
 import { PAL, alpha, SECTIONS, type ReportSectionId } from "./report/theme";
@@ -23,13 +23,17 @@ import { fetchMonthPlan } from "../../lib/db/monthPlans";
 import { downloadSheetsAsXlsx, xlsxFailText } from "../../lib/exportXlsx";
 import { useToast } from "../../hooks/useToast";
 import { effectiveCamp, resolveCampBucketType, type CampDayBucket } from "../../lib/campaignDays";
-import { planCampAllocation } from "../../lib/report/monthlyReportInsights";
-import { changeTone, noiseBand } from "../../lib/report/brandReport";
+import { planCampAllocation, planSlotTargetSum } from "../../lib/report/monthlyReportInsights";
+import { planGaps, planSums } from "../../lib/report/nextMonthPlan";
+import { changeTone } from "../../lib/report/brandReport";
+import { isBigChange } from "../../lib/report/changeThreshold";
 import { skuImageKey, type ScatterPoint } from "../../lib/report/reportVisuals";
 import { hostReliability, isBorderline, reliabilityText } from "../../lib/report/deepAnalysis";
 import { hostVsPeer, type HostInsightRow } from "../../lib/report/sectionInsights";
 import { byHost, byHostDayType, dayTypeTeamTotals, dataQuality, filterSessions, splitUnassignedHost } from "../../lib/performance/hostPerformance";
 import { platformOf } from "../../lib/reportPlatform";
+import { cancelledPlan } from "../../lib/performance/planRunRate";
+import { todayVn } from "../../lib/performance/brandCommitment";
 import { PLATFORM_PROFILES } from "../../lib/platforms/profiles";
 import type { ReportScope } from "../../lib/report/reportScope";
 import { pageNoteKey, type InsightBlocks } from "../../lib/report/pageInsights";
@@ -106,7 +110,7 @@ const SHOPEE = PLATFORM_PROFILES.Shopee.id;
 const BLUE = "#7fb0e0";
 const TAB_CLS: Record<string, string> = { daily: "g-daily", dday: "g-dday", midmonth: "g-mm", payday: "g-pd" };
 const pct = (v: number | null | undefined, d = 1) => (v == null ? "—" : `${fmtFixed(v, d)}%`);
-const sgnP = (v: number | null | undefined) => (v == null ? "—" : fmtP(v, 1));
+const sgnP = (v: number | null | undefined) => (v == null ? "—" : fmtP(v, 0));
 const signedM = (v: number) => (v >= 0 ? "+" : "") + fmtM(v);
 const nf = (v: number) => Math.round(v).toLocaleString(numLocale());
 const durLabel = (sec: number) => (sec >= 60 ? `${Math.floor(sec / 60)}m${String(Math.round(sec % 60)).padStart(2, "0")}s` : `${Math.round(sec)}s`);
@@ -135,17 +139,17 @@ function bridgeAxis(from: number, steps: number[]) {
 }
 
 /** Phễu theo phiên (Live List): Viewers → ATC → Orders, cùng hai cách xem với Phễu LIVE của TikTok. */
-const FunnelPanel: React.FC<{ stages: { label: string; prev: number; cur: number }[]; ratios: { n: string; d: string; p: number | null; c: number | null }[]; band: number | null; prevShort: string }> = ({ stages, ratios, band, prevShort }) => {
+const FunnelPanel: React.FC<{ stages: { label: string; prev: number; cur: number }[]; ratios: { n: string; d: string; p: number | null; c: number | null }[]; prevShort: string }> = ({ stages, ratios, prevShort }) => {
   const [mode, setMode] = useState<"p" | "i">("p");
   const chg = (p: number, c: number) => (p > 0 ? (c / p - 1) * 100 : null);
   const rch = ratios.map((r) => (r.p != null && r.c != null && r.p > 0 ? (r.c / r.p - 1) * 100 : null));
-  const sig = (v: number | null) => v != null && band != null && Math.abs(v) > band;
+  const sig = isBigChange;
   const idx = (s: { prev: number; cur: number }) => (s.prev > 0 ? (s.cur / s.prev) * 100 : 0);
   const hb = hbars(
-    stages.map((s) => ({ name: s.label, sub: `${nf(s.prev)} → ${nf(s.cur)}`, value: idx(s), text: String(Math.round(idx(s))), cls: idx(s) < 97 ? "red" : "", mark: 100 })),
+    stages.map((s) => ({ name: s.label, sub: `${nf(s.prev)} → ${nf(s.cur)}`, value: idx(s), text: String(Math.round(idx(s))), cls: idx(s) < 100 && sig(idx(s) - 100) ? "red" : "", mark: 100 })),
     Math.max(120, Math.ceil(Math.max(...stages.map(idx)) / 10) * 10 + 7)
   );
-  const cls = (v: number | null) => (v == null ? "nt" : sig(v) ? (v > 0 ? "up" : "dn") : "nt");
+  const cls = (v: number | null) => (v == null || !sig(v) ? "nt" : v > 0 ? "up" : "dn");
   return (
     <div className="pn">
       <div className="pnh">{tr("Phễu của phiên live", "Live session funnel")}</div>
@@ -173,7 +177,7 @@ const FunnelPanel: React.FC<{ stages: { label: string; prev: number; cur: number
                     <div className="rt">{pct(r.c, 2)}</div>
                     <div className="ar">→</div>
                     <div>{prevShort}: {pct(r.p, 2)}</div>
-                    <div className={sig(rc) ? "dn" : (rc ?? 0) > 0 ? "up" : "nt"} style={{ fontWeight: 700 }}>{sgnP(rc)}{sig(rc) ? tr(" · vượt ngưỡng", " · beyond range") : ""}</div>
+                    <div className={cls(rc)} style={{ fontWeight: 700 }}>{sgnP(rc)}</div>
                   </div>
                 )}
               </React.Fragment>
@@ -203,6 +207,8 @@ interface Props {
   onReportChange: (r: BrandMonthlyReport) => void;
   /** Ca trong app (mọi sàn) — trang Host đọc ca Shopee trực tiếp như report TikTok đọc ca TikTok. */
   liveSessions: LiveSession[];
+  /** Ca chờ đăng ký sống — để Kế Hoạch Tháng sau biết ca nào đã huỷ. */
+  shiftSlots?: ShiftSlot[];
   /** Phạm vi dịch vụ brand × Shopee (0190): Ads ngoài phạm vi ⇒ không có trang Quảng cáo; brand tự live ⇒ nhãn số tổng
    *  "gồm phiên brand tự live" khi Live List có ≥3% GMV ngoài ca YFB. Shopee chưa có trang Affiliate nên công tắc đó chỉ hiện ở dòng phạm vi. */
   scope: ReportScope;
@@ -210,7 +216,7 @@ interface Props {
   showAll?: boolean;
 }
 
-export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, month, snapshot: s, report, canManage, onReportChange, liveSessions, scope, showAll = false }) => {
+export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, month, snapshot: s, report, canManage, onReportChange, liveSessions, shiftSlots = [], scope, showAll = false }) => {
   const h = s.headline;
   const o = s.overview;
   const { showToast } = useToast();
@@ -225,7 +231,6 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
   const kmRow = (key: ShopeeKmKey, tab: ShopeeTab = "all") => pm.km[tab].rows.find((r) => r.def.key === key);
   const kmVal = (key: ShopeeKmKey) => kmRow(key)?.values[lastIdx] ?? null;
   const kmChg = (key: ShopeeKmKey) => kmRow(key)?.changes[lastIdx] ?? null;
-  const band = pm.km.all.bands[lastIdx] ?? null;
   const scoreAll = pm.score.find((r) => r.key === "all");
 
   // ---- Kế hoạch tháng sau: đọc thẳng Kế Hoạch Tháng Shopee (nguồn duy nhất), như report TikTok — không vào bản chụp.
@@ -240,7 +245,19 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
       cancelled = true;
     };
   }, [brandId, nextMonth]);
-  const nextAlloc = useMemo(() => (nextPlan && nextPlan.slots.length > 0 ? planCampAllocation(nextPlan.slots, effectiveCamp(nextPlan.plan.campRanges)) : null), [nextPlan]);
+  const nextCancelled = useMemo(
+    () => cancelledPlan(nextMonth, nextPlan?.slots ?? [], shiftSlots, liveSessions.filter((x) => x.brandId === brandId && platformOf(x) === SHOPEE), todayVn()),
+    [nextPlan, nextMonth, shiftSlots, liveSessions, brandId]
+  );
+  const nextAlloc = useMemo(() => (nextPlan && nextPlan.slots.length > 0 ? planCampAllocation(nextPlan.slots, effectiveCamp(nextPlan.plan.campRanges), nextCancelled.ids) : null), [nextPlan, nextCancelled]);
+
+  // Hàng của bảng Kế hoạch Target Live — khối Insight trang Tháng sau đọc đúng các hàng này.
+  const nextRows = SHOPEE_BUCKETS.map((key) => {
+    const a = nextAlloc?.find((x) => x.key === key);
+    const c = pm.score.find((r) => r.key === key);
+    return { key, name: SHOPEE_TAB_LABEL[key], achieved: c?.gmvPerHour ?? null, sessionsCur: c?.sessions ?? 0, plan: a && (a.slots > 0 || a.target > 0) ? { hours: a.hours, target: a.target, slots: a.slots } : undefined };
+  });
+  const nextTotal = { key: "all", name: tr("Cả tháng", "Whole month"), achieved: scoreAll?.gmvPerHour ?? null, sessionsCur: scoreAll?.sessions ?? 0 };
 
   // ---- Host: ca Shopee của brand trong app (cùng các hàm của report TikTok), loại ngày theo khung camp của từng tháng trong bản chụp.
   const bucketAny = useMemo(() => {
@@ -284,7 +301,7 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
               : "."
         }`
       : null;
-  const hostTeam = useMemo(() => dayTypeTeamTotals(hostDayType), [hostDayType]);
+  const hostTeam = useMemo(() => dayTypeTeamTotals(hostDayType, { sessions: completed, bucketOf: bucketAny }), [hostDayType, completed, bucketAny]);
   const hostPeer = useMemo(() => {
     const rows = new Map<string, HostInsightRow>();
     for (const b of SHOPEE_BUCKETS) {
@@ -320,8 +337,7 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
     shortName: hostShortName,
     slots: slots.map((r) => {
       const c = pctChange(r.prev.gmvPerHour, r.cur.gmvPerHour);
-      const b = noiseBand(r.prev.n, r.cur.n, pm.cv.cv);
-      return { label: r.label, prevN: r.prev.n, curN: r.cur.n, prev: r.prev.gmvPerHour, cur: r.cur.gmvPerHour, change: c, band: b, tone: changeTone(c, b, true) as "up" | "down" | "flat" };
+      return { label: r.label, prevN: r.prev.n, curN: r.cur.n, prev: r.prev.gmvPerHour, cur: r.cur.gmvPerHour, change: c, tone: changeTone(c, true) as "up" | "down" | "flat" };
     }),
     spread: shopeeSpread(s),
     top: shopeeTopSessions(s),
@@ -371,7 +387,9 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
           }),
         relMonths,
         nextLabel: monthLong(nextMonth),
-        hasNextPlan: !!nextPlan && nextPlan.plan.targetGmv > 0 && nextPlan.slots.length > 0,
+        hasNextPlan: !!nextPlan && planSlotTargetSum(nextPlan.slots) > 0,
+        nextGaps: planGaps(nextRows, nextTotal),
+        nextUnpriced: nextPlan && planSlotTargetSum(nextPlan.slots) <= 0 && nextPlan.slots.length > nextCancelled.count ? { sessions: nextPlan.slots.length - nextCancelled.count, hours: planSums(nextRows).hours, achieved: scoreAll?.gmvPerHour ?? null } : null,
         withAds: scope.ads
       }),
     [s, pm, hostPeer, relByName, relMonths, nextMonth, nextPlan, scope.ads]
@@ -462,7 +480,7 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
       ]);
     }
   }
-  const kmHead = [tr("Chỉ số", "Metric"), ...months.map((m) => monthShortLabel(m.month)), ...months.slice(1).map((m, i) => `${monthShortLabel(m.month)} ${tr("so", "vs")} ${monthShortLabel(months[i].month)} (${kmTable.bands[i + 1] == null ? "—" : "±" + Math.round(kmTable.bands[i + 1]!) + "%"})`)];
+  const kmHead = [tr("Chỉ số", "Metric"), ...months.map((m) => monthShortLabel(m.month)), ...months.slice(1).map((m, i) => `${monthShortLabel(m.month)} ${tr("so", "vs")} ${monthShortLabel(months[i].month)}`)];
   const kmTabs = SHOPEE_TABS.filter((t) => t === "all" || pm.km[t].sessions[pm.km[t].sessions.length - 1] > 0);
 
   // ======================= 3 · Đơn huỷ =======================
@@ -515,38 +533,36 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
   ].map(({ key, label }) => {
     const r = kmRow(key);
     const c = kmChg(key);
-    const sig = c != null && band != null && Math.abs(c) > band;
     return {
       label,
       value: r ? fmtShopeeKm(r.def.kind, kmVal(key)) : "—",
-      note: `${sgnP(c)}${key === "gmvPerHour" ? ` ${tr("so với", "vs")} ${pm.prevLabel ?? tr("tháng trước", "last month")}` : sig ? (c! < 0 ? tr(" · giảm có ý nghĩa", " · significant decline") : tr(" · tăng có ý nghĩa", " · significant increase")) : band != null ? ` · ${tr("ngưỡng", "range")} ±${Math.round(band)}%` : ""}`,
-      color: c == null ? undefined : c < 0 ? ("red" as const) : ("green" as const)
+      note: `${sgnP(c)} ${tr("so với", "vs")} ${pm.prevLabel ?? tr("tháng trước", "last month")}`,
+      color: c == null || !isBigChange(c) ? undefined : c < 0 ? ("red" as const) : ("green" as const)
     };
   });
   const factorCols: ShopeeFactor[] = d && d.parts.some((p) => p.key === "atcRate") ? ["hours", "viewersPerHour", "atcRate", "gmvPerAtc"] : ["hours", "viewersPerHour"];
   const dayFactorHtml = pm.dayFactors.length
     ? tbl(
-        [tr("Loại ngày", "Day type"), ...factorCols.map((f) => SHOPEE_FACTOR_LABEL[f]), SM.gmvPerHour, tr("Ngưỡng", "Range"), tr("Đánh giá", "Assessment")],
+        [tr("Loại ngày", "Day type"), ...factorCols.map((f) => SHOPEE_FACTOR_LABEL[f]), SM.gmvPerHour, tr("Đánh giá", "Assessment")],
         pm.dayFactors.map((r) => {
           const gp = r.change.gmvPerHour;
           const [t, k] =
-            r.band == null
+            r.sessionsPrev === 0 || r.sessionsCur === 0
               ? [tr("chưa đủ phiên", "not enough sessions"), "m"]
               : r.significant
-                ? [(gp ?? 0) < 0 ? tr("giảm có ý nghĩa", "significant decline") : tr("tăng có ý nghĩa", "significant increase"), (gp ?? 0) < 0 ? "r" : "g"]
-                : [tr("trong ngưỡng dao động", "within normal range"), "m"];
+                ? [(gp ?? 0) < 0 ? tr("giảm từ 10%", "down 10% or more") : tr("tăng từ 10%", "up 10% or more"), (gp ?? 0) < 0 ? "r" : "g"]
+                : [tr("đổi dưới 10%", "changed under 10%"), "m"];
           return [
             `${SHOPEE_TAB_LABEL[r.key]}<br><span class="nt" style="font-size:11px">${r.sessionsPrev} → ${r.sessionsCur} ${tr("phiên", "sessions")}</span>`,
             ...[...factorCols, "gmvPerHour" as const].map((f, i) => {
               const v = r.change[f];
               if (v == null) return "—";
-              return { t: fmtP(v), c: "hm", s: (i === 0 ? heat(v, 40, BLUE, BLUE) : heat(v, 30)) + (i > 0 && r.band != null && Math.abs(v) > r.band ? ";box-shadow:inset 0 0 0 1.5px var(--cream);font-weight:800" : "") };
+              return { t: fmtP(v), c: "hm", s: !isBigChange(v) ? "" : i === 0 ? heat(v, 40, BLUE, BLUE) : heat(v, 30) + ";box-shadow:inset 0 0 0 1.5px var(--cream);font-weight:800" };
             }),
-            r.band != null ? `±${Math.round(r.band)}%` : "—",
             W(pill(t, k))
           ];
         }),
-        [factorCols.length + 3]
+        [factorCols.length + 2]
       )
     : "";
   // Số đo từng loại ngày (bảng .vt của TikTok): mỗi loại ngày một nhóm cột các tháng, ô tô màu theo thay đổi so với tháng liền trước.
@@ -571,7 +587,7 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
                     if (i === 0) return `<td class="cellc base gs ${TAB_CLS[t]}">${txt}</td>`;
                     const c = r?.changes[i] ?? null;
                     const tone = r?.tones[i];
-                    const st = c == null ? "" : (k === "hours" ? heat(c, 40, BLUE, BLUE) : heat(c, 30)) + (tone === "up" || tone === "down" ? ";box-shadow:inset 0 0 0 1.5px var(--cream);font-weight:800" : "");
+                    const st = c == null || !isBigChange(c) ? "" : (k === "hours" ? heat(c, 40, BLUE, BLUE) : heat(c, 30)) + (tone === "up" || tone === "down" ? ";box-shadow:inset 0 0 0 1.5px var(--cream);font-weight:800" : "");
                     return `<td class="cellc" style="${st}">${txt}${c != null ? `<small>${fmtP(c)}</small>` : ""}</td>`;
                   })
                   .join("");
@@ -675,7 +691,6 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
             shop={null}
             gmvPerHour={scoreAll?.gmvPerHour ?? null}
             gmvPerHourChange={kmChg("gmvPerHour")}
-            gmvPerHourBand={band}
             hoursChange={kmChg("hours")}
             bridge={shopeeTargetBridge(pm)}
             score={shopeeScoreRows(pm)}
@@ -711,8 +726,8 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
               <DemoPanel
                 title={tr(`${pm.km.all.rows.length} chỉ số, ${months.length === 3 ? "ba" : months.length} tháng ${winNote ? `cùng kỳ ${winNote}` : "cả tháng"}`, `${pm.km.all.rows.length} metrics, ${months.length} months, ${winNote ? `same period ${winNote}` : "full month"}`)}
                 sub={tr(
-                  `Màu xanh / đỏ khi thay đổi vượt ngưỡng dao động của tab đó (độ lệch Sales/giờ mỗi phiên ±${Math.round(pm.cv.cv * 100)}%, ${pm.cv.measured ? "đo trên phiên của brand" : "mức mặc định, chưa đủ phiên để đo riêng"}). ${METRIC.liveHours} và chỉ số quy mô đi theo giờ (${SM.gmv}, ${METRIC.orders}, ${METRIC.itemsSoldShopee}, ${METRIC.viewers}, ${METRIC.atc}) không đánh giá tốt hay xấu.`,
-                  `Green / red when a change exceeds that tab's normal range (Sales/hour deviation per session ±${Math.round(pm.cv.cv * 100)}%, ${pm.cv.measured ? "measured on the brand's sessions" : "default level, not enough sessions to measure"}). ${METRIC.liveHours} and volume metrics that follow hours (${SM.gmv}, ${METRIC.orders}, ${METRIC.itemsSoldShopee}, ${METRIC.viewers}, ${METRIC.atc}) are not rated good or bad.`
+                  `Màu xanh (tốt lên) / đỏ (xấu đi) khi đổi từ 10% trở lên so với tháng liền trước. ${METRIC.liveHours} và chỉ số quy mô đi theo giờ (${SM.gmv}, ${METRIC.orders}, ${METRIC.itemsSoldShopee}, ${METRIC.viewers}, ${METRIC.atc}) không đánh giá tốt hay xấu.`,
+                  `Green (better) / red (worse) when a metric changes 10% or more vs the month before. ${METRIC.liveHours} and volume metrics that follow hours (${SM.gmv}, ${METRIC.orders}, ${METRIC.itemsSoldShopee}, ${METRIC.viewers}, ${METRIC.atc}) are not rated good or bad.`
                 )}
               >
                 <div className="tabs" role="tablist">
@@ -752,12 +767,12 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
               </div>
               {bridgeHtml ? <Html html={bridgeHtml} /> : <p className="pns">{tr("Chưa đủ số của cả 2 kỳ (Giờ live, Viewers, ATC trong Live List) để tách nguyên nhân.", "Not enough data in both periods (live hours, Viewers, ATC in the Live List) to separate causes.")}</p>}
             </div>
-            {funnel && <FunnelPanel stages={funnel.stages} ratios={funnel.ratios} band={band} prevShort={monthLong(prevMonth)} />}
+            {funnel && <FunnelPanel stages={funnel.stages} ratios={funnel.ratios} prevShort={monthLong(prevMonth)} />}
           </div>
           {dayFactorHtml && (
             <div className="pn">
               <div className="pnh">{tr("Thay đổi các yếu tố theo loại ngày", "Factor changes by day type")}</div>
-              <div className="pns">{tr("% thay đổi tháng này so với tháng trước; mỗi loại ngày so với chính nó theo lịch Campaign. Viền sáng = vượt ngưỡng dao động.", "% change this month vs last month; each day type compared with itself per the Campaign calendar. Bright border = beyond normal range.")}</div>
+              <div className="pns">{tr("% thay đổi tháng này so với tháng trước; mỗi loại ngày so với chính nó theo lịch Campaign. Chỉ tô ô đổi từ 10% trở lên.", "% change this month vs last month; each day type compared with itself per the Campaign calendar. Only changes of 10% or more are coloured.")}</div>
               <DemoTable html={dayFactorHtml} />
               <div className="legend"><span>{tr(`Màu xanh: tăng · màu đỏ: giảm · màu xanh dương: ${METRIC.liveHours} (do lịch quyết định, không đánh giá tốt hay xấu)`, `Green: up · red: down · blue: ${METRIC.liveHours} (set by the schedule, not rated good or bad)`)}</span></div>
             </div>
@@ -767,12 +782,12 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
               <div className="pnh">{tr("Số đo từng loại ngày", "Measures by day type")}</div>
               <div className="pns">
                 {tr(
-                  `Mỗi ô tô màu theo mức thay đổi so với tháng trước (xanh tăng, đỏ giảm, đậm hơn khi thay đổi lớn); viền sáng = vượt ngưỡng dao động. Mỗi loại ngày là một nhóm cột ${months.map((m) => monthShortLabel(m.month)).join(", ")} cùng màu nhận diện.`,
-                  `Each cell is coloured by its change vs last month (green up, red down, darker for larger changes); bright border = beyond normal range. Each day type is a group of ${months.map((m) => monthShortLabel(m.month)).join(", ")} columns in its own colour.`
+                  `Ô đổi từ 10% trở lên so với tháng trước được tô (xanh tăng, đỏ giảm, đậm hơn khi thay đổi lớn). Mỗi loại ngày là một nhóm cột ${months.map((m) => monthShortLabel(m.month)).join(", ")} cùng màu nhận diện.`,
+                  `Cells that changed 10% or more vs last month are coloured (green up, red down, darker for larger changes). Each day type is a group of ${months.map((m) => monthShortLabel(m.month)).join(", ")} columns in its own colour.`
                 )}
               </div>
               <div className="tw"><table id="dayAbs" className="vt" dangerouslySetInnerHTML={{ __html: absHtml }} /></div>
-              <div className="legend"><span>{tr(`${monthShortLabel(months[0].month)} là mốc, không tô · viền sáng = vượt ngưỡng dao động · xanh dương = ${METRIC.liveHours}`, `${monthShortLabel(months[0].month)} is the baseline, not coloured · bright border = beyond normal range · blue = ${METRIC.liveHours}`)}</span></div>
+              <div className="legend"><span>{tr(`${monthShortLabel(months[0].month)} là mốc, không tô · chỉ tô khi đổi từ 10% · xanh dương = ${METRIC.liveHours}`, `${monthShortLabel(months[0].month)} is the baseline, not coloured · coloured only from 10% · blue = ${METRIC.liveHours}`)}</span></div>
             </div>
           )}
           {o ? (
@@ -928,12 +943,9 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
             nextMonth={nextMonth}
             curLabel={String(Number(month.slice(5)))}
             nextLabel={String(Number(nextMonth.slice(5)))}
-            rows={SHOPEE_BUCKETS.map((key) => {
-              const a = nextAlloc?.find((x) => x.key === key);
-              const c = pm.score.find((r) => r.key === key);
-              return { key, name: SHOPEE_TAB_LABEL[key], achieved: c?.gmvPerHour ?? null, sessionsCur: c?.sessions ?? 0, plan: a && a.slots > 0 ? { hours: a.hours, target: a.target, slots: a.slots } : undefined };
-            })}
-            total={{ key: "all", name: tr("Cả tháng", "Whole month"), achieved: scoreAll?.gmvPerHour ?? null, sessionsCur: scoreAll?.sessions ?? 0 }}
+            rows={nextRows}
+            total={nextTotal}
+            cancelled={nextCancelled}
             saved={decodeLiveTarget(report?.sectionNotes?.[LIVE_TARGET_MANUAL_KEY]?.text)}
             canEdit={canManage}
             onSave={async (m) => onReportChange(await saveMonthlyReportSectionNote(brandId, `${month}-01`, LIVE_TARGET_MANUAL_KEY, encodeLiveTarget(m), "Shopee"))}

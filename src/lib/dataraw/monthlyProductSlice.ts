@@ -267,6 +267,10 @@ export interface PromotionMonthSlice {
   excludedMultiMonth: number;
   /** Tổng "Discount amount" của các chương trình chạy trọn trong tháng (không chỉ top). */
   totalDiscount?: number;
+  /** Số chương trình có kỳ chạy nằm trong tháng (items chỉ giữ top) và số còn đang chạy lúc xuất file.
+   *  Bản chụp cũ không có. */
+  insideCount?: number;
+  openCount?: number;
   /** Top chương trình vắt qua nhiều tháng theo GMV LUỸ KẾ — không xếp hạng cùng bảng chính vì không cắt được theo tháng. */
   longTerm?: PromotionRow[];
 }
@@ -336,6 +340,8 @@ export async function fetchTopPromotionsMonthSlice(brandId: string, monthStart: 
     hasAnyBatch: true,
     excludedMultiMonth: parsed.length - insideMonth.length,
     totalDiscount: insideMonth.reduce((a, r) => a + (r.discount ?? 0), 0),
+    insideCount: insideMonth.length,
+    openCount: insideMonth.filter((r) => /ongoing|đang/i.test(r.status)).length,
     longTerm: parsed.filter((r) => !inside.has(r)).sort((a, b) => b.gmv - a.gmv).slice(0, 5)
   };
 }

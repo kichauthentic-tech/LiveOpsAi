@@ -73,6 +73,12 @@ export interface PlanRunRate {
 
 const hhmm = (t: string) => (t || "").slice(0, 5);
 
+/** Các ca kế hoạch đã huỷ (ca chờ hoặc ca thật bị huỷ) — cùng luật nối ca của planRunRate. */
+export function cancelledPlan(month: string, planSlots: BrandMonthPlanSlot[], shiftSlots: ShiftSlot[], brandSessions: LiveSession[], today: string): { ids: Set<string>; count: number; target: number } {
+  const off = planRunRate(month, planSlots, shiftSlots, brandSessions, today).slots.filter((s) => s.state === "cancelled");
+  return { ids: new Set(off.map((s) => s.planSlot.id)), count: off.length, target: off.reduce((a, s) => a + s.target, 0) };
+}
+
 export function planRunRate(
   month: string,
   planSlots: BrandMonthPlanSlot[],

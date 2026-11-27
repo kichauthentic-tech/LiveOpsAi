@@ -72,7 +72,7 @@ const REPORT_VIEWS: Record<ReportPlatform, { preload: () => void; pdf: boolean; 
   Shopee: {
     preload: () => void ShopeeMonthlyReportTabs.preload(),
     pdf: true,
-    Render: (p) => <ShopeeMonthlyReportTabs brandId={p.brandId} brandName={p.brandName} month={p.month} snapshot={p.snapshot as ShopeeReportSnapshot} report={p.report} canManage={p.canManage} onReportChange={p.onReportChange} liveSessions={p.liveSessions} scope={p.scope} showAll={p.forBrand} />
+    Render: (p) => <ShopeeMonthlyReportTabs brandId={p.brandId} brandName={p.brandName} month={p.month} snapshot={p.snapshot as ShopeeReportSnapshot} report={p.report} canManage={p.canManage} onReportChange={p.onReportChange} liveSessions={p.liveSessions} shiftSlots={p.shiftSlots} scope={p.scope} showAll={p.forBrand} />
   }
 };
 import { MonthPicker } from "../common/MonthPicker";

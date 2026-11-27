@@ -113,6 +113,17 @@ export function refundMonthStatus(input: RefundMonthInput): RefundMonthStatus {
   };
 }
 
+/** File tháng này "non" hơn hẳn file tháng trước: xuất khi đơn còn được hoàn trả VÀ sớm hơn ≥ 3 ngày (tính từ cuối tháng của
+ *  mỗi file). Cùng tuổi file (vd cả hai xuất giữa tháng) thì vẫn so được. Thiếu ngày xuất ⇒ null. */
+export function refundImmature(
+  cur: Pick<RefundMonthStatus, "month" | "exportedAt" | "settleFrom"> | null,
+  prev: Pick<RefundMonthStatus, "month" | "exportedAt"> | null
+): { exportedAt: string; settleFrom: string; prevExportedAt: string } | null {
+  if (!cur?.exportedAt || !prev?.exportedAt || cur.exportedAt >= cur.settleFrom) return null;
+  const age = (exported: string, month: string) => Math.round((Date.parse(exported) - Date.parse(monthEndIso(month))) / 86_400_000);
+  return age(prev.exportedAt, prev.month) - age(cur.exportedAt, cur.month) >= 3 ? { exportedAt: cur.exportedAt, settleFrom: cur.settleFrom, prevExportedAt: prev.exportedAt } : null;
+}
+
 /** Hai tháng chỉ so Refund rate được khi cùng mẫu file và mẫu đã biết. */
 export function compareRefundRates(
   cur: Pick<RefundMonthStatus, "rate" | "template">,

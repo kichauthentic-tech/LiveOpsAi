@@ -188,8 +188,14 @@ export interface PlanCampAllocation {
 // Giờ kế hoạch của ca — dùng chung pnl.sessionDurationHours (giờ bắt đầu = giờ kết thúc ra 0, không phải 24 giờ).
 const slotHours = sessionDurationHours;
 
-/** Cộng target + giờ của ca Kế Hoạch Tháng theo khung camp (khoảng camp của chính kế hoạch đó). */
-export function planCampAllocation(slots: Pick<BrandMonthPlanSlot, "date" | "startTime" | "endTime" | "targetGmv">[], overrides?: CampOverrides): PlanCampAllocation[] {
+/** Target tháng của một Kế Hoạch Tháng = Σ target các ca — cùng luật với target tháng đã chốt (lockedPlanTargets) mà Dashboard
+ *  và report của chính tháng đó chấm. Ô target ở đầu kế hoạch không tự đổi khi nâng target ca sau khi chốt, nên không dùng. */
+export const planSlotTargetSum = (slots: Pick<BrandMonthPlanSlot, "targetGmv">[]): number => slots.reduce((a, s) => a + (s.targetGmv || 0), 0);
+
+/** Cộng target + giờ của ca Kế Hoạch Tháng theo khung camp (khoảng camp của chính kế hoạch đó).
+ *  Ca đã huỷ (`cancelledIds`, xem cancelledPlanSlotIds) không tính vào giờ và số ca vì sẽ không live;
+ *  target vẫn cộng đủ như target tháng của report. */
+export function planCampAllocation(slots: (Pick<BrandMonthPlanSlot, "date" | "startTime" | "endTime" | "targetGmv"> & { id?: string })[], overrides?: CampOverrides, cancelledIds?: ReadonlySet<string>): PlanCampAllocation[] {
   const acc: Record<CampDayBucket, { target: number; hours: number; slots: number }> = {
     dday: { target: 0, hours: 0, slots: 0 },
     midmonth: { target: 0, hours: 0, slots: 0 },
@@ -199,6 +205,7 @@ export function planCampAllocation(slots: Pick<BrandMonthPlanSlot, "date" | "sta
   for (const s of slots) {
     const a = acc[resolveCampBucketType(s.date, overrides)];
     a.target += s.targetGmv || 0;
+    if (s.id && cancelledIds?.has(s.id)) continue;
     a.hours += slotHours(s.startTime, s.endTime);
     a.slots += 1;
   }
@@ -268,6 +275,16 @@ export function skuMoves(cur: SkuRankSlice | null, prev: SkuRankSlice | null, to
     };
   });
   return { rows, perDay, curDays, prevDays, prevLimit: prev?.hasAnyBatch ? prev.limit : null };
+}
+
+/** MỌI mã đổi hạng trong bảng (đúng các mũi tên người đọc thấy), mức đổi lớn xếp trước. `includeNew`: mã mới vào top
+ *  (không có hạng tháng trước) tính là tăng hạng — chỉ bật khi tháng trước có bảng xếp hạng. */
+export function skuRankMoves(rows: SkuMove[], includeNew: boolean): { risers: SkuMove[]; fallers: SkuMove[] } {
+  const gain = (r: SkuMove) => (r.prevRank ?? 99) - r.rank;
+  return {
+    risers: rows.filter((r) => (r.prevRank != null || includeNew) && gain(r) > 0).sort((a, b) => gain(b) - gain(a)),
+    fallers: rows.filter((r) => r.prevRank != null && gain(r) < 0).sort((a, b) => gain(a) - gain(b))
+  };
 }
 
 // ---------- toàn shop ----------

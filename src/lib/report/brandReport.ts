@@ -5,61 +5,21 @@ import { vnDateOf } from "../dataraw/vnDate";
 import { entryStatus, parseDayLabel, planBudget, planHours } from "../affiliate/plan";
 import { KEY_METRICS, keyMetricValue, type KeyMetricDef } from "./keyMetrics";
 import { liveStatsFromRows, pctChange, type CampCompareRow, type LiveStats } from "./monthlyReportInsights";
+import { isBigChange } from "./changeThreshold";
 
-// Report Tháng gửi brand — bố cục 10 trang (user duyệt demo CROCS T9, 24/10/2026). Phần MỚI so với 7 phần cũ: ngưỡng dao động
-// cho mọi % thay đổi theo loại ngày, bảng nhiệt loại ngày × yếu tố, Key Metrics 3 tháng × 5 bảng, bảng điểm target, affiliate
+// Report Tháng gửi brand — bố cục 10 trang (user duyệt demo CROCS T9, 24/10/2026). Phần MỚI so với 7 phần cũ: ngưỡng thay đổi
+// (changeThreshold.ts) cho mọi % theo loại ngày, bảng nhiệt loại ngày × yếu tố, Key Metrics 3 tháng × 5 bảng, bảng điểm target, affiliate
 // theo phiên creator + lịch creator tháng sau. Mọi hàm thuần, không đọc DB (test: tests/brandReport.test.ts).
 
-// ---------- ngưỡng dao động ----------
+// ---------- đọc thay đổi ----------
 
-/** Độ lệch GMV/giờ của MỘT ca so với mức kỳ vọng (cùng tháng × loại ngày × buổi) — đo trên 229 ca CROCS T6–T9 (26/09). */
-export const SESSION_CV = 0.26;
-
-/**
- * Ngưỡng dao động 95% (đơn vị %) khi so một chỉ số của hai kỳ có n₁ và n₂ ca: 1,96 × CV × √(1/n₁ + 1/n₂). Thay đổi nhỏ hơn
- * ngưỡng thì không kết luận được (vd đợt camp 4 ca ⇒ ±36%). Dùng chung một CV cho mọi chỉ số là gần đúng — với GMV/giờ là
- * chuẩn nhất, với tỷ lệ phễu là cận trên thận trọng. Kỳ không có ca ⇒ null.
- */
-export function noiseBand(n1: number, n2: number, cv: number = SESSION_CV): number | null {
-  if (n1 < 1 || n2 < 1) return null;
-  return 196 * cv * Math.sqrt(1 / n1 + 1 / n2);
-}
-
-/**
- * CV của GMV/giờ MỘT ca đo trên chính các ca của brand (nhóm tháng × loại ngày × buổi, CV gộp theo bậc tự do), thay cho hằng số
- * CROCS `SESSION_CV`. Cần ≥ 30 ca nằm trong nhóm ≥ 3 ca, không thì null ⇒ dùng mặc định. Kẹp 0,15–0,45 để một tháng lạ không làm ngưỡng
- * vô nghĩa. `bucketOf(date)` là loại ngày của đúng tháng chứa ngày đó.
- */
-export function estimateSessionCv(rows: { startTime: string; gmv: number; hours: number }[], bucketOf: (date: string) => string): number | null {
-  const groups = new Map<string, number[]>();
-  for (const r of rows) {
-    if (!(r.hours > 0) || !(r.gmv > 0)) continue;
-    const date = vnDateOf(r.startTime);
-    const h = (new Date(r.startTime).getUTCHours() + 7) % 24;
-    const key = `${date.slice(0, 7)}|${bucketOf(date)}|${h < 12 ? "s" : h < 17 ? "c" : "t"}`;
-    (groups.get(key) ?? groups.set(key, []).get(key)!).push(r.gmv / r.hours);
-  }
-  let used = 0, df = 0, ss = 0;
-  for (const xs of groups.values()) {
-    if (xs.length < 3) continue;
-    const mean = xs.reduce((a, b) => a + b, 0) / xs.length;
-    if (mean <= 0) continue;
-    const varr = xs.reduce((a, b) => a + (b - mean) ** 2, 0) / (xs.length - 1);
-    used += xs.length;
-    df += xs.length - 1;
-    ss += (xs.length - 1) * (varr / (mean * mean));
-  }
-  if (used < 30 || df <= 0) return null;
-  return Math.min(0.45, Math.max(0.15, Math.sqrt(ss / df)));
-}
-
-/** "up" / "down" = cải thiện / suy giảm vượt ngưỡng; "shift" = đổi vượt ngưỡng ở chỉ số trung tính; "noise" = trong ngưỡng. */
+/** "up" / "down" = cải thiện / suy giảm từ 10%; "shift" = đổi từ 10% ở chỉ số trung tính; "noise" = đổi dưới 10%. */
 export type ChangeTone = "up" | "down" | "shift" | "noise";
 
-export function changeTone(change: number | null, band: number | null, goodWhenUp: boolean | null): ChangeTone {
-  if (change == null || band == null || Math.abs(change) < band) return "noise";
+export function changeTone(change: number | null, goodWhenUp: boolean | null): ChangeTone {
+  if (!isBigChange(change)) return "noise";
   if (goodWhenUp == null) return "shift";
-  return change > 0 === goodWhenUp ? "up" : "down";
+  return change! > 0 === goodWhenUp ? "up" : "down";
 }
 
 // ---------- bảng nhiệt loại ngày × yếu tố ----------
@@ -71,28 +31,25 @@ export interface DayTypeFactorRow {
   key: CampDayBucket;
   sessionsPrev: number;
   sessionsCur: number;
-  band: number | null;
   change: Record<DayTypeFactor, number | null>;
-  /** GMV/giờ đổi vượt ngưỡng dao động. */
+  /** GMV/giờ đổi từ 10% trở lên. */
   significant: boolean;
 }
 
 /** Mỗi loại ngày so với CHÍNH loại ngày đó tháng trước (đầu vào = campCompare, cùng khung camp từng tháng). Daily đứng đầu. */
-export function dayTypeFactorRows(rows: CampCompareRow[], cv: number = SESSION_CV): DayTypeFactorRow[] {
+export function dayTypeFactorRows(rows: CampCompareRow[]): DayTypeFactorRow[] {
   const order: CampDayBucket[] = ["daily", "dday", "midmonth", "payday"];
   return order
     .map((k) => rows.find((r) => r.key === k))
     .filter((r): r is CampCompareRow => !!r && (r.cur.sessions > 0 || r.prev.sessions > 0))
     .map((r) => {
-      const band = noiseBand(r.prev.sessions, r.cur.sessions, cv);
       const change = Object.fromEntries(DAY_TYPE_FACTORS.map((f) => [f, pctChange(keyMetricValue(r.prev, f), keyMetricValue(r.cur, f))])) as Record<DayTypeFactor, number | null>;
       return {
         key: r.key,
         sessionsPrev: r.prev.sessions,
         sessionsCur: r.cur.sessions,
-        band,
         change,
-        significant: changeTone(change.gmvPerHour, band, true) !== "noise"
+        significant: isBigChange(change.gmvPerHour)
       };
     });
 }
@@ -144,17 +101,17 @@ export interface KeyMetricsCell {
   tones: ChangeTone[];
 }
 
-/** Một bảng Key Metrics: các tháng theo thứ tự cũ → mới. Giờ live không đánh giá tốt/xấu (do lịch quyết định). */
-export function keyMetricsTable(months: KeyMetricsMonth[], tab: KeyMetricsTab, cv: number = SESSION_CV): { bands: (number | null)[]; rows: KeyMetricsCell[]; downCount: number } {
-  const bands = months.map((m, i) => (i === 0 ? null : noiseBand(months[i - 1].stats[tab].sessions, m.stats[tab].sessions, cv)));
+/** Một bảng Key Metrics: các tháng theo thứ tự cũ → mới. Giờ live (do lịch quyết định) và chỉ số quy mô (đi theo Giờ live)
+ *  không đánh giá tốt/xấu — cùng cách đọc với report Shopee. */
+export function keyMetricsTable(months: KeyMetricsMonth[], tab: KeyMetricsTab): { rows: KeyMetricsCell[]; downCount: number } {
   const rows = KEY_METRICS.map((def) => {
     const values = months.map((m) => keyMetricValue(m.stats[tab], def.key));
     const changes = values.map((v, i) => (i === 0 ? null : pctChange(values[i - 1], v)));
-    const tones = changes.map((c, i) => (def.key === "hours" ? "noise" : changeTone(c, bands[i], def.goodWhenUp)));
+    const tones = changes.map((c) => (def.key === "hours" || def.volume ? "noise" : changeTone(c, def.goodWhenUp)));
     return { def, values, changes, tones };
   });
   const last = months.length - 1;
-  return { bands, rows, downCount: rows.filter((r) => r.tones[last] === "down").length };
+  return { rows, downCount: rows.filter((r) => r.tones[last] === "down").length };
 }
 
 // ---------- bảng điểm trang 1 ----------

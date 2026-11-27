@@ -1,7 +1,9 @@
+import { isBigChange } from "./changeThreshold";
 import { fmtVndShort } from "../format";
 import { METRIC } from "../metricGlossary";
 import { pctTxt, signed } from "./monthlyReportInsights";
 import { byLang, numLocale, t } from "../displayLang";
+import type { PlanGaps } from "./nextMonthPlan";
 
 // "Insight tổng hợp" cuối mỗi trang Report Tháng (2026-10-28, demo scratchpad/report_t10_v3.html): 4 khối cố định
 // Quan sát / Nguyên nhân / Tác động / Đề xuất, mỗi khối MỘT đoạn sinh từ câu mẫu có chỗ trống + quy tắc chọn.
@@ -65,9 +67,9 @@ export interface SummaryInsightInput {
   liveTarget: number | null;
   /** `gphPct` / `hoursPct` = GMV/giờ thực ÷ kế hoạch và Giờ live thực ÷ kế hoạch (%) — số của chính trang 1. */
   days: { label: string; target: number | null; actual: number; gphPct?: number | null; hoursPct?: number | null }[];
-  /** Chỉ dùng khi thiếu số kế hoạch theo loại ngày (Shopee): yếu tố GMV/giờ giảm mạnh nhất của loại ngày vượt ngưỡng.
+  /** Chỉ dùng khi thiếu số kế hoạch theo loại ngày (Shopee): yếu tố GMV/giờ giảm mạnh nhất của loại ngày đổi từ 10%.
    *  Có kế hoạch thì trang 1 KHÔNG phân tích yếu tố — việc đó thuộc trang Phân tích nguyên nhân (audit trùng lặp 30/10). */
-  worstFactor: { dayLabel: string; factorLabel: string; change: number; /** GMV/giờ của loại ngày (%) và ngưỡng dao động của nó. */ dayChange?: number; band?: number | null } | null;
+  worstFactor: { dayLabel: string; factorLabel: string; change: number; /** GMV/giờ của loại ngày (%). */ dayChange?: number } | null;
   shopKpi: { target: number; projected: number | null } | null;
   /** Tên chỉ số doanh số trong câu — report Shopee truyền "GMV" (Sales(Placed Order)). Mặc định LIVE GMV. */
   gmvLabel?: string;
@@ -95,9 +97,8 @@ export function summaryBlocks(i: SummaryInsightInput): InsightBlocks {
   // Nguyên nhân ở cấp trang 1 = thiếu do GMV/giờ hay do Giờ live so với kế hoạch; yếu tố phễu nằm ở trang Phân tích nguyên nhân.
   const planDays = withT.filter((d) => d.gphPct != null);
   const wf = i.worstFactor;
-  // "Vượt ngưỡng" là của GMV/giờ cả loại ngày; từng yếu tố có ngưỡng riêng — chỉ nói yếu tố vượt ngưỡng khi |đổi| ≥ ngưỡng.
-  const wfBand = wf?.band != null ? `±${Math.round(wf.band)}%` : "";
-  const wfSig = wf != null && wf.band != null && Math.abs(wf.change) >= wf.band;
+  // GMV/giờ cả loại ngày đã đổi từ 10%; một yếu tố chỉ được nêu là nguyên nhân khi chính nó cũng đổi từ 10%.
+  const wfSig = isBigChange(wf?.change);
   const dayPlan = (d: (typeof planDays)[number]) =>
     t(`${d.label} ${pctTxt(d.gphPct!, 0)} GMV/giờ kế hoạch${d.hoursPct != null ? `, ${pctTxt(d.hoursPct, 0)} Giờ live kế hoạch` : ""}`, `${d.label} ${pctTxt(d.gphPct!, 0)} of planned GMV/hour${d.hoursPct != null ? `, ${pctTxt(d.hoursPct, 0)} of planned live hours` : ""}`);
   // Hai vế cùng dưới 95% ⇒ nêu cả hai, vế có % thấp hơn là phần lớn hơn của phần thiếu (JOCKEY T10 Daily: 88% GMV/giờ, 64% Giờ live).
@@ -122,11 +123,11 @@ export function summaryBlocks(i: SummaryInsightInput): InsightBlocks {
     : wf
       ? wf.dayChange != null
         ? t(
-            `${wf.dayLabel}: GMV/giờ ${signed(wf.dayChange, 0)}${wfBand ? ` vượt ngưỡng dao động ${wfBand}` : ""}; yếu tố giảm nhiều nhất là ${wf.factorLabel} ${signed(wf.change, 0)}${wfSig ? ", cũng vượt ngưỡng" : ", chưa vượt ngưỡng riêng nên chưa quy được cho một yếu tố"}.`,
-            `${wf.dayLabel}: GMV/hour ${signed(wf.dayChange, 0)}${wfBand ? `, beyond the normal range of ${wfBand}` : ""}; the biggest decline is ${wf.factorLabel} ${signed(wf.change, 0)}${wfSig ? ", also beyond its range" : ", still within its own range, so it cannot be attributed to a single factor yet"}.`
+            `${wf.dayLabel}: GMV/giờ ${signed(wf.dayChange, 0)}; yếu tố giảm nhiều nhất là ${wf.factorLabel} ${signed(wf.change, 0)}${wfSig ? "" : ", dưới 10% nên chưa quy được cho một yếu tố"}.`,
+            `${wf.dayLabel}: GMV/hour ${signed(wf.dayChange, 0)}; the biggest decline is ${wf.factorLabel} ${signed(wf.change, 0)}${wfSig ? "" : ", under 10%, so it cannot be attributed to a single factor yet"}.`
           )
         : t(`${wf.dayLabel}: ${wf.factorLabel} ${signed(wf.change, 0)} so với cùng loại ngày tháng trước.`, `${wf.dayLabel}: ${wf.factorLabel} ${signed(wf.change, 0)} vs the same day type last month.`)
-      : t("Không loại ngày nào có GMV/giờ đổi vượt ngưỡng dao động so với tháng trước; chênh lệch so với Target chưa quy được cho một yếu tố cụ thể.", "No day type moved GMV/hour beyond its normal range vs last month; the gap to Target cannot be attributed to a specific factor yet.");
+      : t("Không loại ngày nào có GMV/giờ đổi từ 10% so với tháng trước; chênh lệch so với Target chưa quy được cho một yếu tố cụ thể.", "No day type moved GMV/hour by 10% or more vs last month; the gap to Target cannot be attributed to a specific factor yet.");
   const k = i.shopKpi;
   // Không có KPI toàn shop ⇒ bỏ khối (câu "chưa có KPI GMV trong Kế Hoạch Tháng" là việc của ops, không phải tác động).
   const impact =
@@ -150,7 +151,6 @@ export function summaryBlocks(i: SummaryInsightInput): InsightBlocks {
 export interface KeyMetricsInsightInput {
   /** Cả tháng, tháng này so với tháng trước, theo thứ tự phễu của bảng. */
   rows: { label: string; change: number | null; tone: "up" | "down" | "shift" | "noise"; /** Chỉ số kết quả (GMV, Orders…) — là hệ quả, không làm nguyên nhân. */ result?: boolean }[];
-  band: number | null;
   prevLabel: string;
   /** Chỉ số theo dõi chính đã chọn ở trang Phân tích nguyên nhân (yếu tố kéo GMV/giờ nhiều nhất) — hai trang đề xuất cùng một chỉ số. */
   mainMetric?: string | null;
@@ -161,12 +161,11 @@ export function keyMetricsBlocks(i: KeyMetricsInsightInput): InsightBlocks {
   if (rows.length === 0) return empty();
   const down = rows.filter((r) => r.tone === "down");
   const up = rows.filter((r) => r.tone === "up");
-  const band = i.band != null ? `±${pctTxt(i.band, 0)}` : "";
   const list = (xs: typeof rows) => xs.map((r) => `${r.label} ${signed(r.change!, 0)}`).join(", ");
   if (down.length === 0 && up.length === 0) {
     return {
-      observe: t(`Cả tháng so với ${i.prevLabel}: không chỉ số nào đổi vượt ngưỡng dao động${band ? ` ${band}` : ""}.`, `Full month vs ${i.prevLabel}: no metric moved beyond its normal range${band ? ` of ${band}` : ""}.`),
-      cause: t("Các thay đổi nằm trong biến động thông thường giữa các phiên, chưa kết luận được xu hướng.", "Changes are within normal session-to-session variation; no trend can be concluded yet."),
+      observe: t(`Cả tháng so với ${i.prevLabel}: không chỉ số nào tốt lên hay xấu đi từ 10%.`, `Full month vs ${i.prevLabel}: no metric improved or declined by 10% or more.`),
+      cause: t("Các chỉ số được đánh giá tốt hay xấu đều đổi dưới 10%, chưa kết luận được xu hướng.", "Every metric rated good or bad moved by less than 10%; no trend can be concluded yet."),
       impact: t("Chưa có chỉ số nào cần xử lý riêng.", "No metric needs specific action."),
       advise: t("Giữ chỉ số theo dõi hiện tại và đánh giá lại ở report tháng sau.", "Keep the current tracking metrics and review again in next month's report.")
     };
@@ -174,16 +173,16 @@ export function keyMetricsBlocks(i: KeyMetricsInsightInput): InsightBlocks {
   const first = down.find((r) => !r.result) ?? down[0];
   return {
     observe: join(
-      t(`Cả tháng so với ${i.prevLabel}${band ? ` (ngưỡng ${band})` : ""}:`, `Full month vs ${i.prevLabel}${band ? ` (range ${band})` : ""}:`),
-      down.length ? t(`suy giảm vượt ngưỡng: ${list(down)}.`, `declines beyond range: ${list(down)}.`) : t("không chỉ số nào suy giảm vượt ngưỡng.", "no metric declined beyond its range."),
-      up.length ? t(`Cải thiện vượt ngưỡng: ${list(up)}.`, `Improvements beyond range: ${list(up)}.`) : ""
+      t(`Cả tháng so với ${i.prevLabel}:`, `Full month vs ${i.prevLabel}:`),
+      down.length ? t(`suy giảm từ 10%: ${list(down)}.`, `declines of 10% or more: ${list(down)}.`) : t("không chỉ số nào suy giảm từ 10%.", "no metric declined by 10% or more."),
+      up.length ? t(`Cải thiện từ 10%: ${list(up)}.`, `Improvements of 10% or more: ${list(up)}.`) : ""
     ),
     cause: first
-      ? t(`${first.label} là chỉ số phễu suy giảm vượt ngưỡng đầu tiên (không tính chỉ số kết quả) (${signed(first.change!, 0)}); các chỉ số phía sau trong phễu thay đổi theo.`, `${first.label} is the first funnel metric to decline beyond its range (excluding result metrics) (${signed(first.change!, 0)}); metrics further down the funnel follow.`)
-      : t("Các chỉ số cải thiện không kèm chỉ số nào suy giảm vượt ngưỡng.", "Metrics improved with no metric declining beyond its range."),
+      ? t(`${first.label} là chỉ số phễu đầu tiên suy giảm từ 10% (không tính chỉ số kết quả) (${signed(first.change!, 0)}); các chỉ số phía sau trong phễu thay đổi theo.`, `${first.label} is the first funnel metric to decline by 10% or more (excluding result metrics) (${signed(first.change!, 0)}); metrics further down the funnel follow.`)
+      : t("Các chỉ số cải thiện không kèm chỉ số nào suy giảm từ 10%.", "Metrics improved with no metric declining by 10% or more."),
     impact: down.length
-      ? t(`${down.length} chỉ số suy giảm có ý nghĩa; chưa suy ra tác động nếu chưa đối chiếu GMV/giờ ở trang Phân tích nguyên nhân.`, `${down.length} metric(s) declined significantly; the impact is assessed against GMV/hour on the Root-cause page.`)
-      : t("Không có chỉ số suy giảm có ý nghĩa ở cấp cả tháng.", "No significant decline at full-month level."),
+      ? t(`${down.length} chỉ số suy giảm từ 10%; chưa suy ra tác động nếu chưa đối chiếu GMV/giờ ở trang Phân tích nguyên nhân.`, `${down.length} metric(s) declined by 10% or more; the impact is assessed against GMV/hour on the Root-cause page.`)
+      : t("Không có chỉ số nào suy giảm từ 10% ở cấp cả tháng.", "No decline of 10% or more at full-month level."),
     advise: i.mainMetric
       ? t(`Chỉ số theo dõi chính của tháng sau: ${i.mainMetric} (yếu tố kéo GMV/giờ nhiều nhất, trang Phân tích nguyên nhân)${first && first.label !== i.mainMetric ? `; ${first.label} theo dõi kèm, chỉ tiêu bằng mức ${i.prevLabel}` : ""}.`, `Main tracking metric for next month: ${i.mainMetric} (the factor moving GMV/hour the most, Root-cause page)${first && first.label !== i.mainMetric ? `; also track ${first.label} with a goal at the ${i.prevLabel} level` : ""}.`)
       : first
@@ -203,24 +202,40 @@ export interface NmvInsightInput {
   /** Tháng này / tháng trước chưa chốt (còn trong thời gian hoàn trả). Một chốt một chưa ⇒ không so chênh. */
   curProvisional?: boolean;
   prevProvisional?: boolean;
+  /** File của tháng này xuất sớm hơn hẳn (tính từ cuối tháng của nó) so với file tháng trước, khi đơn còn được hoàn trả
+   *  ⇒ tỷ lệ còn tăng được, không so chênh (refundImmature). */
+  curImmature?: { exportedAt: string; settleFrom: string; prevExportedAt: string } | null;
+  /** Hai tháng xuất bằng hai mẫu file Shop Analytics ⇒ cột Hoàn tiền không so được. */
+  templateMismatch?: boolean;
+  /** LIVE GMV và tỷ lệ đang dùng cho ô NMV — để nói NMV đổi bao nhiêu nếu áp tỷ lệ tháng trước. */
+  nmvBase?: { liveGmv: number; rate: number } | null;
 }
 
 export function nmvBlocks(i: NmvInsightInput): InsightBlocks {
   if (i.refundCur == null && i.nmvSource == null) return empty();
   const maturityMismatch = i.curProvisional != null && i.prevProvisional != null && i.curProvisional !== i.prevProvisional;
-  const delta = i.refundCur != null && i.refundPrev != null && !maturityMismatch ? i.refundCur - i.refundPrev : null;
+  const dm = (iso: string) => `${Number(iso.slice(8, 10))}/${iso.slice(5, 7)}`;
+  const why = i.templateMismatch
+    ? t("hai tháng xuất bằng mẫu file Shop Analytics khác nhau", "the two months use different Shop Analytics file templates")
+    : i.curImmature
+      ? t(`tính tới ngày xuất file, đơn tháng này có ít thời gian hoàn trả hơn đơn ${i.prevLabel} (tháng này xuất ${dm(i.curImmature.exportedAt)}, còn được hoàn trả tới ${dm(i.curImmature.settleFrom)}; ${i.prevLabel} xuất ${dm(i.curImmature.prevExportedAt)})`, `as of the export dates, this month's orders have had less time to be returned than ${i.prevLabel}'s (this month exported ${dm(i.curImmature.exportedAt)}, returns open until ${dm(i.curImmature.settleFrom)}; ${i.prevLabel} exported ${dm(i.curImmature.prevExportedAt)})`)
+      : maturityMismatch
+        ? i.curProvisional ? t(`tháng này chưa chốt, ${i.prevLabel} đã chốt`, `this month is not final yet while ${i.prevLabel} is final`) : t(`tháng này đã chốt, ${i.prevLabel} chưa chốt`, `this month is final while ${i.prevLabel} is not`)
+        : "";
+  const delta = i.refundCur != null && i.refundPrev != null && !why ? i.refundCur - i.refundPrev : null;
+  const atPrevRate = i.curImmature && !i.templateMismatch && i.nmvBase && i.refundPrev != null && i.refundPrev > i.nmvBase.rate ? i.nmvBase.liveGmv * (1 - i.refundPrev / 100) : null;
   return {
     observe:
       i.refundCur != null
         ? t(
-            `Refund rate kỳ này ${pctTxt(i.refundCur)}${i.refundPrev != null ? ` (${i.prevLabel}: ${pctTxt(i.refundPrev)}${maturityMismatch ? `, chưa so sánh được vì ${i.curProvisional ? "tháng này chưa chốt, " + i.prevLabel + " đã chốt" : "tháng này đã chốt, " + i.prevLabel + " chưa chốt"}` : ""}${delta != null ? `, ${sgn(delta)}${Math.abs(delta).toLocaleString(numLocale(), { maximumFractionDigits: 1 })} điểm` : ""})` : ""}.`,
-            `Refund rate this period ${pctTxt(i.refundCur)}${i.refundPrev != null ? ` (${i.prevLabel}: ${pctTxt(i.refundPrev)}${maturityMismatch ? `, not comparable because ${i.curProvisional ? "this month is not final yet while " + i.prevLabel + " is final" : "this month is final while " + i.prevLabel + " is not"}` : ""}${delta != null ? `, ${sgn(delta)}${Math.abs(delta).toLocaleString(numLocale(), { maximumFractionDigits: 1 })} pts` : ""})` : ""}.`
+            `Refund rate kỳ này ${pctTxt(i.refundCur)}${i.refundPrev != null ? ` (${i.prevLabel}: ${pctTxt(i.refundPrev)}${why ? `, chưa so sánh được vì ${why}` : ""}${delta != null ? `, ${sgn(delta)}${Math.abs(delta).toLocaleString(numLocale(), { maximumFractionDigits: 1 })} điểm` : ""})` : ""}.`,
+            `Refund rate this period ${pctTxt(i.refundCur)}${i.refundPrev != null ? ` (${i.prevLabel}: ${pctTxt(i.refundPrev)}${why ? `, not comparable because ${why}` : ""}${delta != null ? `, ${sgn(delta)}${Math.abs(delta).toLocaleString(numLocale(), { maximumFractionDigits: 1 })} pts` : ""})` : ""}.`
           )
         : t("Chưa có Refund rate của kỳ này.", "No refund rate for this period yet."),
     cause: t("Refund rate là số ghi nhận tại thời điểm xuất file; kỳ mới còn trong thời gian hoàn trả nên chưa đạt độ chín như kỳ cũ. File hiện chưa tách hoàn và hủy.", "The refund rate is as recorded when the file was exported; the latest period is still within the return window, so it is not as mature as earlier periods. The file does not yet separate returns from cancellations."),
     impact: t(
-      `NMV là số ước tính theo ${(i.nmvSource ?? "Refund rate thực của cả shop").replace(/^ước tính\s*[—-]\s*/, "").replace(/^theo\s+/, "")}${i.nmvSource && /mặc định/.test(i.nmvSource) && i.refundCur != null ? `, khác Refund rate thực ${pctTxt(i.refundCur)}` : ""} và có thể đổi khi hết thời gian hoàn trả${maturityMismatch ? "; hai tháng khác mức chín nên không so chênh trực tiếp" : ""}.`,
-      `NMV is an estimate based on ${(i.nmvSource ?? "the shop's actual refund rate").replace(/^estimated\s*[—-]\s*/i, "").replace(/^(based on|using)\s+/i, "")}${i.nmvSource && /default/i.test(i.nmvSource) && i.refundCur != null ? `, which differs from the actual refund rate of ${pctTxt(i.refundCur)}` : ""} and may change once the return window closes${maturityMismatch ? "; the two months are at different maturity, so the gap is not compared directly" : ""}.`
+      `NMV là số ước tính theo ${(i.nmvSource ?? "Refund rate thực của cả shop").replace(/^ước tính\s*[—-]\s*/, "").replace(/^theo\s+/, "")}${i.nmvSource && /mặc định/.test(i.nmvSource) && i.refundCur != null ? `, khác Refund rate thực ${pctTxt(i.refundCur)}` : ""} và có thể đổi khi hết thời gian hoàn trả${why ? "; không so chênh trực tiếp hai tháng" : ""}.${atPrevRate != null ? ` Nếu áp tỷ lệ ${pctTxt(i.refundPrev!)} của ${i.prevLabel}, NMV kỳ này khoảng ${money(atPrevRate)} thay vì ${money(i.nmvBase!.liveGmv * (1 - i.nmvBase!.rate / 100))}.` : ""}`,
+      `NMV is an estimate based on ${(i.nmvSource ?? "the shop's actual refund rate").replace(/^estimated\s*[—-]\s*/i, "").replace(/^(based on|using)\s+/i, "")}${i.nmvSource && /default/i.test(i.nmvSource) && i.refundCur != null ? `, which differs from the actual refund rate of ${pctTxt(i.refundCur)}` : ""} and may change once the return window closes${why ? "; the two months are not compared directly" : ""}.${atPrevRate != null ? ` At the ${i.prevLabel} rate of ${pctTxt(i.refundPrev!)}, this period's NMV would be about ${money(atPrevRate)} instead of ${money(i.nmvBase!.liveGmv * (1 - i.nmvBase!.rate / 100))}.` : ""}`
     ),
     advise: t("Ghi ngày xuất file của từng tháng, cập nhật Refund rate sau khi hết thời gian hoàn trả, và bổ sung file Order để tách hoàn và hủy.", "Record each month's file export date, update the refund rate after the return window closes, and add the Order file to separate returns from cancellations.")
   };
@@ -239,6 +254,8 @@ export interface ShopInsightPageInput {
   inhouseLive?: boolean;
   /** YFB chỉ nhận livestream (không Ads, không Affiliate) ⇒ các kênh còn lại là đối chứng sạch; việc của kênh khác là thông tin cho brand. */
   liveOnly?: boolean;
+  /** Loại ngày có GMV/giờ giảm từ 10% (trang Nguyên nhân). Nhóm đối chứng so TỔNG GMV nên thêm giờ live có thể che mất. */
+  weakDays?: { label: string; gphChange: number; hoursChange: number | null }[];
 }
 
 export function shopBlocks(i: ShopInsightPageInput): InsightBlocks {
@@ -265,6 +282,16 @@ export function shopBlocks(i: ShopInsightPageInput): InsightBlocks {
           `${i.control.map((c) => `${c.label}: YFB livestream ${signed(c.liveChg, 0)}, other channels ${signed(c.restChg, 0)}`).join("; ")} — livestream did not fall more than the other channels.${inhouseNote}`
         )
       : t("Chưa có nhóm đối chứng (cần file Shop Analytics của hai tháng).", "No control group yet (needs Shop Analytics files for both months).");
+  const weak = ops ? [] : i.weakDays ?? [];
+  const weakNote = weak.length
+    ? t(
+        `Tuy vậy GMV/giờ giảm từ 10% ở ${weak.map((d) => `${d.label} (${signed(d.gphChange, 0)}${d.hoursChange != null && Math.abs(d.hoursChange) >= 5 ? `, Giờ live ${signed(d.hoursChange, 0)}` : ""})`).join("; ")}, nên tổng GMV chưa phản ánh hiệu suất mỗi giờ.`,
+        `However GMV/hour fell by 10% or more on ${weak.map((d) => `${d.label} (${signed(d.gphChange, 0)}${d.hoursChange != null && Math.abs(d.hoursChange) >= 5 ? `, live hours ${signed(d.hoursChange, 0)}` : ""})`).join("; ")}, so total GMV does not show performance per hour.`
+      )
+    : "";
+  const weakAdvice = weak.length
+    ? t(`Rà soát GMV/giờ ở ${weak.map((d) => d.label).join(", ")} (trang Phân tích nguyên nhân) trước khi giữ nguyên số giờ live.`, `Review GMV/hour on ${weak.map((d) => d.label).join(", ")} (Root-cause page) before keeping the same live hours.`)
+    : "";
   const neg = byAbs.filter((c) => c.delta < 0)[0];
   const impact = neg ? t(`${neg.label} là kênh giảm lớn nhất (${moneySigned(neg.delta)}).`, `${neg.label} is the channel with the largest decline (${moneySigned(neg.delta)}).`) : t("Không kênh nào giảm so với kỳ trước.", "No channel declined vs the previous period.");
   // Kênh giảm lớn nhất (ngoài livestream) luôn có việc riêng, kể cả khi livestream cũng cần rà soát.
@@ -276,8 +303,8 @@ export function shopBlocks(i: ShopInsightPageInput): InsightBlocks {
       : t(`Trao đổi với brand kế hoạch ${neg.label} cho tháng sau và theo dõi tỷ trọng kênh.`, `Align with the brand on next month's ${neg.label} plan and track the channel mix.`);
   const advise = ops
     ? join(t(`Rà soát khung giờ, host và kịch bản livestream ở ${ops.label} trước khi kết luận.`, `Review time slots, hosts and livestream scripts for ${ops.label} before concluding.`), negAdvice)
-    : negAdvice || t("Duy trì lịch livestream hiện tại.", "Keep the current livestream schedule.");
-  return { observe, cause, impact, advise };
+    : join(weakAdvice, negAdvice) || t("Duy trì lịch livestream hiện tại.", "Keep the current livestream schedule.");
+  return { observe, cause: join(cause, weakNote), impact, advise };
 }
 
 // ---------- 5. Phân tích nguyên nhân ----------
@@ -286,30 +313,45 @@ export interface WhyInsightInput {
   gmvPerHourChange: number | null;
   /** 5 yếu tố của LIVE GMV: đóng góp tuyệt đối (đồng) và % đổi. */
   parts: { key?: string; label: string; value: number; change: number }[];
-  /** Loại ngày có GMV/giờ đổi vượt ngưỡng dao động. */
+  /** Loại ngày có GMV/giờ đổi từ 10% trở lên. */
   significantDays: { label: string; change: number }[];
-  band: number | null;
-  /** Ngưỡng dao động (%) của cả tháng cho từng yếu tố; null = chưa biết (coi mọi yếu tố là có ý nghĩa). */
-  factorBand?: number | null;
   mix: { mix: number; rate: number } | null;
   /** Tên chỉ số doanh số trong câu (mặc định LIVE GMV; Shopee "GMV"). */
   gmvLabel?: string;
 }
 
-/** Yếu tố hiệu suất dẫn dắt GMV/giờ: ưu tiên yếu tố vượt ngưỡng dao động; không có thì lấy yếu tố lớn nhất nhưng đánh dấu yếu (chưa kết luận). */
+/** Yếu tố hiệu suất dẫn dắt GMV/giờ: ưu tiên yếu tố đổi từ 10%; không có thì lấy yếu tố lớn nhất nhưng đánh dấu yếu (chưa kết luận). */
 function whyLead(i: WhyInsightInput) {
   const perf = i.parts.filter((p) => p.key !== "hours");
   const dirList = (i.gmvPerHourChange ?? 0) < 0 ? perf.filter((p) => p.value < 0).sort((a, b) => a.value - b.value) : perf.filter((p) => p.value > 0).sort((a, b) => b.value - a.value);
-  const sigOf = (x: { change: number }) => i.factorBand == null || Math.abs(x.change) >= i.factorBand;
-  const lead = dirList.find(sigOf) ?? dirList[0];
-  return { lead, leadWeak: lead != null && !sigOf(lead) };
+  const lead = dirList.find((x) => isBigChange(x.change)) ?? dirList[0];
+  return { lead, leadWeak: lead != null && !isBigChange(lead.change) };
 }
 
-/** Chỉ số theo dõi chính mà trang Phân tích nguyên nhân đề xuất (yếu tố kéo giảm vượt ngưỡng) — trang Key Metrics nói cùng chỉ số. */
+/** Chỉ số theo dõi chính mà trang Phân tích nguyên nhân đề xuất (yếu tố kéo giảm từ 10%) — trang Key Metrics nói cùng chỉ số. */
 export function whyMainMetric(i: WhyInsightInput): string | null {
   if (i.gmvPerHourChange == null || i.parts.length === 0) return null;
   const { lead, leadWeak } = whyLead(i);
   return lead && lead.value < 0 && !leadWeak ? lead.label : null;
+}
+
+/** Tiêu đề trang Phân tích nguyên nhân: loại ngày giảm từ 10% đứng trước (kể cả khi cả tháng tăng); một yếu tố
+ *  chỉ được gọi là "kéo giảm" khi chính nó giảm từ 10%. */
+export function whyHeadline(i: { metric: string; gmvPerHourChange: number | null; parts: { key?: string; label: string; value: number; change: number }[]; days: { label: string; change: number }[] }): string | null {
+  const g = i.gmvPerHourChange;
+  if (g == null) return null;
+  const head = `${i.metric} ${signed(g)}`;
+  const list = (xs: typeof i.days) => xs.map((d) => `${d.label} (${signed(d.change, 0)})`).join(", ");
+  const negDays = i.days.filter((d) => d.change < 0).sort((a, b) => a.change - b.change);
+  if (negDays.length) return t(`${head}: giảm từ 10% ở ${list(negDays)}`, `${head}: decline of 10% or more in ${list(negDays)}`);
+  const neg = i.parts.filter((p) => p.key !== "hours" && p.value < 0).sort((a, b) => a.value - b.value);
+  const sigFactor = neg.find((p) => isBigChange(p.change));
+  const factorTxt = (p: (typeof neg)[number]) => `${p.label} (${signed(p.change, 0)}, ${moneySigned(p.value)})`;
+  if (sigFactor) return t(`${head}: yếu tố hiệu suất kéo giảm nhiều nhất là ${factorTxt(sigFactor)}`, `${head}: the performance factor pulling it down most is ${factorTxt(sigFactor)}`);
+  if (g < 0 && neg[0]) return t(`${head}: ${factorTxt(neg[0])} đóng góp giảm nhiều nhất nhưng đổi dưới 10%`, `${head}: ${factorTxt(neg[0])} contributed most to the decline but moved by less than 10%`);
+  const posDays = i.days.filter((d) => d.change > 0);
+  if (posDays.length) return t(`${head}: tăng từ 10% ở ${list(posDays)}`, `${head}: increase of 10% or more in ${list(posDays)}`);
+  return t(`${head}: không loại ngày hay yếu tố hiệu suất nào giảm từ 10%`, `${head}: no day type or performance factor declined by 10% or more`);
 }
 
 export function whyBlocks(i: WhyInsightInput): InsightBlocks {
@@ -323,20 +365,21 @@ export function whyBlocks(i: WhyInsightInput): InsightBlocks {
   const pos = perf.filter((p) => p.value > 0).sort((a, b) => b.value - a.value);
   const fmt = (xs: typeof i.parts) => xs.slice(0, 3).map((p) => `${p.label} (${moneySigned(p.value)})`).join(", ");
   const sig = i.significantDays;
+  const sigList = sig.map((d) => `${d.label} (${signed(d.change, 0)})`).join(", ");
+  const negSig = sig.filter((d) => d.change < 0).sort((a, b) => a.change - b.change);
   const observe = join(
     t(`GMV/giờ ${signed(i.gmvPerHourChange, 0)} so với cùng kỳ tháng trước.`, `GMV/hour ${signed(i.gmvPerHourChange, 0)} vs the same period last month.`),
     hoursPart ? t(`Giờ live ${signed(hoursPart.change, 0)} (${moneySigned(hoursPart.value)} ${G}) do lịch quyết định, không tính vào nguyên nhân của GMV/giờ.`, `Live hours ${signed(hoursPart.change, 0)} (${moneySigned(hoursPart.value)} ${G}) are set by the schedule and are not counted as a cause of GMV/hour.`) : "",
     pos.length ? t(`Đóng góp tích cực: ${fmt(pos)}.`, `Positive contributions: ${fmt(pos)}.`) : "",
     neg.length ? t(`Đóng góp tiêu cực: ${fmt(neg)}.`, `Negative contributions: ${fmt(neg)}.`) : "",
     sig.length
-      ? t(`${sig.map((d) => `${d.label} (${signed(d.change, 0)})`).join(", ")} đổi GMV/giờ vượt ngưỡng dao động${i.band != null ? ` ±${pctTxt(i.band, 0)}` : ""}.`, `${sig.map((d) => `${d.label} (${signed(d.change, 0)})`).join(", ")} moved GMV/hour beyond the normal range${i.band != null ? ` of ±${pctTxt(i.band, 0)}` : ""}.`)
-      : t("Không loại ngày nào đổi GMV/giờ vượt ngưỡng dao động.", "No day type moved GMV/hour beyond its normal range.")
+      ? t(`Loại ngày có GMV/giờ đổi từ 10%: ${sigList}.`, `Day types with GMV/hour moving 10% or more: ${sigList}.`)
+      : t("Không loại ngày nào đổi GMV/giờ từ 10%.", "No day type moved GMV/hour by 10% or more.")
   );
   const { lead, leadWeak } = whyLead(i);
-  const fb = i.factorBand != null ? `±${pctTxt(i.factorBand, 0)}` : "";
   const cause = lead
     ? leadWeak
-      ? t(`${lead.label} đóng góp tuyệt đối lớn nhất vào mức ${i.gmvPerHourChange < 0 ? "giảm" : "tăng"} (${signed(lead.change, 0)}, ${moneySigned(lead.value)} ${G}) nhưng nằm trong ngưỡng dao động ${fb}; chưa yếu tố hiệu suất nào vượt ngưỡng nên chưa kết luận được nguyên nhân.`, `${lead.label} contributed the most to the ${i.gmvPerHourChange < 0 ? "decline" : "increase"} (${signed(lead.change, 0)}, ${moneySigned(lead.value)} ${G}) but is within its normal range of ${fb}; no performance factor is beyond its range, so no cause can be concluded yet.`)
+      ? t(`${lead.label} đóng góp tuyệt đối lớn nhất vào mức ${i.gmvPerHourChange < 0 ? "giảm" : "tăng"} (${signed(lead.change, 0)}, ${moneySigned(lead.value)} ${G}) nhưng đổi dưới 10%; chưa yếu tố hiệu suất nào cùng chiều đổi từ 10% nên chưa kết luận được nguyên nhân.`, `${lead.label} contributed the most to the ${i.gmvPerHourChange < 0 ? "decline" : "increase"} (${signed(lead.change, 0)}, ${moneySigned(lead.value)} ${G}) but moved by less than 10%; no performance factor in the same direction moved 10% or more, so no cause can be concluded yet.`)
       : t(`${lead.label} là yếu tố hiệu suất đóng góp tuyệt đối lớn nhất vào mức ${i.gmvPerHourChange < 0 ? "giảm" : "tăng"} (${signed(lead.change, 0)}, ${moneySigned(lead.value)} ${G}).`, `${lead.label} is the performance factor contributing the most to the ${i.gmvPerHourChange < 0 ? "decline" : "increase"} (${signed(lead.change, 0)}, ${moneySigned(lead.value)} ${G}).`)
     : sorted[0]
       ? t(`Yếu tố hiệu suất đóng góp lớn nhất: ${sorted[0].label} (${moneySigned(sorted[0].value)}).`, `Largest performance factor: ${sorted[0].label} (${moneySigned(sorted[0].value)}).`)
@@ -344,16 +387,21 @@ export function whyBlocks(i: WhyInsightInput): InsightBlocks {
   const m = i.mix;
   const impact = m
     ? Math.abs(m.mix) < Math.abs(m.rate) * 0.3
-      ? t(`Nguyên nhân nằm ở hiệu suất, không ở lịch live: cơ cấu giờ ${moneySigned(m.mix)}/giờ, hiệu suất trong từng loại ngày ${moneySigned(m.rate)}/giờ.`, `The cause is performance, not the live schedule: hour mix ${moneySigned(m.mix)}/hour, performance within day types ${moneySigned(m.rate)}/hour.`)
+      ? t(`Thay đổi nằm ở hiệu suất, không ở lịch live: cơ cấu giờ ${moneySigned(m.mix)}/giờ, hiệu suất trong từng loại ngày ${moneySigned(m.rate)}/giờ.`, `The change is in performance, not the live schedule: hour mix ${moneySigned(m.mix)}/hour, performance within day types ${moneySigned(m.rate)}/hour.`)
       : t(`Một phần do lịch: cơ cấu giờ giữa các loại ngày ${moneySigned(m.mix)}/giờ, hiệu suất trong từng loại ngày ${moneySigned(m.rate)}/giờ.`, `Partly due to the schedule: hour mix across day types ${moneySigned(m.mix)}/hour, performance within day types ${moneySigned(m.rate)}/hour.`)
     : lead
       ? t(`Đưa ${lead.label} về mức kỳ trước sẽ bổ sung khoảng ${money(Math.abs(lead.value))} ${G}.`, `Bringing ${lead.label} back to last period's level would add about ${money(Math.abs(lead.value))} ${G}.`)
       : t("Chưa tách được cơ cấu lịch và hiệu suất.", "Schedule mix and performance could not be separated yet.");
-  const advise = lead && lead.value < 0
+  const dayAdvice = negSig.length
+    ? t(`Rà soát ${negSig.map((d) => `${d.label} (GMV/giờ ${signed(d.change, 0)})`).join(", ")} trước vì giảm từ 10%: xem khung giờ, host và kịch bản của loại ngày này.`, `Review ${negSig.map((d) => `${d.label} (GMV/hour ${signed(d.change, 0)})`).join(", ")} first, as it fell 10% or more: check its time slots, hosts and scripts.`)
+    : "";
+  const focus = negSig[0] ?? sig[0];
+  const factorAdvice = lead && lead.value < 0
     ? leadWeak
-      ? t(`Theo dõi ${lead.label} theo từng loại ngày${sig[0] ? `, bắt đầu từ ${sig[0].label}` : ""}, chưa coi là nguyên nhân cho tới khi vượt ngưỡng dao động.`, `Track ${lead.label} by day type${sig[0] ? `, starting with ${sig[0].label}` : ""}; do not treat it as the cause until it moves beyond its normal range.`)
-      : t(`Đặt ${lead.label} làm chỉ số theo dõi chính của tháng sau, theo từng loại ngày${sig[0] ? `, bắt đầu từ ${sig[0].label}` : ""}.`, `Make ${lead.label} next month's main tracking metric, by day type${sig[0] ? `, starting with ${sig[0].label}` : ""}.`)
-    : t("Giữ kịch bản hiện tại; theo dõi GMV/giờ theo từng loại ngày.", "Keep the current scripts; track GMV/hour by day type.");
+      ? t(`Theo dõi ${lead.label} theo từng loại ngày${focus ? `, bắt đầu từ ${focus.label}` : ""}, chưa coi là nguyên nhân cho tới khi đổi từ 10%.`, `Track ${lead.label} by day type${focus ? `, starting with ${focus.label}` : ""}; do not treat it as the cause until it moves 10% or more.`)
+      : t(`Đặt ${lead.label} làm chỉ số theo dõi chính của tháng sau, theo từng loại ngày${focus ? `, bắt đầu từ ${focus.label}` : ""}.`, `Make ${lead.label} next month's main tracking metric, by day type${focus ? `, starting with ${focus.label}` : ""}.`)
+    : "";
+  const advise = join(dayAdvice, factorAdvice) || t("Giữ kịch bản hiện tại; theo dõi GMV/giờ theo từng loại ngày.", "Keep the current scripts; track GMV/hour by day type.");
   return { observe, cause, impact, advise };
 }
 
@@ -361,38 +409,70 @@ export function whyBlocks(i: WhyInsightInput): InsightBlocks {
 
 export interface ProductsInsightInput {
   topN: number;
+  /** MỌI mã đổi hạng trong bảng (skuRankMoves), mức đổi lớn xếp trước — câu đếm phải khớp mũi tên trong bảng. */
   risers: { name: string; from: number | null; to: number; ctor: number | null }[];
   fallers: { name: string; from: number | null; to: number; ctor: number | null; ctr: number | null }[];
+  /** Chưa có bảng SKU tháng trước ⇒ không đếm mã tăng/giảm. */
+  noPrev?: boolean;
   lead: { name: string; share: number } | null;
-  promo: { name: string; roi: number | null } | null;
+  /** Chương trình có Total GMV cao nhất; kèm tiền giảm giá và ROI các chương trình khác trong bảng để không khen mỗi GMV. */
+  promo: { name: string; roi: number | null; discount?: number | null; totalDiscount?: number | null; otherRois?: number[] } | null;
   /** Tên tỷ lệ chuyển đổi theo SKU (mặc định CTOR; Shopee: Orders/Product Clicks). */
   rateLabel?: string;
   /** Khối Tác động khi không có bảng khuyến mãi theo chương trình (Shopee: xu/voucher đã nhận). */
   promoNote?: string;
 }
 
+/** Đổi từ 2 hạng trở lên (hoặc mới vào top) mới đủ để đề xuất việc làm. */
+const bigMove = (x: { from: number | null; to: number }) => x.from == null || Math.abs(x.to - x.from) >= 2;
+
 export function productsBlocks(i: ProductsInsightInput): InsightBlocks {
   if (i.risers.length === 0 && i.fallers.length === 0 && !i.lead) return empty();
   const mv = (x: { name: string; from: number | null; to: number }) => `${x.name} (${x.from ?? t("ngoài top", "outside top")} → ${x.to})`;
+  const up = i.risers.slice(0, 3), down = i.fallers.slice(0, 3);
+  const listed = (xs: typeof up, total: number) => xs.map(mv).join("; ") + (total > xs.length ? t(` và ${total - xs.length} mã khác`, ` and ${total - xs.length} more`) : "");
   const observe = join(
-    t(`Top ${i.topN} SKU: ${i.risers.length} mã tăng hạng, ${i.fallers.length} mã giảm hạng.`, `Top ${i.topN} SKUs: ${i.risers.length} moved up, ${i.fallers.length} moved down.`),
-    i.risers.length ? t(`Tăng hạng: ${i.risers.map(mv).join("; ")}.`, `Moved up: ${i.risers.map(mv).join("; ")}.`) : "",
-    i.fallers.length ? t(`Giảm hạng: ${i.fallers.map(mv).join("; ")}.`, `Moved down: ${i.fallers.map(mv).join("; ")}.`) : "",
+    i.noPrev
+      ? t(`Top ${i.topN} SKU: chưa có bảng tháng trước để so hạng.`, `Top ${i.topN} SKUs: no previous month table to compare ranks.`)
+      : t(`Top ${i.topN} SKU: ${i.risers.length} mã tăng hạng, ${i.fallers.length} mã giảm hạng.`, `Top ${i.topN} SKUs: ${i.risers.length} moved up, ${i.fallers.length} moved down.`),
+    up.length ? t(`Tăng hạng: ${listed(up, i.risers.length)}.`, `Moved up: ${listed(up, i.risers.length)}.`) : "",
+    down.length ? t(`Giảm hạng: ${listed(down, i.fallers.length)}.`, `Moved down: ${listed(down, i.fallers.length)}.`) : "",
     i.lead ? t(`${i.lead.name} dẫn đầu, ${pctTxt(i.lead.share, 0)} GMV nhóm top.`, `${i.lead.name} leads with ${pctTxt(i.lead.share, 0)} of top-group GMV.`) : ""
   );
-  const rc = i.risers.filter((r) => r.ctor != null).map((r) => `${r.name} ${pctTxt(r.ctor!, 2)}`);
-  const fc = i.fallers.filter((r) => r.ctor != null).map((r) => `${r.name} ${pctTxt(r.ctor!, 2)}`);
+  // Liệt kê tới 5 mã mỗi nhóm và nói thẳng khi tỷ lệ chuyển đổi KHÔNG tách được hai nhóm — chỉ nêu 3 mã đầu từng giấu mất mã phản ví dụ.
+  const withRate = <T extends { ctor: number | null }>(xs: T[]) => xs.filter((r): r is T & { ctor: number } => r.ctor != null);
+  const rAll = withRate(i.risers), fAll = withRate(i.fallers);
+  const rates = (xs: { name: string; ctor: number }[]) => xs.slice(0, 5).map((r) => `${r.name} ${pctTxt(r.ctor, 2)}`).join(", ") + (xs.length > 5 ? t(` và ${xs.length - 5} mã khác`, ` and ${xs.length - 5} more`) : "");
   const R = i.rateLabel ?? "CTOR";
-  const cause = rc.length || fc.length
-    ? join(rc.length ? t(`${R} nhóm tăng hạng: ${rc.join(", ")}.`, `${R} of risers: ${rc.join(", ")}.`) : "", fc.length ? t(`${R} nhóm giảm hạng: ${fc.join(", ")}.`, `${R} of fallers: ${fc.join(", ")}.`) : "")
+  const lowUp = [...rAll].sort((a, b) => a.ctor - b.ctor)[0];
+  const highDown = [...fAll].sort((a, b) => b.ctor - a.ctor)[0];
+  const split = !lowUp || !highDown
+    ? ""
+    : lowUp.ctor > highDown.ctor
+      ? t(`Mọi mã tăng hạng có ${R} cao hơn mọi mã giảm hạng.`, `Every riser has a higher ${R} than every faller.`)
+      : t(`${R} không tách được hai nhóm: ${lowUp.name} tăng hạng với ${pctTxt(lowUp.ctor, 2)}, không cao hơn ${highDown.name} (${pctTxt(highDown.ctor, 2)}) vốn giảm hạng.`, `${R} does not separate the two groups: ${lowUp.name} moved up at ${pctTxt(lowUp.ctor, 2)}, no higher than ${highDown.name} (${pctTxt(highDown.ctor, 2)}), which moved down.`);
+  const cause = rAll.length || fAll.length
+    ? join(rAll.length ? t(`${R} nhóm tăng hạng: ${rates(rAll)}.`, `${R} of risers: ${rates(rAll)}.`) : "", fAll.length ? t(`${R} nhóm giảm hạng: ${rates(fAll)}.`, `${R} of fallers: ${rates(fAll)}.`) : "", split)
     : t(`Chưa có ${R} theo SKU để giải thích thay đổi hạng.`, `No ${R} by SKU yet to explain rank changes.`);
-  const impact = i.promoNote != null ? i.promoNote : i.promo
-    ? t(`Chương trình khuyến mãi mang LIVE GMV cao nhất: ${i.promo.name}`, `Promotion with the highest LIVE GMV: ${i.promo.name}`) + `${i.promo.roi != null ? `, ROI ${i.promo.roi.toLocaleString(numLocale(), { maximumFractionDigits: 2 })}` : ""}.`
+  const dec2 = (v: number) => v.toLocaleString(numLocale(), { maximumFractionDigits: 2 });
+  const p = i.promo;
+  const others = (p?.otherRois ?? []).filter((x) => x > 0);
+  const lowestRoi = !!p && p.roi != null && p.roi > 0 && others.length > 0 && p.roi < Math.min(...others);
+  const discShare = p?.discount != null && p.discount > 0 && p.totalDiscount != null && p.totalDiscount > 0 ? (p.discount / p.totalDiscount) * 100 : null;
+  const impact = i.promoNote != null ? i.promoNote : p
+    ? join(
+        t(`Trong các chương trình khuyến mãi có kỳ chạy nằm trong tháng, Total GMV cao nhất thuộc về: ${p.name}`, `Among promotions whose period falls in the month, the highest Total GMV belongs to: ${p.name}`) + `${p.roi != null && p.roi > 0 ? `, ROI ${dec2(p.roi)}` : ""}.`,
+        discShare != null ? t(`Chương trình này dùng ${money(p.discount!)} tiền giảm giá, ${pctTxt(discShare, 0)} của ${money(p.totalDiscount!)} cả tháng.`, `It used ${money(p.discount!)} in discounts, ${pctTxt(discShare, 0)} of the month's ${money(p.totalDiscount!)}.`) : "",
+        lowestRoi ? t(`ROI này thấp nhất trong các chương trình có tiền giảm giá ở bảng (còn lại ${dec2(Math.min(...others))}–${dec2(Math.max(...others))}).`, `This is the lowest ROI among the discounting programmes in the table (the rest ${dec2(Math.min(...others))}–${dec2(Math.max(...others))}).`) : ""
+      )
     : t("Chưa có số liệu chương trình khuyến mãi của tháng.", "No promotion data for the month yet.");
+  const rise = i.risers.find(bigMove);
+  const drops = i.fallers.filter(bigMove).slice(0, 3);
   const advise = join(
-    i.risers[0] ? t(`Tăng thời lượng giới thiệu ${i.risers[0].name} trên live.`, `Give ${i.risers[0].name} more airtime on live.`) : "",
-    i.fallers[0] ? t(`Kiểm tra tồn kho, giá và kịch bản chuyển đổi của ${i.fallers.map((f) => f.name).join(", ")}.`, `Check stock, pricing and the conversion script for ${i.fallers.map((f) => f.name).join(", ")}.`) : "",
-    !i.risers[0] && !i.fallers[0] ? t("Giữ cơ cấu SKU hiện tại; không SKU nào đổi hạng đáng kể.", "Keep the current SKU mix; no SKU changed rank significantly.") : ""
+    rise ? t(`Tăng thời lượng giới thiệu ${rise.name} trên live.`, `Give ${rise.name} more airtime on live.`) : "",
+    drops.length ? t(`Kiểm tra tồn kho, giá và kịch bản chuyển đổi của ${drops.map((f) => f.name).join(", ")}.`, `Check stock, pricing and the conversion script for ${drops.map((f) => f.name).join(", ")}.`) : "",
+    !rise && !drops.length ? t("Giữ cơ cấu SKU hiện tại; không SKU nào đổi hạng đáng kể.", "Keep the current SKU mix; no SKU changed rank significantly.") : "",
+    i.promoNote == null && lowestRoi && discShare != null && discShare >= 25 ? t(`Xem lại mức giảm của ${p!.name} trước khi lặp lại: ROI thấp nhất nhưng chiếm ${pctTxt(discShare, 0)} tiền giảm giá.`, `Review the discount level of ${p!.name} before repeating it: lowest ROI yet ${pctTxt(discShare, 0)} of the discount spend.`) : ""
   );
   return { observe, cause, impact, advise };
 }
@@ -404,7 +484,9 @@ export interface PeopleInsightInput {
   hosts: { name: string; verdict: "above" | "below" | "unclear"; ci: string; sessions: number; borderline: boolean }[];
   months: number;
   /** `index` = GMV thực ÷ GMV kỳ vọng theo loại ngày (1 = trung bình); có thì xếp khung theo chỉ số này để khử hiệu ứng loại ngày. */
-  slots: { label: string; gmvPerHour: number; n: number; index?: number; /** GMV/giờ đổi so với tháng trước (%) + ngưỡng dao động — số của ô/bảng khung giờ trên trang. */ change?: number | null; band?: number | null }[];
+  slots: { label: string; gmvPerHour: number; n: number; index?: number; /** GMV/giờ đổi so với tháng trước (%) — số của ô/bảng khung giờ trên trang. */ change?: number | null }[];
+  /** GMV/giờ cả tháng đổi so với tháng trước (%) — chỉ khi biết số này mới được nói một khung đổi theo xu hướng chung. */
+  monthChange?: number | null;
   minSessions?: number;
 }
 
@@ -429,19 +511,21 @@ export function peopleBlocks(i: PeopleInsightInput): InsightBlocks {
     below.length ? t(`Thấp hơn: ${below.map(txt).join("; ")}.`, `Below: ${below.map(txt).join("; ")}.`) : "",
     unclear > 0 ? t(`${unclear} host chưa khác biệt rõ so với trung bình.`, `${unclear} host(s) not clearly different from the average.`) : ""
   );
-  // Ô và bảng khung giờ so với tháng trước; Insight xếp theo chỉ số khử loại ngày. Khung đổi vượt ngưỡng mà Insight im lặng thì
+  // Ô và bảng khung giờ so với tháng trước; Insight xếp theo chỉ số khử loại ngày. Khung đổi từ 10% mà Insight im lặng thì
   // brand đọc thành mâu thuẫn (audit 30/10: VERA Tối −32% vượt ±18%, Insight "giữ khung giờ") ⇒ nói rõ đó là biến động chung hay riêng khung.
   const sig = slots
-    .filter((s) => s.change != null && s.band != null && s.band > 0 && Math.abs(s.change) >= s.band)
-    .sort((a, b) => Math.abs(b.change!) / b.band! - Math.abs(a.change!) / a.band!)[0];
+    .filter((s) => isBigChange(s.change))
+    .sort((a, b) => Math.abs(b.change!) - Math.abs(a.change!))[0];
+  const month = i.monthChange ?? null;
+  const monthWide = sig != null && month != null && Math.sign(month) === Math.sign(sig.change!) && !isBigChange(sig.change! - month);
   const sigNote = sig
-    ? adjusted && sig.index! >= 0.9
-      ? t(`Khung ${sig.label} ${signed(sig.change!, 0)} so với tháng trước (vượt ngưỡng ±${Math.round(sig.band!)}%) nhưng vẫn đạt ${Math.round(sig.index! * 100)}% mức trung bình cùng loại ngày tháng này: GMV/giờ ${sig.change! < 0 ? "giảm" : "tăng"} chung cả tháng, không riêng khung giờ này.`, `The ${sig.label} slot is ${signed(sig.change!, 0)} vs last month (beyond ±${Math.round(sig.band!)}%) but still at ${Math.round(sig.index! * 100)}% of this month's same-day-type average: GMV/hour ${sig.change! < 0 ? "fell" : "rose"} across the whole month, not just in this slot.`)
-      : t(`Khung ${sig.label} ${signed(sig.change!, 0)} so với tháng trước, vượt ngưỡng ±${Math.round(sig.band!)}%${adjusted ? ` và ở mức ${Math.round(sig.index! * 100)}% trung bình cùng loại ngày` : ""}.`, `The ${sig.label} slot is ${signed(sig.change!, 0)} vs last month, beyond ±${Math.round(sig.band!)}%${adjusted ? `, at ${Math.round(sig.index! * 100)}% of the same-day-type average` : ""}.`)
+    ? monthWide && adjusted && sig.index! >= 0.9
+      ? t(`Khung ${sig.label} ${signed(sig.change!, 0)} so với tháng trước nhưng vẫn đạt ${Math.round(sig.index! * 100)}% mức trung bình cùng loại ngày tháng này: GMV/giờ ${sig.change! < 0 ? "giảm" : "tăng"} chung cả tháng (${signed(month!, 0)}), không riêng khung giờ này.`, `The ${sig.label} slot is ${signed(sig.change!, 0)} vs last month but still at ${Math.round(sig.index! * 100)}% of this month's same-day-type average: GMV/hour ${sig.change! < 0 ? "fell" : "rose"} across the whole month (${signed(month!, 0)}), not just in this slot.`)
+      : t(`Khung ${sig.label} ${signed(sig.change!, 0)} so với tháng trước${month != null ? ` (cả tháng ${signed(month, 0)})` : ""}${adjusted ? `; khung này đạt ${Math.round(sig.index! * 100)}% mức trung bình cùng loại ngày` : ""}.`, `The ${sig.label} slot is ${signed(sig.change!, 0)} vs last month${month != null ? ` (whole month ${signed(month, 0)})` : ""}${adjusted ? `; it is at ${Math.round(sig.index! * 100)}% of the same-day-type average` : ""}.`)
     : "";
   const cause = join(
     bestS && worstS && bestS !== worstS
-      ? t(`Khung giờ bắt đầu phiên${adjusted ? " (đã so với trung bình cùng loại ngày)" : ""}: ${slotNote(bestS)}; ${slotNote(worstS)} (${worstS.n} phiên).`, `Session start time slots${adjusted ? " (vs the same-day-type average)" : ""}: ${slotNote(bestS)}; ${slotNote(worstS)} (${worstS.n} sessions).`)
+      ? t(`Khung giờ bắt đầu phiên${adjusted ? " (đã so với trung bình cùng loại ngày)" : ""}: cao nhất là ${slotNote(bestS)}, ${bestS.n} phiên; thấp nhất là ${slotNote(worstS)}, ${worstS.n} phiên.`, `Session start time slots${adjusted ? " (vs the same-day-type average)" : ""}: highest is ${slotNote(bestS)}, ${bestS.n} sessions; lowest is ${slotNote(worstS)}, ${worstS.n} sessions.`)
       : t("Chưa đủ phiên theo khung giờ để so sánh (cần từ 3 phiên mỗi khung).", "Not enough sessions per time slot to compare (needs at least 3 per slot)."),
     sigNote
   );
@@ -537,6 +621,12 @@ export interface NextInsightInput {
   hasLivePlan: boolean;
   hasCreatorPlan: boolean;
   withCreator?: boolean;
+  /** Nhãn tháng của report (mốc GMV/giờ đã đạt). */
+  curLabel?: string;
+  /** Phần kế hoạch đòi GMV/giờ cao hơn mức đã đạt từ 10% (planGaps). */
+  gaps?: PlanGaps | null;
+  /** Kế Hoạch Tháng đã có phiên nhưng Target bằng 0 — khác hẳn "chưa lập kế hoạch". `achieved` = GMV/giờ tháng report. */
+  unpriced?: { sessions: number; hours: number; achieved: number | null } | null;
 }
 
 export function nextBlocks(i: NextInsightInput): InsightBlocks {
@@ -545,6 +635,58 @@ export function nextBlocks(i: NextInsightInput): InsightBlocks {
   const missing = [!i.hasLivePlan && "Target Live", withCreator && !i.hasCreatorPlan && t("lịch Booking Creator (Target Creator)", "the Creator Booking schedule (Creator Target)")].filter(Boolean) as string[];
   const and = t(" và ", " and ");
   const have = withCreator ? t("Target Live và lịch Booking Creator", "Target Live and the Creator Booking schedule") : "Target Live";
+  const gaps = i.hasLivePlan ? i.gaps : null;
+  const lead = gaps?.total ?? gaps?.days[0] ?? null;
+  if (gaps && lead) {
+    const curVi = (i.curLabel ?? "tháng này").toLowerCase();
+    const curEn = i.curLabel ?? "this month";
+    const list = [
+      ...(gaps.total ? [t(`cả tháng ${signed(gaps.total.gapPct, 0)}`, `full month ${signed(gaps.total.gapPct, 0)}`)] : []),
+      ...gaps.days.slice(0, gaps.total ? 2 : 3).map((d) => `${d.name} ${signed(d.gapPct, 0)}`)
+    ].join(", ");
+    const hours = lead.hours.toLocaleString(numLocale(), { maximumFractionDigits: 1 });
+    const reach = (lead.achieved / lead.required) * 100;
+    const worst = gaps.days[0];
+    return {
+      observe: join(
+        t(`${i.nextLabel} cần GMV/giờ cao hơn mức đạt ${curVi} từ 10%: ${list}.`, `${i.nextLabel} needs GMV/hour 10% or more above the ${curEn} level: ${list}.`),
+        missing.length ? t(`Còn thiếu ${missing.join(and)}.`, `${missing.join(and)} still missing.`) : ""
+      ),
+      cause: t(
+        `${lead.name}: Target ${money(lead.target)} trên ${hours} giờ live, tức ${money(lead.required)}/giờ; ${curVi} đạt ${money(lead.achieved)}/giờ.`,
+        `${lead.name}: a ${money(lead.target)} Target over ${hours} live hours, or ${money(lead.required)}/hour; ${curEn} achieved ${money(lead.achieved)}/hour.`
+      ),
+      impact: t(
+        `Nếu GMV/giờ giữ như ${curVi}, ${hours} giờ kế hoạch đạt khoảng ${money(lead.achieved * lead.hours)}, bằng ${pctTxt(reach, 0)} Target ${money(lead.target)}.`,
+        `At the ${curEn} GMV/hour, the planned ${hours} hours would bring about ${money(lead.achieved * lead.hours)}, ${pctTxt(reach, 0)} of the ${money(lead.target)} Target.`
+      ),
+      advise: join(
+        t(
+          `Thống nhất cách bù phần chênh: thêm giờ live, đổi phân bổ giữa các loại ngày hoặc chỉnh Target${worst ? `; xem trước ${worst.name} (chênh lớn nhất)` : ""}.`,
+          `Agree how to close the gap: add live hours, rebalance day types or adjust the Target${worst ? `; start with ${worst.name} (largest gap)` : ""}.`
+        ),
+        missing.length ? t(`YFB gửi thêm ${missing.join(and)}.`, `YFB will also send ${missing.join(and)}.`) : ""
+      )
+    };
+  }
+  const sched = !i.hasLivePlan ? i.unpriced : null;
+  if (sched) {
+    const hours = sched.hours.toLocaleString(numLocale(), { maximumFractionDigits: 1 });
+    const curVi = (i.curLabel ?? "tháng này").toLowerCase();
+    const curEn = i.curLabel ?? "this month";
+    const creator = withCreator && !i.hasCreatorPlan ? t("lịch Booking Creator (Target Creator)", "the Creator Booking schedule (Creator Target)") : "";
+    return {
+      observe: join(
+        t(`${i.nextLabel} đã có lịch ${sched.sessions} phiên (${hours} giờ live) nhưng chưa đặt Target Live.`, `${i.nextLabel} has ${sched.sessions} sessions scheduled (${hours} live hours) but no Live Target yet.`),
+        creator ? t(`Còn thiếu ${creator}.`, `${creator} still missing.`) : ""
+      ),
+      cause: t(`Target của các phiên trong Kế Hoạch Tháng đang bằng 0.`, `The sessions in the month plan have a Target of 0.`),
+      impact: t("Chưa đặt Target thì chưa tính được GMV/giờ yêu cầu và chưa chấm được tiến độ.", "Without a Target, required GMV/hour cannot be calculated and progress cannot be tracked."),
+      advise: sched.achieved != null && sched.achieved > 0
+        ? t(`YFB đặt Target Live theo phiên; mốc tham chiếu: GMV/giờ ${curVi} ${money(sched.achieved)} × ${hours} giờ ≈ ${money(sched.achieved * sched.hours)}.`, `YFB will set Live Targets per session; reference point: ${curEn} GMV/hour ${money(sched.achieved)} × ${hours} hours ≈ ${money(sched.achieved * sched.hours)}.`)
+        : t("YFB đặt Target Live theo phiên trong Kế Hoạch Tháng.", "YFB will set Live Targets per session in the month plan.")
+    };
+  }
   const observe = missing.length ? t(`${i.nextLabel} chưa có ${missing.join(and)}.`, `${i.nextLabel} does not have ${missing.join(and)} yet.`) : t(`${i.nextLabel} đã có ${have}.`, `${i.nextLabel} has ${have}.`);
   return {
     observe,

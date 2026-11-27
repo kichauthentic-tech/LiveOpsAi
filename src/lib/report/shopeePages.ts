@@ -3,12 +3,12 @@ import type { LiveSession } from "../../types";
 import { fmtVndShort } from "../format";
 import { METRIC } from "../metricGlossary";
 import { vnDateOf } from "../dataraw/vnDate";
-import { estimateSessionCv, noiseBand, SESSION_CV } from "./brandReport";
+import { isBigChange } from "./changeThreshold";
 import { logShareBreakdown, type DriverBreakdown } from "./monthlyReportInsights";
-import { keyMetricsBlocks, nextBlocks, peopleBlocks, productsBlocks, summaryBlocks, whyBlocks, type InsightBlocks } from "./pageInsights";
+import { keyMetricsBlocks, nextBlocks, peopleBlocks, productsBlocks, summaryBlocks, whyBlocks, whyHeadline, type InsightBlocks } from "./pageInsights";
 import { keyMetricsHeadline, observeHeadline, summaryHeadline } from "./pageHeadlines";
 import { bridgePoints, targetBridge, type BridgePoint, type PlanHourRow } from "./reportVisuals";
-import { skuMoves, type SkuMoves } from "./monthlyReportInsights";
+import { skuMoves, skuRankMoves, type SkuMoves } from "./monthlyReportInsights";
 import type { ScoreRow } from "./brandReport";
 import type { SkuRankSlice } from "../dataraw/monthlyProductSlice";
 import type { SessionSpread } from "./rhythm";
@@ -16,7 +16,8 @@ import type { CampDayBucket } from "../campaignDays";
 import { hasShopeeAds } from "../dataraw/shopeeAds";
 import { shopeeAdsHeadline, shopeeAdsSuiteBlocks } from "./shopeeAdsInsight";
 import { monthDays, type ShopeeReportSnapshot, type ShopeeStreamRow } from "./shopeeSnapshot";
-import { byLang, numLocale, monthShort, t } from "../displayLang";
+import { byLang, numLocale, monthLong, monthShort, t } from "../displayLang";
+import type { PlanGaps } from "./nextMonthPlan";
 
 // Report Tháng SHOPEE theo khung trang của report TikTok (29/10/2026, làm lại tối 29/10 cho trùng TikTok): Tổng quan & KPI → Key Metrics
 // → Đơn huỷ → Nguyên nhân → Sản phẩm & khuyến mãi → Host & khung giờ → Quảng cáo (theo phạm vi dịch vụ) → Tháng sau. Trang dùng
@@ -26,7 +27,7 @@ import { byLang, numLocale, monthShort, t } from "../displayLang";
 // Khác TikTok (luật đa sàn, WORKSPACE §5.6): không mượn chỉ số TikTok. Live List của Shopee theo phiên chỉ có Viewers, Engaged
 // Viewers, Comments, ATC, Avg. Viewing Duration, Orders, Items Sold, Sales ⇒ phép tách GMV là
 // Giờ live × Viewers/giờ × ATC/Viewer × GMV/ATC (không có LIVE impressions / CTR / CTOR theo phiên như TikTok).
-// Cùng TikTok: so cùng kỳ (tháng còn dở thì mọi tháng cắt cùng số ngày), ngưỡng dao động 1,96 × CV × √(1/n₁ + 1/n₂) với CV đo trên
+// Cùng TikTok: so cùng kỳ (tháng còn dở thì mọi tháng cắt cùng số ngày), thay đổi từ 10% mới tô (changeThreshold.ts), đo trên
 // phiên của chính brand, loại ngày theo khung camp của từng tháng, Insight 4 khối Quan sát / Nguyên nhân / Tác động / Đề xuất.
 
 export type ShopeeBucket = "daily" | "dday" | "midmonth" | "payday";
@@ -168,50 +169,36 @@ export function fmtShopeeKm(kind: Kind, v: number | null | undefined): string {
   }
 }
 
-/** CV GMV/giờ một phiên đo trên Live List của brand (mọi tháng có trong bản chụp); thiếu phiên ⇒ mặc định. */
-export function shopeeSessionCv(model: ShopeeMonthsModel): { cv: number; measured: boolean } {
-  const rows = model.months.flatMap((m) => m.streams.map((x) => ({ startTime: `${x.date}T${x.time || "00:00"}:00+07:00`, gmv: x.gmv, hours: x.hours, m })));
-  const byDate = new Map(model.months.flatMap((m) => m.streams.map((x) => [x.date, m] as const)));
-  const cv = estimateSessionCv(rows, (d) => {
-    const m = byDate.get(d);
-    return m ? bucketOfDate(m, d) : "daily";
-  });
-  return cv != null ? { cv, measured: true } : { cv: SESSION_CV, measured: false };
-}
-
 export interface ShopeeKmRow {
   def: ShopeeKmDef;
   values: (number | null)[];
   /** % đổi so với tháng liền trước (phần tử 0 = null). */
   changes: (number | null)[];
-  /** "up"/"down" = tốt lên / xấu đi vượt ngưỡng; "noise" = trong ngưỡng; "neutral" = không đánh giá. */
+  /** "up"/"down" = tốt lên / xấu đi từ 10%; "noise" = đổi dưới 10%; "neutral" = không đánh giá. */
   tones: ("up" | "down" | "noise" | "neutral" | null)[];
 }
 
 export interface ShopeeKmTable {
   sessions: number[];
-  bands: (number | null)[];
   rows: ShopeeKmRow[];
 }
 
-export function shopeeKmTable(model: ShopeeMonthsModel, tab: ShopeeTab, cv: number): ShopeeKmTable {
+export function shopeeKmTable(model: ShopeeMonthsModel, tab: ShopeeTab): ShopeeKmTable {
   const counts = model.months.map((m) => shopeeCounts(streamsOf(m, tab, model.cutDay)));
   const sessions = counts.map((c) => c.sessions);
-  const bands = sessions.map((n, i) => (i === 0 ? null : noiseBand(sessions[i - 1], n, cv)));
   const rows = SHOPEE_KM.map((def) => {
     const values = counts.map((c) => def.value(c));
     const changes = values.map((v, i) => (i === 0 ? null : pctChange(values[i - 1], v)));
-    const tones = changes.map((c, i) => {
+    const tones = changes.map((c) => {
       if (c == null) return null;
       // Chỉ số quy mô (GMV, Orders, Viewers…) đi theo Giờ live ⇒ như Giờ live, không đánh giá tốt/xấu (VERA T10: GMV +21% chỉ vì giờ +26%).
       if (def.goodWhenUp == null || def.volume) return "neutral" as const;
-      const b = bands[i];
-      if (b == null || Math.abs(c) <= b) return "noise" as const;
+      if (!isBigChange(c)) return "noise" as const;
       return (c > 0) === def.goodWhenUp ? ("up" as const) : ("down" as const);
     });
     return { def, values, changes, tones };
   }).filter((r) => r.values.some((v) => v != null));
-  return { sessions, bands, rows };
+  return { sessions, rows };
 }
 
 // ---------- tách nguyên nhân ----------
@@ -252,12 +239,11 @@ export interface ShopeeDayFactorRow {
   sessionsPrev: number;
   sessionsCur: number;
   change: Partial<Record<ShopeeFactor | "gmvPerHour", number | null>>;
-  band: number | null;
   significant: boolean;
 }
 
 /** Thay đổi các yếu tố theo loại ngày, tháng report so với tháng trước (cùng kỳ, mỗi tháng theo khung camp của nó). */
-export function shopeeDayFactorRows(model: ShopeeMonthsModel, cv: number): ShopeeDayFactorRow[] {
+export function shopeeDayFactorRows(model: ShopeeMonthsModel): ShopeeDayFactorRow[] {
   const n = model.months.length;
   if (n < 2) return [];
   const [pm, cm] = [model.months[n - 2], model.months[n - 1]];
@@ -268,7 +254,6 @@ export function shopeeDayFactorRows(model: ShopeeMonthsModel, cv: number): Shope
     const ra = (c: ShopeeCounts) => (c.rich.sessions === c.sessions && c.rich.atc > 0 ? c : null);
     const ca = ra(a), cb = ra(b);
     const gph = pctChange(ratio(a.gmv, a.hours), ratio(b.gmv, b.hours));
-    const band = noiseBand(a.sessions, b.sessions, cv);
     return [{
       key: k,
       sessionsPrev: a.sessions,
@@ -280,8 +265,7 @@ export function shopeeDayFactorRows(model: ShopeeMonthsModel, cv: number): Shope
         gmvPerAtc: ca && cb ? pctChange(ca.gmv / ca.rich.atc, cb.gmv / cb.rich.atc) : null,
         gmvPerHour: gph
       },
-      band,
-      significant: gph != null && band != null && Math.abs(gph) > band
+      significant: isBigChange(gph)
     }];
   });
 }
@@ -535,7 +519,6 @@ export function shopeeTopSessions(s: ShopeeReportSnapshot, n = 10): ShopeeTopSes
 // ---------- mô hình trang ----------
 
 const money = (v: number) => fmtVndShort(v);
-const signed = (v: number, d = 0) => `${v >= 0 ? "+" : "−"}${Math.abs(v).toLocaleString(numLocale(), { maximumFractionDigits: d })}%`;
 const pctTxt = (v: number, d = 0) => `${v.toLocaleString(numLocale(), { maximumFractionDigits: d })}%`;
 const none = () => t("Chưa đủ số liệu của trang này để nêu nhận định.", "Not enough data on this page to draw conclusions yet.");
 export const SHOPEE_EMPTY_BLOCKS: InsightBlocks = byLang(() => ({ observe: none(), cause: "—", impact: "—", advise: "—" }));
@@ -549,7 +532,6 @@ const prevMonthOf = (m: string) => {
 
 export interface ShopeePageModel {
   model: ShopeeMonthsModel;
-  cv: { cv: number; measured: boolean };
   score: ShopeeScoreRow[];
   km: Record<ShopeeTab, ShopeeKmTable>;
   drivers: DriverBreakdown<ShopeeFactor> | null;
@@ -561,18 +543,16 @@ export interface ShopeePageModel {
 
 export function shopeePageModel(s: ShopeeReportSnapshot): ShopeePageModel {
   const model = shopeeMonths(s);
-  const cv = shopeeSessionCv(model);
-  const km = Object.fromEntries(SHOPEE_TABS.map((t) => [t, shopeeKmTable(model, t, cv.cv)])) as Record<ShopeeTab, ShopeeKmTable>;
+  const km = Object.fromEntries(SHOPEE_TABS.map((t) => [t, shopeeKmTable(model, t)])) as Record<ShopeeTab, ShopeeKmTable>;
   const n = model.months.length;
   const win = (m: string) => (model.cutDay != null ? `1–${model.cutDay}/${m.slice(5)}` : monthShortLabel(m));
   const drivers = n >= 2 ? shopeeDrivers(shopeeCounts(streamsOf(model.months[n - 2], "all", model.cutDay)), shopeeCounts(streamsOf(model.months[n - 1], "all", model.cutDay))) : null;
   return {
     model,
-    cv,
     score: shopeeScore(s, model),
     km,
     drivers,
-    dayFactors: shopeeDayFactorRows(model, cv.cv),
+    dayFactors: shopeeDayFactorRows(model),
     prevLabel: n >= 2 ? win(model.months[n - 2].month) : null,
     curLabel: win(s.month)
   };
@@ -593,6 +573,10 @@ export interface ShopeeInsightExtra {
   relMonths: number;
   nextLabel: string;
   hasNextPlan: boolean;
+  /** Phần kế hoạch tháng sau đòi Sales/giờ cao hơn mức đã đạt từ 10% (planGaps). */
+  nextGaps?: PlanGaps | null;
+  /** Kế hoạch tháng sau có phiên nhưng chưa đặt Target. */
+  nextUnpriced?: { sessions: number; hours: number; achieved: number | null } | null;
   /** YFB chạy Ads Shopee cho brand (phạm vi 0190) — tắt thì Insight không khuyên chỉnh Ads. */
   withAds?: boolean;
 }
@@ -608,7 +592,7 @@ function shopeeInsightsRaw(s: ShopeeReportSnapshot, p: ShopeePageModel, x: Shope
   const km = p.km.all;
   const last = p.model.months.length - 1;
   const sigDays = p.dayFactors.filter((r) => r.significant);
-  // Yếu tố giảm mạnh nhất trong loại ngày có GMV/giờ đổi vượt ngưỡng (cùng tiêu chí worstFactor của TikTok).
+  // Yếu tố giảm mạnh nhất trong loại ngày có GMV/giờ đổi từ 10% (cùng tiêu chí worstFactor của TikTok).
   const worstSig = [...sigDays].sort((a, b) => (a.change.gmvPerHour ?? 0) - (b.change.gmvPerHour ?? 0))[0];
   const factorKeys = (["viewersPerHour", "atcRate", "gmvPerAtc"] as const).filter((k) => worstSig?.change[k] != null).sort((a, b) => worstSig!.change[a]! - worstSig!.change[b]!);
   const cancel = shopeeCancelMonths(p);
@@ -623,7 +607,6 @@ function shopeeInsightsRaw(s: ShopeeReportSnapshot, p: ShopeePageModel, x: Shope
       : t("Chưa có Sales (Confirmed Order) để tính phần đơn huỷ.", "No Sales (Confirmed Order) yet to calculate cancellations.");
   const sku = shopeeSkuMoves(s, p.model.cutDay);
   const skuRows = sku?.rows ?? [];
-  const gain = (r: (typeof skuRows)[number]) => (r.prevRank == null ? 99 : r.prevRank) - r.rank;
   const top10 = skuRows.reduce((a, r) => a + r.gmv, 0);
   const slots = shopeeSlots(p);
   const shortP = (n: string) => shortName(n, 40);
@@ -638,14 +621,13 @@ function shopeeInsightsRaw(s: ShopeeReportSnapshot, p: ShopeePageModel, x: Shope
         const planGph = tgt != null && ph ? tgt / ph : null;
         return { label: SHOPEE_TAB_LABEL[r.key], target: tgt, actual: r.actual, gphPct: planGph && r.gmvPerHour != null ? (r.gmvPerHour / planGph) * 100 : null, hoursPct: ph ? (r.hours / ph) * 100 : null };
       }),
-      worstFactor: worstSig && factorKeys[0] ? { dayLabel: SHOPEE_TAB_LABEL[worstSig.key], factorLabel: SHOPEE_FACTOR_LABEL[factorKeys[0]], change: worstSig.change[factorKeys[0]]!, dayChange: worstSig.change.gmvPerHour ?? undefined, band: worstSig.band } : null,
+      worstFactor: worstSig && factorKeys[0] ? { dayLabel: SHOPEE_TAB_LABEL[worstSig.key], factorLabel: SHOPEE_FACTOR_LABEL[factorKeys[0]], change: worstSig.change[factorKeys[0]]!, dayChange: worstSig.change.gmvPerHour ?? undefined } : null,
       shopKpi: null,
       impact: cancelImpact,
       withAds: x.withAds
     }),
     keymetrics: keyMetricsBlocks({
       rows: km.rows.map((r) => ({ label: r.def.label, change: r.changes[last], tone: kmTone(r.tones[last]), result: r.def.group === "result" })),
-      band: km.bands[last] ?? null,
       prevLabel: p.model.months.length >= 2 ? monthShortLabel(p.model.months[last - 1].month) : t("tháng trước", "last month")
     }),
     nmv: shopeeCancelBlocks(cancel),
@@ -654,15 +636,13 @@ function shopeeInsightsRaw(s: ShopeeReportSnapshot, p: ShopeePageModel, x: Shope
       gmvPerHourChange: kmCell(km, "gmvPerHour") ? kmCell(km, "gmvPerHour")!.changes[last] : null,
       parts: p.drivers ? p.drivers.parts.map((d) => ({ key: d.key, label: SHOPEE_FACTOR_LABEL[d.key], value: d.value, change: d.change })) : [],
       significantDays: sigDays.map((r) => ({ label: SHOPEE_TAB_LABEL[r.key], change: r.change.gmvPerHour! })),
-      band: sigDays[0]?.band ?? null,
-      factorBand: km.bands[last] ?? null,
       mix: null
     }),
     products: s.products.count
       ? withoutPrevRank(s, skuRows, productsBlocks({
           topN: skuRows.length,
-          risers: skuRows.filter((r) => r.prevRank != null && gain(r) >= 2).sort((a, b) => gain(b) - gain(a)).slice(0, 3).map((r) => ({ name: shortP(r.name), from: r.prevRank, to: r.rank, ctor: r.ctor })),
-          fallers: skuRows.filter((r) => r.prevRank != null && r.rank - r.prevRank >= 2).sort((a, b) => b.rank - b.prevRank! - (a.rank - a.prevRank!)).slice(0, 3).map((r) => ({ name: shortP(r.name), from: r.prevRank, to: r.rank, ctor: r.ctor, ctr: null })),
+          risers: skuRankMoves(skuRows, false).risers.map((r) => ({ name: shortP(r.name), from: r.prevRank, to: r.rank, ctor: r.ctor })),
+          fallers: skuRankMoves(skuRows, false).fallers.map((r) => ({ name: shortP(r.name), from: r.prevRank, to: r.rank, ctor: r.ctor, ctr: null })),
           lead: skuRows[0] && top10 > 0 ? { name: shortP(skuRows[0].name), share: (skuRows[0].gmv / top10) * 100 } : null,
           promo: null,
           rateLabel: `${METRIC.orders}/Product Clicks`,
@@ -672,10 +652,11 @@ function shopeeInsightsRaw(s: ShopeeReportSnapshot, p: ShopeePageModel, x: Shope
     people: peopleBlocks({
       hosts: x.hosts,
       months: x.relMonths,
-      slots: slots.filter((r) => r.cur.gmvPerHour != null).map((r) => ({ label: r.label.toLowerCase(), gmvPerHour: r.cur.gmvPerHour!, n: r.cur.n, index: r.cur.index ?? undefined, change: r.prev.gmvPerHour && r.cur.gmvPerHour != null ? (r.cur.gmvPerHour / r.prev.gmvPerHour - 1) * 100 : null, band: noiseBand(r.prev.n, r.cur.n, p.cv.cv) }))
+      monthChange: kmCell(km, "gmvPerHour")?.changes[last] ?? null,
+      slots: slots.filter((r) => r.cur.gmvPerHour != null).map((r) => ({ label: r.label.toLowerCase(), gmvPerHour: r.cur.gmvPerHour!, n: r.cur.n, index: r.cur.index ?? undefined, change: r.prev.gmvPerHour && r.cur.gmvPerHour != null ? (r.cur.gmvPerHour / r.prev.gmvPerHour - 1) * 100 : null }))
     }),
     ads: shopeeAdsBlocks(s),
-    next: nextBlocks({ nextLabel: x.nextLabel, hasLivePlan: x.hasNextPlan, hasCreatorPlan: false, withCreator: false })
+    next: nextBlocks({ nextLabel: x.nextLabel, hasLivePlan: x.hasNextPlan, hasCreatorPlan: false, withCreator: false, curLabel: monthLong(s.month), gaps: x.nextGaps, unpriced: x.nextUnpriced })
   };
 }
 
@@ -725,10 +706,17 @@ function shopeeHeadlinesRaw(s: ShopeeReportSnapshot, p: ShopeePageModel, blocks:
   out.keymetrics = p.model.months.length < 2
     ? t("Chưa có tháng trước để so sánh chỉ số.", "No previous month to compare metrics with.")
     : keyMetricsHeadline({ rows: km.rows.map((r) => ({ label: r.def.label, change: r.changes[last], tone: kmTone(r.tones[last]), result: r.def.group === "result" })), prevLabel: monthShortLabel(p.model.months[last - 1].month) });
-  // Nguyên nhân: cùng câu của DemoWhyPage — bước nghẽn = yếu tố hiệu suất đóng góp âm lớn nhất.
+  // Nguyên nhân: cùng hàm tiêu đề với DemoWhyPage.
   const gph = kmCell(km, "gmvPerHour")?.changes[last] ?? null;
-  const worst = p.drivers ? [...p.drivers.parts].filter((d) => d.key !== "hours").sort((a, b) => a.value - b.value)[0] : null;
-  if (p.drivers && worst && worst.value < 0 && gph != null) out.why = `${SM.gmvPerHour} ${signed(gph)}: ${t("yếu tố hiệu suất kéo giảm nhiều nhất là", "the performance factor pulling it down most is")} ${SHOPEE_FACTOR_LABEL[worst.key]} (${signed(worst.change)}, ${worst.value >= 0 ? "+" : "−"}${money(Math.abs(worst.value))})`;
+  const why = p.drivers
+    ? whyHeadline({
+        metric: SM.gmvPerHour,
+        gmvPerHourChange: gph,
+        parts: p.drivers.parts.map((d) => ({ key: d.key, label: SHOPEE_FACTOR_LABEL[d.key], value: d.value, change: d.change })),
+        days: p.dayFactors.filter((r) => r.significant && r.change.gmvPerHour != null).map((r) => ({ label: SHOPEE_TAB_LABEL[r.key], change: r.change.gmvPerHour! }))
+      })
+    : null;
+  if (why) out.why = why;
   if (s.adsSuite && hasShopeeAds(s.adsSuite) && (s.adsSuite.shop || s.adsSuite.product)) out.ads = shopeeAdsHeadline(s.adsSuite) ?? out.ads;
   return out;
 }

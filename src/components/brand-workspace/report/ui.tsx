@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Cell } from "recharts";
 import { BarChart3, Lightbulb, ChevronDown, ChevronLeft, ChevronRight, Download, Loader2, Save } from "lucide-react";
+import { isBigChange } from "../../../lib/report/changeThreshold";
 import { metricHint } from "../../../lib/metricGlossary";
 import { DRIVER_LABEL, DriverBreakdown } from "../../../lib/report/monthlyReportInsights";
 import { insightToText, parseInsightText, SectionInsight } from "../../../lib/report/sectionInsights";
@@ -221,7 +222,7 @@ export const PageHead: React.FC<{ no: string; title: string; sub?: string; headl
             {(m.badge != null || m.change != null || m.note) && (
               <div className="note">
                 {m.badge != null && <span className={`pc ${m.badge >= 100 ? "up" : m.badge >= 90 ? "am" : "dn"}`}>{m.badgeLabel ?? `${fmtFixed(m.badge, 0)}% Target`}</span>}
-                {m.change != null && <span className={m.change >= 0 ? "up" : "dn"}>{m.change >= 0 ? "▲" : "▼"} {fmtFixed(Math.abs(m.change), 1)}% {t("cùng kỳ", "vs same period")} </span>}
+                {m.change != null && <span className={!isBigChange(m.change) ? "nt" : m.change >= 0 ? "up" : "dn"}>{m.change >= 0 ? "▲" : "▼"} {fmtFixed(Math.abs(m.change), 0)}% {t("cùng kỳ", "vs same period")} </span>}
                 {m.note}
               </div>
             )}

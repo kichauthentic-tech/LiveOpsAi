@@ -30,7 +30,6 @@ export interface HostSlotRow {
   prev: number | null;
   cur: number | null;
   change: number | null;
-  band: number | null;
   tone: "up" | "down" | "flat";
 }
 
@@ -91,9 +90,9 @@ export function hostKpis(d: HostPageData): PageMetric[] {
   }
   const t = teamAll(d.team);
   if (t.sessions > 0 && t.gmvPerHour != null) out.push({ label: `${tr("Trung bình team", "Team average")} · ${METRIC.gmvPerHour}`, value: fmtVndShort(t.gmvPerHour), note: `${t.sessions} ${tr("phiên", "sessions")} · ${dec(t.hours, 1)} ${tr("giờ", "h")}` });
-  const slot = [...d.slots].filter((s) => s.cur != null).sort((a, b) => Math.abs(b.change ?? 0) / (b.band || 100) - Math.abs(a.change ?? 0) / (a.band || 100))[0];
+  const slot = [...d.slots].filter((s) => s.cur != null).sort((a, b) => Math.abs(b.change ?? 0) - Math.abs(a.change ?? 0))[0];
   if (slot && slot.cur != null) {
-    out.push({ label: slot.label, value: fmtVndShort(slot.cur), note: slot.change != null ? `${pctSigned(slot.change)}${slot.band != null ? ` · ${tr("ngưỡng", "range")} ±${dec(slot.band, 0)}%` : ""}` : undefined });
+    out.push({ label: slot.label, value: fmtVndShort(slot.cur), note: slot.change != null ? pctSigned(slot.change) : undefined });
   }
   if (d.spread) out.push({ label: tr(`Trung vị ${METRIC.gmvPerHour} mỗi phiên`, `Median ${METRIC.gmvPerHour} per session`), value: fmtVndShort(d.spread.median), note: `${tr("nửa giữa", "middle half")}: ${fmtVndShort(d.spread.p25)}–${fmtVndShort(d.spread.p75)}` });
   return out;
@@ -132,27 +131,32 @@ function pairHtml(k: PairKey, hs: HostAll[], t: DayTypeMetrics, shortName: (n: s
   });
   const svg = scatter(pts, { x0, x1, kx: 7, y0, y1, ky: 4, xf: spec.xf, yf: spec.yf, xl: spec.xl, yl: spec.yl, vx: spec.vx ?? undefined, vy: spec.vy, h: 330, quad: [{ x: 56, y: 28, t: spec.quad[0] }, { x: 628, y: 292, t: spec.quad[1], a: "end" }] });
   // Câu nhận xét dưới biểu đồ: nêu host nổi nhất của đúng cặp đang xem, số lấy từ dữ liệu.
-  const top = (f: (h: HostAll) => number | null, dir: 1 | -1 = 1) => [...hs].filter((h) => f(h) != null).sort((a, b) => dir * (f(b)! - f(a)!))[0];
+  const top = (f: (h: HostAll) => number | null, dir: 1 | -1 = 1, from: HostAll[] = hs) => [...from].filter((h) => f(h) != null).sort((a, b) => dir * (f(b)! - f(a)!))[0];
   const nm = (h?: HostAll) => (h ? shortNameOf(shortName, h) : "—");
   let cap = "";
-  if (hs.length) {
+  // Câu nêu host "cao nhất / thấp nhất" chỉ xét host đủ phiên — một phiên đẹp từng đủ để được nêu tên.
+  const enough = hs.filter((h) => h.m.sessions >= MIN_RANK_SESSIONS && spec.x(h) != null && spec.y(h) != null);
+  const basisNote = tr(` Chỉ xét host từ ${MIN_RANK_SESSIONS} phiên, chưa chỉnh theo loại ngày và buổi.`, ` Only hosts with ${MIN_RANK_SESSIONS}+ sessions; not adjusted for day type or time of day.`);
+  if (hs.length && k !== "d" && !enough.length) {
+    cap = tr(`Chưa host nào đủ ${MIN_RANK_SESSIONS} phiên trong tháng để so.`, `No host has ${MIN_RANK_SESSIONS} sessions this month yet.`);
+  } else if (hs.length) {
     if (k === "a") {
-      const v = top((h) => h.m.viewsPerHour);
-      const c = top((h) => h.m.ctor);
+      const v = top((h) => h.m.viewsPerHour, 1, enough);
+      const c = top((h) => h.m.ctor, 1, enough);
       cap = tr(
         `${nm(v)} kéo nhiều người xem nhất (${num0(v.m.viewsPerHour!)} ${viewsLabel}) với ${METRIC.ctor} ${f2(v.m.ctor ?? 0)}, trung bình team ${f2(t.ctor ?? 0)}; ${nm(c)} có ${METRIC.ctor} cao nhất (${f2(c.m.ctor!)}).`,
         `${nm(v)} draws the most viewers (${num0(v.m.viewsPerHour!)} ${viewsLabel}) with ${METRIC.ctor} ${f2(v.m.ctor ?? 0)} vs a team average of ${f2(t.ctor ?? 0)}; ${nm(c)} has the highest ${METRIC.ctor} (${f2(c.m.ctor!)}).`
       );
     } else if (k === "b") {
-      const g = top((h) => h.m.gmvPerHour);
-      const v = top((h) => h.m.viewsPerHour, -1);
+      const g = top((h) => h.m.gmvPerHour, 1, enough);
+      const v = top((h) => h.m.viewsPerHour, -1, enough);
       cap = tr(
         `${nm(g)} có ${METRIC.gmvPerHour} cao nhất (${M1(g.m.gmvPerHour!)}); ${nm(v)} có ${viewsLabel} thấp nhất (${num0(v.m.viewsPerHour!)}), ${METRIC.gmvPerHour} ${M1(v.m.gmvPerHour ?? 0)}.`,
         `${nm(g)} has the highest ${METRIC.gmvPerHour} (${M1(g.m.gmvPerHour!)}); ${nm(v)} has the lowest ${viewsLabel} (${num0(v.m.viewsPerHour!)}), ${METRIC.gmvPerHour} ${M1(v.m.gmvPerHour ?? 0)}.`
       );
     } else if (k === "c") {
-      const l = top((h) => h.m.liveCtr);
-      const c = top((h) => h.m.ctor);
+      const l = top((h) => h.m.liveCtr, 1, enough);
+      const c = top((h) => h.m.ctor, 1, enough);
       cap = tr(`${nm(l)} có ${METRIC.liveCtr} cao nhất (${dec(l.m.liveCtr!, 1)}%); ${nm(c)} có ${METRIC.ctor} cao nhất (${f2(c.m.ctor!)}).`, `${nm(l)} has the highest ${METRIC.liveCtr} (${dec(l.m.liveCtr!, 1)}%); ${nm(c)} has the highest ${METRIC.ctor} (${f2(c.m.ctor!)}).`);
     } else {
       const h = top((x) => x.m.hours);
@@ -161,6 +165,7 @@ function pairHtml(k: PairKey, hs: HostAll[], t: DayTypeMetrics, shortName: (n: s
         `${nm(h)} has the most ${METRIC.liveHours} (${dec(h.m.hours, 1)}) with ${METRIC.gmvPerHour} ${M1(h.m.gmvPerHour ?? 0)}. Hosts with fewer than ${MIN_RANK_SESSIONS} sessions are too small a sample to conclude.`
       );
     }
+    if (k !== "d") cap += basisNote;
   }
   return { name: spec.name, title: spec.title, sub: spec.sub, svg, cap };
 }
@@ -276,7 +281,7 @@ export const HostPageBody: React.FC<{ data: HostPageData; children?: React.React
         {d.slots.some((s) => s.cur != null || s.prev != null) && (
           <div className="pn">
             <div className="pnh">{tr(`${METRIC.gmvPerHour} theo khung giờ bắt đầu phiên`, `${METRIC.gmvPerHour} by session start time`)}</div>
-            <div className="pns">{tr(`${d.prevPeriod} so với ${d.curPeriod}. Chỉ có ý nghĩa khi vượt ngưỡng dao động.`, `${d.prevPeriod} vs ${d.curPeriod}. Only meaningful beyond the normal range.`)}</div>
+            <div className="pns">{tr(`${d.prevPeriod} so với ${d.curPeriod}. Bảng khung giờ tô khi đổi từ 10%.`, `${d.prevPeriod} vs ${d.curPeriod}. The time-slot table colours changes of 10% or more.`)}</div>
             <div dangerouslySetInnerHTML={{ __html: slotChart }} />
             <div className="legend">
               <span><i style={{ background: "var(--blue)" }} />{d.prevPeriod}</span>
@@ -301,7 +306,7 @@ export const HostPageBody: React.FC<{ data: HostPageData; children?: React.React
             ))}
           </div>
           <div className="tw"><table dangerouslySetInnerHTML={{ __html: hostDayTableHtml(d, activeDay) }} /></div>
-          <div className="legend"><span>{tr("▲ ▼ = cao hơn / thấp hơn trung bình team có ý nghĩa trong loại ngày đó", "▲ ▼ = significantly above / below the team average for that day type")}</span></div>
+          <div className="legend"><span>{tr(`▲ ▼ = cao hơn / thấp hơn trung bình team từ ${DAY_TYPE_DIFF_THRESHOLD}% trở lên trong loại ngày đó (host từ ${MIN_SESSIONS_TO_COMPARE} phiên). Chưa loại trừ biến động ngẫu nhiên: ít phiên thì chỉ để tham khảo.`, `▲ ▼ = ${DAY_TYPE_DIFF_THRESHOLD}% or more above / below the team average for that day type (hosts with ${MIN_SESSIONS_TO_COMPARE}+ sessions). Random variation is not ruled out: treat small samples as indicative only.`)}</span></div>
         </div>
       )}
       <div className="stk">
@@ -319,14 +324,13 @@ export const HostPageBody: React.FC<{ data: HostPageData; children?: React.React
               <table
                 dangerouslySetInnerHTML={{
                   __html: tbl(
-                    [tr("Khung giờ", "Time slot"), tr("Phiên", "Sessions"), d.prevMonthLabel, d.curMonthLabel, "±", tr("Ngưỡng", "Range")],
+                    [tr("Khung giờ", "Time slot"), tr("Phiên", "Sessions"), d.prevMonthLabel, d.curMonthLabel, "±"],
                     d.slots.map((s) => [
                       esc(s.label),
                       `${s.prevN} → ${s.curN}`,
                       s.prev != null ? fmtVndShort(s.prev) : "—",
                       s.cur != null ? fmtVndShort(s.cur) : "—",
-                      s.change == null ? "—" : { t: pctSigned(s.change), c: s.tone === "down" ? "dn" : s.tone === "up" ? "up" : "nt" },
-                      s.band == null ? "—" : `±${dec(s.band, 0)}%`
+                      s.change == null ? "—" : { t: pctSigned(s.change), c: s.tone === "down" ? "dn" : s.tone === "up" ? "up" : "nt" }
                     ])
                   )
                 }}

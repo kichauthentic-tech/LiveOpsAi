@@ -1,5 +1,6 @@
+import { isBigChange } from "../../../lib/report/changeThreshold";
 import React, { useState } from "react";
-import { BLOCK_KEYS, BLOCK_LABEL, decodeEdits, encodeEdits, shownBlocks, type BlockKey, type InsightBlocks, type InsightEdits } from "../../../lib/report/pageInsights";
+import { BLOCK_KEYS, BLOCK_LABEL, decodeEdits, encodeEdits, shownBlocks, whyHeadline, type BlockKey, type InsightBlocks, type InsightEdits } from "../../../lib/report/pageInsights";
 import { errorMessage } from "../../../lib/errorMessage";
 import { DAY_TYPE, METRIC } from "../../../lib/metricGlossary";
 import type { ControlRow, ControlVerdict } from "../../../lib/report/deepAnalysis";
@@ -17,7 +18,7 @@ import { type AttributionByType, type AttributionMonth } from "../../../lib/repo
 import { numLocale, byLang, t } from "../../../lib/displayLang";
 
 const BLUE = "#7fb0e0";
-import { W, ch, columns, fmtM, fmtP, heat, hbars, pill, stack100, tbl, waterfall, type Cell } from "./demoCharts";
+import { W, columns, fmtM, fmtP, heat, hbars, pill, stack100, tbl, waterfall, type Cell } from "./demoCharts";
 import { featureOffText } from "../../../lib/featureOff";
 
 // Hai trang "Toàn shop & đóng góp của livestream YFB" và "Phân tích nguyên nhân" dựng theo demo Report Tháng đã chốt
@@ -105,7 +106,7 @@ export const DemoInsight: React.FC<{
     <>
       <div className="insbar">
         <span>{t("Insight tổng hợp", "Key insights")}</span>
-        <span className="st" aria-live="polite">{msg ?? (note && note.savedAt < computedAt && edited ? "Số liệu đã cập nhật sau lần sửa — đọc lại cho khớp" : "")}</span>
+        <span className="st" aria-live="polite">{msg ?? (canManage && note && note.savedAt < computedAt && edited ? "Số liệu đã cập nhật sau lần sửa — đọc lại cho khớp" : "")}</span>
         <span className="sp" />
         {canManage && (
           <>
@@ -191,6 +192,9 @@ const VERDICT: Record<ControlVerdict, [string, string]> = byLang(() => ({
   ops: [t("kém hơn các kênh còn lại", "worse than other channels"), "r"],
   market: [t("tương đương các kênh còn lại", "in line with other channels"), "m"]
 }));
+/** % đổi so kỳ trước: chỉ tô từ 10% (changeThreshold). */
+const chgColor = (v: number | null | undefined): "red" | "green" | undefined => (v == null || !isBigChange(v) ? undefined : v < 0 ? "red" : "green");
+const chgPct = (v: number) => ({ t: fmtP(v), c: !isBigChange(v) ? "nt" : v > 0 ? "up" : "dn" });
 export const DemoShopPage: React.FC<DemoShopProps> = ({ no, title, control, mixes, mixLabels, attribution, attributionTypes, yfbGmv, shopCur, shopPrev, window: w, traffic, inhouseLive = false, liveOnly = false, fallbackHeadline, insight }) => {
   const rows = (["daily", "camp", "all"] as const).map((k) => control.find((r) => r.key === k)).filter((r): r is ControlRow => !!r);
   const all = control.find((r) => r.key === "all");
@@ -208,10 +212,10 @@ export const DemoShopPage: React.FC<DemoShopProps> = ({ no, title, control, mixe
   const kpis: DemoKpi[] = [
     { label: `Total GMV · ${curLbl}`, value: shopCur ? fmtM(shopCur.gmv) : "—", note: shopChg != null ? `${fmtP(shopChg, 1)} ${t("so với", "vs")} ${prevLbl}` : t("chưa có số kỳ trước", "no previous-period data") },
     { label: t("Tỷ trọng livestream YFB", "YFB livestream share"), value: shareCur != null ? fmtP(shareCur, 1, false) : "—", note: sharePrev != null && shareCur != null ? `${prevLbl}: ${fmtP(sharePrev, 1, false)} (${shareCur - sharePrev < 0 ? "−" : "+"}${fmtFixed(Math.abs(shareCur - sharePrev), 1)} ${t("điểm", "pts")})` : "" },
-    { label: `${t("Lượt truy cập shop", "Shop visits")} · ${visRow ? controlLabel(visRow.key) : ""}`, value: visRow?.visitorsChg != null ? fmtP(visRow.visitorsChg) : "—", note: visRow?.cvrPrev != null && visRow.cvrCur != null ? `${t("CVR shop", "Shop CVR")} ${fmtP(visRow.cvrPrev, 2, false)} → ${fmtP(visRow.cvrCur, 2, false)}` : "", color: visRow?.visitorsChg != null ? (visRow.visitorsChg >= 0 ? "green" : "red") : undefined },
+    { label: `${t("Lượt truy cập shop", "Shop visits")} · ${visRow ? controlLabel(visRow.key) : ""}`, value: visRow?.visitorsChg != null ? fmtP(visRow.visitorsChg) : "—", note: visRow?.cvrPrev != null && visRow.cvrCur != null ? `${t("CVR shop", "Shop CVR")} ${fmtP(visRow.cvrPrev, 2, false)} → ${fmtP(visRow.cvrCur, 2, false)}` : "", color: chgColor(visRow?.visitorsChg) },
     inhouseLive
       ? { label: t("Brand tự live (Seller LIVE ngoài phiên YFB)", "Brand in-house live (Seller LIVE outside YFB sessions)"), value: own ? fmtM(own[1]) : "—", note: own ? `${prevLbl}: ${fmtM(own[0])}${ownChg != null ? ` (${fmtP(ownChg)})` : ""}` : "" }
-      : { label: "Affiliate LIVE", value: affChg != null ? fmtP(affChg) : "—", note: aff[0] != null && aff[1] != null ? `${m1(aff[0])} → ${m1(aff[1])}` : "", color: affChg != null ? (affChg >= 0 ? "green" : "red") : undefined }
+      : { label: "Affiliate LIVE", value: affChg != null ? fmtP(affChg) : "—", note: aff[0] != null && aff[1] != null ? `${m1(aff[0])} → ${m1(aff[1])}` : "", color: chgColor(affChg) }
   ];
   const headline = rows.length
     ? rows
@@ -243,9 +247,9 @@ export const DemoShopPage: React.FC<DemoShopProps> = ({ no, title, control, mixe
     const [verdict, k] = v ? VERDICT[v] : [t("chưa đủ số", "not enough data"), "m"];
     return [
       `${controlLabel(r.key)} · ${r.days} ${t("ngày", "days")}`,
-      r.liveChg != null ? ch(fmtP(r.liveChg), 10) : "—",
-      r.restChg != null ? ch(fmtP(r.restChg), 10) : "—",
-      r.visitorsChg != null ? ch(fmtP(r.visitorsChg), 10) : "—",
+      r.liveChg != null ? chgPct(r.liveChg) : "—",
+      r.restChg != null ? chgPct(r.restChg) : "—",
+      r.visitorsChg != null ? chgPct(r.visitorsChg) : "—",
       r.cvrPrev != null && r.cvrCur != null ? `${fmtP(r.cvrPrev, 2, false)} → ${fmtP(r.cvrCur, 2, false)}` : "—",
       W(pill(verdict, k))
     ];
@@ -413,7 +417,6 @@ export interface DemoWhyProps {
   windowLabel: string;
   prevShort: string;
   stats: { prev: WhyStats; cur: WhyStats };
-  band: number | null;
   drivers: DriverBreakdown | null;
   driverLabels: { from: string; to: string };
   funnel: { impressions: FunnelStageLite; views: FunnelStageLite; productImpressions: FunnelStageLite; productClicks: FunnelStageLite; orders: FunnelStageLite } | null;
@@ -428,12 +431,13 @@ const FACTOR_ORDER = DAY_TYPE_FACTORS;
 const TAB_CLS: Record<string, string> = { daily: "g-daily", dday: "g-dday", midmonth: "g-mm", payday: "g-pd" };
 const ABS_ORDER = ["gmv", "hours", "gmvPerHour", "err", "viewsPerHour", "liveCtr", "ctor", "aov", "upt"];
 
-const FunnelPanel: React.FC<{ funnel: NonNullable<DemoWhyProps["funnel"]>; band: number | null; prevShort: string }> = ({ funnel, band, prevShort }) => {
+const FunnelPanel: React.FC<{ funnel: NonNullable<DemoWhyProps["funnel"]>; prevShort: string }> = ({ funnel, prevShort }) => {
   const [mode, setMode] = useState<"p" | "i">("p");
   const { impressions: im, views: vw, productImpressions: pi, productClicks: pc, orders: od } = funnel;
   const chg = (p: number, c: number) => (p > 0 ? (c / p - 1) * 100 : null);
   const rate = (n: number, d: number) => (d > 0 ? (n / d) * 100 : null);
-  const sig = (v: number | null) => v != null && band != null && Math.abs(v) > band;
+  const sig = isBigChange;
+  const down = (i: number) => i < 100 && isBigChange(i - 100);
   const ratio = [
     { n: METRIC.err, d: "Views ÷ LIVE impressions", p: rate(vw.prev, im.prev), c: rate(vw.cur, im.cur) },
     { n: METRIC.liveCtr, d: "Product clicks ÷ Views", p: rate(pc.prev, vw.prev), c: rate(pc.cur, vw.cur) },
@@ -442,13 +446,14 @@ const FunnelPanel: React.FC<{ funnel: NonNullable<DemoWhyProps["funnel"]>; band:
   const stages = [im, vw, pc, od];
   const ratioFor = [ratio[0], ratio[1], ratio[2]];
   const idx = (s: FunnelStageLite) => (s.prev > 0 ? (s.cur / s.prev) * 100 : 0);
-  const chgCls = (v: number | null, neutral: boolean) => (v == null || neutral ? "nt" : sig(v) ? (v > 0 ? "up" : "dn") : "nt");
+  const chgCls = (v: number | null, neutral: boolean) => (v == null || neutral || !sig(v) ? "nt" : v > 0 ? "up" : "dn");
+  const productCtrChg = rate(pc.prev, pi.prev) && rate(pc.cur, pi.cur) ? ((rate(pc.cur, pi.cur) as number) / (rate(pc.prev, pi.prev) as number) - 1) * 100 : null;
   const hbHtml = hbars(
     [
       { name: im.label, sub: `${fmtM(im.prev)} → ${fmtM(im.cur)}`, value: idx(im), text: String(Math.round(idx(im))), cls: idx(im) > 100 ? "blue" : "" },
-      { name: vw.label, sub: `${nf(vw.prev)} → ${nf(vw.cur)}`, value: idx(vw), text: String(Math.round(idx(vw))), cls: idx(vw) < 97 ? "red" : "" },
+      { name: vw.label, sub: `${nf(vw.prev)} → ${nf(vw.cur)}`, value: idx(vw), text: String(Math.round(idx(vw))), cls: down(idx(vw)) ? "red" : "" },
       { name: pi.label, sub: `${fmtM(pi.prev)} → ${fmtM(pi.cur)}`, value: idx(pi), text: String(Math.round(idx(pi))), dim: true },
-      { name: pc.label, sub: `${nf(pc.prev)} → ${nf(pc.cur)}`, value: idx(pc), text: String(Math.round(idx(pc))), cls: idx(pc) < 97 ? "red" : "" },
+      { name: pc.label, sub: `${nf(pc.prev)} → ${nf(pc.cur)}`, value: idx(pc), text: String(Math.round(idx(pc))), cls: down(idx(pc)) ? "red" : "" },
       { name: od.label, sub: `${nf(od.prev)} → ${nf(od.cur)}`, value: idx(od), text: String(Math.round(idx(od))), dim: true }
     ].map((r) => ({ ...r, mark: 100 })),
     Math.max(120, Math.ceil(Math.max(...[im, vw, pi, pc, od].map(idx)) / 10) * 10 + 7)
@@ -457,7 +462,7 @@ const FunnelPanel: React.FC<{ funnel: NonNullable<DemoWhyProps["funnel"]>; band:
     [t("Tỷ lệ", "Rate"), prevShort, t("Tháng này", "This month"), "±"],
     [
       [`${METRIC.err} (Views ÷ LIVE impressions)`, pct1(ratio[0].p ?? 0), { t: pct1(ratio[0].c ?? 0), c: chgCls(ratio[0].chg, false) }, { t: sgn(ratio[0].chg), c: chgCls(ratio[0].chg, false) }],
-      ["Product CTR", pct1(rate(pc.prev, pi.prev) ?? 0), pct1(rate(pc.cur, pi.cur) ?? 0), { t: sgn(rate(pc.prev, pi.prev) && rate(pc.cur, pi.cur) ? ((rate(pc.cur, pi.cur) as number) / (rate(pc.prev, pi.prev) as number) - 1) * 100 : null), c: "nt" }],
+      ["Product CTR", pct1(rate(pc.prev, pi.prev) ?? 0), pct1(rate(pc.cur, pi.cur) ?? 0), { t: sgn(productCtrChg), c: chgCls(productCtrChg, false) }],
       [`${METRIC.ctor} (Orders ÷ Product clicks)`, pct1(ratio[2].p ?? 0), { t: pct1(ratio[2].c ?? 0), c: chgCls(ratio[2].chg, false) }, { t: sgn(ratio[2].chg), c: chgCls(ratio[2].chg, false) }]
     ]
   );
@@ -481,7 +486,7 @@ const FunnelPanel: React.FC<{ funnel: NonNullable<DemoWhyProps["funnel"]>; band:
                   <div className="n">{s.label}</div>
                   <div className="v">{nf(s.cur)}</div>
                   <div className="p">{prevShort}: {nf(s.prev)}</div>
-                  <div className={i === 0 && c != null && c > 0 ? "up" : "nt"} style={{ marginTop: 6, fontSize: 12 }}>{sgn(c)}</div>
+                  <div className={i === 0 && c != null && c > 0 && sig(c) ? "up" : "nt"} style={{ marginTop: 6, fontSize: 12 }}>{sgn(c)}</div>
                 </div>
                 {r && (
                   <div className={`arw${rs ? " sig" : ""}`}>
@@ -489,7 +494,7 @@ const FunnelPanel: React.FC<{ funnel: NonNullable<DemoWhyProps["funnel"]>; band:
                     <div className="rt">{fmtP(r.c ?? 0, i === 1 ? 1 : 2, false)}</div>
                     <div className="ar">→</div>
                     <div>{prevShort}: {fmtP(r.p ?? 0, i === 1 ? 1 : 2, false)}</div>
-                    <div className={rs ? "dn" : (r.chg ?? 0) > 0 ? "up" : "nt"} style={{ fontWeight: 700 }}>{sgn(r.chg)}{rs ? t(" · vượt ngưỡng", " · beyond range") : ""}</div>
+                    <div className={chgCls(r.chg, false)} style={{ fontWeight: 700 }}>{sgn(r.chg)}</div>
                   </div>
                 )}
               </React.Fragment>
@@ -506,22 +511,25 @@ const FunnelPanel: React.FC<{ funnel: NonNullable<DemoWhyProps["funnel"]>; band:
   );
 };
 
-export const DemoWhyPage: React.FC<DemoWhyProps> = ({ no, title, fallbackHeadline, windowLabel, prevShort, stats, band, drivers, driverLabels, funnel, dayRows, keyMonths, monthShort, insight }) => {
+export const DemoWhyPage: React.FC<DemoWhyProps> = ({ no, title, fallbackHeadline, windowLabel, prevShort, stats, drivers, driverLabels, funnel, dayRows, keyMonths, monthShort, insight }) => {
   const c = (p: number | null, q: number | null) => pctOf(p, q);
   const gph = c(stats.prev.gmvPerHour, stats.cur.gmvPerHour), vph = c(stats.prev.viewsPerHour, stats.cur.viewsPerHour), err = c(stats.prev.err, stats.cur.err), ctor = c(stats.prev.ctor, stats.cur.ctor);
-  const sig = (v: number | null) => v != null && band != null && Math.abs(v) > band;
-  const col = (v: number | null): "red" | "green" | undefined => (v == null ? undefined : v < 0 ? "red" : "green");
+  const col = (v: number | null): "red" | "green" | undefined => (v == null || !isBigChange(v) ? undefined : v < 0 ? "red" : "green");
   const kpis: DemoKpi[] = [
     { label: METRIC.gmvPerHour, value: stats.cur.gmvPerHour != null ? fmtM(stats.cur.gmvPerHour) : "—", note: `${sgn(gph)} ${t("so với", "vs")} ${prevShort}`, color: col(gph) },
-    { label: METRIC.viewsPerHour, value: stats.cur.viewsPerHour != null ? nf(stats.cur.viewsPerHour) : "—", note: `${sgn(vph)}${band != null ? ` · ${t("ngưỡng", "range")} ±${Math.round(band)}%` : ""}`, color: col(vph) },
-    { label: METRIC.err, value: stats.cur.err != null ? pct1(stats.cur.err) : "—", note: `${sgn(err)}${sig(err) ? (err! < 0 ? t(" · giảm có ý nghĩa", " · significant decline") : t(" · tăng có ý nghĩa", " · significant increase")) : ""}`, color: col(err) },
+    { label: METRIC.viewsPerHour, value: stats.cur.viewsPerHour != null ? nf(stats.cur.viewsPerHour) : "—", note: `${sgn(vph)} ${t("so với", "vs")} ${prevShort}`, color: col(vph) },
+    { label: METRIC.err, value: stats.cur.err != null ? pct1(stats.cur.err) : "—", note: `${sgn(err)} ${t("so với", "vs")} ${prevShort}`, color: col(err) },
     { label: METRIC.ctor, value: stats.cur.ctor != null ? pct1(stats.cur.ctor) : "—", note: `${sgn(ctor)} ${t("so với", "vs")} ${stats.prev.ctor != null ? pct1(stats.prev.ctor) : "—"}`, color: col(ctor) }
   ];
-  // tiêu đề kết luận: bước nghẽn = yếu tố đóng góp âm lớn nhất
-  const worst = drivers ? [...drivers.parts].filter((x) => x.key !== "hours").sort((x, y) => x.value - y.value)[0] : null;
-  const headline = drivers && worst && worst.value < 0
-    ? t(`${METRIC.gmvPerHour} ${sgn(gph)}: yếu tố hiệu suất kéo giảm nhiều nhất là ${DRIVER_LABEL[worst.key]} (${fmtP(worst.change)}, ${M(worst.value)})`, `${METRIC.gmvPerHour} ${sgn(gph)}: the performance factor pulling it down most is ${DRIVER_LABEL[worst.key]} (${fmtP(worst.change)}, ${M(worst.value)})`)
-    : fallbackHeadline;
+  const headline =
+    (drivers &&
+      whyHeadline({
+        metric: METRIC.gmvPerHour,
+        gmvPerHourChange: gph,
+        parts: drivers.parts.map((x) => ({ key: x.key, label: DRIVER_LABEL[x.key], value: x.value, change: x.change })),
+        days: dayRows.filter((r) => r.significant && r.change.gmvPerHour != null).map((r) => ({ label: DAY_TYPE_SHORT[r.key], change: r.change.gmvPerHour! }))
+      })) ||
+    fallbackHeadline;
 
   let bridge = "";
   if (drivers) {
@@ -540,27 +548,26 @@ export const DemoWhyPage: React.FC<DemoWhyProps> = ({ no, title, fallbackHeadlin
   // Thay đổi các yếu tố theo loại ngày
   const dayHtml = dayRows.length
     ? tbl(
-        [t("Loại ngày", "Day type"), METRIC.liveHours, METRIC.viewsPerHour, METRIC.liveCtr, METRIC.ctor, METRIC.aov, METRIC.gmvPerHour, t("Ngưỡng", "Range"), t("Đánh giá", "Assessment")],
+        [t("Loại ngày", "Day type"), METRIC.liveHours, METRIC.viewsPerHour, METRIC.liveCtr, METRIC.ctor, METRIC.aov, METRIC.gmvPerHour, t("Đánh giá", "Assessment")],
         dayRows.map((r) => {
           const gp = r.change.gmvPerHour;
           const [verdict, k] =
-            r.band == null
+            r.sessionsPrev === 0 || r.sessionsCur === 0
               ? [t("chưa đủ phiên", "not enough sessions"), "m"]
               : r.significant
-                ? [(gp ?? 0) < 0 ? t("giảm có ý nghĩa", "significant decline") : t("tăng có ý nghĩa", "significant increase"), (gp ?? 0) < 0 ? "r" : "g"]
-                : [t("trong ngưỡng dao động", "within normal range"), "m"];
+                ? [(gp ?? 0) < 0 ? t("giảm từ 10%", "down 10% or more") : t("tăng từ 10%", "up 10% or more"), (gp ?? 0) < 0 ? "r" : "g"]
+                : [t("đổi dưới 10%", "changed under 10%"), "m"];
           return [
             `${DAY_TYPE_SHORT[r.key]}<br><span class="nt" style="font-size:11px">${r.sessionsPrev} → ${r.sessionsCur} ${t("phiên", "sessions")}</span>`,
             ...FACTOR_ORDER.map((f, i) => {
               const v = r.change[f];
               if (v == null) return "—";
-              return { t: fmtP(v), c: "hm", s: (i === 0 ? heat(v, 40, BLUE, BLUE) : heat(v, 30)) + (i > 0 && r.band != null && Math.abs(v) > r.band ? ";box-shadow:inset 0 0 0 1.5px var(--cream);font-weight:800" : "") };
+              return { t: fmtP(v), c: "hm", s: !isBigChange(v) ? "" : i === 0 ? heat(v, 40, BLUE, BLUE) : heat(v, 30) + ";box-shadow:inset 0 0 0 1.5px var(--cream);font-weight:800" };
             }),
-            r.band != null ? `±${Math.round(r.band)}%` : "—",
             W(pill(verdict, k))
           ];
         }),
-        [8]
+        [7]
       )
     : "";
 
@@ -584,8 +591,8 @@ export const DemoWhyPage: React.FC<DemoWhyProps> = ({ no, title, fallbackHeadlin
                     const txt = cell.value != null ? fmtKeyMetric(def(r.key), cell.value) : "—";
                     if (i === 0) return `<td class="cellc base gs ${TAB_CLS[t]}">${txt}</td>`;
                     const v = cell.change;
-                    const neutral = r.key === "hours";
-                    const st = v == null ? "" : (neutral ? heat(v, 40, BLUE, BLUE) : heat(v, 30)) + (cell.significant ? ";box-shadow:inset 0 0 0 1.5px var(--cream);font-weight:800" : "");
+                    const neutral = r.key === "hours" || !!def(r.key).volume;
+                    const st = v == null || !isBigChange(v) ? "" : (neutral ? heat(v, 40, BLUE, BLUE) : heat(v, 30)) + (cell.significant ? ";box-shadow:inset 0 0 0 1.5px var(--cream);font-weight:800" : "");
                     return `<td class="cellc" style="${st}">${txt}${v != null ? `<small>${fmtP(v)}</small>` : ""}</td>`;
                   })
                   .join("")
@@ -606,12 +613,12 @@ export const DemoWhyPage: React.FC<DemoWhyProps> = ({ no, title, fallbackHeadlin
           <div className="pns">GMV = {METRIC.liveHours} × {METRIC.viewsPerHour} × {METRIC.liveCtr} × {METRIC.ctor} × {METRIC.aov} · {windowLabel} · {t("5 phần cộng đúng mức thay đổi.", "the 5 parts add up exactly to the change.")}</div>
           {bridge ? <Html html={bridge} /> : <p className="pns">{t("Chưa đủ số của cả 2 kỳ (Giờ live, Views, Product clicks, Orders) để tách nguyên nhân.", "Not enough data in both periods (live hours, Views, Product clicks, Orders) to separate causes.")}</p>}
         </div>
-        {funnel && <FunnelPanel funnel={funnel} band={band} prevShort={prevShort} />}
+        {funnel && <FunnelPanel funnel={funnel} prevShort={prevShort} />}
       </div>
       {dayHtml && (
         <div className="pn">
           <div className="pnh">{t("Thay đổi các yếu tố theo loại ngày", "Factor changes by day type")}</div>
-          <div className="pns">{t("% thay đổi tháng này so với tháng trước; mỗi loại ngày so với chính nó theo lịch Campaign. Viền sáng = vượt ngưỡng dao động.", "% change this month vs last month; each day type compared with itself per the Campaign calendar. Bright border = beyond normal range.")}</div>
+          <div className="pns">{t("% thay đổi tháng này so với tháng trước; mỗi loại ngày so với chính nó theo lịch Campaign. Chỉ tô ô đổi từ 10% trở lên.", "% change this month vs last month; each day type compared with itself per the Campaign calendar. Only changes of 10% or more are coloured.")}</div>
           <Tbl html={dayHtml} />
           <div className="legend"><span>{t(`Màu xanh: tăng · màu đỏ: giảm · màu xanh dương: ${METRIC.liveHours} (do lịch quyết định, không đánh giá tốt hay xấu)`, `Green: up · red: down · blue: ${METRIC.liveHours} (set by the schedule, not rated good or bad)`)}</span></div>
         </div>
@@ -621,16 +628,16 @@ export const DemoWhyPage: React.FC<DemoWhyProps> = ({ no, title, fallbackHeadlin
           <div className="pnh">{t("Số đo từng loại ngày", "Measures by day type")}</div>
           <div className="pns">
             {t(
-              `Mỗi ô tô màu theo mức thay đổi so với tháng trước (xanh tăng, đỏ giảm, đậm hơn khi thay đổi lớn); viền sáng = vượt ngưỡng dao động. Mỗi loại ngày là một nhóm cột ${keyMonths.map((m) => monthShort(m.month)).join(", ")} cùng màu nhận diện.`,
-              `Each cell is coloured by its change vs last month (green up, red down, darker for larger changes); bright border = beyond normal range. Each day type is a group of ${keyMonths.map((m) => monthShort(m.month)).join(", ")} columns in its own colour.`
+              `Ô đổi từ 10% trở lên so với tháng trước được tô (xanh tăng, đỏ giảm, đậm hơn khi thay đổi lớn). Mỗi loại ngày là một nhóm cột ${keyMonths.map((m) => monthShort(m.month)).join(", ")} cùng màu nhận diện.`,
+              `Cells that changed 10% or more vs last month are coloured (green up, red down, darker for larger changes). Each day type is a group of ${keyMonths.map((m) => monthShort(m.month)).join(", ")} columns in its own colour.`
             )}
           </div>
           <div className="tw"><table id="dayAbs" className="vt" dangerouslySetInnerHTML={{ __html: absHtml }} /></div>
           <div className="legend">
             <span>
               {t(
-                `${keyMonths[1] ? monthShort(keyMonths[1].month) : ""} tô màu theo thay đổi so với ${first}, ${keyMonths[2] ? `${monthShort(keyMonths[2].month)} theo thay đổi so với ${monthShort(keyMonths[1].month)}` : ""} · ${first} là mốc, không tô · viền sáng = vượt ngưỡng dao động · xanh dương = ${METRIC.liveHours}`,
-                `${keyMonths[1] ? monthShort(keyMonths[1].month) : ""} coloured by change vs ${first}${keyMonths[2] ? `, ${monthShort(keyMonths[2].month)} by change vs ${monthShort(keyMonths[1].month)}` : ""} · ${first} is the baseline, not coloured · bright border = beyond normal range · blue = ${METRIC.liveHours}`
+                `${keyMonths[1] ? monthShort(keyMonths[1].month) : ""} tô màu theo thay đổi so với ${first}, ${keyMonths[2] ? `${monthShort(keyMonths[2].month)} theo thay đổi so với ${monthShort(keyMonths[1].month)}` : ""} · ${first} là mốc, không tô · chỉ tô khi đổi từ 10% · xanh dương = ${METRIC.liveHours}`,
+                `${keyMonths[1] ? monthShort(keyMonths[1].month) : ""} coloured by change vs ${first}${keyMonths[2] ? `, ${monthShort(keyMonths[2].month)} by change vs ${monthShort(keyMonths[1].month)}` : ""} · ${first} is the baseline, not coloured · coloured only from 10% · blue = ${METRIC.liveHours}`
               )}
             </span>
           </div>

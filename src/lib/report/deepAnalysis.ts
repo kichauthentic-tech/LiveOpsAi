@@ -71,9 +71,22 @@ export interface GiftStats {
   uptShop: number;
 }
 
-/** Đơn cả shop lấy từ Shop Analytics cắt ĐÚNG kỳ file Sản Phẩm (file Sản Phẩm là tổng cả kỳ, không cắt ngày được). */
+/** File Shop Analytics thiếu ngày so với kỳ file Sản Phẩm ⇒ trả ngày cuối của hai file; đủ ngày hoặc thiếu hẳn một file ⇒ null.
+ *  File Sản Phẩm là tổng cả kỳ nên lúc này không chia được: món của N ngày ÷ đơn của ít hơn N ngày làm UPT đội lên
+ *  (VERA T10: file Sản Phẩm 1–29, file shop 1–25 ⇒ UPT ra 1,63, cao hơn thật khoảng 16%). */
+export function giftCoverageGap(gift: GiftSlice | null | undefined, shop: ShopDaysMonthSlice | null | undefined): { shopThrough: string | null; productThrough: string; missingDays: number } | null {
+  if (!gift?.hasAnyBatch || !gift.periodStart || !gift.periodEnd || !shop?.hasAnyBatch) return null;
+  const have = new Set(shop.days.filter((d) => d.date >= gift.periodStart! && d.date <= gift.periodEnd!).map((d) => d.date));
+  const span = Math.round((Date.parse(gift.periodEnd) - Date.parse(gift.periodStart)) / 86_400_000) + 1;
+  if (have.size >= span) return null;
+  return { shopThrough: [...have].sort().pop() ?? null, productThrough: gift.periodEnd, missingDays: span - have.size };
+}
+
+/** Đơn cả shop lấy từ Shop Analytics cắt ĐÚNG kỳ file Sản Phẩm (file Sản Phẩm là tổng cả kỳ, không cắt ngày được).
+ *  File shop không phủ đủ kỳ đó ⇒ null (xem giftCoverageGap). */
 export function giftStats(gift: GiftSlice | null | undefined, shop: ShopDaysMonthSlice | null | undefined): GiftStats | null {
   if (!gift?.hasAnyBatch || !gift.periodStart || !gift.periodEnd || !shop?.hasAnyBatch) return null;
+  if (giftCoverageGap(gift, shop)) return null;
   const orders = shop.days.filter((d) => d.date >= gift.periodStart! && d.date <= gift.periodEnd!).reduce((a, d) => a + d.orders, 0);
   if (orders <= 0 || gift.items <= 0) return null;
   return {
