@@ -21,7 +21,7 @@ import { adsTypeRows } from "../../lib/report/adsSlide";
 import { BookingPlanPanel, LIVE_TARGET_MANUAL_KEY, NextLivePlanPanel, decodeLiveTarget, encodeLiveTarget } from "./report/NextMonthPanels";
 import { REFUND_FINAL_KEY, applyFinalRate, bookingTotals, decodeRefundFinal, encodeRefundFinal, planGaps, planSums, refundTrackRows } from "../../lib/report/nextMonthPlan";
 import { BLOCK_KEYS, BLOCK_LABEL, decodeEdits, shownBlocks, type InsightBlocks, adsBlocks, affiliateBlocks, keyMetricsBlocks, nextBlocks, nmvBlocks, pageNoteKey, peopleBlocks, productsBlocks, shopBlocks, summaryBlocks, whyBlocks, whyMainMetric, type InsightPage, type WhyInsightInput } from "../../lib/report/pageInsights";
-import { contextInsight, HostInsightRow, hostVsPeer, InsightSection, peopleInsight, peopleOpsNote, productsInsight, sectionNextSteps, SectionInsight, shopInsight, shortSku, whyInsight } from "../../lib/report/sectionInsights";
+import { contextInsight, HostInsightRow, hostVsPeer, InsightSection, peopleInsight, peopleOpsNote, productsInsight, sectionNextSteps, SectionInsight, shopInsight, shortSku, chartSkuLabel, whyInsight } from "../../lib/report/sectionInsights";
 import { CAMP_DAY_BUCKET_LABEL, CAMP_DAY_BUCKET_ORDER, effectiveCamp, resolveCampBucketType, type CampDayBucket, type CampOverrides } from "../../lib/campaignDays";
 import { liveFunnel, sessionSpread } from "../../lib/report/rhythm";
 import { adsMonthStats, adsPrevSameCut } from "../../lib/dataraw/adsCampaignOverview";
@@ -665,7 +665,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     () =>
       (skuMoveData?.rows ?? [])
         .filter((r) => r.ctr != null && r.ctor != null)
-        .map((r) => ({ key: r.name, label: shortSku(r.name), x: r.ctr!, y: r.ctor!, size: r.gmv, tone: r.prevRank == null ? "flat" : r.rank < r.prevRank ? "up" : r.rank > r.prevRank ? "down" : "flat" })),
+        .map((r) => ({ key: r.name, label: chartSkuLabel(r.name), full: shortSku(r.name), x: r.ctr!, y: r.ctor!, size: r.gmv, tone: r.prevRank == null ? "flat" : r.rank < r.prevRank ? "up" : r.rank > r.prevRank ? "down" : "flat" })),
     [skuMoveData]
   );
   // Phần 5 — so mặt bằng tháng này (cột phụ) theo loại ngày.

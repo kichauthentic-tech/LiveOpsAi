@@ -29,7 +29,7 @@ import { changeTone } from "../../lib/report/brandReport";
 import { isBigChange } from "../../lib/report/changeThreshold";
 import { skuImageKey, type ScatterPoint } from "../../lib/report/reportVisuals";
 import { hostReliability, isBorderline, reliabilityText } from "../../lib/report/deepAnalysis";
-import { hostVsPeer, type HostInsightRow } from "../../lib/report/sectionInsights";
+import { chartSkuLabel, hostVsPeer, type HostInsightRow } from "../../lib/report/sectionInsights";
 import { byHost, byHostDayType, dayTypeTeamTotals, dataQuality, filterSessions, splitUnassignedHost } from "../../lib/performance/hostPerformance";
 import { platformOf } from "../../lib/reportPlatform";
 import { cancelledPlan } from "../../lib/performance/planRunRate";
@@ -343,7 +343,7 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
     const clicks = rows.reduce((a, r) => a + (byName.get(r.name)?.clicks ?? 0), 0);
     return rows
       .filter((r) => r.ctor != null && (byName.get(r.name)?.clicks ?? 0) > 0 && clicks > 0)
-      .map((r) => ({ key: r.name, label: r.name, x: ((byName.get(r.name)!.clicks) / clicks) * 100, y: r.ctor!, size: r.gmv, tone: r.prevRank == null ? "flat" : r.rank < r.prevRank ? "up" : r.rank > r.prevRank ? "down" : "flat" }));
+      .map((r) => ({ key: r.name, label: chartSkuLabel(r.name), full: r.name, x: ((byName.get(r.name)!.clicks) / clicks) * 100, y: r.ctor!, size: r.gmv, tone: r.prevRank == null ? "flat" : r.rank < r.prevRank ? "up" : r.rank > r.prevRank ? "down" : "flat" }));
   }, [sku, s.products.top]);
   const skuCur = useMemo(() => shopeeSkuSlices(s, cut).cur, [s, cut]);
   const productsData: ProductsPageData = {

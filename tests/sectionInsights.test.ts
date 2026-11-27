@@ -12,6 +12,7 @@ import {
   sectionNextSteps,
   shopInsight,
   shortSku,
+  chartSkuLabel,
   whyInsight
 } from "../src/lib/report/sectionInsights";
 
@@ -125,8 +126,8 @@ test("Hàng — SKU dẫn đầu giảm mạnh: nêu ở kết luận, không l�
       row("Bella - Winter White - 210062-11S", 10, 6, 180_400_000, -15.2, 3.16, 1.23)
     ],
     perDay: true,
-    curDays: 22,
     gmvNotComparable: false,
+    curDays: 22,
     prevDays: 31,
     prevLimit: 30
   };
@@ -220,4 +221,23 @@ test("Việc cần làm của các phần gom về phần 7, bỏ việc autoNex
   const noOps = sectionNextSteps({ ...all, shop: ins("Tỷ trọng Affiliate LIVE giảm — rà lịch creator và gói hỗ trợ affiliate cho tháng sau.") }, null);
   expect(noOps).toHaveLength(3);
   expect(noOps.join("\n")).not.toMatch(/traffic/);
+});
+
+test("chartSkuLabel: tên Fujiwa rút còn quy cách + dòng SP + dung tích, không trùng nhau", () => {
+  const cases: [string, string][] = [
+    ["Thùng 24 Chai Nước Ion Kiềm Fujiwa 450mL Cân Bằng Ph Tự Nhiên Bù Khoáng Và Thanh Lọc Cơ Thể", "T24 Ion Kiềm 450"],
+    ["Thùng 24 Chai Nước Tinh Khiết Fujiwa 450mL Nguồn Nước Tinh Khiết Phù Hợp", "T24 Tinh Khiết 450"],
+    ["Thùng 24 Chai Nước Ion Fujiwa Speed 550mL Bổ Sung Khoáng, Hồi Phục Năng Lượng Nhanh", "T24 Ion Speed 550"],
+    ["Thùng 12 Chai Nước Ion Kiềm Fujiwa 1250mL Cân Bằng Ph", "T12 Ion Kiềm 1250"],
+    ["Hộp 12 Túi Nước Giàu Canxi Fujiwa 270mL Bổ Sung Canxi", "H12 Canxi 270"],
+    ["Hộp 12 Túi Nước Giàu Hydrogen Fujiwa 270Ml Bảo Vệ Tế Bào", "H12 Hydrogen 270"],
+    ["Thùng 48 Túi Nước Giàu Hydrogen Fujiwa 270mL Bảo Vệ Tế Bào", "T48 Hydrogen 270"],
+    ["Nước Súc Miệng Fujisalt Chai 680mL (Thùng 12 Chai) Kháng Khuẩn", "T12 Súc Miệng Fujisalt 680"],
+    ["Combo 2 Bình Nước Ion Kiềm Fujiwa 6L Cân Bằng Ph Tự Nhiên", "C2 Bình Ion Kiềm 6L"]
+  ];
+  for (const [full, short] of cases) expect(chartSkuLabel(full)).toBe(short);
+  // chạy lại trên nhãn đã rút phải giữ nguyên (ProductsPage gọi chartSkuLabel lần nữa)
+  expect(chartSkuLabel("C2 Bình Ion Kiềm 6L")).toBe("C2 Bình Ion Kiềm 6L");
+  // tên không có dung tích (CROCS…) giữ cách cắt cũ
+  expect(chartSkuLabel("Classic - Bone - 10001-2Y2")).toBe("Classic Bone");
 });

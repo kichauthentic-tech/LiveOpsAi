@@ -321,9 +321,36 @@ export function peopleOpsNote(hosts: HostInsightRow[], rel: HostReliability[] = 
 /** "Classic - Bone - 10001-2Y2" → "Classic - Bone" (mã hàng ở cuối chỉ làm câu dài). */
 export const shortSku = (name: string) => name.replace(/\s*-\s*[\w-]*\d[\w-]*$/, "").trim() || name;
 
+/** Mã quy cách: tên sàn hay mở đầu bằng "Thùng 24 Chai…", "Hộp 12 Túi…" — nhãn chart chỉ giữ chữ cái đầu + số lượng. */
+const PACK_CODE: Record<string, string> = { thùng: "T", hộp: "H", lốc: "L", combo: "C", set: "S", bộ: "B" };
+/** Từ chung không giúp phân biệt SKU trên chart (đơn vị đựng, nhãn hiệu, lời quảng cáo ngắn). */
+const LABEL_FILLER = new Set(["chai", "túi", "lon", "cái", "gói", "nước", "giàu", "bổ", "sung", "trải", "nghiệm", "fujiwa", "chính", "hãng", "hương", "the", "mát", "1"]);
+const VOLUME_RE = /\b(\d+(?:[.,]\d+)?)\s?(ml|l|g|kg)\b/i;
+
+/** Nhãn ngắn kiểu "T24 Ion Kiềm 450": quy cách + dòng SP + dung tích; phần quảng cáo sau dung tích bỏ hẳn. Trả null nếu tên không có dung tích (để rơi về cách cắt cũ). */
+const packedSkuLabel = (base: string): string | null => {
+  const vol = VOLUME_RE.exec(base);
+  if (!vol) return null;
+  let head = base.slice(0, vol.index).trim();
+  let pack = "";
+  const paren = /\((thùng|hộp|lốc|set|bộ)\s+(\d+)[^)]*\)/i.exec(base.slice(vol.index));
+  if (paren) pack = `${PACK_CODE[paren[1].toLowerCase()]}${paren[2]}`;
+  const lead = /^(thùng|hộp|lốc|combo|set|bộ)\s+(\d+)\s+/i.exec(head);
+  if (lead) {
+    pack = `${PACK_CODE[lead[1].toLowerCase()]}${lead[2]}`;
+    head = head.slice(lead[0].length);
+  }
+  const words = head.split(/\s+/).filter((w) => w && !LABEL_FILLER.has(w.toLowerCase()));
+  if (words.length === 0 && !pack) return null;
+  const size = vol[2].toLowerCase() === "ml" ? vol[1] : `${vol[1]}${vol[2].toUpperCase()}`;
+  return [pack, ...words, size].filter(Boolean).join(" ");
+};
+
 /** Nhãn ngắn cho điểm trên biểu đồ: tên dài (VERA, Misaki…) cắt còn ~max ký tự + mã sản phẩm (token có chữ+số như "M1016" hoặc ≥3 chữ số như "6323") để vẫn phân biệt được. Tên ngắn giữ nguyên. */
 export const chartSkuLabel = (name: string, max = 30) => {
   const base = shortSku(name).replace(/ - /g, " ").replace(/\s+/g, " ").trim();
+  const packed = packedSkuLabel(base);
+  if (packed && packed.length <= max + 8) return packed;
   if (base.length <= max) return base;
   const code = base.split(" ").find((t) => /^(?=.*\d)(?=.*[A-Za-z])[\w-]{3,}$/.test(t) || /^\d{3,}$/.test(t));
   const room = code ? max - code.length - 3 : max - 1;

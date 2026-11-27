@@ -141,6 +141,8 @@ export function heatColor(change: number | null, neutral: boolean, scale = 30): 
 export interface ScatterPoint {
   key: string;
   label: string;
+  /** Tên đầy đủ — hiện ở tooltip khi nhãn trên chart đã rút gọn. */
+  full?: string;
   x: number;
   y: number;
   /** Kích thước điểm (GMV hoặc số phiên). */

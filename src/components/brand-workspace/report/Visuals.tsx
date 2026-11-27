@@ -191,7 +191,7 @@ const ScatterBody: React.FC<{ points: ScatterPoint[]; x: ScatterAxis; y: Scatter
               if (!p) return null;
               return (
                 <div className="px-2.5 py-1.5 rounded-lg text-2xs" style={chartTooltipStyle}>
-                  <b>{p.label}</b>
+                  <b>{p.full ?? p.label}</b>
                   <div>{x.title}: {x.fmt(p.x)}</div>
                   <div>{y.title}: {y.fmt(p.y)}</div>
                 </div>
